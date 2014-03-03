@@ -11,7 +11,6 @@ creative output where copies of an original are the marketable good.
 ## Requirements
 
 - [Eris](https://github.com/erisproject/eris)
-
 - [gtkmm-3.0](http://www.gtkmm.org)
 
 ## License
