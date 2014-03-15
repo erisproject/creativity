@@ -6,7 +6,8 @@ flags = [
         '-Wall',
         '-Wextra',
         '-std=c++11',
-        '-I', '.'
+        '-I', '.',
+        '-I', 'build' # The pick up the generated creativity/config.hpp
         ]
 
 # Try to invoke pkg-config to get the addition include directories needed for
