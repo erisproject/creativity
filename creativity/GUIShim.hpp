@@ -24,8 +24,9 @@ class GUIShim : boost::noncopyable {
          */
         GUIShim(
                 /** The simulation object this GUI is for; the simulation is not expected to be
-                 * populated yet. */
-                Eris<Simulation> eris,
+                 * populated yet. Typically called with an Eris<Simulation> object (which is
+                 * castable to an std::shared_ptr) */
+                std::shared_ptr<Simulation> eris,
                 /** A function to call with the GUI simulation parameters (in a GUI.Parameters
                  * struct) when the user instructs (via the GUI) to start the simulation.  This
                  * function should set up the simulation but not start it: it will be followed
@@ -42,6 +43,9 @@ class GUIShim : boost::noncopyable {
                 std::function<void()> &stop
         );
 
+        /// Destructor: tells GUI to quit and rejoins GUI thread
+        ~GUIShim();
+
         /** Checks whether the GUI has generated any events and, if so, processes them.  If there
          * are no pending events, this returns immediately.
          */
@@ -55,13 +59,16 @@ class GUIShim : boost::noncopyable {
         /** Starts the GUI. */
         void start(int argc, char *argv[]);
 
-        /** Waits for the GUI thread to finish. */
-        void join();
+        /** Resynchronizes the simulation's agents into the GUI and tells the GUI to update its
+         * graph.
+         */
+        void sync();
 
     protected:
         /** Processes a single event from the event queue and call the appropriate handler. */
 //        processEvent()
 
+        std::shared_ptr<Simulation> sim_;
         GUI gui_;
 
 };

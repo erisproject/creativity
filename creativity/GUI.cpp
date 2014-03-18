@@ -17,6 +17,9 @@ GUI::Exception::Exception(const std::string &what) : std::runtime_error(what) {}
 GUI::GUI() {}
 
 void GUI::start(int argc, char *argv[]) {
+    if (gui_thread_)
+        throw std::runtime_error("GUI thread can only be started once!");
+
     auto app = Gtk::Application::create(argc, argv, "ca.imaginary.test.cairo-drawing",
             Gio::APPLICATION_NON_UNIQUE);
     auto builder = Gtk::Builder::create();
@@ -30,11 +33,16 @@ void GUI::start(int argc, char *argv[]) {
 
     builder->add_from_file(datadir + "/gui.glade"); // May throw exception
 
-    //thr_run(app, builder);
     gui_thread_.reset(new std::thread(&GUI::thr_run, this, app, builder));
+
+    // Wait for the thread to finish its startup
+    std::unique_lock<std::mutex> lock(mutex_);
+    cv_.wait(lock, [this]() -> bool { return thread_running_; });
+    lock.unlock();
 }
 
-void GUI::join() {
+void GUI::quit() {
+    quit_dispatcher_->emit();
     gui_thread_->join();
 }
 
@@ -42,66 +50,64 @@ void GUI::thr_run(decltype(Gtk::Application::create()) app, decltype(Gtk::Builde
     auto window = builder_widget<Gtk::Window>("window1", builder);
     auto vis = builder_widget<Gtk::Viewport>("view_vis", builder);
 
-    // DEBUG:
-    addPoint(4, 7, PointType::X);
-    addPoint(-4, -7, PointType::X);
-    addPoint(0, 3, PointType::X);
-    addPoint(9, -2, PointType::X);
-    addPoint(7, -2, PointType::X);
-    addPoint(5, -2, PointType::X);
-    addPoint(5, 1, PointType::X);
-    addPoint(-1, 0.09, PointType::X);
-    addPoint(2, 2, PointType::X);
+    // Lock access to everything until we're set up.  We'll unlock and notify on cv_ once the
+    // mainloop is running.
+    std::unique_lock<std::mutex> lock{mutex_};
 
-    addPoint(0.1, -0.2, PointType::SQUARE);
-    addCircle(0.1, -0.2, 2, CircleType::A);
-    addCircle(0.1, -0.2, 3, CircleType::B);
-    addCircle(0.1, -0.2, 4, CircleType::B);
-    addCircle(0.1, -0.2, 5, CircleType::B);
-    addCircle(0.1, -0.2, 6, CircleType::B);
+    graph_ = std::unique_ptr<GraphArea>(new GraphArea{10, 10, -10, -10, *this});
 
-    addPoint(-5, -5, PointType::SQUARE);
-    addCircle(-5, -5, 1.2, CircleType::A);
-    addCircle(-5, -5, 1, CircleType::B);
+    redraw_dispatcher_ = std::unique_ptr<Glib::Dispatcher>(new Glib::Dispatcher);
+    redraw_dispatcher_->connect([this] { graph_->queue_draw(); });
 
-    GraphArea area(10, 10, -10, -10, *this);
+    quit_dispatcher_ = std::unique_ptr<Glib::Dispatcher>(new Glib::Dispatcher);
+    quit_dispatcher_->connect([app] { app->quit(); });
 
-    vis->add(area);
-    area.show();
+    vis->add(*graph_);
+    graph_->show();
+
+    Glib::signal_idle().connect_once([this,&lock] {
+            thread_running_ = true;
+            lock.unlock();
+            cv_.notify_all();
+            });
 
     app->run(*window);
 }
 
 unsigned long GUI::addPoint(const double &x, const double &y, const PointType &type) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> guard(mutex_);
     points_.emplace(point_id_next_++, Point_{ .x=x, .y=y, .type=type });
     return point_id_next_-1;
 }
 
 bool GUI::removePoint(const unsigned long &id) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> guard(mutex_);
     return points_.erase(id) > 0;
 }
 
 void GUI::clearPoints() {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> guard(mutex_);
     points_.clear();
 }
 
 unsigned long GUI::addCircle(const double &cx, const double &cy, const double &r, const CircleType &type) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> guard(mutex_);
     circles_.emplace(circle_id_next_++, Circle_{ .cx=cx, .cy=cy, .r=r, .type=type });
     return circle_id_next_-1;
 }
 
 bool GUI::removeCircle(const unsigned long &id) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> guard(mutex_);
     return circles_.erase(id) > 0;
 }
 
 void GUI::clearCircles() {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::lock_guard<std::mutex> guard(mutex_);
     circles_.clear();
+}
+
+void GUI::redraw() {
+    redraw_dispatcher_->emit();
 }
 
 GUI::GraphArea::GraphArea(const double &top, const double &right, const double &bottom, const double &left, GUI &gui) :
@@ -142,15 +148,15 @@ bool GUI::GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
     cr->move_to(0, zero_y);
     cr->line_to(width, zero_y);
     cr->stroke();
+    cr->restore();
 
-    std::lock_guard<std::mutex> lock(gui_.mutex_);
+    std::lock_guard<std::mutex> guard(gui_.mutex_);
     for (auto &pt : gui_.points_)
         drawPoint(cr, pt.second, trans);
 
     for (auto &circ : gui_.circles_)
         drawCircle(cr, circ.second, trans);
 
-    cr->restore();
     return true;
 }
 
