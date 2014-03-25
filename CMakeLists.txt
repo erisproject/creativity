@@ -26,9 +26,8 @@ foreach(pkg ${creativity_pkgconfig})
     add_definitions(${${pkg}_CFLAGS_OTHER})
 endforeach()
 
-find_package(Boost REQUIRED)
-
-include_directories(${Boost_INCLUDE_DIRS})
+#find_package(Boost REQUIRED)
+#include_directories(${Boost_INCLUDE_DIRS})
 
 # Find library source/headers
 file(GLOB_RECURSE cr_libsrc creativity/*.cpp)

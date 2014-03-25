@@ -1,18 +1,35 @@
+#pragma once
 #include <eris/WrappedPositional.hpp>
 #include <eris/Good.hpp>
 
+using namespace eris;
+
 namespace creativity {
 
-class BookBase : public eris::Good::Discrete {
+class Reader; // forward-declaration
+
+class Book : public Positional<Good::Discrete> {
     public:
-        BookBase(double quality) : quality_(quality) {}
+        Book(Position p, SharedMember<Reader> r)
+            : Positional<Good::Discrete>(p), author_(r) {}
 
-        double quality() const { return quality_; }
+        /// Returns the age of the book, in simulation periods.
+        unsigned long age() {
+            return simulation()->t() - created_;
+        }
+
+        virtual void added() override {
+            created_ = simulation()->t();
+        }
+
+        SharedMember<Reader> author() {
+            return simAgent<Reader>(author_);
+        }
+
     private:
-        double quality_;
+        unsigned long created_;
+        eris_id_t author_;
 };
-
-typedef eris::WrappedPositional<BookBase> Book;
 
 }
 
