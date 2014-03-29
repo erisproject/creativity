@@ -1,17 +1,28 @@
 #include "creativity/GUI.hpp"
 #include "creativity/Reader.hpp"
 #include "creativity/Book.hpp"
+#include "creativity/common.hpp"
 #include <eris/Eris.hpp>
 #include <eris/Simulation.hpp>
 #include <eris/Random.hpp>
+#include <eris/intraopt/FixedIncome.hpp>
 #include <functional>
 #include <iostream>
 
 using namespace creativity;
-using namespace std::placeholders;
+using namespace eris;
 
 int main(int argc, char *argv[1]) {
     Eris<Simulation> sim;
+    MONEY = sim->create<Good::Continuous>();
+
+    ERIS_DBGVAR(MONEY);
+
+    SharedMember<Member> moneymem{MONEY};
+    ERIS_DBGVAR(moneymem);
+
+    SharedMember<Good::Continuous> moneyagain{moneymem};
+    ERIS_DBGVAR(moneyagain);
 
     bool setup = false, stopped = false, step = false, quit = false;
     unsigned long num_readers = 1000;
@@ -22,26 +33,50 @@ int main(int argc, char *argv[1]) {
     std::chrono::milliseconds redraw{50};
 
     // Set up handlers for user actions in the GUI
-    auto on_setup = [&](GUI::Parameters p) { // Setup
-        if (p.dimensions != 2)
-            throw std::domain_error{"Cannot yet handle dimensions != 2"};
-        if (p.readers < 1)
-            throw std::domain_error{"Must have at least one reader"};
-        if (p.prob_writer < 0 || p.prob_writer > 1)
-            throw std::domain_error{"Book probability `" + std::to_string(p.prob_writer) + "' is invalid"};
-        if (p.book_sd < 0)
-            throw std::domain_error{"Book standard deviation `" + std::to_string(p.book_sd) + "' is invalid"};
-        num_readers = p.readers;
-        prob_writer = p.prob_writer;
-        book_sd = p.book_sd;
-        speed_limit = p.speed_limit;
-        redraw = p.redraw;
-
-        setup = true;
+    auto on_setup = [&](GUI::Parameter p) { // Setup
+        switch (p.param) {
+            case GUI::ParamType::begin:
+                setup = false;
+                break;
+            case GUI::ParamType::dimensions:
+                if (p.ul != 2)
+                    throw std::domain_error{"Cannot yet handle dimensions ≠ 2"};
+                // FIXME
+                break;
+            case GUI::ParamType::readers:
+                if (p.ul < 1)
+                    throw std::domain_error{"Must have at least one reader"};
+                num_readers = p.ul;
+                break;
+            case GUI::ParamType::prob_writer:
+                if (p.dbl < 0 || p.dbl > 1)
+                    throw std::domain_error{"Book probability `" + std::to_string(p.dbl) + "' is invalid"};
+                prob_writer = p.dbl;
+                break;
+            case GUI::ParamType::book_sd:
+                if (p.dbl < 0)
+                    throw std::domain_error{"Book standard deviation `" + std::to_string(p.dbl) + "' is invalid"};
+                book_sd = p.dbl;
+                break;
+            case GUI::ParamType::redraw:
+                redraw = p.dur_ms;
+                break;
+            case GUI::ParamType::speed_limit:
+                speed_limit = p.dur_ms;
+                break;
+            case GUI::ParamType::threads:
+                sim->maxThreads(p.ul);
+                break;
+            case GUI::ParamType::erred:
+                break;
+            case GUI::ParamType::finished:
+                setup = true;
+                break;
+        }
     };
     auto on_run = [&](unsigned long periods) { // Run
         if (not setup)
-            throw std::logic_error{"Event error: RUN before SETUP"};
+            throw std::logic_error{"Event error: RUN before successful SETUP"};
         run_start = sim->t();
         run_end = run_start + periods;
         stopped = false;
@@ -73,6 +108,7 @@ int main(int argc, char *argv[1]) {
         auto r = sim->create<Reader>(Position{unif_pm10(rng), unif_pm10(rng)});
         r->writer_prob = prob_writer;
         r->writer_book_sd = book_sd;
+        sim->create<intraopt::FixedIncome>(r, Bundle{{ MONEY, 1000 }});
     }
     auto readers = sim->agents<Reader>();
 
@@ -100,7 +136,9 @@ int main(int argc, char *argv[1]) {
         while (not quit and (step or (not stopped and sim->t() < run_end))) {
             start = std::chrono::high_resolution_clock::now();
 
+            std::cerr << "running\n";
             sim->run();
+            std::cerr << "done running\n";
 
             if (step) step = false;
 
@@ -125,7 +163,6 @@ int main(int argc, char *argv[1]) {
 
             auto sleep = speed_limit - (end - start);
             if (not finished and sleep > zero_ms) {
-                std::cerr << "sleep for " << sleep.count() << "\n";
                 std::this_thread::sleep_for(sleep);
             }
         }

@@ -2,14 +2,17 @@
 #include "creativity/config.hpp"
 #include "creativity/Reader.hpp"
 #include "creativity/Book.hpp"
+#include "creativity/BookMarket.hpp"
 #include <iostream>
 #include <cstdlib>
 #include <iomanip>
 
+using namespace eris;
+
 namespace creativity {
 
-GUI::GUI(std::shared_ptr<eris::Simulation> sim,
-        std::function<void(Parameters)> setup,
+GUI::GUI(std::shared_ptr<Simulation> sim,
+        std::function<void(Parameter)> setup,
         std::function<void(unsigned int count)> run,
         std::function<void()> stop,
         std::function<void()> resume,
@@ -83,18 +86,18 @@ void GUI::thr_run() {
     auto *run = widget<Gtk::Button>("btn_start");
 
     run->signal_clicked().connect([this] {
-        Parameters p;
-        p.readers = sb_int("set_readers");
-        p.dimensions = sb_int("set_dimensions");
-        p.prob_writer = sb("set_create_prob");
-        p.book_sd = sb("set_sd");
-        p.speed_limit = std::chrono::milliseconds{sb_int("set_speed")};
-        p.redraw = std::chrono::milliseconds{sb_int("set_redraw")};
+        std::vector<Parameter> params;
+        params.push_back({ParamType::readers, .ul=(unsigned long)sb_int("set_readers")});
+        params.push_back({ParamType::dimensions, .ul=(unsigned long)sb_int("set_dimensions")});
+        params.push_back({ParamType::prob_writer, .dbl=sb("set_create_prob")});
+        params.push_back({ParamType::book_sd, .dbl=sb("set_sd")});
+        params.push_back({ParamType::speed_limit, .dur_ms=std::chrono::milliseconds{sb_int("set_speed")}});
+        params.push_back({ParamType::redraw, .dur_ms=std::chrono::milliseconds{sb_int("set_redraw")}});
+        unsigned int threads;
+        widget<Gtk::ComboBox>("combo_threads")->get_active()->get_value(0, threads);
+        params.push_back({ParamType::threads, .ul=(unsigned long)threads});
 
-        for (auto &widg : {"set_readers", "set_dimensions", "set_create_prob", "set_sd", "set_speed"})
-            widget<Gtk::SpinButton>(widg)->set_sensitive(false);
-
-        queueEvent(Event::Type::setup, std::move(p));
+        queueEvent(Event::Type::setup, std::move(params));
         queueEvent(Event::Type::run, sb_int("set_periods"));
     });
 
@@ -114,6 +117,16 @@ void GUI::thr_run() {
         queueEvent(Event::Type::step);
     });
 
+    auto thrbox = widget<Gtk::ComboBox>("combo_threads");
+    auto thrlist = Glib::RefPtr<Gtk::ListStore>::cast_static(thrbox->get_model());
+    for (unsigned int i = 2; i <= std::thread::hardware_concurrency(); i++) {
+        auto iter = thrlist->append();
+        iter->set_value(0, i);
+        iter->set_value(1, std::to_string(i) + " threads");
+    }
+    //thrbox->set_active(*(thrlist->children().rbegin()));
+    thrbox->set_active(*(thrlist->children().begin()));
+
     Gtk::Viewport *vis;
     builder_->get_widget("view_vis", vis);
 
@@ -121,7 +134,85 @@ void GUI::thr_run() {
     // mainloop is running.
     std::unique_lock<std::mutex> lock{mutex_};
 
-    graph_ = std::unique_ptr<GUIGraphArea>(new GUIGraphArea{11., 11., -11., -11., *this, sim_});
+    graph_ = std::unique_ptr<GUIGraphArea>(new GUIGraphArea{11., 11., -11., -11., sim_});
+    main->add_events(Gdk::EventMask::BUTTON_PRESS_MASK);
+
+    // FIXME: change mouse the clickable when over readers/books?
+
+    graph_->signal_button_press_event().connect([this](GdkEventButton *event) -> bool {
+        // Calculate the *graph* position where the user clicked
+        auto c2g = graph_->graph_to_canvas();
+        c2g.invert();
+
+        double x = event->x, y = event->y;
+        c2g.translate(x, y);
+
+        Position pos{{x, y}};
+        // Figure out the closest thing (Reader or Book) to where the click happened
+        SharedMember<Reader> reader;
+        SharedMember<Book> book;
+
+        for (auto &r : sim_->agents<Reader>())
+            if (not reader or r->distance(pos) < reader->distance(pos))
+                reader = r;
+        for (auto &r : sim_->goods<Book>())
+            if (not book or r->distance(pos) < book->distance(pos))
+                book = r;
+
+        double dist = std::min(reader->distance(pos), book->distance(pos));
+
+        // If not within 5 pixels of the closest thing, ignore.
+        if (dist > 5) return false;
+
+        if (reader->distance(pos) <= book->distance(pos)) {
+            // If a reader, open up and fill out the reader info dialog
+            auto dlg_reader = widget<Gtk::Dialog>("dlg_readerinfo");
+            widget<Gtk::Label>("vrd_id")->set_text(std::to_string(reader->id()));
+            std::ostringstream pos;
+            pos << "(" << std::setw(7) << std::showpoint << reader->position()[0] << "," << reader->position()[1] << ")";
+            widget<Gtk::Label>("vrd_pos")->set_text(pos.str());
+            widget<Gtk::Label>("vrd_u")->set_text(std::to_string(reader->u()));
+            widget<Gtk::Label>("vrd_ulife")->set_text(std::to_string(reader->uLifetime()));
+            widget<Gtk::Label>("vrd_libsize")->set_text(std::to_string(reader->library().size()));
+            widget<Gtk::Label>("vrd_libnew")->set_text(std::to_string(reader->newBooks().size()));
+            widget<Gtk::Label>("vrd_books")->set_text(std::to_string(reader->wrote().size()));
+            auto last_book = sim_->good<Book>(reader->wrote().back());
+            widget<Gtk::Label>("vrd_lastbookage")->set_text(std::to_string(last_book->age()));
+            dlg_reader->run();
+            dlg_reader->hide();
+        }
+        else {
+            // If a book, open up and fill out the book info dialog
+            auto dlg_book = widget<Gtk::Dialog>("dlg_bookinfo");
+            widget<Gtk::Label>("vbk_id")->set_text(std::to_string(book->id()));
+            std::ostringstream pos;
+            pos << "(" << std::setw(7) << std::showpoint << book->position()[0] << "," << book->position()[1] << ")";
+            widget<Gtk::Label>("vbk_pos")->set_text(pos.str());
+            widget<Gtk::Label>("vbk_mkt")->set_text(book->onMarket()
+                    ? std::to_string(book->market()->id())
+                    : "(not on market)"
+            );
+            widget<Gtk::Label>("vbk_p")->set_text(book->onMarket()
+                    ? std::to_string(book->market()->price())
+                    : "(not on market)"
+            );
+            widget<Gtk::Label>("vbk_age")->set_text(std::to_string(book->age()));
+            widget<Gtk::Label>("vbk_sales")->set_text(std::to_string(book->sales()));
+            unsigned long copies = 0;
+            for (auto &r : sim_->agents<Reader>()) {
+                if (r->library().count(book))
+                    copies++;
+            }
+            widget<Gtk::Label>("vbk_copies")->set_text(std::to_string(copies));
+            widget<Gtk::Label>("vbk_author")->set_text(book->hasAuthor()
+                    ? std::to_string(book->author()->id())
+                    : "(dead)"
+            );
+            dlg_book->run();
+            dlg_book->hide();
+        }
+        return true;
+    });
 
     dispatcher_ = std::unique_ptr<Glib::Dispatcher>(new Glib::Dispatcher);
     dispatcher_->connect([this] { thr_signal(); });
@@ -146,6 +237,7 @@ void GUI::thr_signal() {
     std::unique_lock<std::mutex> lock(mutex_);
     // Keep track of the *last* state change we see, and whether or not we see a redraw (we want to
     // skip everything except the last).
+    std::stringstream errors;
     Signal last_state{Signal::Type::quit}, last_progress{Signal::Type::quit}, last_redraw{Signal::Type::quit};
     for (Signal &s : signal_queue_) {
         switch (s.type) {
@@ -164,8 +256,8 @@ void GUI::thr_signal() {
                 last_progress = s;
                 break;
             case Signal::Type::error:
-                // FIXME:
-                // - Show error popup
+                std::cerr << "Thr received error signal\n";
+                errors << s.message << "\n";
                 break;
         }
     }
@@ -173,9 +265,13 @@ void GUI::thr_signal() {
     lock.unlock();
 
     if (last_state.type == Signal::Type::running) {
+        std::cerr << "running signal received\n";
         widget<Gtk::Notebook>("nb_tabs")->set_current_page(1);
 
-        // - Replace Play button with Pause button
+        // Disable spin buttons:
+        for (auto &widg : {"set_readers", "set_dimensions", "set_create_prob", "set_sd", "set_speed"})
+            widget<Gtk::SpinButton>(widg)->set_sensitive(false);
+
         widget<Gtk::Button>("btn_start")->set_sensitive(false);
         widget<Gtk::Button>("btn_run")->set_visible(false);
         widget<Gtk::Button>("btn_run")->set_sensitive(true);
@@ -193,7 +289,7 @@ void GUI::thr_signal() {
     if (last_progress.type == Signal::Type::progress) {
         // .uls contains: t, end, readers, books
         // .doubles has: speed
-        auto progress = widget<Gtk::ProgressBar>("progressbar1");
+        auto progress = widget<Gtk::ProgressBar>("progress_stage");
         progress->set_text(std::to_string(last_progress.uls[0]) + " / " + std::to_string(last_progress.uls[1]));
         progress->set_fraction((double) last_progress.uls[0] / (double) last_progress.uls[1]);
         widget<Gtk::Label>("status_readers")->set_text(std::to_string(last_progress.uls[2]));
@@ -203,6 +299,15 @@ void GUI::thr_signal() {
 
         widget<Gtk::Label>("status_speed")->set_text(speed.str());
     }
+
+    std::string errstr = errors.str();
+    if (not errstr.empty()) {
+        auto dlg_error = widget<Gtk::MessageDialog>("dlg_error");
+        dlg_error->set_secondary_text(errors.str());
+        dlg_error->run();
+        dlg_error->hide();
+    }
+
     if (last_redraw.type == Signal::Type::redraw) {
         graph_->queue_draw();
     }
@@ -238,32 +343,51 @@ void GUI::error(std::string message) { queueSignal({ Signal::Type::error, messag
 
 GUI::Event::Event() : none{true} {}
 GUI::Event::Event(Event::Type t) : type{t} {}
-GUI::Event::Event(Event::Type t, Parameters &&p)
-    : type{t}, parameters{std::make_shared<Parameters>(std::move(p))} {}
+GUI::Event::Event(Event::Type t, std::vector<Parameter> &&p)
+    : type{t}, parameters{std::move(p)} {}
 GUI::Event::Event(Event::Type t, const unsigned long &ulval)
     : type{t}, ul{ulval} {}
 GUI::Event::operator bool() { return not none; }
 
 void GUI::checkEvents() {
     std::unique_lock<std::mutex> lock(mutex_);
-    for (auto &e : event_queue_) handleEvent(e);
-    event_queue_.clear();
+    processEvents_(lock);
 }
 
 void GUI::waitEvents() {
     // Just like the above except that we wait until there is at least one item in the queue:
     std::unique_lock<std::mutex> lock(mutex_);
     cv_.wait(lock, [this]() -> bool { return not event_queue_.empty(); });
-
-    for (auto &e : event_queue_) handleEvent(e);
-    event_queue_.clear();
+    processEvents_(lock);
 }
 
+// Moves out the current queue elements, unlocks the lock, then processes the queue elements.
+void GUI::processEvents_(std::unique_lock<decltype(mutex_)> &lock) {
+    decltype(event_queue_) dequeued;
+    dequeued.swap(event_queue_);
+    lock.unlock();
+
+    for (auto &e : dequeued) handleEvent(e);
+}
+
+
 void GUI::handleEvent(const Event &event) {
+    std::vector<std::string> setup_errors;
     try {
         switch (event.type) {
             case Event::Type::setup:
-                if (on_setup_) on_setup_(*event.parameters);
+                if (on_setup_ and not event.parameters.empty()) {
+                    on_setup_({.param=ParamType::begin});
+                    for (auto &p : event.parameters) {
+                        try {
+                            on_setup_(p);
+                        }
+                        catch (std::exception &e) {
+                            setup_errors.push_back(e.what());
+                        }
+                    }
+                    on_setup_({ .param = setup_errors.empty() ? ParamType::finished : ParamType::erred });
+                }
                 break;
             case Event::Type::run:
                 if (on_run_) on_run_(event.ul);
@@ -281,9 +405,12 @@ void GUI::handleEvent(const Event &event) {
                 if (on_quit_) on_quit_();
                 break;
         }
-    } catch (std::exception e) {
-        // FIXME
-        std::cerr << "Caught exception (" << e.what() << ") from handler.  FIXME!\n";
+    } catch (std::exception &e) {
+        queueSignal({ Signal::Type::error, e.what() });
+    }
+
+    for (auto &e : setup_errors) {
+        queueSignal({ Signal::Type::error, e });
     }
 }
 

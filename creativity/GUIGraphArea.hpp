@@ -7,8 +7,6 @@
 
 namespace creativity {
 
-class GUI;
-
 class GUIGraphArea : public Gtk::DrawingArea, eris::noncopyable {
     public:
         /** Creates a graph area that draws in the rectangle bounded by [`bottom', `top'] on the
@@ -16,7 +14,12 @@ class GUIGraphArea : public Gtk::DrawingArea, eris::noncopyable {
          * bottom or left larger than top or bottom will flip the respective axis.
          */
         GUIGraphArea(const double &top, const double &right, const double &bottom, const double &left,
-                GUI &gui, std::shared_ptr<eris::Simulation> sim);
+                std::shared_ptr<eris::Simulation> sim);
+
+        /** Returns a Cairo::Matrix that translates graph coordinates into screen coordinates.  To
+         * go the other way, invert this matrix.
+         */
+        Cairo::Matrix graph_to_canvas() const;
 
         /** Draws the current set of points/circles. */
         virtual bool on_draw(const Cairo::RefPtr<Cairo::Context> &cr) override;
@@ -34,9 +37,10 @@ class GUIGraphArea : public Gtk::DrawingArea, eris::noncopyable {
          * \param x the point x coordinate, in graph space
          * \param y the point y coordinate, in graph space
          * \param type the type of point to draw
+         * \param scale the scale of the point.  1 (the default) means default size.
          */
         void drawPoint(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans,
-                double x, double y, const PointType &type);
+                double x, double y, const PointType &type, double scale = 1.0);
 
         /** Circle types supported by addCircle() */
         enum class CircleType {
@@ -64,9 +68,14 @@ class GUIGraphArea : public Gtk::DrawingArea, eris::noncopyable {
         /// Every `tick_big`th tick will be triple-sized
         int tick_big = 5;
 
+        /** The radius of markers representing points, in pixels.  For example, a value of 5 means
+         * that CROSS points will have horizontal and vertical lines extending a distance of 5,
+         * while X points will have diagonal lines with a length of 5.  For SQUARE points the
+         * diagonals of the square will have length 10 (and so edges will be \f$\5 \sqrt{2}\f$
+         * pixels long).
+         */
+        double point_size = 5.0;
     private:
-        // Reference to the parent
-        GUI &gui_;
         // simulation object
         std::shared_ptr<eris::Simulation> sim_;
         // The bounds of the graph

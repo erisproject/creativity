@@ -21,16 +21,7 @@ namespace creativity {
  */
 class GUI : eris::noncopyable {
     public:
-        /// The parameters configurable through the GUI.
-        struct Parameters {
-            unsigned int dimensions;
-            unsigned int readers;
-//            unsigned int publishers;
-            double prob_writer;
-            double book_sd;
-            std::chrono::milliseconds speed_limit;
-            std::chrono::milliseconds redraw;
-        };
+        struct Parameter; // forward declaration
 
         /** Creates a new GUI object.  The GUI is not set up and started until the start() method is
          * called.
@@ -40,15 +31,15 @@ class GUI : eris::noncopyable {
                  * populated yet. Typically called with an Eris<Simulation> object (which is
                  * castable to an std::shared_ptr) */
                 std::shared_ptr<eris::Simulation> eris,
-                /** A function to call with the GUI simulation parameters (in a GUI.Parameters
-                 * struct) when the user instructs (via the GUI) to start the simulation.  This
+                /** A function to call with the GUI simulation parameters (in a series of
+                 * GUI.Parameter structs) when the user configures the simulation via the GUI.  This
                  * function should set up the simulation but not start it: it will be followed
                  * immediately followed by a `run` call (assuming no error occurs).
                  *
                  * If the simulation cannot be started (for example, because some parameters are
                  * invalid) the function should throw a GUI::Exception; the .what() value of the
                  * exception will be displayed to the user as an error message. */
-                std::function<void(Parameters params)> setup,
+                std::function<void(Parameter param)> setup,
                 /** Called to run the simulation for count periods. */
                 std::function<void(unsigned int rounds)> run,
                 /** Called when the user hits the stop button in the GUI. This should pause the
@@ -87,14 +78,6 @@ class GUI : eris::noncopyable {
          */
         void waitEvents();
 
-        /** The radius of markers representing points, in pixels.  For example, a value of 5 means
-         * that CROSS points will have horizontal and vertical lines extending a distance of 5,
-         * while X points will have diagonal lines with a length of 5.  For SQUARE points the
-         * diagonals of the square will have length 10 (and so edges will be \f$\5 \sqrt{2}\f$
-         * pixels long).
-         */
-        double pointMarkerRadius = 5.0;
-
         /** Signals the GUI thread that the visual objects have been updated and the graph needs to
          * be redrawn.  Note that this is not synchronous: if the GUI thread is currently busy, the
          * redraw might not actually happen until it becomes idle.  It is also collapsed: if
@@ -118,9 +101,52 @@ class GUI : eris::noncopyable {
          */
         void stopped(bool done);
 
-        /** Sends a signal to the GUI thread that an error has occured.  Takes a string to display
+        /** Sends a signal to the GUI thread that an error has occurred.  Takes a string to display
          * in a dialog to the user. */
         void error(std::string message);
+
+        /// Parameter types for a Parameter.
+        enum class ParamType {
+            /// Sets the number of dimensions in `.ul`
+            dimensions,
+            /// Sets the number of readers in `.ul`
+            readers,
+            /// Sets the writer probability in `.dbl`
+            prob_writer,
+            /// Sets the book location standard deviation in `.dbl`
+            book_sd,
+            /// Sets the simulation speed limit in `.dur_ms`
+            speed_limit,
+            /// Sets the minimum redraw period in `.dur_ms`
+            redraw,
+            /// Number of threads to use in `.ul`
+            threads,
+            /// Sent by the GUI to indicate that some parameters are being changed.
+            begin,
+            /// Fired when setup ends unsuccessfully because when one or more setup parameters threw exceptions
+            erred,
+            /// Fired when setup ends successfully (no setup parameter threw an exception)
+            finished
+        };
+        /** The parameter struct for passing a configured value back from the GUI.  The GUI always
+         * sends a `begin` followed by zero or more settings then either `erred` or `finished` (the
+         * former if one or more exceptions occurred in the settings, the latter if no exceptions
+         * occurred).
+         */
+        struct Parameter {
+            /// The parameter type
+            ParamType param;
+            /// A value of various types
+            union {
+                bool bl;
+                unsigned long ul;
+                long l;
+                unsigned int ui;
+                int i;
+                double dbl;
+                std::chrono::milliseconds dur_ms;
+            };
+        };
 
         /** Simple class containing event information.
          */
@@ -149,8 +175,10 @@ class GUI : eris::noncopyable {
                  */
                 Type type;
 
-                /// Will be set to configured GUI::Parameters if this is a setup event
-                std::shared_ptr<Parameters> parameters;
+                /** Will be set to a list of configured GUI::Parameters if this is a setup event.
+                 * The `begin` and `finished` GUI::Parameter meta-values are *not* included.
+                 */
+                std::vector<Parameter> parameters;
 
                 /** unsigned long integer value associated with the event.  Used by Event::Type::run
                  * to send the number of iterations to run.
@@ -163,8 +191,9 @@ class GUI : eris::noncopyable {
                 Event();
                 /// Constructs an event with no parameters or value
                 Event(Type t);
-                /// Constructs an event with Parameters
-                Event(Type t, Parameters &&p);
+                /// Constructs an event with Parameters.  The vector should not contain
+                /// begin/finished parameter events; these will be sent appropriately.
+                Event(Type t, std::vector<Parameter> &&p);
                 /// Constructs an event with an unsigned long value
                 Event(Type t, const unsigned long &ul);
         };
@@ -204,6 +233,10 @@ class GUI : eris::noncopyable {
         /// Used to signal the main thread that the initialization is done
         std::condition_variable cv_;
 
+        /** Swaps out the queue elements into a local queue, unlocks the lock, then processes the
+         * swapped out queue elements.  This is the common code for waitEvents() and checkEvents().
+         */
+        void processEvents_(std::unique_lock<decltype(mutex_)> &lock);
 
         /** Signal class to send a signal with a tuple of arbitrary data. */
         class Signal {
@@ -272,13 +305,14 @@ class GUI : eris::noncopyable {
         /// The simulation object
         std::shared_ptr<eris::Simulation> sim_;
         // The callbacks for GUI thread events
-        std::function<void(GUI::Parameters)> on_setup_;
+        std::function<void(GUI::Parameter)> on_setup_;
         std::function<void(unsigned int count)> on_run_;
         std::function<void()> on_stop_;
         std::function<void()> on_resume_;
         std::function<void()> on_step_;
         std::function<void()> on_quit_;
 
+        /** Handles a single event received from the GUI thread. */
         void handleEvent(const GUI::Event &event);
 };
 

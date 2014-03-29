@@ -26,6 +26,8 @@ foreach(pkg ${creativity_pkgconfig})
     add_definitions(${${pkg}_CFLAGS_OTHER})
 endforeach()
 
+add_definitions("-DERIS_DEBUG")
+
 #find_package(Boost REQUIRED)
 #include_directories(${Boost_INCLUDE_DIRS})
 
