@@ -15,14 +15,7 @@ using namespace eris;
 int main(int argc, char *argv[1]) {
     Eris<Simulation> sim;
     MONEY = sim->create<Good::Continuous>();
-
-    ERIS_DBGVAR(MONEY);
-
-    SharedMember<Member> moneymem{MONEY};
-    ERIS_DBGVAR(moneymem);
-
-    SharedMember<Good::Continuous> moneyagain{moneymem};
-    ERIS_DBGVAR(moneyagain);
+    sim->create<NEW_BOOKS_Cleaner>();
 
     bool setup = false, stopped = false, step = false, quit = false;
     unsigned long num_readers = 1000;
@@ -97,7 +90,7 @@ int main(int argc, char *argv[1]) {
 
     auto &rng = eris::Random::rng();
     std::uniform_real_distribution<double> unif_01{0, 1};
-    std::uniform_real_distribution<double> unif_pm10{-10, 10};
+    std::uniform_real_distribution<double> unif_pmb{-BOUNDARY, BOUNDARY};
 
     while (!setup) {
         gui.waitEvents();
@@ -105,7 +98,7 @@ int main(int argc, char *argv[1]) {
     }
 
     for (auto i = 0UL; i < num_readers; i++) {
-        auto r = sim->create<Reader>(Position{unif_pm10(rng), unif_pm10(rng)});
+        auto r = sim->create<Reader>(Position{unif_pmb(rng), unif_pmb(rng)});
         r->writer_prob = prob_writer;
         r->writer_book_sd = book_sd;
         sim->create<intraopt::FixedIncome>(r, Bundle{{ MONEY, 1000 }});
@@ -115,7 +108,7 @@ int main(int argc, char *argv[1]) {
     gui.progress(run_end, 0);
     auto last_progress = std::chrono::high_resolution_clock::now();
     auto last_progress_t = sim->t();
-    gui.redraw();
+    gui.redraw(true);
 
     // If redraw is 0, we use 
     constexpr auto zero_ms = std::chrono::milliseconds::zero();
@@ -129,6 +122,7 @@ int main(int argc, char *argv[1]) {
         std::chrono::high_resolution_clock::now() + progress_freq};
 
     while (not quit) {
+        std::cerr << "asfafasdf\n";
         if (sim->t() < run_end) {
             // Tell the GUI we've started running.
             gui.running();
@@ -143,6 +137,7 @@ int main(int argc, char *argv[1]) {
             if (step) step = false;
 
             bool finished = stopped or sim->t() >= run_end;
+            ERIS_DBG("");
             end = std::chrono::high_resolution_clock::now();
             // Only update the progress and check events every 50ms
             if (finished or end >= next_progress) {
@@ -155,17 +150,25 @@ int main(int argc, char *argv[1]) {
                 next_progress = end + progress_freq;
             }
 
+            if (quit) break;
+
+            // Make sure stopped hasn't changed:
+            if (not finished and stopped) finished = true;
+
             // Only trigger a redraw and event check at most once every 50ms, or if we're done
             if (finished or end >= next_sync) {
-                gui.redraw();
+                gui.redraw(true);
                 next_sync = redraw == zero_ms ? never : end + redraw;
             }
 
+            ERIS_DBG("");
             auto sleep = speed_limit - (end - start);
             if (not finished and sleep > zero_ms) {
                 std::this_thread::sleep_for(sleep);
             }
+            ERIS_DBG("");
         }
+            ERIS_DBG("");
 
         // If the GUI told us to quit, just quit.
         if (quit) break;
@@ -173,7 +176,10 @@ int main(int argc, char *argv[1]) {
         // Tell the GUI we finished
         gui.stopped(sim->t() >= run_end);
 
+        std::cerr << "waiting for more\n";
         // Wait for the GUI to tell us to do something else
         gui.waitEvents();
+        std::cerr << "got more\n";
     }
+    std::cerr << "running off the bottom of main\n";
 }

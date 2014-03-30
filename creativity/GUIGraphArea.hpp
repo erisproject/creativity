@@ -7,6 +7,9 @@
 
 namespace creativity {
 
+// forward declarations
+class GUI;
+
 class GUIGraphArea : public Gtk::DrawingArea, eris::noncopyable {
     public:
         /** Creates a graph area that draws in the rectangle bounded by [`bottom', `top'] on the
@@ -14,7 +17,7 @@ class GUIGraphArea : public Gtk::DrawingArea, eris::noncopyable {
          * bottom or left larger than top or bottom will flip the respective axis.
          */
         GUIGraphArea(const double &top, const double &right, const double &bottom, const double &left,
-                std::shared_ptr<eris::Simulation> sim);
+                std::shared_ptr<eris::Simulation> sim, GUI &gui);
 
         /** Returns a Cairo::Matrix that translates graph coordinates into screen coordinates.  To
          * go the other way, invert this matrix.
@@ -78,6 +81,8 @@ class GUIGraphArea : public Gtk::DrawingArea, eris::noncopyable {
     private:
         // simulation object
         std::shared_ptr<eris::Simulation> sim_;
+        // The parent GUI
+        GUI &gui_;
         // The bounds of the graph
         std::array<double, 4> bounds_;
         // Constants for access into bounds_

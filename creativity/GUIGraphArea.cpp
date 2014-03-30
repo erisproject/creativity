@@ -8,8 +8,8 @@
 namespace creativity {
 
 GUIGraphArea::GUIGraphArea(const double &top, const double &right, const double &bottom, const double &left,
-        std::shared_ptr<eris::Simulation> sim) :
-    sim_{sim}, bounds_{{top,right,bottom,left}}
+        std::shared_ptr<eris::Simulation> sim, GUI &gui) :
+    sim_{sim}, gui_{gui}, bounds_{{top,right,bottom,left}}
 {}
 
 Cairo::Matrix GUIGraphArea::graph_to_canvas() const {
@@ -135,6 +135,8 @@ bool GUIGraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
     }
 
     cr->restore();
+    std::cerr << "sending a redraw\n";
+    gui_.queueEvent(GUI::Event::Type::redraw);
     return true;
 }
 

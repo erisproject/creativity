@@ -48,7 +48,7 @@ const double& Reader::u() const {
 const double& Reader::uLifetime() const {
     return u_lifetime_;
 }
-const std::unordered_set<eris_id_t>& Reader::newBooks() const {
+const std::unordered_set<SharedMember<Book>>& Reader::newBooks() const {
     return new_books_;
 }
 
@@ -97,6 +97,9 @@ void Reader::interApply() {
         // The book is centered at the reader's position:
         Position bookPos{position()};
 
+        // Initial price (FIXME):
+        double FIXME_initial_price = 1;
+
         if (writer_book_sd > 0) {
             // Now add some noise to each dimension
             std::normal_distribution<double> book_noise(0, writer_book_sd);
@@ -105,45 +108,121 @@ void Reader::interApply() {
             }
         }
 
-        // FIXME: initial price?
-        double FIXME_initial_price = 1;
+        // Finally we need a quality distribution.  Use chi²(1) for now.
+        std::chi_squared_distribution<double> chisq1(1);
+        auto quality = std::bind(chisq1, rng);
 
-        wrote_.push_back(simulation()->create<Book>(bookPos, sharedSelf(), FIXME_initial_price));
+        wrote_.push_back(simulation()->create<Book>(bookPos, sharedSelf(), FIXME_initial_price, quality));
+    }
+}
+
+void Reader::interAdvance() {
+    // This is really crude: just move N(0,1) in a random direction 50% of the time.
+
+    auto &rng = Random::rng();
+    std::normal_distribution<double> stdnormal;
+    std::normal_distribution<double> step_dist{0, 0.25};
+
+    // Choose a random distance and a random direction
+    if (std::bernoulli_distribution{0.5}(rng)) {
+        const double distance = step_dist(rng);
+        // Uniform hypersphere surface picking: draw a N(0,1) for each dimension, then normalize to
+        // a unit distance.  See http://mathworld.wolfram.com/HyperspherePointPicking.html
+        Position walk = Position::zero(position());
+        double tss = 0.0;
+        while (tss == 0.0) { // Extremely likely that this loop runs only once
+            for (size_t i = 0; i < walk.dimensions; i++) {
+                const double x = stdnormal(rng);
+                walk[i] = x;
+                tss += x*x;
+            }
+        }
+        walk *= distance / sqrt(tss);
+        Position dest = position() + walk;
+        for (size_t i = 0; i < dest.dimensions; i++) {
+            // Keep reflecting off the boundaries until we're inside the boundary.  This is
+            // typically going to happen at most once, but could be more than once if `distance`
+            // above happened to be a very large draw.
+            while (fabs(dest[i]) > BOUNDARY) {
+                if (dest[i] > BOUNDARY) // and > 0
+                    dest[i] = BOUNDARY + BOUNDARY - dest[i];
+                else // dest[i] < -BOUNDARY < 0
+                    dest[i] = -BOUNDARY - BOUNDARY - dest[i];
+            }
+        }
+
+        if (dest) moveTo(dest);
     }
 }
 
 double Reader::uBook(const SharedMember<Book> &b) const {
-    return std::max(0.0, evalPolynomial(distance(b), u_poly_));
+    double u = evalPolynomial(distance(b), u_poly_);
+    double q_DEBUG = quality(b);
+    //std::cerr << "Evaluating book " << b << ": quality=" << q_DEBUG << ", totalu=" << q_DEBUG + u << "\n";
+    u += q_DEBUG;//quality(b);
+    if (u < 0) u = 0.0;
+    return u;
+}
+
+double Reader::quality(const SharedMember<Book> &b) const {
+    auto found = library_.find(b);
+    if (found != library_.end())
+        return found->second;
+
+    // Predict quality
+    double e_qual = 0;
+    auto author = b->author();
+    auto n = author->wrote().size();
+    auto coef = q_coef_.find(author);
+    if (coef == q_coef_.end())
+        coef = q_coef_.find(0);
+
+    if (coef != q_coef_.end()) {
+        e_qual +=
+            coef->second[0] +
+            coef->second[1] * n +
+            coef->second[2] * n * n;
+    }
+
+    return e_qual;
 }
 
 double Reader::penalty(unsigned long n) const {
     return evalPolynomial(n, pen_poly_);
 }
 
-const std::unordered_set<eris_id_t>& Reader::library() { return library_; }
+const std::unordered_map<eris_id_t, double>& Reader::library() { return library_; }
+
+void Reader::intraInitialize() {
+    for (auto &bm : NEW_BOOKS) {
+        book_cache_.insert(bm);
+    }
+}
 
 void Reader::intraOptimize() {
     auto lock = readLock();
-    auto book_markets = simulation()->markets<BookMarket>();
-    std::vector<size_t> bmi;
-    bmi.reserve(book_markets.size());
-    for (size_t i = 0; i < book_markets.size(); i++)
-        bmi.push_back(i);
-    std::shuffle(bmi.begin(), bmi.end(), Random::rng());
+
+    std::vector<SharedMember<BookMarket>> cache_del;
     // Map u-p values to sets of market ids
     std::map<double, std::vector<SharedMember<BookMarket>>> book_net_u;
-    for (auto &i : bmi) {
-        auto &bm = book_markets[i];
+    for (auto &bm : book_cache_) {
+        if (not bm) { // Market removed: remove from cache and continue
+            cache_del.push_back(bm);
+            continue;
+        }
         auto book = bm->book();
-        if (library_.count(book) > 0) continue;
+        if (library_.count(book) > 0) {
+            // Already have the book: remove from cache and continue
+            cache_del.push_back(bm);
+            continue;
+        }
         double u = uBook(book);
-        lock.add(bm);
-        auto pinfo = bm->price(1);
-        if (pinfo.feasible and u > pinfo.total) {
-            // Good: the book is available and its utility exceeds its purchase price
+        double p = bm->price();
+        if (u >= p) {
+            // Good: the book is available and its utility (before any penalty) exceeds the purchase price
+            // Store the net utility of this book:
             book_net_u[u - bm->price()].push_back(std::move(bm));
         }
-        lock.remove(bm);
     }
 
     // Shuffle the order of any books with the same net utilities so that we'll be choosing randomly
@@ -154,6 +233,8 @@ void Reader::intraOptimize() {
     }
 
     lock.write(); // Time to get serious.
+
+    for (auto &del : cache_del) book_cache_.erase(del);
 
     std::set<SharedMember<Book>> buy;
     double money = assets()[MONEY];
@@ -200,7 +281,9 @@ void Reader::intraApply() {
     for (auto &res : reservations_) {
         res->buy();
     }
-    library_.insert(reserved_books_.begin(), reserved_books_.end());
+    for (auto &book : reserved_books_) {
+        library_.emplace(book, book->qualityDraw(*this));
+    }
     reservations_.clear();
     new_books_.clear();
     std::swap(new_books_, reserved_books_); // Clear away into new_books_
@@ -210,7 +293,6 @@ void Reader::intraApply() {
     // Finalize utility
     u_curr_ = u(money, new_books_);
     u_lifetime_ += u_curr_;
-    ERIS_DBGVAR(u_curr_);
 }
 void Reader::intraReset() {
     auto lock = writeLock();

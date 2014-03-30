@@ -1,20 +1,30 @@
 #include "creativity/Book.hpp"
 #include "creativity/BookMarket.hpp"
+#include "creativity/Reader.hpp"
 
 using namespace eris;
 
 namespace creativity {
 
-Book::Book(Position p, SharedMember<Reader> author, double initial_price)
-    : Positional<Good::Discrete>(p), author_(author), init_price_{initial_price}
+Book::Book(
+        Position p,
+        SharedMember<Reader> author,
+        double initial_price,
+        std::function<double(const Book&, const Reader&)> quality)
+    : Positional<Good::Discrete>(p),
+        author_{author},
+        init_price_{initial_price},
+        quality_{quality}
 {}
 
 void Book::added() {
     auto sim = simulation();
     created_ = sim->t();
     copies_sold_ = 0;
-    market_ = sim->create<BookMarket>(*this, init_price_);
-    dependsWeaklyOn(market_);
+    auto mkt = sim->create<BookMarket>(*this, init_price_);
+    NEW_BOOKS.push_back(mkt);
+    market_ = mkt;
+    dependsWeaklyOn(mkt);
 }
 
 void Book::weakDepRemoved(SharedMember<Member>, const eris::eris_id_t &old) {
@@ -40,6 +50,10 @@ bool Book::hasAuthor() const {
     return author_ != 0;
 }
 
+eris_id_t Book::authorID() const {
+    return author_;
+}
+
 SharedMember<Reader> Book::author() const {
     return simAgent<Reader>(author_);
 }
@@ -50,6 +64,10 @@ bool Book::onMarket() const {
 
 SharedMember<BookMarket> Book::market() const {
     return simMarket<BookMarket>(market_);
+}
+
+double Book::qualityDraw(const Reader &reader) {
+    return std::max(0.0, quality_(*this, reader));
 }
 
 }

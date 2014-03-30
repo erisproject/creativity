@@ -9,6 +9,7 @@
 namespace creativity {
 
 class Book; // forward declaration
+class BookMarket;
 
 /** A Reader is an agent with a position whose utility is determined by books and an outside option.
  * In particular, his utility is quasilinear of the form:
@@ -31,7 +32,9 @@ class Book; // forward declaration
  */
 class Reader : public eris::Positional<eris::agent::AssetAgent>,
     public virtual eris::interopt::Apply,
-    public virtual eris::intraopt::OptApplyReset
+    public virtual eris::interopt::Advance,
+    public virtual eris::intraopt::OptApplyReset,
+    public virtual eris::intraopt::Initialize
 {
     public:
         /// Inherit positional constructor
@@ -78,29 +81,49 @@ class Reader : public eris::Positional<eris::agent::AssetAgent>,
          */
         const double& uLifetime() const;
 
-        /** Returns/accesses the library of books owned by this Reader. */
-        const std::unordered_set<eris::eris_id_t>& library();
-
-        /** Returns the set of eris_id_t values of Books that were purchased in the last period.
+        /** Returns/accesses the library of books owned by this Reader.
          *
-         * This is updated only during the agent's intraApply() phase.
+         * \returns map where keys are the eris_id_t of the books and values are the realized
+         * quality of the books. */
+        const std::unordered_map<eris::eris_id_t, double>& library();
+
+        /** Returns the set of Books that were purchased in the last period.
+         *
+         * This is updated only during the agent's intraApply() phase; it intra stages before
+         * "apply" it gives the new books in the previous period.
          */
-        const std::unordered_set<eris::eris_id_t>& newBooks() const;
+        const std::unordered_set<eris::SharedMember<Book>>& newBooks() const;
 
         /** Returns a list of eris_id_t of books this reader wrote, in chronological order from
          * earliest to latest. */
         const std::vector<eris::eris_id_t>& wrote() const;
 
-        /** Returns the unpenalized utility of reading the given book.  The utility is found
-         * by evaluating the utility polynomial (as returned by uPolynomial()) at the distance
-         * from the Reader to the given Book or 0, if the polynomial value is negative.
+        /** Returns the unpenalized utility of reading the given book.  The utility is found by
+         * adding together the distance polynomial value and the quality value of the book.  The
+         * distance polynomial is as returned by distPolynomial(), evaluated at the distance from
+         * the Reader to the given Book.  The quality comes from calling the quality() method.  If
+         * the calculated overall value is less than 0, 0 is returned.
          *
-         * This method does *not* check whether the book is already in the user's library: code
-         * calling this method should check that and use 0 instead of calling this method if so.
+         * If the book is already in the reader's library, this returns the realized utility.
+         * Otherwise, this method returns an estimate.  See quality() for details.
+         *
+         * Note that this method isn't enough to evaluate the utility of adding an additional book:
+         * calling code must also ensure that the book being added is not already contained in the
+         * reader's library.
          *
          * \param b the book.
+         *
+         * \returns the estimated utility from reading the given book, if not in the reader's
+         * library; the realized utility from reading the given book if in the reader's library.
          */
         virtual double uBook(const eris::SharedMember<Book> &b) const;
+
+        /** Returns the quality of a given book.  If the given book is already in the user's
+         * library, this returns a realized quality value; otherwise it returns a predicted quality
+         * value based on the reader's prior.  This quantity must be stable (that is, calling it
+         * multiple times without the library or prior having changed will return the same value).
+         */
+        virtual double quality(const eris::SharedMember<Book> &b) const;
 
         /** Utility penalty from reading `books` books.  Must be (non-strictly) increasing and
          * strictly positive, and must return 0 for 0 books.  Uses the current penalty polynomial
@@ -195,6 +218,9 @@ class Reader : public eris::Positional<eris::agent::AssetAgent>,
         /** In-between periods, the reader randomly creates a book. */
         void interApply() override;
 
+        /** When advancing a period, the reader takes a random step. */
+        void interAdvance() override;
+
         /** The probability that the reader will write a book in between periods. Defaults to 0.001. */
         double writer_prob{0.001};
 
@@ -205,6 +231,9 @@ class Reader : public eris::Positional<eris::agent::AssetAgent>,
          * Defaults to 0.5.
          */
         double writer_book_sd{0.5};
+
+        /// Updates the book market cache with any new books
+        void intraInitialize() override;
 
         /** Performs intra-period optimization to pick an optimal set of books to buy this period.
          *
@@ -234,15 +263,27 @@ class Reader : public eris::Positional<eris::agent::AssetAgent>,
     private:
         std::vector<double> u_poly_ = Reader::default_polynomial;
         std::vector<double> pen_poly_ = Reader::default_penalty_polynomial;
-        std::unordered_set<eris::eris_id_t> library_;
+        /// Map of books owned to realized quality of those books:
+        std::unordered_map<eris::eris_id_t, double> library_;
         /// Reservations of books being purchased
         std::forward_list<eris::Market::Reservation> reservations_;
         /// set of books associated with reservations_
-        std::unordered_set<eris::eris_id_t> reserved_books_;
+        std::unordered_set<eris::SharedMember<Book>> reserved_books_;
         /// Books purchased in the just-finished period
-        std::unordered_set<eris::eris_id_t> new_books_;
+        std::unordered_set<eris::SharedMember<Book>> new_books_;
         /// Books written by this reader, in order from earliest to latest
         std::vector<eris::eris_id_t> wrote_;
+        /// Cache of the set of book markets available
+        std::unordered_set<eris::SharedMember<BookMarket>> book_cache_;
+
+        // Quality prior coefficients.  Key is the author id, values are the author-specific
+        // coefficients.  0 is for the global (non-author-specific) parameters.
+        //
+        // FIXME: this just returns the mean of a chi-squared-1, which is temporary for as long as a
+        // chi-squared-1 is the quality distribution in interApply, but needs to be changed when
+        // that changes.
+        std::unordered_map<eris::eris_id_t, std::array<double, 3>> q_coef_{{0, {{1, 0, 0}}}};
+
         double u_curr_, u_lifetime_;
 };
 

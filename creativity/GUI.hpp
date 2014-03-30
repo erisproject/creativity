@@ -79,11 +79,15 @@ class GUI : eris::noncopyable {
         void waitEvents();
 
         /** Signals the GUI thread that the visual objects have been updated and the graph needs to
-         * be redrawn.  Note that this is not synchronous: if the GUI thread is currently busy, the
-         * redraw might not actually happen until it becomes idle.  It is also collapsed: if
-         * multiple redraw() signals are queued, the thread ignores all but the last one.
+         * be redrawn.  Note that this is not, by default, synchronous: if the GUI thread is
+         * currently busy, the redraw might not actually happen until it becomes idle.  It is also
+         * collapsed: if multiple redraw() signals are queued, the thread ignores all but the last
+         * one.
+         *
+         * If the optional parameter is given and true, this blocks until the thread finishes a
+         * redraw.
          */
-        void redraw();
+        void redraw(bool sync=false);
 
         /** Sends a signal to the GUI thread that the simulation has started or resumed running. */
         void running();
@@ -159,7 +163,8 @@ class GUI : eris::noncopyable {
                     stop, ///< The user hit the "stop" button to pause the simulation.
                     resume, ///< The user hit the "resume" button to unpause the simulation.
                     step, ///< The user hit the "step" button to unpause the simulation for one step.
-                    quit ///< Sent when the user quits the application
+                    quit, ///< Sent when the user quits the application
+                    redraw ///< Sent to indicate that a redraw is complete.  Used internally for redraw(true) calls.
                 };
 
                 /// Will be true if this is a fake Event indicating that no events are pending.
@@ -197,6 +202,11 @@ class GUI : eris::noncopyable {
                 /// Constructs an event with an unsigned long value
                 Event(Type t, const unsigned long &ul);
         };
+
+        /** Processes events sent by the GUI until at least one event of the given type has been
+         * received.
+         */
+        void waitForEvent(Event::Type t);
 
     private:
         /// The thread the GUI is running in.  Set during construction.
@@ -279,6 +289,8 @@ class GUI : eris::noncopyable {
          */
         template <typename... Args>
         void queueEvent(Args&&... args);
+
+        friend class GUIGraphArea;
 
         /// Called by the GUI thread to process the signal queue
         void thr_signal();

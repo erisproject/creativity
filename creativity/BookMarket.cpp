@@ -26,6 +26,7 @@ BookMarket::price_info BookMarket::price(double q) const {
 
 void BookMarket::setPrice(double p) {
     if (p <= 0) throw std::domain_error("Cannot call BookMarket::setPrice() with a non-positive price");
+    if (simulation()->runStageIntra()) throw std::logic_error("Cannot change book price during intra-optimization");
     price_ = p;
 }
 

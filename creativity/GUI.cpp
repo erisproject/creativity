@@ -134,7 +134,7 @@ void GUI::thr_run() {
     // mainloop is running.
     std::unique_lock<std::mutex> lock{mutex_};
 
-    graph_ = std::unique_ptr<GUIGraphArea>(new GUIGraphArea{11., 11., -11., -11., sim_});
+    graph_ = std::unique_ptr<GUIGraphArea>(new GUIGraphArea{11., 11., -11., -11., sim_, *this});
     main->add_events(Gdk::EventMask::BUTTON_PRESS_MASK);
 
     // FIXME: change mouse the clickable when over readers/books?
@@ -205,7 +205,7 @@ void GUI::thr_run() {
             }
             widget<Gtk::Label>("vbk_copies")->set_text(std::to_string(copies));
             widget<Gtk::Label>("vbk_author")->set_text(book->hasAuthor()
-                    ? std::to_string(book->author()->id())
+                    ? std::to_string(book->author())
                     : "(dead)"
             );
             dlg_book->run();
@@ -309,7 +309,16 @@ void GUI::thr_signal() {
     }
 
     if (last_redraw.type == Signal::Type::redraw) {
-        graph_->queue_draw();
+        std::cerr << "queueing a redraw\n";
+        if (graph_->get_is_drawable()) {
+            graph_->queue_draw();
+        }
+        else {
+            std::cerr << "...but not visible, so skipping\n";
+            // Not currently drawable (perhaps not on visualization tab), so send back a fake redraw
+            // event in case the caller is going to wait for a redraw to complete.
+            queueEvent(Event::Type::redraw);
+        }
     }
 }
 
@@ -326,7 +335,10 @@ void GUI::queueSignal(Signal &&s) {
     }
 }
 
-void GUI::redraw() { queueSignal(Signal::Type::redraw); }
+void GUI::redraw(bool sync) {
+    queueSignal(Signal::Type::redraw);
+    if (sync) waitForEvent(Event::Type::redraw);
+}
 
 void GUI::running() { queueSignal(Signal::Type::running); }
 
@@ -359,6 +371,19 @@ void GUI::waitEvents() {
     std::unique_lock<std::mutex> lock(mutex_);
     cv_.wait(lock, [this]() -> bool { return not event_queue_.empty(); });
     processEvents_(lock);
+}
+
+void GUI::waitForEvent(Event::Type t) {
+    bool done = false;
+    while (not done) {
+        std::unique_lock<std::mutex> lock(mutex_);
+        cv_.wait(lock, [this]() -> bool { return not event_queue_.empty(); });
+        for (auto &e : event_queue_) {
+            std::cerr << "saw event\n";
+            if (e.type == t) { done = true; break; }
+        }
+        processEvents_(lock);
+    }
 }
 
 // Moves out the current queue elements, unlocks the lock, then processes the queue elements.
@@ -403,6 +428,8 @@ void GUI::handleEvent(const Event &event) {
                 break;
             case Event::Type::quit:
                 if (on_quit_) on_quit_();
+                break;
+            default: // Ignore anything else
                 break;
         }
     } catch (std::exception &e) {

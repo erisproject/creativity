@@ -30,11 +30,16 @@ class BookMarket : public eris::Market, public virtual eris::interopt::Advance {
 
         /** Sets the price of copies of the book on the market for future sales.  The value is a
          * multiple of creativity::MONEY.
+         *
+         * This may not be called during an intra-optimization phase.
          */
         void setPrice(double p);
 
         /** Returns the price of a single copy of the book.  This will be the same value as any of
          * `m.price(1).total`, `m.price(1).marginalFirst`, `m.price(1).marginal`.
+         *
+         * This is guaranteed not to change during an intra-period optimization phase (and so a read
+         * lock on the market to obtain market price is not required).
          */
         const double& price();
 
