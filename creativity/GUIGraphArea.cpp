@@ -5,10 +5,12 @@
 #include <eris/Random.hpp>
 #include <cmath>
 
+using namespace eris;
+
 namespace creativity {
 
 GUIGraphArea::GUIGraphArea(const double &top, const double &right, const double &bottom, const double &left,
-        std::shared_ptr<eris::Simulation> sim, GUI &gui) :
+        std::shared_ptr<Simulation> sim, GUI &gui) :
     sim_{sim}, gui_{gui}, bounds_{{top,right,bottom,left}}
 {}
 
@@ -90,10 +92,13 @@ bool GUIGraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
     }
     cr->stroke();
 
+    SharedMember<Reader> token_reader; // Need to keep a reader for wrapping
+
     cr->set_source_rgba(1, 0.55, 0, 0.5); // Lines from readers to purchased books
     for (auto &r : sim_->agents<Reader>()) {
+        if (!token_reader) { token_reader = r; }
         double rx = r->position()[0], ry = r->position()[1];
-        drawPoint(cr, trans, rx, ry, PointType::X);
+        drawPoint(cr, trans, rx, ry, PointType::X, r);
 
         const double radius1 = 0.05 * (r->u() - 1000);
         const double radius2 = 0.1 * r->newBooks().size();
@@ -102,54 +107,99 @@ bool GUIGraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
         }
         if (radius2 > 0) { // Bought some books
             drawCircle(cr, trans, rx, ry, radius2, CircleType::A);
-            trans.transform_point(rx, ry);
             for (auto &book_id : r->newBooks()) {
                 auto b = sim_->good<Book>(book_id);
-                double bx = b->position()[0], by = b->position()[1];
-                trans.transform_point(bx, by);
-                cr->move_to(rx, ry);
-                cr->line_to(bx, by);
+                drawWrappingLine(cr, trans, r, b);
             }
             cr->stroke();
         }
         // NB: rx, ry may be translated now
     }
 
-    cr->set_source_rgba(0.5, 0.2, 0.5, 0.5); // Lines from books to their author
+    cr->set_source_rgba(0.5, 0.2, 0.5, 0.5); // Colour for lines from books to their author
     for (auto &b : sim_->goods<Book>()) {
         // Give new books a larger cross: a brand new book gets a point 3 times as large; this
         // scaling decreases linearly to the regular size at a 10-period old book.
         const double scale = std::max(1.0, 3.0 - 0.3*b->age());
 
-        drawPoint(cr, trans, b->position()[0], b->position()[1], PointType::CROSS, scale);
+        // Draw book:
+        drawPoint(cr, trans, b->position()[0], b->position()[1], PointType::CROSS, token_reader, scale);
 
-        auto a = b->author();
-        auto bx = b->position()[0], by = b->position()[1],
-             ax = a->position()[0], ay = a->position()[1];
+        drawWrappingLine(cr, trans, b->author(), b);
 
-        trans.transform_point(bx, by);
-        trans.transform_point(ax, ay);
-        cr->move_to(bx, by);
-        cr->line_to(ax, ay);
         cr->stroke();
     }
 
     cr->restore();
-    std::cerr << "sending a redraw\n";
     gui_.queueEvent(GUI::Event::Type::redraw);
     return true;
 }
 
+void GUIGraphArea::drawWrappingLine(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans, const Reader &r, const Book &b) {
+    cr->save();
+    cr->transform(trans);
+    const auto &rp = r.position();
+    const double x_span = r.wrapUpperBound()[0] - r.wrapLowerBound()[0];
+    const double y_span = r.wrapUpperBound()[1] - r.wrapLowerBound()[1];
+    auto v = r.vectorTo(b);
+    // There are nine virtual points the author can take; draw a line from each of them (at most
+    // three of these lines will actually show up)
+    for (double r_x : {rp[0], rp[0] - x_span, rp[0] + x_span}) {
+        for (double r_y : {rp[1], rp[1] - y_span, rp[1] + y_span}) {
+            cr->move_to(r_x, r_y);
+            cr->rel_line_to(v[0], v[1]);
+        }
+    }
+    cr->restore(); // Undo transformation
+}
+
 void GUIGraphArea::drawPoint(
         const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans,
-        double x, double y, const PointType &type, double scale) {
+        double x, double y, const PointType &type, const SharedMember<Reader> &r, const double &scale) {
+
+    // The radius of the point
+    const double pt_radius = point_size * scale;
+
+    // Before we transform x and y, consider whether there are wrapped versions of the point we need
+    // to worry about; if so, draw them first.
+    if (r) {
+        SharedMember<Reader> null_reader;
+        double dim_x = r->wrapUpperBound()[0] - r->wrapLowerBound()[0],
+               dim_y = r->wrapUpperBound()[1] - r->wrapLowerBound()[1];
+        bool wrap_right = x + pt_radius > r->wrapUpperBound()[0],
+             wrap_left = x - pt_radius < r->wrapLowerBound()[0],
+             wrap_up = y + pt_radius > r->wrapUpperBound()[1],
+             wrap_down = y - pt_radius < r->wrapLowerBound()[1];
+
+        // There are 8 wrapping possibilities to consider; the first 4 are corners, the last 4 are
+        // single-dimension edge wraps.  Corners are just like double-edged wraps, but *also* have
+        // to wrap to the opposite corner.
+        if (wrap_left and wrap_up) // Upper left
+            drawPoint(cr, trans, x+dim_x, y-dim_y, type, null_reader, scale); // Lower right
+        else if (wrap_left and wrap_down) // Lower left
+            drawPoint(cr, trans, x+dim_x, y+dim_y, type, null_reader, scale); // Upper right
+        else if (wrap_right and wrap_up) // Upper right
+            drawPoint(cr, trans, x-dim_x, y-dim_y, type, null_reader, scale); // Lower left
+        else if (wrap_right and wrap_down) // Lower right
+            drawPoint(cr, trans, x-dim_x, y+dim_y, type, null_reader, scale); // Upper left
+
+        // Now the edge mirroring
+        if (wrap_left)
+            drawPoint(cr, trans, x+dim_x, y, type, null_reader, scale);
+        else if (wrap_right)
+            drawPoint(cr, trans, x-dim_x, y, type, null_reader, scale);
+        
+        if (wrap_up)
+            drawPoint(cr, trans, x, y-dim_y, type, null_reader, scale);
+        else if (wrap_down)
+            drawPoint(cr, trans, x, y+dim_y, type, null_reader, scale);
+    }
+
     // Get the user-space coordinates of the point
     trans.transform_point(x, y);
 
     cr->save();
     cr->set_line_width(2.0);
-
-    const double pt_radius = point_size * scale;
 
     switch (type) {
         case PointType::X:
@@ -208,7 +258,7 @@ void GUIGraphArea::drawCircle(const Cairo::RefPtr<Cairo::Context> &cr, const Cai
     // Draw a radial line at a quasi-random angle (based on the position and radius values) to the
     // center of the circle
     //std::uniform_real_distribution<double> rand_angle(0, 2*M_PI);
-    //double angle = rand_angle(eris::Random::rng());
+    //double angle = rand_angle(Random::rng());
     double angle = std::fmod(1000000 * cx * cy * r, 2*M_PI);
     cr->move_to(cx, cy);
     cr->rel_line_to(r*std::sin(angle), r*std::cos(angle));

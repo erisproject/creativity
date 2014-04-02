@@ -134,7 +134,7 @@ void GUI::thr_run() {
     // mainloop is running.
     std::unique_lock<std::mutex> lock{mutex_};
 
-    graph_ = std::unique_ptr<GUIGraphArea>(new GUIGraphArea{11., 11., -11., -11., sim_, *this});
+    graph_ = std::unique_ptr<GUIGraphArea>(new GUIGraphArea{10., 10., -10., -10., sim_, *this});
     main->add_events(Gdk::EventMask::BUTTON_PRESS_MASK);
 
     // FIXME: change mouse the clickable when over readers/books?

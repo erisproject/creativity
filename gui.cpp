@@ -98,7 +98,8 @@ int main(int argc, char *argv[1]) {
     }
 
     for (auto i = 0UL; i < num_readers; i++) {
-        auto r = sim->create<Reader>(Position{unif_pmb(rng), unif_pmb(rng)});
+        auto r = sim->create<Reader>(Position{unif_pmb(rng), unif_pmb(rng)},
+                Position{-BOUNDARY,-BOUNDARY}, Position{BOUNDARY, BOUNDARY});
         r->writer_prob = prob_writer;
         r->writer_book_sd = book_sd;
         sim->create<intraopt::FixedIncome>(r, Bundle{{ MONEY, 1000 }});

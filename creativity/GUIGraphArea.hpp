@@ -9,6 +9,8 @@ namespace creativity {
 
 // forward declarations
 class GUI;
+class Reader;
+class Book;
 
 class GUIGraphArea : public Gtk::DrawingArea, eris::noncopyable {
     public:
@@ -40,10 +42,11 @@ class GUIGraphArea : public Gtk::DrawingArea, eris::noncopyable {
          * \param x the point x coordinate, in graph space
          * \param y the point y coordinate, in graph space
          * \param type the type of point to draw
+         * \param Take this Reader's wrapping into account when drawing the point.
          * \param scale the scale of the point.  1 (the default) means default size.
          */
         void drawPoint(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans,
-                double x, double y, const PointType &type, double scale = 1.0);
+                double x, double y, const PointType &type, const eris::SharedMember<Reader> &r, const double &scale = 1.0);
 
         /** Circle types supported by addCircle() */
         enum class CircleType {
@@ -87,6 +90,9 @@ class GUIGraphArea : public Gtk::DrawingArea, eris::noncopyable {
         std::array<double, 4> bounds_;
         // Constants for access into bounds_
         static constexpr size_t TOP = 0, RIGHT = 1, BOTTOM = 2, LEFT = 3;
+        // Sets up one or more (wrapping) lines between the reader to the book, but does not
+        // actually draw it with stroke().  The reader's wrapping is used.
+        void drawWrappingLine(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans, const Reader &r, const Book &b);
 };
 
 }

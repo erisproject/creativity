@@ -12,6 +12,10 @@ namespace creativity {
 const std::vector<double> Reader::default_polynomial{{4., -1.}};
 const std::vector<double> Reader::default_penalty_polynomial{{0, 0, 0.25}};
 
+Reader::Reader(const Position &pos, const Position &b1, const Position &b2)
+    : WrappedPositional<agent::AssetAgent>(pos, b1, b2)
+{}
+
 void Reader::uPolynomial(std::vector<double> coef) {
     // 0th coefficient must be positive
     if (coef.size() >= 1 and coef[0] <= 0) throw std::domain_error("Invalid uPolynomial: coef[0] <= 0");
@@ -138,20 +142,7 @@ void Reader::interAdvance() {
             }
         }
         walk *= distance / sqrt(tss);
-        Position dest = position() + walk;
-        for (size_t i = 0; i < dest.dimensions; i++) {
-            // Keep reflecting off the boundaries until we're inside the boundary.  This is
-            // typically going to happen at most once, but could be more than once if `distance`
-            // above happened to be a very large draw.
-            while (fabs(dest[i]) > BOUNDARY) {
-                if (dest[i] > BOUNDARY) // and > 0
-                    dest[i] = BOUNDARY + BOUNDARY - dest[i];
-                else // dest[i] < -BOUNDARY < 0
-                    dest[i] = -BOUNDARY - BOUNDARY - dest[i];
-            }
-        }
-
-        if (dest) moveTo(dest);
+        moveBy(walk);
     }
 }
 

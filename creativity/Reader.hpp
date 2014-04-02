@@ -1,5 +1,5 @@
 #pragma once
-#include <eris/Positional.hpp>
+#include <eris/WrappedPositional.hpp>
 #include <eris/agent/AssetAgent.hpp>
 #include <eris/Market.hpp>
 #include <string>
@@ -30,15 +30,15 @@ class BookMarket;
  * quality, considering their price, then deciding which books to buy.  Books are only purchased
  * once, and at most one copy is purchased by any reader.
  */
-class Reader : public eris::Positional<eris::agent::AssetAgent>,
+class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
     public virtual eris::interopt::Apply,
     public virtual eris::interopt::Advance,
     public virtual eris::intraopt::OptApplyReset,
     public virtual eris::intraopt::Initialize
 {
     public:
-        /// Inherit positional constructor
-        using eris::Positional<eris::agent::AssetAgent>::Positional;
+        /// Constructor takes the reader position and the (wrapping) positional boundaries
+        Reader(const eris::Position &pos, const eris::Position &b1, const eris::Position &b2);
 
         /** Takes a money value and a container of SharedMember<Book> objects and returns the
          * utility for that set of books.  This is calculated as the money plus the sum of utilities

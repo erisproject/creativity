@@ -14,11 +14,12 @@ class BookMarket;
  * thing that is changeable is the number of sales, which is internally protected by sales(unsigned long).
  * Thus obtaining a lock (even a read lock) on this class is seldom necessary.
  */
-class Book final : public eris::Positional<eris::Good::Discrete> {
+class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
     public:
         /** Constructs a new book at the given position created by the given author.  When the book
          * is added to the simulation, a BookMarket is constructed for selling the book which
-         * starts the price at `initial_price`.
+         * starts the price at `initial_price`.  The book will have the same wrapping boundaries as
+         * the author.
          *
          * \param p the position of the book
          * \param author the author of the book

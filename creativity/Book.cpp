@@ -11,7 +11,7 @@ Book::Book(
         SharedMember<Reader> author,
         double initial_price,
         std::function<double(const Book&, const Reader&)> quality)
-    : Positional<Good::Discrete>(p),
+    : WrappedPositional<Good::Discrete>(p, author->wrapLowerBound(), author->wrapUpperBound()),
         author_{author},
         init_price_{initial_price},
         quality_{quality}
