@@ -171,8 +171,8 @@ double Reader::quality(const SharedMember<Book> &b) const {
     if (coef != q_coef_.end()) {
         e_qual +=
             coef->second[0] +
-            coef->second[1] * n +
-            coef->second[2] * n * n;
+            coef->second[1] * n; //+
+            //coef->second[2] * n * n;
     }
 
     return e_qual;
