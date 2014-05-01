@@ -18,7 +18,9 @@ include(GNUInstallDirs)
 find_package(PkgConfig REQUIRED)
 set(creativity_pkgconfig_GTKMM gtkmm-3.0)
 set(creativity_pkgconfig_ERIS liberis)
+
 set(creativity_pkgconfig ERIS GTKMM)
+
 foreach(pkg ${creativity_pkgconfig})
     pkg_check_modules(${pkg} REQUIRED ${creativity_pkgconfig_${pkg}})
     include_directories(${${pkg}_INCLUDE_DIRS})
@@ -59,3 +61,5 @@ target_link_libraries(creativity-gui creativity)
 install(FILES gui.glade creativity.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/creativity/gui.glade)
 
 #add_subdirectory(doc EXCLUDE_FROM_ALL)
+
+add_subdirectory(scratch)
