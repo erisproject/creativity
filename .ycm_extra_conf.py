@@ -7,6 +7,7 @@ flags = [
         '-Wextra',
         '-std=c++11',
         '-I', '.',
+        '-I', '/usr/include/eigen3',
         '-I', 'build' # The pick up the generated creativity/config.hpp
         ]
 
