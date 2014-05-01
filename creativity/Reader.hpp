@@ -120,8 +120,8 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
 
         /** Returns the quality of a given book.  If the given book is already in the user's
          * library, this returns a realized quality value; otherwise it returns a predicted quality
-         * value based on the reader's prior.  This quantity must be stable (that is, calling it
-         * multiple times without the library or prior having changed will return the same value).
+         * value based on the reader's prior.  This quantity must be non-stochastic (calling it
+         * multiple times without the library or prior having changed should return the same value).
          */
         virtual double quality(const eris::SharedMember<Book> &b) const;
 
@@ -144,22 +144,25 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * - `coef[0] > 0` must be true.  If it isn't, the decreasing requirement of uBook means
          *   that the reader gets no utility ever from books (since \f$f(x > 0) < f(0) \leq 0\f$).
          * - The first non-zero coefficient (not counting `coef[0]`) must be negative (typically
-         *   this means `coef[1] < 0`).  If it isn't, the polynomial is increasing for values of `d`
-         *   close to 0 (more technically, the derivative of the polynomial is strictly positive at
-         *   values close to 0).
+         *   this means `coef[1] <= 0`).  If it isn't, the polynomial is increasing for values of
+         *   `d` close to 0 (more technically, the derivative of the polynomial is strictly positive
+         *   at 0).
          * - the last non-zero coefficient (not counting `coef[0]`) must be negative.  If it isn't,
          *   the limit of the polynomial is positive infinity and thus must (eventually) be upward
          *   sloping.
          * - the polynomial must be decreasing when evaluated at 0, 0.000001, 0.001, 0.01, 0.1, 1,
-         *   10, 100, 1000, 1000000.  These values are arbitrary, and if course this is no guarantee
+         *   10, 100, 1000, 1000000.  These values are arbitrary, and of course this is no guarantee
          *   that the polynomial is decreasing between and outside these values: it only provides a
          *   safety check.
          *
          * \param coef the vector of polynomial coefficients.
+         *
+         * Note that the coefficients set here might not be used by a subclass that overrides
+         * uBook().
          */
         void uPolynomial(std::vector<double> coef);
 
-        /** Returns the coefficients for the uBook() polynomial.
+        /** Accesses the vector of coefficients for the uBook() polynomial.
          *
          * \sa uPolynomial(std::vector<double>)
          */
