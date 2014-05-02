@@ -11,7 +11,7 @@ namespace creativity {
 extern eris::SharedMember<eris::Good::Continuous> MONEY;
 
 /// The reader boundary (from 0, in each dimension).  If readers attempt to move off the boundary,
-/// they "bounce" back in.
+/// they "wrap", coming in the opposite side(s).
 constexpr double BOUNDARY = 10;
 
 class BookMarket; // Forward declaration

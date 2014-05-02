@@ -5,6 +5,11 @@
 #include <string>
 #include <vector>
 #include <unordered_set>
+#include <Eigen3/Core>
+#include "belief/Profit.hpp"
+#include "belief/Demand.hpp"
+
+using Eigen::Vector3d;
 
 namespace creativity {
 
@@ -37,8 +42,19 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
     public virtual eris::intraopt::Initialize
 {
     public:
-        /// Constructor takes the reader position and the (wrapping) positional boundaries
-        Reader(const eris::Position &pos, const eris::Position &b1, const eris::Position &b2);
+        /** Constructor takes the reader position and the (wrapping) positional boundaries, plus
+         * rvalue models for lifetime profit and per-period demand.
+         *
+         * \param pos the initial position of the reader
+         * \param b1 a vertex of the wrapping boundary box for the reader
+         * \param b2 the vertex opposite `b1` of the wrapping boundary box for the reader
+         * \param demand a per-period demand belief object
+         * \param profit a per-period profit belief object
+         */
+        Reader(
+                const eris::Position &pos, const eris::Position &b1, const eris::Position &b2,
+                belief::Demand &&demand, belief::Profit &&profit
+              );
 
         /** Takes a money value and a container of SharedMember<Book> objects and returns the
          * utility for that set of books.  This is calculated as the money plus the sum of utilities
@@ -235,6 +251,21 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          */
         double writer_book_sd{0.5};
 
+        /** The reader's creation coefficients.  This reader can exhert effort \f$\ell \geq 0\f$ to
+         * create a book of quality \f$q(\ell) = \alpha_0 + \alpha_1 \ell^{\alpha_2}\f$, where
+         * \f$\alpha\f$ is this vector.
+         *
+         * The default value is \f$\alpha = (-5.0, 1.0, 0.25).
+         */
+        Vector3d creation_coefs{-5.0, 1.0, 0.25};
+
+        /** Returns the resulting quality of this reader exerting effort level `effort` to create a
+         * book.
+         *
+         * \sa creation_coefs
+         */
+        double creationQuality(const double &effort) const;
+
         /// Updates the book market cache with any new books
         void intraInitialize() override;
 
@@ -263,6 +294,21 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         /** Resets the book purchases calculated in intraOptimize(). */
         void intraReset() override;
 
+    protected:
+        /// Belief about lifetime book profits
+        belief::Profit profit_belief_;
+        /// Belief about per-period demand
+        belief::Demand demand_belief_;
+
+        /** Updates the demand equation belief based on book sales observed in the previous period.
+         */
+        void updateDemandBelief();
+
+        /** Updates the profit equation belief based on observations from the previous period.
+         */
+        void updateProfitBelief();
+
+
     private:
         std::vector<double> u_poly_ = Reader::default_polynomial;
         std::vector<double> pen_poly_ = Reader::default_penalty_polynomial;
@@ -287,7 +333,9 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         // that changes.
         std::unordered_map<eris::eris_id_t, std::array<double, 3>> q_coef_{{0, {{1, 0, 0}}}};
 
+        // Track current and cumulative utility:
         double u_curr_, u_lifetime_;
+
 };
 
 }

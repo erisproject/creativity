@@ -68,6 +68,27 @@ class Demand : public Linear<7> {
         double predict(const double &P, const double &q, const unsigned long &S,
                 const unsigned long &otherBooks, const unsigned long &marketBooks);
 
+        /** Given a set of model parameters (other than \f$P_b\f$) and an optional per-unit cost
+         * (defaulting to 0), this returns the \f$P_b\f$ value that maximizes total profits:
+         *
+         * \f[
+         *     P_b Q_b(P_b, \hdots) - c_b Q_b(P_b, \hdots)
+         * \f]
+         *
+         * This optimal value is calculated numerically.
+         *
+         * \param q the quality of the book
+         * \param S prior book sales
+         * \param otherBooks the number of other books created by this book's author.  This parameter
+         * also determines the `onlyBook` dummy (`= 1` iff `otherBooks == 0`).
+         * \param marketBooks the number of books on the market last period
+         *
+         * \sa eris::single_peak_search for the numerical algorithm used.
+         */
+        double argmax(const double &q, const unsigned long &S, const unsigned long &otherBooks, const unsigned long &marketBooks,
+                const double &c = 0.0);
+        // FIXME: implement this
+
     private:
         unsigned int D_;
 

@@ -12,8 +12,12 @@ namespace creativity {
 const std::vector<double> Reader::default_polynomial{{4., -1.}};
 const std::vector<double> Reader::default_penalty_polynomial{{0, 0, 0.25}};
 
-Reader::Reader(const Position &pos, const Position &b1, const Position &b2)
-    : WrappedPositional<agent::AssetAgent>(pos, b1, b2)
+Reader::Reader(
+        const Position &pos, const Position &b1, const Position &b2,
+        belief::Demand &&demand, belief::Profit &&profit
+        )
+    : WrappedPositional<agent::AssetAgent>(pos, b1, b2),
+    profit_belief_{std::move(profit)}, demand_belief_{std::move(demand)}
 {}
 
 void Reader::uPolynomial(std::vector<double> coef) {
@@ -92,25 +96,47 @@ const std::vector<double>& Reader::penaltyPolynomial() const {
     return pen_poly_;
 }
 
+double Reader::creationQuality(const double &effort) const {
+    return creation_coefs[0] + creation_coefs[1] * std::pow(effort, creation_coefs[2]);
+}
 
 void Reader::interApply() {
-    auto &rng = Random::rng();
-    // Flip a (weighted) coin to determine creativity:
-    if (std::bernoulli_distribution{writer_prob}(rng)) {
+    // Update lifetime profit and per-period demand beliefs
+    updateDemandBelief();
+    updateProfitBelief();
+
+    const double previous_books = wrote().size();
+    const double market_books = simulation()->countMarkets<BookMarket>();
+
+    // Find the l that maximizes creation profit
+    double l_max = profit_belief_.argmax(
+            [this] (const double &l) -> double { return creationQuality(l); },
+            previous_books, market_books, assets()[MONEY]
+            );
+    double e_profit = profit_belief_.predict(creationQuality(l_max), previous_books, market_books);
+
+    // Create a book if E(profit) > effort required
+    if (e_profit > l_max) {
 
         // The book is centered at the reader's position:
         Position bookPos{position()};
 
-        // Initial price (FIXME):
-        double FIXME_initial_price = 1;
-
         if (writer_book_sd > 0) {
+            auto &rng = Random::rng();
             // Now add some noise to each dimension
             std::normal_distribution<double> book_noise(0, writer_book_sd);
             for (auto &x : bookPos) {
                 x += book_noise(rng);
             }
         }
+
+    // Set the price of the book for the upcoming period
+
+    // Flip a (weighted) coin to determine creativity:
+    if (std::bernoulli_distribution{writer_prob}(rng)) {
+
+        // Initial price (FIXME):
+        double FIXME_initial_price = 1;
 
         // Finally we need a quality distribution.  Use chi²(1) for now.
         std::chi_squared_distribution<double> chisq1(1);
@@ -194,7 +220,8 @@ void Reader::intraOptimize() {
     auto lock = readLock();
 
     std::vector<SharedMember<BookMarket>> cache_del;
-    // Map u-p values to sets of market ids
+    // Map utility-minus-price values to sets of market ids so that we can pick the book(s) where
+    // net utility (i.e. u-p) is highest.
     std::map<double, std::vector<SharedMember<BookMarket>>> book_net_u;
     for (auto &bm : book_cache_) {
         if (not bm) { // Market removed: remove from cache and continue
