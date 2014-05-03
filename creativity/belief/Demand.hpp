@@ -1,13 +1,14 @@
 #pragma once
-#include <creativity/belief/Linear.hpp>
+#include "creativity/belief/Linear.hpp"
+#include <eris/algorithms.hpp>
 
 namespace creativity { namespace belief {
 
 /** This class represents an author's belief about the per-period demand for books.  The model is of
  * the form:
  *
- * \f$Q_b = \beta_1 + \beta_2 P_b^D + \beta_3 q_b^D + \beta_4 S_{b-} + \beta_5 onlyBook + \beta_6 otherBooks 
- * + \beta_7 marketBooks + u\f$
+ * \f$Q_b = \beta_0 + \beta_1 P_b^D + \beta_2 q_b^D + \beta_3 S_{b-} + \beta_4 onlyBook + \beta_5 otherBooks 
+ * + \beta_6 marketBooks + u\f$
  * where:
  * - \f$Q_b\f$ is the quantity (i.e. copies) sold
  * - \f$P_b\f$ is the price of a copy (which must be non-negative)
@@ -24,9 +25,9 @@ namespace creativity { namespace belief {
  * - \f$marketBooks\f$ is the number of books on the market in the previous period
  *
  * The following restrictions are imposed on beliefs:
- * - \f$\beta_2 \leq 0\f$ (higher price means fewer sales)
- * - \f$\beta_3 \geq 0\f$ (higher quality means more sales)
- * - \f$\beta_7 \leq 0\f$ (more competition means fewer sales)
+ * - \f$\beta_1 \leq 0\f$ (higher price means fewer sales)
+ * - \f$\beta_2 \geq 0\f$ (higher quality means more sales)
+ * - \f$\beta_6 \leq 0\f$ (more competition means fewer sales)
  *
  * These constraints are combined with a natural conjugate prior for the purposes of updating the
  * beliefs via Bayesian econometrics.
@@ -75,19 +76,54 @@ class Demand : public Linear<7> {
          *     P_b Q_b(P_b, \hdots) - c_b Q_b(P_b, \hdots)
          * \f]
          *
-         * This optimal value is calculated numerically.
+         * If \f$c_b = 0\f$ this value is calculated analytically as:
+         * \f[
+         *     P_b = \sqrt[D]{\frac{X\gamma}{-\beta_1(1+D)}}
+         * \f]
+         * where \f$X\gamma\f$ is the set of values and parameters in the model other than \f$P\f$.
+         * When \f$X\gamma <= 0\f$, \f$P_b = 0\f$ is returned instead.  Note that \f$\beta_1\f$ is
+         * negative by assumption (and prior) so that the equation above has the same sign as
+         * \f$X\gamma\f$.
+         *
+         * When \f$c_b > 0\f$, the profit equation above equals:
+         * \f[
+         *     (P - c)X\gamma + \beta_1(P-c)P^D
+         * \f]
+         * where, as above, \f$X\gamma\f$ is the value of all non-price independent variables and
+         * coefficients.  When \f$X\gamma \leq 0\f$, expected quantity is 0 and so the minimum
+         * price, \f$P = c\f$, is returned.  Otherwise the optimum is an equation of the form
+         * \f$a + bP^{D-1} + cP^D = 0\f$, which has no simple analytical solution for an arbitrary
+         * \f$D\f$ dimensionality value.
+         *
+         * Instead the simple eris::single_peak_search numerical algorithm is used.  Note that in
+         * the profit equation above, the first term (\f$(P-c)X\gamma\f$) is positive and the second
+         * term (\f$\beta_1(P-c)P^D\f$) is negative since \f$\beta_1 < 0\f$ (by assumption and
+         * prior).  Thus the profit equation is clearly single-peaked in \f$P\f$, and so
+         * eris::single_peak_search will work without issue.
          *
          * \param q the quality of the book
          * \param S prior book sales
          * \param otherBooks the number of other books created by this book's author.  This parameter
          * also determines the `onlyBook` dummy (`= 1` iff `otherBooks == 0`).
          * \param marketBooks the number of books on the market last period
+         * \param c the per-unit cost of copies.  Optional: defaults to 0.
          *
+         * \returns the value of \f$P\f$ that maximizes the above equation.  The returned value will
+         * always be greater than or equal to `c` (which defaults to 0).
+         *
+         * \throws std::domain_error if `c < 0` or `q < 0`
+         *
+         * \sa argmaxP_MAX: the maximum P that will be considered when using the numerical algorithm
+         * (i.e. when `c > 0`).
          * \sa eris::single_peak_search for the numerical algorithm used.
          */
-        double argmax(const double &q, const unsigned long &S, const unsigned long &otherBooks, const unsigned long &marketBooks,
+        double argmaxP(const double &q, const unsigned long &S, const unsigned long &otherBooks, const unsigned long &marketBooks,
                 const double &c = 0.0);
-        // FIXME: implement this
+
+        /** The maximum P that will be considered for argmaxP() when called with `c > 0`.  Only
+         * needs to be adjusted if the optimal value of P could potential exceed the default of 10,000.
+         */
+        double argmaxP_MAX = 10000;
 
     private:
         unsigned int D_;

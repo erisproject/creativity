@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 #include <unordered_set>
-#include <Eigen3/Core>
+#include <Eigen/Core>
 #include "belief/Profit.hpp"
 #include "belief/Demand.hpp"
 
@@ -325,6 +325,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         /// Cache of the set of book markets available
         std::unordered_set<eris::SharedMember<BookMarket>> book_cache_;
 
+        // FIXME: Move to to a belief class
         // Quality prior coefficients.  Key is the author id, values are the author-specific
         // coefficients.  0 is for the global (non-author-specific) parameters.
         //

@@ -129,9 +129,12 @@ void Reader::interApply() {
                 x += book_noise(rng);
             }
         }
+    }
 
-    // Set the price of the book for the upcoming period
+    // Set the price of all books for the upcoming period
+    
 
+    /* Old, stale code:
     // Flip a (weighted) coin to determine creativity:
     if (std::bernoulli_distribution{writer_prob}(rng)) {
 
@@ -144,6 +147,7 @@ void Reader::interApply() {
 
         wrote_.push_back(simulation()->create<Book>(bookPos, sharedSelf(), FIXME_initial_price, quality));
     }
+    */
 }
 
 void Reader::interAdvance() {
@@ -209,6 +213,13 @@ double Reader::penalty(unsigned long n) const {
 }
 
 const std::unordered_map<eris_id_t, double>& Reader::library() { return library_; }
+
+void Reader::updateDemandBelief() {
+    throw std::runtime_error("FIXME: updateDemandBelief not yet implemented!\n");
+}
+void Reader::updateProfitBelief() {
+    throw std::runtime_error("FIXME: updateProfitBelief not yet implemented!\n");
+}
 
 void Reader::intraInitialize() {
     for (auto &bm : NEW_BOOKS) {
