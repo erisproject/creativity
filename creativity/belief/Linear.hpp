@@ -13,6 +13,20 @@ namespace creativity { namespace belief {
 template <unsigned int Parameters>
 class Linear {
     public:
+#if !EIGEN_VERSION_AT_LEAST(3,3,0)
+        /** Move constructor for Eigen versions before 3.3.  Eigen 3.2 and earlier don't have proper
+         * move support, and the implicit ones break things, so we work around this by providing a
+         * Move constructor that just calls the implicit copy constructor.  This, of course, means
+         * that for old Eigen versions, almost nothing is saved by moving since we actually copy.
+         *
+         * Eigen 3.3 adds a proper move constructor, and so we don't need this: the default implicit
+         * move constructor should work just fine.
+         */
+        Linear(Linear &&mv) : Linear(mv) {}
+        /// Default move constructor
+        Linear(const Linear &copy) = default;
+#endif
+
         /// The number of parameters of the model
         constexpr static unsigned int K = Parameters;
         /// Default constructor deleted
