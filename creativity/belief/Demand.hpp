@@ -48,11 +48,11 @@ class Demand : public Linear<7> {
          * integer).
          */
         Demand(
-                unsigned int D,
-                Matrix<double, K, 1> beta_prior,
-                double s_prior,
-                Matrix<double, K, K> V_prior,
-                double n_prior
+                const unsigned int &D,
+                const VectorKd &beta_prior,
+                const double &s_prior,
+                const MatrixKd &V_prior,
+                const double &n_prior
               );
 
         /** Given a set of model parameters, this returns an expected value \f$Q_b\f$, the number of sales.
@@ -67,13 +67,13 @@ class Demand : public Linear<7> {
          * \throws std::domain_error if `P < 0` or `q < 0`.
          */
         double predict(const double &P, const double &q, const unsigned long &S,
-                const unsigned long &otherBooks, const unsigned long &marketBooks);
+                const unsigned long &otherBooks, const unsigned long &marketBooks) const;
 
         /** Given a set of model parameters (other than \f$P_b\f$) and an optional per-unit cost
          * (defaulting to 0), this returns the \f$P_b\f$ value that maximizes total profits:
          *
          * \f[
-         *     P_b Q_b(P_b, \hdots) - c_b Q_b(P_b, \hdots)
+         *     P_b Q_b(P_b, \ldots) - c_b Q_b(P_b, \ldots)
          * \f]
          *
          * If \f$c_b = 0\f$ this value is calculated analytically as:
@@ -105,11 +105,13 @@ class Demand : public Linear<7> {
          * \param S prior book sales
          * \param otherBooks the number of other books created by this book's author.  This parameter
          * also determines the `onlyBook` dummy (`= 1` iff `otherBooks == 0`).
-         * \param marketBooks the number of books on the market last period
+         * \param marketBooks the number of books on the market in the last pre-prediction period
+         * (including this book, if this book was on the market)
          * \param c the per-unit cost of copies.  Optional: defaults to 0.
          *
-         * \returns the value of \f$P\f$ that maximizes the above equation.  The returned value will
-         * always be greater than or equal to `c` (which defaults to 0).
+         * \returns a std::pair of values where `.first` is the maximizing price and `.second` is
+         * the maximum at that price.  The returned price will always be greater than or equal to
+         * `c` (which defaults to 0).
          *
          * \throws std::domain_error if `c < 0` or `q < 0`
          *
@@ -117,8 +119,8 @@ class Demand : public Linear<7> {
          * (i.e. when `c > 0`).
          * \sa eris::single_peak_search for the numerical algorithm used.
          */
-        double argmaxP(const double &q, const unsigned long &S, const unsigned long &otherBooks, const unsigned long &marketBooks,
-                const double &c = 0.0);
+        std::pair<double, double> argmaxP(const double &q, const unsigned long &S, const unsigned long &otherBooks, const unsigned long &marketBooks,
+                const double &c = 0.0) const;
 
         /** The maximum P that will be considered for argmaxP() when called with `c > 0`.  Only
          * needs to be adjusted if the optimal value of P could potential exceed the default of 10,000.

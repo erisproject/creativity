@@ -8,6 +8,7 @@
 #include <Eigen/Core>
 #include "belief/Profit.hpp"
 #include "belief/Demand.hpp"
+#include "belief/Quality.hpp"
 
 using Eigen::Vector3d;
 
@@ -16,14 +17,15 @@ namespace creativity {
 class Book; // forward declaration
 class BookMarket;
 
-/** A Reader is an agent with a position whose utility is determined by books and an outside option.
- * In particular, his utility is quasilinear of the form:
+/** A Reader is an agent that both consumes previously unread books and potentially writes new books
+ * and sells copies of those books.  The Reader's utility is determined by books read and an outside
+ * option; in particular it is quasilinear of the form:
  *
- * \f$u(m, x_0, x_1, \hdots, x_{n-1}) = m + \sum_{i=1}^{n} f(b_i) - p(n)\f$
+ * \f$u(m, x_0, x_1, \ldots, x_{n-1}) = m + \sum_{i=1}^{n} f(b_i) - p(n)\f$
  *
  * where:
  *     - \f$r\f$ is the Reader's position
- *     - \f$b_1, \hdots, b_n\f$ are the positions of the \f$n\f$ books the agent buys this period
+ *     - \f$b_1, \ldots, b_n\f$ are the positions of the \f$n\f$ books the agent buys this period
  *     - \f$f(b)\f$ is a function that maps a book into a utility value using a decreasing function
  *     of the distance between the reader's position and the book's position.  It returns 0 for any
  *     books that the reader already owns.
@@ -31,9 +33,63 @@ class BookMarket;
  *     - \f$m\f$ is the quantity of non-book spending the reader engages in which delivers a
  *     constant marginal utility of 1.
  *
- * The reader optimizes by looking at all Books currently available for sale, assessing their
- * quality, considering their price, then deciding which books to buy.  Books are only purchased
- * once, and at most one copy is purchased by any reader.
+ * Behaviour
+ * =========
+ *
+ * Reading books
+ * -------------
+ * A reader optimizes in each period by looking at all Books currently available for sale, assessing
+ * their quality, considering their price, then deciding which books to buy.  Books are only
+ * purchased once, and at most one copy is purchased by any reader.  The utility gain of a book is
+ * incurred immediately.
+ *
+ * Book quality is not observable but book authorship is.  Readers have beliefs about book quality
+ * of previously known and previously unknown authors with which they can estimate quality.  Once
+ * purchased, readers obtain a random, permanent quality draw (which is based on the actual quality)
+ * as their own private assessment of the book's quality.
+ *
+ * Writing books
+ * -------------
+ * "Readers" have an innate ability to write a book by using effort (measured in terms of foregone
+ * income), where more effort creates a higher quality book.  This potential author has beliefs
+ * (more details below) about the profitability of authorship, based on observed book sales, with
+ * which he makes the decision to create or not, deciding the quality at which to create in the
+ * process.
+ *
+ * Having created a book (or many books), the author determines a price for each of his books in
+ * each period, based on a belief of the demand structure for a book.  Once the believed
+ * profitability of a book becomes negative, the author permanently withdraws the book from the
+ * market.
+ *
+ * Beliefs
+ * =======
+ * Reader behaviour is governed by the following beliefs which are updated over time.
+ *
+ * Book quality
+ * ----------------------
+ * When considering a book that has not been read (previously read books are not considered at all),
+ * a Reader predicts quality using the model:
+ *
+ *     FIXME
+ *     (include "known" dummy and "known" x "mean quality" terms, and perhaps "known" x "numBooks")
+ *
+ * to predict a book's quality.  This belief is updated whenever the reader reads any books.
+ *
+ * Lifetime profit
+ * ---------------
+ * Readers have a belief about the lifetime profitability of a single book which depends on various
+ * author attributes and the book quality.  This belief is updated based on all books this Reader
+ * has obtained plus his own previous books (if any).
+ * 
+ * See creativity::belief::Profit for details.
+ *
+ * Per-period demand
+ * -----------------
+ * Authors set a fixed price for a book in each period.  In order to do so, they have a belief about
+ * the demand curve in the economy, which is updated using the price, quality, and attributes of
+ * observed books.
+ *
+ * See creativity::belief::Demand for details.
  */
 class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
     public virtual eris::interopt::Apply,
@@ -42,18 +98,23 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
     public virtual eris::intraopt::Initialize
 {
     public:
-        /** Constructor takes the reader position and the (wrapping) positional boundaries, plus
-         * rvalue models for lifetime profit and per-period demand.
+        /** Constructor takes the reader position and the (wrapping) positional boundaries, new
+         * model objects for lifetime profit and per-period demand, and the fixed and per-unit costs
+         * of copies.
          *
          * \param pos the initial position of the reader
          * \param b1 a vertex of the wrapping boundary box for the reader
          * \param b2 the vertex opposite `b1` of the wrapping boundary box for the reader
          * \param demand a per-period demand belief object
          * \param profit a per-period profit belief object
+         * \param quality a quality belief object
+         * \param cFixed the fixed cost of keeping a book on the market
+         * \param cUnit the per-unit cost of producing copies of a book
          */
         Reader(
                 const eris::Position &pos, const eris::Position &b1, const eris::Position &b2,
-                belief::Demand &&demand, belief::Profit &&profit
+                belief::Demand &&demand, belief::Profit &&profit, belief::Quality &&quality,
+                double cFixed, double cUnit
               );
 
         /** Takes a money value and a container of SharedMember<Book> objects and returns the
@@ -61,7 +122,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * from each book (from uBook()) minus the penalty incurred by buying the given number of
          * books.
          *
-         * \param the money leftover after buying the provided set of books
+         * \param money the money leftover after buying the provided set of books
          * \param books an iterable container of SharedMember<Book> objects.
          */
         template <typename Container>
@@ -136,8 +197,8 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
 
         /** Returns the quality of a given book.  If the given book is already in the user's
          * library, this returns a realized quality value; otherwise it returns a predicted quality
-         * value based on the reader's prior.  This quantity must be non-stochastic (calling it
-         * multiple times without the library or prior having changed should return the same value).
+         * value based on the reader's quality prior.  This quantity must be non-stochastic (i.e.
+         * calling it multiple times with the same library and prior should return the same value).
          */
         virtual double quality(const eris::SharedMember<Book> &b) const;
 
@@ -187,8 +248,8 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         /** Evaluates the given polynomial at the value `x`.
          *
          * \param x the value at which to evaluate the polynomial.
-         * \param coefficients the coefficients at which to evaluate the polynomial.
-         * `coefficients[0]` is the constant, `coefficients[i]` applies to the \f$x^i\f$ term.
+         * \param polynomial the coefficients at which to evaluate the polynomial.
+         * `coefficients[0]` is the constant term, `coefficients[i]` applies to the \f$x^i\f$ term.
          */
         static double evalPolynomial(const double &x, const std::vector<double> &polynomial);
 
@@ -204,17 +265,12 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * required to evaluate to be increasing in the non-negative integers \f$n\f$.
          *
          * Some rudimentary safety checks are performed to check common ways the given polynomial
-         * might be invalid:
-         * - f(0) <= f(1)
-         * - f(1) <= f(2)
-         * - ...
-         * - f(9) <= f(10)
-         * - f(10) <= f(20)
-         * - f(20) <= f(30)
-         * - ...
-         * - f(90) <= f(100)
-         * - f(100) <= f(1000)
-         * - f(1000) <= f(1000000)
+         * might be invalid; in particular, it must satisfy each of the following inequalities:
+         *
+         * \f[
+         *   f(0) \leq f(1) \leq f(2) \leq \ldots \leq f(9) \leq f(10) \leq f(20) \leq f(30) \leq
+         *   \ldots \leq f(90) \leq f(100) \leq f(1000) \leq f(1000000)
+         * \f]
          *
          * \param coef the vector of polynomial coefficients.
          * \throw std::domain_error if the polynomial appears inadmissable by failure of one of the
@@ -240,22 +296,29 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         /** When advancing a period, the reader takes a random step. */
         void interAdvance() override;
 
-        /** The probability that the reader will write a book in between periods. Defaults to 0.001. */
-        double writer_prob{0.001};
-
         /** The standard deviation of a written book.  A written book will be located at the
          * reader's position plus independent draws from \f$N(0, s)\f$ in each dimension, where
-         * \f$s\f$ is the value of this parameter.
+         * \f$s\f$ is the value of this parameter.  Note that this means the distance from the
+         * author is distributed as \f$\sqrt{\Chi^2_D}\f$, where \f$D\f$ is the number of
+         * dimensions.
          *
          * Defaults to 0.5.
          */
         double writer_book_sd{0.5};
 
+        /** The standard deviation of the quality draw for books written by this author.  A new
+         * reader realizes a quality drawn from a normal distribution with mean of the true quality
+         * and this standard deviation, with negative values truncated to zero.  (Note that changing
+         * negative values to 0 has the effect of increasing the mean and decreasing the variance
+         * with this effect being small only when the value truncation is rare).
+         */
+        double writer_quality_sd{1.0};
+
         /** The reader's creation coefficients.  This reader can exhert effort \f$\ell \geq 0\f$ to
          * create a book of quality \f$q(\ell) = \alpha_0 + \alpha_1 \ell^{\alpha_2}\f$, where
          * \f$\alpha\f$ is this vector.
          *
-         * The default value is \f$\alpha = (-5.0, 1.0, 0.25).
+         * The default value is \f$\alpha = (-5.0, 1.0, 0.25)\f$.
          */
         Vector3d creation_coefs{-5.0, 1.0, 0.25};
 
@@ -299,6 +362,8 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         belief::Profit profit_belief_;
         /// Belief about per-period demand
         belief::Demand demand_belief_;
+        /// Belief about book quality
+        belief::Quality quality_belief_;
 
         /** Updates the demand equation belief based on book sales observed in the previous period.
          */
@@ -307,6 +372,10 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         /** Updates the profit equation belief based on observations from the previous period.
          */
         void updateProfitBelief();
+
+        /** Updates the quality model based on observations from the previous period.
+         */
+        void updateQualityBelief();
 
 
     private:
@@ -325,17 +394,11 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         /// Cache of the set of book markets available
         std::unordered_set<eris::SharedMember<BookMarket>> book_cache_;
 
-        // FIXME: Move to to a belief class
-        // Quality prior coefficients.  Key is the author id, values are the author-specific
-        // coefficients.  0 is for the global (non-author-specific) parameters.
-        //
-        // FIXME: this just returns the mean of a chi-squared-1, which is temporary for as long as a
-        // chi-squared-1 is the quality distribution in interApply, but needs to be changed when
-        // that changes.
-        std::unordered_map<eris::eris_id_t, std::array<double, 3>> q_coef_{{0, {{1, 0, 0}}}};
-
         // Track current and cumulative utility:
         double u_curr_, u_lifetime_;
+
+        // Costs for creating copies of a book
+        double c_fixed_, c_unit_;
 
 };
 

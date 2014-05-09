@@ -65,6 +65,7 @@ class GUI : eris::noncopyable {
         /// Simple wrapper around std::runtime_error used to send error messages back to the user.
         class Exception : public std::runtime_error {
             public:
+                /** Constructor: takes an exception message to display to the user. */
                 Exception(const std::string &what);
         };
 
@@ -115,10 +116,14 @@ class GUI : eris::noncopyable {
             dimensions,
             /// Sets the number of readers in `.ul`
             readers,
-            /// Sets the writer probability in `.dbl`
-            prob_writer,
             /// Sets the book location standard deviation in `.dbl`
             book_sd,
+            /// Sets the perceived quality standard deviation in `.dbl`
+            quality_draw_sd,
+            /// Sets the fixed cost of keeping a book on the market in `.dbl`
+            cost_fixed,
+            /// Sets the per-unit cost of copies of a book in `.dbl`
+            cost_unit,
             /// Sets the simulation speed limit in `.dur_ms`
             speed_limit,
             /// Sets the minimum redraw period in `.dur_ms`

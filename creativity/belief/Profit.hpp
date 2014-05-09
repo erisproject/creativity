@@ -41,11 +41,11 @@ class Profit : public Linear<5> {
          * integer).
          */
         Profit(
-                unsigned int D,
-                Matrix<double, K, 1> beta_prior,
-                double s_prior,
-                Matrix<double, K, K> V_prior,
-                double n_prior
+                const unsigned int &D,
+                const VectorKd &beta_prior,
+                const double &s_prior,
+                const MatrixKd &V_prior,
+                const double &n_prior
               );
 
         /** Given a set of model parameters, this returns an expected value \f$\Pi_b\f$, the
@@ -56,7 +56,7 @@ class Profit : public Linear<5> {
          * parameter also determines the `firstBook` dummy (`= 1` iff `previousBooks == 0`).
          * \param marketBooks the number of books on the market last period
          */
-        double predict(const double &q, const unsigned long &previousBooks, const unsigned long &marketBooks);
+        double predict(const double &q, const unsigned long &previousBooks, const unsigned long &marketBooks) const;
 
         /** Given `previousBooks` and `marketBooks` parameters, a function \f$q(\ell)\f$ that returns
          * expected quality for a given value \f$\ell\f$, and \f$\ell_{max}\f$, this numerically
@@ -76,14 +76,16 @@ class Profit : public Linear<5> {
          * substituted instead.
          * \param previousBooks the previous books of the author
          * \param marketBooks the books on the market in the previous period
+         * \param l_max the maximum value of `l` to consider.  This is typically the reader's
+         * money (income) on hand.
          *
          * \sa eris::single_peak_search for the numerical algorithm used.
          */
-        double argmax(
+        double argmaxL(
                 const std::function<double(const double &)> q,
                 const unsigned long &previousBooks, const unsigned long &marketBooks,
                 const double &l_max
-                );
+                ) const;
 
     private:
         unsigned int D_;

@@ -11,7 +11,7 @@ namespace creativity {
 
 GUIGraphArea::GUIGraphArea(const double &top, const double &right, const double &bottom, const double &left,
         std::shared_ptr<Simulation> sim, GUI &gui) :
-    sim_{sim}, gui_{gui}, bounds_{{top,right,bottom,left}}
+    sim_{sim}, gui_{gui}, bounds_{top,right,bottom,left}
 {}
 
 Cairo::Matrix GUIGraphArea::graph_to_canvas() const {
@@ -22,13 +22,13 @@ Cairo::Matrix GUIGraphArea::graph_to_canvas() const {
     // The second of these is typically negative, which is correct because "up" in the graph
     // translates to a lower coordinate on the screen (since positive y coordinates are down the
     // screen).
-    const double gwidth = bounds_[RIGHT] - bounds_[LEFT],
-          gheight = bounds_[BOTTOM] - bounds_[TOP];
+    const double gwidth = bounds_.right - bounds_.left,
+          gheight = bounds_.bottom - bounds_.top;
 
     // Build a transformation that converts from positions to canvas coordinates
     auto trans = Cairo::identity_matrix();
     trans.scale(width / gwidth, height / gheight);
-    trans.translate(-bounds_[LEFT], -bounds_[TOP]);
+    trans.translate(-bounds_.left, -bounds_.top);
 
     return trans;
 }
@@ -64,7 +64,7 @@ bool GUIGraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 
     // Tick marks
     cr->set_line_width(1.0);
-    const double tick_max_x = std::max(std::abs(bounds_[RIGHT]), std::abs(bounds_[LEFT]));
+    const double tick_max_x = std::max(std::abs(bounds_.right), std::abs(bounds_.left));
     int tick_num = 0;
     for (double gx = tick_space; gx <= tick_max_x; gx += tick_space) {
         const double curr_tick_size = (++tick_num % tick_big) ? tick_size : 3*tick_size;
@@ -77,7 +77,7 @@ bool GUIGraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
         cr->move_to(x, y - curr_tick_size/2.0);
         cr->rel_line_to(0, curr_tick_size);
     }
-    const double tick_max_y = std::max(std::abs(bounds_[TOP]), std::abs(bounds_[BOTTOM]));
+    const double tick_max_y = std::max(std::abs(bounds_.top), std::abs(bounds_.bottom));
     tick_num = 0;
     for (double gy = tick_space; gy <= tick_max_y; gy += tick_space) {
         const double curr_tick_size = (++tick_num % tick_big) ? tick_size : 3*tick_size;

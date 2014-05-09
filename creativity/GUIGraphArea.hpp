@@ -12,6 +12,7 @@ class GUI;
 class Reader;
 class Book;
 
+/** Gtk drawing area upon which the simulation visualization is drawn.  */
 class GUIGraphArea : public Gtk::DrawingArea, eris::noncopyable {
     public:
         /** Creates a graph area that draws in the rectangle bounded by [`bottom', `top'] on the
@@ -29,6 +30,7 @@ class GUIGraphArea : public Gtk::DrawingArea, eris::noncopyable {
         /** Draws the current set of points/circles. */
         virtual bool on_draw(const Cairo::RefPtr<Cairo::Context> &cr) override;
 
+        /** The types of points drawn by this class. */
         enum class PointType {
             X, //!< A diagonal cross
             CROSS, //!< A horizontal/vertical cross
@@ -42,7 +44,8 @@ class GUIGraphArea : public Gtk::DrawingArea, eris::noncopyable {
          * \param x the point x coordinate, in graph space
          * \param y the point y coordinate, in graph space
          * \param type the type of point to draw
-         * \param Take this Reader's wrapping into account when drawing the point.
+         * \param r this Reader's wrapping is taken into account when drawing the point, so that
+         * points that overlap the boundary are drawn properly on both sides of the edge.
          * \param scale the scale of the point.  1 (the default) means default size.
          */
         void drawPoint(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans,
@@ -87,9 +90,7 @@ class GUIGraphArea : public Gtk::DrawingArea, eris::noncopyable {
         // The parent GUI
         GUI &gui_;
         // The bounds of the graph
-        std::array<double, 4> bounds_;
-        // Constants for access into bounds_
-        static constexpr size_t TOP = 0, RIGHT = 1, BOTTOM = 2, LEFT = 3;
+        struct { double top; double right; double bottom; double left; } bounds_;
         // Sets up one or more (wrapping) lines between the reader to the book, but does not
         // actually draw it with stroke().  The reader's wrapping is used.
         void drawWrappingLine(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans, const Reader &r, const Book &b);

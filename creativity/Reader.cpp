@@ -14,10 +14,12 @@ const std::vector<double> Reader::default_penalty_polynomial{{0, 0, 0.25}};
 
 Reader::Reader(
         const Position &pos, const Position &b1, const Position &b2,
-        belief::Demand &&demand, belief::Profit &&profit
+        belief::Demand &&demand, belief::Profit &&profit, belief::Quality &&quality,
+        double cFixed, double cUnit
         )
     : WrappedPositional<agent::AssetAgent>(pos, b1, b2),
-    profit_belief_{std::move(profit)}, demand_belief_{std::move(demand)}
+    profit_belief_{std::move(profit)}, demand_belief_{std::move(demand)}, quality_belief_{std::move(quality)},
+    c_fixed_{std::move(cFixed)}, c_unit_{std::move(cUnit)}
 {}
 
 void Reader::uPolynomial(std::vector<double> coef) {
@@ -105,21 +107,56 @@ void Reader::interApply() {
     updateDemandBelief();
     updateProfitBelief();
 
+    auto sim = simulation();
+
     const double previous_books = wrote().size();
-    const double market_books = simulation()->countMarkets<BookMarket>();
+    const double market_books = sim->countMarkets<BookMarket>();
+
+    // Set the price of all previous books for the upcoming period.  Remove from market if expected
+    // profit is negative.
+    for (auto &bookid : wrote()) {
+        auto book = simGood<Book>(bookid);
+        if (not book->hasMarket())
+            continue;
+
+        auto book_mkt = book->market();
+
+        auto max = demand_belief_.argmaxP(book->quality(), book->sales(), previous_books-1, market_books, c_unit_);
+        const double &p = max.first;
+        const double &q = max.second;
+        const double profit = (p - c_unit_) * q - c_fixed_;
+
+        if (profit > 0) {
+            // Profitable to keep this book on the market, so do so
+            book_mkt->setPrice(p);
+        }
+        else {
+            // Expected profit is zero or negative: remove this book from the market
+            sim->remove(book_mkt);
+        }
+    }
+
+    // Create a book if E(profit) > effort required
 
     // Find the l that maximizes creation profit
-    double l_max = profit_belief_.argmax(
+    double l_max = profit_belief_.argmaxL(
             [this] (const double &l) -> double { return creationQuality(l); },
             previous_books, market_books, assets()[MONEY]
             );
-    double e_profit = profit_belief_.predict(creationQuality(l_max), previous_books, market_books);
+    double quality = creationQuality(l_max);
+    double e_profit = profit_belief_.predict(quality, previous_books, market_books);
 
-    // Create a book if E(profit) > effort required
+    // If the optimal effort level gives a book with positive expected profits, do it:
     if (e_profit > l_max) {
 
         // The book is centered at the reader's position:
         Position bookPos{position()};
+
+        // Calculate the optimal price.  It's possible that we get back c_unit_ (and so predict
+        // profit is non-positive); write the book anyway: perhaps profits are expected to come in
+        // later periods.
+        auto max = demand_belief_.argmaxP(quality, 0, wrote_.size()-1, market_books, c_unit_);
+        const double &p = max.first;
 
         if (writer_book_sd > 0) {
             auto &rng = Random::rng();
@@ -129,25 +166,13 @@ void Reader::interApply() {
                 x += book_noise(rng);
             }
         }
+
+        std::normal_distribution<double> stdnormal;
+        auto qdraw = [this,&stdnormal] (const Book &book, const Reader &) -> double {
+            return book.quality() + writer_quality_sd * stdnormal(eris::Random::rng());
+        };
+        wrote_.push_back(simulation()->create<Book>(bookPos, sharedSelf(), wrote_.size(), p, quality, qdraw));
     }
-
-    // Set the price of all books for the upcoming period
-    
-
-    /* Old, stale code:
-    // Flip a (weighted) coin to determine creativity:
-    if (std::bernoulli_distribution{writer_prob}(rng)) {
-
-        // Initial price (FIXME):
-        double FIXME_initial_price = 1;
-
-        // Finally we need a quality distribution.  Use chi²(1) for now.
-        std::chi_squared_distribution<double> chisq1(1);
-        auto quality = std::bind(chisq1, rng);
-
-        wrote_.push_back(simulation()->create<Book>(bookPos, sharedSelf(), FIXME_initial_price, quality));
-    }
-    */
 }
 
 void Reader::interAdvance() {
@@ -190,22 +215,8 @@ double Reader::quality(const SharedMember<Book> &b) const {
     if (found != library_.end())
         return found->second;
 
-    // Predict quality
-    double e_qual = 0;
-    auto author = b->author();
-    auto n = author->wrote().size();
-    auto coef = q_coef_.find(author);
-    if (coef == q_coef_.end())
-        coef = q_coef_.find(0);
-
-    if (coef != q_coef_.end()) {
-        e_qual +=
-            coef->second[0] +
-            coef->second[1] * n; //+
-            //coef->second[2] * n * n;
-    }
-
-    return e_qual;
+    // Otherwise we need to use the quality belief to predict the quality
+    return quality_belief_.predict(b);
 }
 
 double Reader::penalty(unsigned long n) const {
@@ -219,6 +230,9 @@ void Reader::updateDemandBelief() {
 }
 void Reader::updateProfitBelief() {
     throw std::runtime_error("FIXME: updateProfitBelief not yet implemented!\n");
+}
+void Reader::updateQualityBelief() {
+    throw std::runtime_error("FIXME: updateQualityBelief not yet implemented!\n");
 }
 
 void Reader::intraInitialize() {

@@ -86,19 +86,24 @@ void GUI::thr_run() {
     auto *run = widget<Gtk::Button>("btn_start");
 
     run->signal_clicked().connect([this] {
+        ERIS_DBG("run clicked");
         std::vector<Parameter> params;
-        params.push_back({ParamType::readers, .ul=(unsigned long)sb_int("set_readers")});
-        params.push_back({ParamType::dimensions, .ul=(unsigned long)sb_int("set_dimensions")});
-        params.push_back({ParamType::prob_writer, .dbl=sb("set_create_prob")});
-        params.push_back({ParamType::book_sd, .dbl=sb("set_sd")});
-        params.push_back({ParamType::speed_limit, .dur_ms=std::chrono::milliseconds{sb_int("set_speed")}});
-        params.push_back({ParamType::redraw, .dur_ms=std::chrono::milliseconds{sb_int("set_redraw")}});
+        Parameter p;
+        p.param = ParamType::readers; p.ul = sb_int("set_readers"); params.push_back(p);
+        p.param = ParamType::dimensions; p.ul = sb_int("set_dimensions"); params.push_back(p);
+        p.param = ParamType::book_sd; p.dbl = sb("set_book_sd"); params.push_back(p);
+        p.param = ParamType::quality_draw_sd; p.dbl = sb("set_quality_draw_sd"); params.push_back(p);
+        p.param = ParamType::cost_fixed; p.dbl = sb("set_cost_fixed"); params.push_back(p);
+        p.param = ParamType::cost_unit; p.dbl = sb("set_cost_unit"); params.push_back(p);
+        p.param = ParamType::speed_limit; p.dur_ms = std::chrono::milliseconds{sb_int("set_speed")}; params.push_back(p);
+        p.param = ParamType::redraw; p.dur_ms = std::chrono::milliseconds{sb_int("set_redraw")}; params.push_back(p);
         unsigned int threads;
         widget<Gtk::ComboBox>("combo_threads")->get_active()->get_value(0, threads);
-        params.push_back({ParamType::threads, .ul=(unsigned long)threads});
+        p.param = ParamType::threads; p.ul = (unsigned long)threads; params.push_back(p);
 
         queueEvent(Event::Type::setup, std::move(params));
         queueEvent(Event::Type::run, sb_int("set_periods"));
+        ERIS_DBG("run events sent");
     });
 
     widget<Gtk::Button>("btn_run")->signal_clicked().connect([this] {
@@ -137,7 +142,7 @@ void GUI::thr_run() {
     graph_ = std::unique_ptr<GUIGraphArea>(new GUIGraphArea{10., 10., -10., -10., sim_, *this});
     main->add_events(Gdk::EventMask::BUTTON_PRESS_MASK);
 
-    // FIXME: change mouse the clickable when over readers/books?
+    // FIXME: change mouse to clickable when over readers/books?
 
     graph_->signal_button_press_event().connect([this](GdkEventButton *event) -> bool {
         // Calculate the *graph* position where the user clicked
@@ -188,11 +193,11 @@ void GUI::thr_run() {
             std::ostringstream pos;
             pos << "(" << std::setw(7) << std::showpoint << book->position()[0] << "," << book->position()[1] << ")";
             widget<Gtk::Label>("vbk_pos")->set_text(pos.str());
-            widget<Gtk::Label>("vbk_mkt")->set_text(book->onMarket()
+            widget<Gtk::Label>("vbk_mkt")->set_text(book->hasMarket()
                     ? std::to_string(book->market()->id())
                     : "(not on market)"
             );
-            widget<Gtk::Label>("vbk_p")->set_text(book->onMarket()
+            widget<Gtk::Label>("vbk_p")->set_text(book->hasMarket()
                     ? std::to_string(book->market()->price())
                     : "(not on market)"
             );
@@ -204,10 +209,7 @@ void GUI::thr_run() {
                     copies++;
             }
             widget<Gtk::Label>("vbk_copies")->set_text(std::to_string(copies));
-            widget<Gtk::Label>("vbk_author")->set_text(book->hasAuthor()
-                    ? std::to_string(book->author())
-                    : "(dead)"
-            );
+            widget<Gtk::Label>("vbk_author")->set_text(std::to_string(book->author()));
             dlg_book->run();
             dlg_book->hide();
         }
@@ -269,7 +271,7 @@ void GUI::thr_signal() {
         widget<Gtk::Notebook>("nb_tabs")->set_current_page(1);
 
         // Disable spin buttons:
-        for (auto &widg : {"set_readers", "set_dimensions", "set_create_prob", "set_sd", "set_speed"})
+        for (auto &widg : {"set_dimensions", "set_readers", "set_book_sd", "set_quality_draw_sd", "set_cost_fixed", "set_cost_unit", "set_speed"})
             widget<Gtk::SpinButton>(widg)->set_sensitive(false);
 
         widget<Gtk::Button>("btn_start")->set_sensitive(false);
@@ -402,7 +404,7 @@ void GUI::handleEvent(const Event &event) {
         switch (event.type) {
             case Event::Type::setup:
                 if (on_setup_ and not event.parameters.empty()) {
-                    on_setup_({.param=ParamType::begin});
+                    on_setup_({ParamType::begin, true});
                     for (auto &p : event.parameters) {
                         try {
                             on_setup_(p);
@@ -411,7 +413,7 @@ void GUI::handleEvent(const Event &event) {
                             setup_errors.push_back(e.what());
                         }
                     }
-                    on_setup_({ .param = setup_errors.empty() ? ParamType::finished : ParamType::erred });
+                    on_setup_({ setup_errors.empty() ? ParamType::finished : ParamType::erred, true });
                 }
                 break;
             case Event::Type::run:
