@@ -2,6 +2,16 @@ cmake_minimum_required(VERSION 2.8)
 
 project(creativity CXX)
 
+# Creativity package version
+set(CREATIVITY_VERSION_MAJOR "0")
+set(CREATIVITY_VERSION_MINOR "0")
+set(CREATIVITY_VERSION_PATCH "1")
+set(CREATIVITY_VERSION "${CREATIVITY_VERSION_MAJOR}.${CREATIVITY_VERSION_MINOR}.${CREATIVITY_VERSION_PATCH}")
+
+set(creativity_author "Jason Rhinelander <jason@imaginary.ca>")
+set(creativity_url "https://github.com/erisproject/creativity")
+set(creativity_description "Agent-based model of creativity & piracy")
+
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/Modules)
 
 # No in-source building
@@ -60,6 +70,6 @@ target_link_libraries(creativity-gui creativity)
 
 install(FILES gui.glade creativity.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/creativity/gui.glade)
 
-#add_subdirectory(doc EXCLUDE_FROM_ALL)
+add_subdirectory(doc)
 
 add_subdirectory(scratch)
