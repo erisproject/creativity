@@ -49,6 +49,7 @@ class Linear {
         /// A square matrix type using the Parameters template value (either fixed or Eigen::Dynamic)
         typedef Matrix<double, KK, KK> MatrixKd;
 
+        // Let Eigen align things if necessary (this will only matter if KK=2 or KK=4)
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     protected:
         /** Stores the given priors.
