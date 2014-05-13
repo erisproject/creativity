@@ -8,11 +8,11 @@ namespace creativity { namespace belief {
 
 Quality::Quality(
                 const VectorKd &beta_prior,
-                const double &s_prior,
+                const double &s2_prior,
                 const MatrixKd &V_prior,
                 const double &n_prior
               )
-    : Linear<KK>(beta_prior, s_prior, V_prior, n_prior)
+    : Linear<KK>(beta_prior, s2_prior, V_prior, n_prior)
 {}
 
 double Quality::predict(const Book &book) const {

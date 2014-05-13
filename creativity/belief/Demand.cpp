@@ -4,8 +4,8 @@ using Eigen::RowVectorXd;
 
 namespace creativity { namespace belief {
 
-Demand::Demand(const unsigned int &D, const VectorKd &beta_prior, const double &s_prior, const MatrixKd &V_prior, const double &n_prior)
-    : Linear<KK>(beta_prior, s_prior, V_prior, n_prior), D_{D}
+Demand::Demand(const unsigned int &D, const VectorKd &beta_prior, const double &s2_prior, const MatrixKd &V_prior, const double &n_prior)
+    : Linear<KK>(beta_prior, s2_prior, V_prior, n_prior), D_{D}
 {}
 
 double Demand::predict(const double &P, const double &q, const unsigned long &S,

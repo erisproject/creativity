@@ -44,7 +44,7 @@ class ProfitStream : public Linear<> {
          * \param beta_prior the prior of the mean values of beta as a column vector, which must all
          * be non-negative.  The length of this vector determines \f$K\f$, the maximum number of
          * periods to consider.
-         * \param s_prior the prior of sigma (typically an estimate thereof).
+         * \param s2_prior the prior of \f$s^2\f$ (typically an estimate thereof).
          * \param V_prior the prior covariance matrix of the estimators, *without* premultiplication
          * by \f$\sigma^2\f$.  That is, for a prior from OLS, this is the matrix \f$(X^\top
          * X)^{-1}\f$, not the matrix \f$s^2(X^\top X)^{-1}\f$.  This matrix should be symmetric,
@@ -56,7 +56,7 @@ class ProfitStream : public Linear<> {
          */
         ProfitStream(
                 const VectorXd &beta_prior,
-                const double &s_prior,
+                const double &s2_prior,
                 const MatrixXd &V_prior,
                 const double &n_prior
               );
