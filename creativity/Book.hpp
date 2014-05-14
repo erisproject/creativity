@@ -1,6 +1,7 @@
 #pragma once
 #include <eris/WrappedPositional.hpp>
 #include <eris/Good.hpp>
+#include <map>
 
 namespace creativity {
 
@@ -10,9 +11,12 @@ class BookMarket;
 
 /** Class representing a particular book.
  *
- * Lock note: an explicit lock on this class doesn't need to be held as most of it is constant.  The only
- * thing that is changeable is the number of sales, which is internally protected by sales(unsigned long).
- * Thus obtaining a lock (even a read lock) on this class is seldom necessary.
+ * Lock note: an explicit lock on this class doesn't need to be held as most of it is constant.  The
+ * only thing that is changeable is the number of sales and revenue of those sales.
+ *
+ * This class automatically establishes momentary read/write locks when accessing or modifying the
+ * sales and revenue information.  However, when outside locks are also in use it is recommended to
+ * include the book in the encompassing lock.
  */
 class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
     public:
@@ -80,10 +84,28 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         eris::SharedMember<BookMarket> market() const;
 
         /// Returns the lifelong number of sales of this book
-        unsigned long sales() const;
+        unsigned long lifeSales() const;
 
-        /// Increases the number of sales of this book by the given amount
-        void sales(unsigned long new_sales);
+        /// Returns the number of sales of this book so far in the current period
+        unsigned long currSales() const;
+
+        /// Returns the number of sales in period `t`
+        unsigned long sales(unsigned long t) const;
+
+        /// Returns the lifelong revenue of this book
+        double lifeRevenue() const;
+
+        /// Returns the revenue of this book so far in the current period
+        double currRevenue() const;
+
+        /// Returns the revenue earned by this book in period `t`
+        double revenue(unsigned long t) const;
+
+        /** Increase the sales and revenue of this book for the current period.  This can safely be
+         * called multiple times per period.  Both the current sales/revenue values and global
+         * revenue values will be increased by the call.
+         */
+        void sale(unsigned long new_sales, double new_revenue);
 
         /** Returns the actual, fixed quality value of the book.  This is meant to be used by the
          * author and the `qDraw` callable object given during construction; readers of the book
@@ -101,7 +123,10 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         double qualityDraw(const Reader &reader);
 
     private:
-        unsigned long created_, copies_sold_;
+        unsigned long created_, copies_sold_total_;
+        double revenue_total_;
+        std::map<unsigned long, unsigned long> copies_sold_;
+        std::map<unsigned long, double> revenue_;
         eris::SharedMember<Reader> author_;
         const unsigned long order_;
         eris::eris_id_t market_;

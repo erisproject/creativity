@@ -7,8 +7,8 @@ namespace creativity { namespace belief {
 /** This class represents an author's belief about the per-period demand for books.  The model is of
  * the form:
  *
- * \f$Q_b = \beta_0 + \beta_1 P_b^D + \beta_2 q_b^D + \beta_3 S_{b-} + \beta_4 onlyBook + \beta_5 otherBooks 
- * + \beta_6 marketBooks + u\f$
+ * \f$Q_b = \beta_0 + \beta_1 P_b^D + \beta_2 q_b^D + \beta_3 S_{b-} + \beta_4 age + \beta_5
+ * onlyBook + \beta_6 otherBooks + \beta_7 marketBooks + u\f$
  * where:
  * - \f$Q_b\f$ is the quantity (i.e. copies) sold
  * - \f$P_b\f$ is the price of a copy (which must be non-negative)
@@ -18,6 +18,7 @@ namespace creativity { namespace belief {
  *   \f$q_b\f$ and \f$P_b\f$ are raised to the dimensionality because changes in either affect
  *   the radius of potential customers, with total customers being proportional to \f$r^D\f$.
  * - \f$S_{b-}\f$ is the number of copies sold in previous periods
+ * - \f$age\f$ is the age of the book, in simulation periods, starting from 0.
  * - \f$onlyBook\f$ is a dummy: 1 if this is the creator's only work, 0 if the creator has other
  *   works.  (Note that this can change during a book's lifetime.)
  * - \f$otherBooks\f$ is the number of other books the author has created.  (Note that this can
@@ -37,23 +38,14 @@ class Demand : public Linear<7> {
         /** Constructs a demand model with the given prior information.
          *
          * \param D the dimensionality of the world.
-         * \param beta_prior the prior of the mean values of beta.  Must be a 7-value (column)
-         * vector.  Values are in the order given in this class's description.
-         * \param s2_prior the prior of \f$s^2\f$ (typically an estimate thereof).
-         * \param V_prior the prior covariance matrix of the estimators, *without* premultiplication
-         * by \f$\sigma^2\f$.  That is, for a prior from OLS, this is the matrix \f$(X^\top
-         * X)^{-1}\f$, not the matrix \f$s^2(X^\top X)^{-1}\f$.  This matrix should be symmetric,
-         * positive definite.
-         * \param n_prior the number of data points supporting the prior (which need not be an
-         * integer).
+         * \param args prior arguments to forward to the base Linear constructor.
+         *
+         * \sa Linear::Linear
          */
-        Demand(
-                const unsigned int &D,
-                const VectorKd &beta_prior,
-                const double &s2_prior,
-                const MatrixKd &V_prior,
-                const double &n_prior
-              );
+        template <typename ...Args>
+        Demand(const unsigned int &D, Args &&...args)
+        : LinearBase{std::forward<Args>(args)...}, D_{D}
+        {}
 
         /** Given a set of model parameters, this returns an expected value \f$Q_b\f$, the number of sales.
          *
@@ -109,9 +101,9 @@ class Demand : public Linear<7> {
          * (including this book, if this book was on the market)
          * \param c the per-unit cost of copies.  Optional: defaults to 0.
          *
-         * \returns a std::pair of values where `.first` is the maximizing price and `.second` is
-         * the maximum at that price.  The returned price will always be greater than or equal to
-         * `c` (which defaults to 0).
+         * \returns a std::pair of double values where `.first` is the maximizing price and
+         * `.second` is the maximum at that price.  The returned price will always be greater than
+         * or equal to `c` (which defaults to 0).
          *
          * \throws std::domain_error if `c < 0` or `q < 0`
          *

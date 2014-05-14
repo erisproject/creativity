@@ -90,7 +90,12 @@ class GUIGraphArea : public Gtk::DrawingArea, eris::noncopyable {
         // The parent GUI
         GUI &gui_;
         // The bounds of the graph
-        struct { double top; double right; double bottom; double left; } bounds_;
+        struct {
+            double top; ///<! the top graph boundary 
+            double right; ///<! the right graph boundary
+            double bottom; ///<! the bottom graph boundary
+            double left; ///<! the left graph boundary
+        } bounds_;
         // Sets up one or more (wrapping) lines between the reader to the book, but does not
         // actually draw it with stroke().  The reader's wrapping is used.
         void drawWrappingLine(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans, const Reader &r, const Book &b);

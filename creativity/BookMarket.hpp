@@ -8,7 +8,7 @@ namespace creativity {
 /** A BookMarket is very simple: it has an exogenously determined price and can supply infinite
  * copies of a Book at that price.
  */
-class BookMarket : public eris::Market, public virtual eris::interopt::Advance {
+class BookMarket : public eris::Market, public virtual eris::intraopt::Finish {
     public:
         /** Constructs a BookMarket that sells copies of the given Book with an initial price of
          * MONEY times p.  Books are created as needed at zero cost.
@@ -56,7 +56,7 @@ class BookMarket : public eris::Market, public virtual eris::interopt::Advance {
 
         /** Transfers all sales generated in the previous period to the author.
          */
-        void interAdvance() override;
+        void intraFinish() override;
 
     protected:
         /** We override reservation completion to transfer the payment to the author and put the

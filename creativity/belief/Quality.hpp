@@ -27,24 +27,7 @@ namespace belief {
  */
 class Quality : public Linear<7> {
     public:
-        /** Constructs a quality model with the given prior information.
-         *
-         * \param beta_prior the prior of the mean values of beta.  Must be a 7-value (column)
-         * vector.  Values are in the order given in this class's description.
-         * \param s2_prior the prior of \f$s^2\f$ (typically an estimate thereof).
-         * \param V_prior the prior covariance matrix of the estimators, *without* premultiplication
-         * by \f$\sigma^2\f$.  That is, for a prior from OLS, this is the matrix \f$(X^\top
-         * X)^{-1}\f$, not the matrix \f$s^2(X^\top X)^{-1}\f$.  This matrix should be symmetric,
-         * positive definite.
-         * \param n_prior the number of data points supporting the prior (which need not be an
-         * integer).
-         */
-        Quality(
-                const VectorKd &beta_prior,
-                const double &s2_prior,
-                const MatrixKd &V_prior,
-                const double &n_prior
-              );
+        using LinearBase::Linear;
 
         /** Given a book, this returns \f$\widehat q_b\f$, the expected quality of the book.
          *
@@ -52,6 +35,17 @@ class Quality : public Linear<7> {
          */
         double predict(const Book &book) const;
 
+        /** Uses the current object's priors to generate a new object whose parameters are the
+         * posteriors of this object after incorporating new data.
+         *
+         * \param y a vector of new y data
+         * \param X a matrix of new X data
+         */
+        Quality update(const Ref<const VectorXd> &y, const Ref<const MatrixXKd> &X) const;
+
+    private:
+        // Initialize a Quality from a Linear<7>
+        Quality(LinearBase &&base) : LinearBase{base} {}
 };
 
 }}

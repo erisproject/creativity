@@ -202,7 +202,7 @@ void GUI::thr_run() {
                     : "(not on market)"
             );
             widget<Gtk::Label>("vbk_age")->set_text(std::to_string(book->age()));
-            widget<Gtk::Label>("vbk_sales")->set_text(std::to_string(book->sales()));
+            widget<Gtk::Label>("vbk_sales")->set_text(std::to_string(book->lifeSales()));
             unsigned long copies = 0;
             for (auto &r : sim_->agents<Reader>()) {
                 if (r->library().count(book))
@@ -404,7 +404,7 @@ void GUI::handleEvent(const Event &event) {
         switch (event.type) {
             case Event::Type::setup:
                 if (on_setup_ and not event.parameters.empty()) {
-                    on_setup_({ParamType::begin, true});
+                    on_setup_({ParamType::begin, {0}});
                     for (auto &p : event.parameters) {
                         try {
                             on_setup_(p);
@@ -413,7 +413,7 @@ void GUI::handleEvent(const Event &event) {
                             setup_errors.push_back(e.what());
                         }
                     }
-                    on_setup_({ setup_errors.empty() ? ParamType::finished : ParamType::erred, true });
+                    on_setup_({ setup_errors.empty() ? ParamType::finished : ParamType::erred, {0} });
                 }
                 break;
             case Event::Type::run:

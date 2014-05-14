@@ -93,7 +93,6 @@ class BookMarket;
  */
 class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
     public virtual eris::interopt::Apply,
-    public virtual eris::interopt::Advance,
     public virtual eris::intraopt::OptApplyReset,
     public virtual eris::intraopt::Initialize
 {
@@ -110,11 +109,12 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * \param quality a quality belief object
          * \param cFixed the fixed cost of keeping a book on the market
          * \param cUnit the per-unit cost of producing copies of a book
+         * \param income the per-period income of the agent
          */
         Reader(
                 const eris::Position &pos, const eris::Position &b1, const eris::Position &b2,
                 belief::Demand &&demand, belief::Profit &&profit, belief::Quality &&quality,
-                double cFixed, double cUnit
+                const double &cFixed, const double &cUnit, const double &income
               );
 
         /** Takes a money value and a container of SharedMember<Book> objects and returns the
@@ -193,14 +193,15 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * \returns the estimated utility from reading the given book, if not in the reader's
          * library; the realized utility from reading the given book if in the reader's library.
          */
-        virtual double uBook(const eris::SharedMember<Book> &b) const;
+        virtual double uBook(eris::SharedMember<Book> b) const;
 
         /** Returns the quality of a given book.  If the given book is already in the user's
-         * library, this returns a realized quality value; otherwise it returns a predicted quality
-         * value based on the reader's quality prior.  This quantity must be non-stochastic (i.e.
-         * calling it multiple times with the same library and prior should return the same value).
+         * library, this returns the realized quality value determined when the book was added;
+         * otherwise it returns a predicted quality value based on the reader's quality prior.  This
+         * quantity must be non-stochastic (i.e.  calling it multiple times with the same library
+         * and prior should return the same value).
          */
-        virtual double quality(const eris::SharedMember<Book> &b) const;
+        virtual double quality(eris::SharedMember<Book> b) const;
 
         /** Utility penalty from reading `books` books.  Must be (non-strictly) increasing and
          * strictly positive, and must return 0 for 0 books.  Uses the current penalty polynomial
@@ -290,12 +291,6 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          */
         static const std::vector<double> default_penalty_polynomial;
 
-        /** In-between periods, the reader randomly creates a book. */
-        void interApply() override;
-
-        /** When advancing a period, the reader takes a random step. */
-        void interAdvance() override;
-
         /** The standard deviation of a written book.  A written book will be located at the
          * reader's position plus independent draws from \f$N(0, s)\f$ in each dimension, where
          * \f$s\f$ is the value of this parameter.  Note that this means the distance from the
@@ -318,9 +313,10 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * create a book of quality \f$q(\ell) = \alpha_0 + \alpha_1 \ell^{\alpha_2}\f$, where
          * \f$\alpha\f$ is this vector.
          *
-         * The default value is \f$\alpha = (-5.0, 1.0, 0.25)\f$.
+         * The default value is \f$\alpha = (-2.0, 4.0, 0.25)\f$, which is appropriate for a
+         * 2-dimensional world and probably a poor choice for any other dimensionality.
          */
-        Vector3d creation_coefs{-5.0, 1.0, 0.25};
+        Vector3d creation_coefs{-2.0, 4.0, 0.25};
 
         /** Returns the resulting quality of this reader exerting effort level `effort` to create a
          * book.
@@ -328,6 +324,19 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * \sa creation_coefs
          */
         double creationQuality(const double &effort) const;
+
+        /** Called at the end of a period (from BookMarket::intraFinish) to transfer book revenue
+         * earned during a period back to the author.  The author subtracts variable cost (if any)
+         * and keeps the remaining profit.  Note that fixed costs have already been removed, and so
+         * this should never result in a negative profit value.
+         *
+         * FIXME: make sure fixed costs are already removed!
+         */
+        void receiveProfits(eris::SharedMember<Book> book, const eris::Bundle &revenue);
+
+        /** In-between periods, the reader receives his income, randomly creates a book, and takes a
+         * random step. */
+        void interApply() override;
 
         /// Updates the book market cache with any new books
         void intraInitialize() override;
@@ -365,6 +374,15 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         /// Belief about book quality
         belief::Quality quality_belief_;
 
+        /** Updates all of the reader's beliefs.
+         *
+         * \sa updateDemandBelief
+         * \sa updateProfitBelief
+         * \sa updateProfitStreamBelief
+         * \sa updateQualityBelief
+         */
+        void updateBeliefs();
+
         /** Updates the demand equation belief based on book sales observed in the previous period.
          */
         void updateDemandBelief();
@@ -372,6 +390,11 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         /** Updates the profit equation belief based on observations from the previous period.
          */
         void updateProfitBelief();
+
+        /** Updates the profit stream equation belief based on observations from the previous
+         * period.
+         */
+        void updateProfitStreamBelief();
 
         /** Updates the quality model based on observations from the previous period.
          */
@@ -399,6 +422,9 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
 
         // Costs for creating copies of a book
         double c_fixed_, c_unit_;
+
+        // Per-period income
+        double income_;
 
 };
 

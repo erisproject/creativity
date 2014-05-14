@@ -11,6 +11,7 @@
 #include <eris/intraopt/FixedIncome.hpp>
 #include <functional>
 #include <iostream>
+#include <iomanip>
 #include <Eigen/Core>
 
 using namespace creativity;
@@ -22,10 +23,13 @@ int main(int argc, char *argv[1]) {
     MONEY = sim->create<Good::Continuous>();
     sim->create<NEW_BOOKS_Cleaner>();
 
+    std::cerr << std::setprecision(16);
+    std::cout << std::setprecision(16);
+
     bool setup = false, stopped = false, step = false, quit = false;
     unsigned long num_readers = 1000;
     double book_sd = 0.5, quality_draw_sd = 1.0;
-    double cost_fixed = 20, cost_unit = 1;
+    double cost_fixed = 20, cost_unit = 1, income = 1000;
     unsigned long run_start = 0, run_end = 999;
     std::chrono::milliseconds speed_limit{50};
     std::chrono::milliseconds redraw{50};
@@ -108,11 +112,10 @@ int main(int argc, char *argv[1]) {
 
     ERIS_DBG("Setting up readers");
     for (auto i = 0UL; i < num_readers; i++) {
-        ERIS_DBG("");
-        VectorXd demand_beta{7}; demand_beta << 0, -1, 1, -0.1, 0, 0, 0;
+        VectorXd demand_beta{7}; demand_beta << 0, -2, 0.5, -0.1, 0, 0, 0;
         MatrixXd demand_V = MatrixXd::Identity(7, 7);
         double demand_s = 10, demand_n = 1;
-        VectorXd profit_beta{5}; profit_beta << 0, 5, 0, 0, 0;
+        VectorXd profit_beta{5}; profit_beta << 0, 1, 0, 0, 0;
         MatrixXd profit_V = MatrixXd::Identity(5, 5);
         double profit_s = 10, profit_n = 1;
         VectorXd quality_beta{7}; quality_beta << 5, -1, 1, 0, 0, 0, 0.1;
@@ -122,16 +125,12 @@ int main(int argc, char *argv[1]) {
         belief::Demand d{2, demand_beta, demand_s, demand_V, demand_n};
         belief::Profit p{2, profit_beta, profit_s, profit_V, profit_n};
         belief::Quality q{quality_beta, quality_s, quality_V, quality_n};
-        ERIS_DBG("");
         auto r = sim->create<Reader>(Position{unif_pmb(rng), unif_pmb(rng)},
                 Position{-BOUNDARY,-BOUNDARY}, Position{BOUNDARY, BOUNDARY},
                 std::move(d), std::move(p), std::move(q),
-                cost_fixed, cost_unit
+                cost_fixed, cost_unit, income
                 );
         r->writer_book_sd = book_sd;
-        ERIS_DBG("");
-        sim->create<intraopt::FixedIncome>(r, Bundle{{ MONEY, 1000 }});
-        ERIS_DBG("");
     }
     ERIS_DBG("Done with readers");
     auto readers = sim->agents<Reader>();

@@ -4,18 +4,14 @@ using Eigen::RowVectorXd;
 
 namespace creativity { namespace belief {
 
-Demand::Demand(const unsigned int &D, const VectorKd &beta_prior, const double &s2_prior, const MatrixKd &V_prior, const double &n_prior)
-    : Linear<KK>(beta_prior, s2_prior, V_prior, n_prior), D_{D}
-{}
-
 double Demand::predict(const double &P, const double &q, const unsigned long &S,
         const unsigned long &otherBooks, const unsigned long &marketBooks) const {
     if (P < 0) throw std::domain_error("Demand::predict: P cannot be < 0");
     if (q < 0) throw std::domain_error("Demand::predict: q cannot be < 0");
-    Matrix<double, 1, KK> X;
+    RowVectorKd X;
     X << 1, std::pow(P, D_), std::pow(q, D_), S, otherBooks == 0 ? 1 : 0, otherBooks, marketBooks;
 
-    return Linear<KK>::predict(X);
+    return LinearBase::predict(X);
 }
 
 std::pair<double, double> Demand::argmaxP(const double &q, const unsigned long &S, const unsigned long &otherBooks, const unsigned long &marketBooks,

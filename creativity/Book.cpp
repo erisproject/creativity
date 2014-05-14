@@ -24,7 +24,13 @@ Book::Book(
 void Book::added() {
     auto sim = simulation();
     created_ = sim->t();
-    copies_sold_ = 0;
+
+    // These shouldn't be doing anything, but clear everything just in case a Book is removed and reintroduced:
+    copies_sold_total_ = 0;
+    copies_sold_.clear();
+    revenue_total_ = 0;
+    revenue_.clear();
+
     auto mkt = sim->create<BookMarket>(*this, init_price_);
     NEW_BOOKS.push_back(mkt);
     market_ = mkt;
@@ -43,14 +49,47 @@ const unsigned long& Book::order() const {
     return order_;
 }
 
-unsigned long Book::sales() const {
+unsigned long Book::lifeSales() const {
     auto lock = readLock();
-    return copies_sold_;
+    return copies_sold_total_;
 }
 
-void Book::sales(unsigned long new_sales) {
+unsigned long Book::currSales() const {
+    return sales(simulation()->t());
+}
+
+unsigned long Book::sales(unsigned long t) const {
+    if (t < created_) return 0;
+    auto lock = readLock();
+    auto it = copies_sold_.find(t);
+    if (it == copies_sold_.end()) return 0;
+    return it->second;
+}
+
+void Book::sale(unsigned long count, double revenue) {
     auto lock = writeLock();
-    copies_sold_ += new_sales;
+    copies_sold_total_ += count;
+    revenue_total_ += revenue;
+    auto t = simulation()->t();
+    copies_sold_[t] += count;
+    revenue_[t] += revenue;
+}
+
+double Book::lifeRevenue() const {
+    auto lock = readLock();
+    return revenue_total_;
+}
+
+double Book::currRevenue() const {
+    return revenue(simulation()->t());
+}
+
+double Book::revenue(unsigned long t) const {
+    if (t < created_) return 0.0;
+    auto lock = readLock();
+    auto it = revenue_.find(t);
+    if (it == revenue_.end()) return 0.0;
+    return it->second;
 }
 
 bool Book::livingAuthor() const {

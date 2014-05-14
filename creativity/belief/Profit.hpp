@@ -6,7 +6,7 @@ namespace creativity { namespace belief {
 /** This class represents an author's belief about the lifetime profitability of a work.  The model
  * is of the form:
  *
- * \f$\Pi_b = \beta_1 + \beta_2 q_b^D + \beta_3 firstBook + \beta_4 previousBooks + \beta_5 marketBooks + u\f$
+ * \f$\Pi_b = \beta_0 + \beta_1 q_b^D + \beta_2 firstBook + \beta_3 previousBooks + \beta_4 marketBooks + u\f$
  * where:
  * - \f$Pi_b\f$ is the lifetime profits of the book
  * - \f$q_b\f$ is the quality of the book, which must be non-negative
@@ -30,23 +30,14 @@ class Profit : public Linear<5> {
         /** Constructs a demand model with the given prior information.
          *
          * \param D the dimensionality of the world.
-         * \param beta_prior the prior of the mean values of beta.  Must be a 5-value (column)
-         * vector.  Values are in the order given in this class's description.
-         * \param s2_prior the prior of \f$s^2\f$ (typically an estimate thereof).
-         * \param V_prior the prior covariance matrix of the estimators, *without* premultiplication
-         * by \f$\sigma^2\f$.  That is, for a prior from OLS, this is the matrix \f$(X^\top
-         * X)^{-1}\f$, not the matrix \f$s^2(X^\top X)^{-1}\f$.  This matrix should be symmetric,
-         * positive definite.
-         * \param n_prior the number of data points supporting the prior (which need not be an
-         * integer).
+         * \param args prior arguments to forward to the base Linear constructor.
+         *
+         * \sa Linear::Linear
          */
-        Profit(
-                const unsigned int &D,
-                const VectorKd &beta_prior,
-                const double &s2_prior,
-                const MatrixKd &V_prior,
-                const double &n_prior
-              );
+        template <typename ...Args>
+        Profit(const unsigned int &D, Args &&...args)
+        : LinearBase{std::forward<Args>(args)...}, D_{D}
+        {}
 
         /** Given a set of model parameters, this returns an expected value \f$\Pi_b\f$, the
          * lifetime profit of the book.
@@ -79,6 +70,8 @@ class Profit : public Linear<5> {
          * \param l_max the maximum value of `l` to consider.  This is typically the reader's
          * money (income) on hand.
          *
+         * \returns the double value \f$\ell\f$ that maximizes expected net profit.
+         *
          * \sa eris::single_peak_search for the numerical algorithm used.
          */
         double argmaxL(
@@ -88,6 +81,8 @@ class Profit : public Linear<5> {
                 ) const;
 
     private:
+        Profit(LinearBase &&move, const unsigned int &D);
+
         unsigned int D_;
 
 };

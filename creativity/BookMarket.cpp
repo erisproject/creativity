@@ -66,16 +66,26 @@ void BookMarket::buy_(Reservation_ &res) {
     auto book = simGood<Book>(book_);
     auto lock = writeLock(book);
     Bundle &b = reservationBundle_(res);
-    book->sales(res.quantity);
-    b.transferApprox(b, proceeds_); // Take the money
-    b.set(book_, res.quantity); // Leave a copy of the book
+
+    // Record the sale in the book status
+    book->sale(res.quantity, b[MONEY]);
+
+    // Transfer the money into the "proceeds" jar (which will eventually go to the author)
+    b.transferApprox(b, proceeds_);
+
+    // Leave a copy of the book
+    b.set(book_, res.quantity);
+
+    // Complete the reservation
     Market::buy_(res);
 }
 
-void BookMarket::interAdvance() {
-    auto author = simGood<Book>(book_)->author();
-    auto lock = writeLock(author);
-    proceeds_.transferApprox(proceeds_, author->assets());
+void BookMarket::intraFinish() {
+    auto bk = book();
+    auto author = bk->author();
+    auto lock = writeLock(bk, author);
+    author->receiveProfits(bk, proceeds_);
+    proceeds_.clear();
 }
 
 }

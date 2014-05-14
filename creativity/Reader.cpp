@@ -15,11 +15,11 @@ const std::vector<double> Reader::default_penalty_polynomial{{0, 0, 0.25}};
 Reader::Reader(
         const Position &pos, const Position &b1, const Position &b2,
         belief::Demand &&demand, belief::Profit &&profit, belief::Quality &&quality,
-        double cFixed, double cUnit
+        const double &cFixed, const double &cUnit, const double &income
         )
     : WrappedPositional<agent::AssetAgent>(pos, b1, b2),
     profit_belief_{std::move(profit)}, demand_belief_{std::move(demand)}, quality_belief_{std::move(quality)},
-    c_fixed_{std::move(cFixed)}, c_unit_{std::move(cUnit)}
+    c_fixed_{cFixed}, c_unit_{cUnit}, income_{income}
 {}
 
 void Reader::uPolynomial(std::vector<double> coef) {
@@ -103,12 +103,20 @@ double Reader::creationQuality(const double &effort) const {
 }
 
 void Reader::interApply() {
-    // Update lifetime profit and per-period demand beliefs
-    updateDemandBelief();
-    updateProfitBelief();
+    // Update the various profit, demand, and quality beliefs
+    updateBeliefs();
+
+    // Give potential income (this has to be before authorship decision, since authorship requires
+    // giving up some potential income: actual income will be this amount minus whatever is given up
+    // to author)
+    assets() += {MONEY, income_};
 
     auto sim = simulation();
 
+    std::normal_distribution<double> stdnormal;
+    auto &rng = Random::rng();
+
+    ERIS_DBG("");
     const double previous_books = wrote().size();
     const double market_books = sim->countMarkets<BookMarket>();
 
@@ -121,7 +129,7 @@ void Reader::interApply() {
 
         auto book_mkt = book->market();
 
-        auto max = demand_belief_.argmaxP(book->quality(), book->sales(), previous_books-1, market_books, c_unit_);
+        auto max = demand_belief_.argmaxP(book->quality(), book->lifeSales(), previous_books-1, market_books, c_unit_);
         const double &p = max.first;
         const double &q = max.second;
         const double profit = (p - c_unit_) * q - c_fixed_;
@@ -143,11 +151,18 @@ void Reader::interApply() {
             [this] (const double &l) -> double { return creationQuality(l); },
             previous_books, market_books, assets()[MONEY]
             );
+    ERIS_DBGVAR(l_max);
     double quality = creationQuality(l_max);
-    double e_profit = profit_belief_.predict(quality, previous_books, market_books);
+
+    ERIS_DBGVAR(quality);
+
+    if (quality >= 0) ERIS_DBGVAR(profit_belief_.predict(quality, previous_books, market_books));
 
     // If the optimal effort level gives a book with positive expected profits, do it:
-    if (e_profit > l_max) {
+    if (quality >= 0 and l_max < profit_belief_.predict(quality, previous_books, market_books)) {
+
+        // The cost (think of this as an opportunity cost) of creating:
+        assets() -= {MONEY, l_max};
 
         // The book is centered at the reader's position:
         Position bookPos{position()};
@@ -158,6 +173,8 @@ void Reader::interApply() {
         auto max = demand_belief_.argmaxP(quality, 0, wrote_.size()-1, market_books, c_unit_);
         const double &p = max.first;
 
+        ERIS_DBGVAR(p);
+
         if (writer_book_sd > 0) {
             auto &rng = Random::rng();
             // Now add some noise to each dimension
@@ -167,23 +184,16 @@ void Reader::interApply() {
             }
         }
 
-        std::normal_distribution<double> stdnormal;
         auto qdraw = [this,&stdnormal] (const Book &book, const Reader &) -> double {
-            return book.quality() + writer_quality_sd * stdnormal(eris::Random::rng());
+            return book.quality() + writer_quality_sd * stdnormal(Random::rng());
         };
         wrote_.push_back(simulation()->create<Book>(bookPos, sharedSelf(), wrote_.size(), p, quality, qdraw));
     }
-}
+    ERIS_DBG("");
 
-void Reader::interAdvance() {
-    // This is really crude: just move N(0,1) in a random direction 50% of the time.
-
-    auto &rng = Random::rng();
-    std::normal_distribution<double> stdnormal;
-    std::normal_distribution<double> step_dist{0, 0.25};
-
-    // Choose a random distance and a random direction
+    // Finally, move N(0,0.25) in a random direction 50% of the time.
     if (std::bernoulli_distribution{0.5}(rng)) {
+        std::normal_distribution<double> step_dist{0, 0.25};
         const double distance = step_dist(rng);
         // Uniform hypersphere surface picking: draw a N(0,1) for each dimension, then normalize to
         // a unit distance.  See http://mathworld.wolfram.com/HyperspherePointPicking.html
@@ -201,7 +211,7 @@ void Reader::interAdvance() {
     }
 }
 
-double Reader::uBook(const SharedMember<Book> &b) const {
+double Reader::uBook(SharedMember<Book> b) const {
     double u = evalPolynomial(distance(b), u_poly_);
     double q_DEBUG = quality(b);
     //std::cerr << "Evaluating book " << b << ": quality=" << q_DEBUG << ", totalu=" << q_DEBUG + u << "\n";
@@ -210,7 +220,7 @@ double Reader::uBook(const SharedMember<Book> &b) const {
     return u;
 }
 
-double Reader::quality(const SharedMember<Book> &b) const {
+double Reader::quality(SharedMember<Book> b) const {
     auto found = library_.find(b);
     if (found != library_.end())
         return found->second;
@@ -225,14 +235,27 @@ double Reader::penalty(unsigned long n) const {
 
 const std::unordered_map<eris_id_t, double>& Reader::library() { return library_; }
 
+void Reader::receiveProfits(SharedMember<Book> book, const Bundle &revenue) {
+    assets() += revenue - Bundle{MONEY, book->currSales() * c_unit_};
+}
+
+void Reader::updateBeliefs() {
+    updateDemandBelief();
+    updateProfitBelief();
+    updateProfitStreamBelief();
+    updateQualityBelief();
+}
 void Reader::updateDemandBelief() {
-    throw std::runtime_error("FIXME: updateDemandBelief not yet implemented!\n");
+    std::cerr << "FIXME: updateDemandBelief not yet implemented!\n";
 }
 void Reader::updateProfitBelief() {
-    throw std::runtime_error("FIXME: updateProfitBelief not yet implemented!\n");
+    std::cerr << "FIXME: updateProfitBelief not yet implemented!\n";
+}
+void Reader::updateProfitStreamBelief() {
+    std::cerr << "FIXME: updateProfitStreamBelief not yet implemented!\n";
 }
 void Reader::updateQualityBelief() {
-    throw std::runtime_error("FIXME: updateQualityBelief not yet implemented!\n");
+    std::cerr << "FIXME: updateQualityBelief not yet implemented!\n";
 }
 
 void Reader::intraInitialize() {
@@ -264,7 +287,7 @@ void Reader::intraOptimize() {
         if (u >= p) {
             // Good: the book is available and its utility (before any penalty) exceeds the purchase price
             // Store the net utility of this book:
-            book_net_u[u - bm->price()].push_back(std::move(bm));
+            book_net_u[u - bm->price()].push_back(bm);
         }
     }
 
@@ -294,6 +317,7 @@ void Reader::intraOptimize() {
 
         lock.add(bm);
         auto book = bm->book();
+        ERIS_DBG("Gonna buy a book!\n");
         // Perform some safety checks:
         // - if we've already added the book to the set of books to buy, don't add it again. (This
         //   should only be possible if there are multiple BookMarkets selling the same book).
@@ -302,6 +326,7 @@ void Reader::intraOptimize() {
         // - if we can't afford it, skip it.
         auto pinfo = bm->price(1);
         if (buy.count(book) == 0 and pinfo.feasible and pinfo.total <= money) {
+            ERIS_DBG("Buying that book!");
             buy.insert(book);
             double u_with_book = u(money - pinfo.total, buy);
             if (u_with_book < u_curr) {

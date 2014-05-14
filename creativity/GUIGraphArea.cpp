@@ -105,14 +105,14 @@ bool GUIGraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
         if (radius1 > 0) { // Utility > 1000 means some utility gain from books
             drawCircle(cr, trans, rx, ry, radius1, CircleType::B);
         }
-        if (radius2 > 0) { // Bought some books
+/*        if (radius2 > 0) { // Bought some books
             drawCircle(cr, trans, rx, ry, radius2, CircleType::A);
             for (auto &book_id : r->newBooks()) {
                 auto b = sim_->good<Book>(book_id);
                 drawWrappingLine(cr, trans, r, b);
             }
             cr->stroke();
-        }
+        }*/
         // NB: rx, ry may be translated now
     }
 

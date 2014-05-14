@@ -39,27 +39,7 @@ namespace creativity { namespace belief {
  */
 class ProfitStream : public Linear<> {
     public:
-        /** Constructs a demand model with the given prior information.
-         *
-         * \param beta_prior the prior of the mean values of beta as a column vector, which must all
-         * be non-negative.  The length of this vector determines \f$K\f$, the maximum number of
-         * periods to consider.
-         * \param s2_prior the prior of \f$s^2\f$ (typically an estimate thereof).
-         * \param V_prior the prior covariance matrix of the estimators, *without* premultiplication
-         * by \f$\sigma^2\f$.  That is, for a prior from OLS, this is the matrix \f$(X^\top
-         * X)^{-1}\f$, not the matrix \f$s^2(X^\top X)^{-1}\f$.  This matrix should be symmetric,
-         * positive definite.
-         * \param n_prior the number of data points supporting the prior (which need not be an
-         * integer).
-         *
-         * \throws std::domain_error if any value of beta_prior is negative.
-         */
-        ProfitStream(
-                const VectorXd &beta_prior,
-                const double &s2_prior,
-                const MatrixXd &V_prior,
-                const double &n_prior
-              );
+        using LinearBase::Linear;
 
         /** Given the cumulative profit of the first \f$n\f$ periods a book is on the market, this
          * returns a predicted remaining cumulative lifetime profit, \f$\widehat\pi_{remaining}\f$.
@@ -71,6 +51,10 @@ class ProfitStream : public Linear<> {
          * profit.
          */
         double predict(const double &profit_curr, const unsigned int &age) const;
+
+    protected:
+        /// Ensures that all beta values are non-negative
+        virtual void verifyParameters() const override;
 };
 
 }}
