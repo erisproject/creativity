@@ -7,7 +7,7 @@ namespace creativity { namespace belief {
 
 double Profit::predict(const double &q, const unsigned long &previousBooks, const unsigned long &marketBooks) const {
     if (q < 0) throw std::domain_error("Profit::predict: q cannot be < 0");
-    RowVectorKd X{K};
+    RowVectorKd X{K()};
     X << 1, std::pow(q, D_), previousBooks == 0 ? 1 : 0, previousBooks, marketBooks;
     return LinearBase::predict(X);
 }

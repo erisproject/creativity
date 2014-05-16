@@ -1,8 +1,11 @@
 #pragma once
 #include "creativity/belief/Linear.hpp"
 #include <eris/algorithms.hpp>
+#include <eris/SharedMember.hpp>
 
-namespace creativity { namespace belief {
+namespace creativity {
+class Book;
+namespace belief {
 
 /** This class represents an author's belief about the per-period demand for books.  The model is of
  * the form:
@@ -119,6 +122,12 @@ class Demand : public Linear<7> {
          */
         double argmaxP_MAX = 10000;
 
+        /** Given a book and perceived quality, this builds an X matrix row of data representing
+         * that book.  This needs to be called after the period has advanced: typically in the
+         * inter-period optimization stage.
+         */
+        RowVectorKd bookRow(eris::SharedMember<Book> book, double quality);
+        
     private:
         unsigned int D_;
 

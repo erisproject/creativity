@@ -40,7 +40,7 @@ class Linear {
          * have proper move support, so for Eigen <3.3 we work around it by changing move assignment
          * into copy assignment (which is, of course, much less efficient).
          */
-        Linear& operator=(Linear &&move) { return operator=(move); }
+        //Linear& operator=(Linear &&move) { return operator=(move); }
         /// Default copy assignment operator
         Linear& operator=(const Linear &copy) = default;
 #endif
@@ -76,15 +76,15 @@ class Linear {
                 const Ref<const MatrixKd> &V_prior,
                 const double &n_prior,
                 const std::shared_ptr<MatrixKd> &V_prior_inv = nullptr
-        ) : K{beta_prior.rows()}, beta_{beta_prior}, s2_{s2_prior}, V_{V_prior}, V_inv_{V_prior_inv}, n_{n_prior}
+        ) : beta_{beta_prior}, s2_{s2_prior}, V_{V_prior}, V_inv_{V_prior_inv}, n_{n_prior}, K_{beta_.rows()}
         {
             // If we're templated as a Dynamic size class, check that the given matrices conform (if
             // not dynamic, this is guaranteed by the fixed constructor parameter sizes).
             if (KK == Eigen::Dynamic) {
-                if (K < 1) throw std::runtime_error("Linear model requires at least one parameter");
+                if (K() < 1) throw std::runtime_error("Linear model requires at least one parameter");
                 if (V_.rows() != V_.cols()) throw std::runtime_error("Linear requires square V_prior matrix");
-                if (K != V_.rows()) throw std::runtime_error("Linear requires beta_prior and V_prior of same number of rows");
-                if (V_inv_ and (V_inv_->rows() != V_inv_->cols() or V_inv_->rows() != K))
+                if (K() != V_.rows()) throw std::runtime_error("Linear requires beta_prior and V_prior of same number of rows");
+                if (V_inv_ and (V_inv_->rows() != V_inv_->cols() or V_inv_->rows() != K()))
                     throw std::runtime_error("Linear constructed with invalid prior inverse");
             }
         }
@@ -95,16 +95,19 @@ class Linear {
         /// Virtual destructor
         virtual ~Linear() = default;
 
+        const VectorKd& DEBUG_betaPrior() { return beta_; }
+
         // Let Eigen align things if necessary (this will only matter if KK=2 or KK=4)
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
         /// Given a row vector of values, predicts using the current beta_ values.
         double predict(const Eigen::Ref<const RowVectorKd> &Xi) const {
+            // FIXME: this is wrong; prediction should be using some sort of sampling
             return Xi * beta_;
         }
 
         /// The number of parameters of the model
-        const long K;
+        const long& K() const { return K_; }
 
     protected:
         /** Called during construction to verify that the given parameters are valid.  Subclasses
@@ -126,7 +129,7 @@ class Linear {
         Linear<KK> update(const Ref<const VectorXd> &y, const Ref<const MatrixXKd> &X) const {
             if (y.rows() != X.rows())
                 throw std::runtime_error("update(y, X) failed: y and X are non-conformable");
-            if (X.cols() != K)
+            if (X.cols() != K())
                 throw std::runtime_error("update(y, X) failed: X has wrong number of columns");
 
             MatrixXd Xt = X.transpose();
@@ -165,15 +168,18 @@ class Linear {
         mutable std::shared_ptr<MatrixKd> V_inv_; // Mutable because we need to create it during const methods,
                                                   // but the creation doesn't actually meaningfully change anything.
 
+        /** The prior n, which need not be an integer.
+         */
+        double n_;
+
         /** Eigen allocator for new MatrixKd objects, used when storing in shared_ptr.  This is
          * really only needed for certain fixed values of KK (2 and 4), but doesn't hurt the rest of
          * the time.
          */
         static Eigen::aligned_allocator<MatrixKd> kd_allocator_;
 
-        /** The prior n, which need not be an integer.
-         */
-        double n_;
+    private:
+        long K_;
 };
 
 template <int KK, typename Z> Eigen::aligned_allocator<Matrix<double, KK, KK>> Linear<KK, Z>::kd_allocator_{};

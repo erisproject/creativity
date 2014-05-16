@@ -1,6 +1,9 @@
 #pragma once
 #include "creativity/belief/Linear.hpp"
+#include "creativity/Book.hpp"
+#include "creativity/BookMarket.hpp"
 #include <eris/algorithms.hpp>
+#include <eris/SharedMember.hpp>
 
 namespace creativity {
 
@@ -43,6 +46,25 @@ class Quality : public Linear<7> {
          */
         Quality update(const Ref<const VectorXd> &y, const Ref<const MatrixXKd> &X) const;
 
+        /** Given a container of books, this builds an X matrix of data representing those books.
+         */
+        template <class Container, typename = typename std::enable_if<std::is_same<typename Container::value_type, eris::SharedMember<Book>>::value>::type>
+        MatrixXKd bookData(const Container books) {
+            MatrixXKd X(books.size(), K());
+            size_t i = 0;
+            for (const eris::SharedMember<Book> &book : books) {
+                X(i, 0) = 1;
+                X(i, 1) = book->order() == 0;
+                X(i, 2) = book->order();
+                X(i, 3) = book->age();
+                double price = book->hasMarket() ? book->market()->price() : 0.0;
+                X(i, 4) = price;
+                X(i, 5) = price*book->age();
+                X(i, 6) = book->lifeSales();
+                i++;
+            }
+            return X;
+        }
     private:
         // Initialize a Quality from a Linear<7>
         Quality(LinearBase &&base) : LinearBase{base} {}

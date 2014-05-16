@@ -1,4 +1,7 @@
 #include "creativity/belief/Demand.hpp"
+#include "creativity/Book.hpp"
+#include "creativity/BookMarket.hpp"
+#include "creativity/Reader.hpp"
 
 using Eigen::RowVectorXd;
 
@@ -39,5 +42,37 @@ std::pair<double, double> Demand::argmaxP(const double &q, const unsigned long &
             }, c, argmaxP_MAX);
     return {p_opt, Xg + beta_[1] * std::pow(p_opt, D_)};
 }
+
+
+Demand::RowVectorKd Demand::bookRow(eris::SharedMember<Book> book, double quality) {
+    RowVectorKd row{K()};
+
+    auto t = book->simulation()->t() - 1;
+    row << 1.0,
+        (book->hasMarket() ? std::pow(book->market()->price(), D_) : 0.0),
+        std::pow(quality, D_),
+        book->lifeSales() - book->sales(t),
+        book->age() - 1.0, // -1 because we're called in interopt, when t() has been incremented.
+        book->author()->wrote().size() == 1 ? 1.0 : 0.0,
+        book->author()->wrote().size() - 1,
+        book->simulation()->countMarket<BookMarket>();
+
+
+
+            MatrixXKd X(books.size(), K());
+            size_t i = 0;
+            for (const eris::SharedMember<Book> &book : books) {
+                X(i, 0) = 1;
+                X(i, 1) = (book->hasMarket() ? std::pow(book->market()->price(), D_) : 0);
+                X(i, 2) = book->order();
+                X(i, 3) = book->age();
+                double price = book->hasMarket() ? book->market()->price() : 0.0;
+                X(i, 4) = price;
+                X(i, 5) = price*book->age();
+                X(i, 6) = book->lifeSales();
+                i++;
+            }
+            return X;
+        }
 
 }}

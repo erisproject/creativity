@@ -4,6 +4,7 @@
 #include "creativity/common.hpp"
 #include "creativity/belief/Demand.hpp"
 #include "creativity/belief/Profit.hpp"
+#include "creativity/belief/ProfitStream.hpp"
 #include "creativity/belief/Quality.hpp"
 #include <eris/Eris.hpp>
 #include <eris/Simulation.hpp>
@@ -111,23 +112,25 @@ int main(int argc, char *argv[1]) {
     }
 
     ERIS_DBG("Setting up readers");
+    VectorXd demand_beta{7}; demand_beta << 0, -2, 0.5, -0.1, 0, 0, 0;
+    MatrixXd demand_V = MatrixXd::Identity(7, 7);
+    double demand_s2 = 10, demand_n = 1;
+    VectorXd profit_beta{5}; profit_beta << 0, 1, 0, 0, 0;
+    MatrixXd profit_V = MatrixXd::Identity(5, 5);
+    double profit_s2 = 10, profit_n = 1;
+    VectorXd quality_beta{7}; quality_beta << 5, -1, 1, 0, 0, 0, 0.1;
+    MatrixXd quality_V = MatrixXd::Identity(7, 7);
+    double quality_s2 = 10, quality_n = 1;
+    VectorXd stream_beta = VectorXd::Zero(10);
+    MatrixXd stream_V = 1e10 * MatrixXd::Identity(10, 10);
+    double stream_s2 = 1e20, stream_n = 0.0001;
     for (auto i = 0UL; i < num_readers; i++) {
-        VectorXd demand_beta{7}; demand_beta << 0, -2, 0.5, -0.1, 0, 0, 0;
-        MatrixXd demand_V = MatrixXd::Identity(7, 7);
-        double demand_s = 10, demand_n = 1;
-        VectorXd profit_beta{5}; profit_beta << 0, 1, 0, 0, 0;
-        MatrixXd profit_V = MatrixXd::Identity(5, 5);
-        double profit_s = 10, profit_n = 1;
-        VectorXd quality_beta{7}; quality_beta << 5, -1, 1, 0, 0, 0, 0.1;
-        MatrixXd quality_V = MatrixXd::Identity(7, 7);
-        double quality_s = 10, quality_n = 1;
-
-        belief::Demand d{2, demand_beta, demand_s, demand_V, demand_n};
-        belief::Profit p{2, profit_beta, profit_s, profit_V, profit_n};
-        belief::Quality q{quality_beta, quality_s, quality_V, quality_n};
         auto r = sim->create<Reader>(Position{unif_pmb(rng), unif_pmb(rng)},
                 Position{-BOUNDARY,-BOUNDARY}, Position{BOUNDARY, BOUNDARY},
-                std::move(d), std::move(p), std::move(q),
+                belief::Demand{2, demand_beta, demand_s2, demand_V, demand_n},
+                belief::Profit{2, profit_beta, profit_s2, profit_V, profit_n},
+                belief::ProfitStream{stream_beta, stream_s2, stream_V, stream_n},
+                belief::Quality{quality_beta, quality_s2, quality_V, quality_n},
                 cost_fixed, cost_unit, income
                 );
         r->writer_book_sd = book_sd;

@@ -7,6 +7,7 @@
 #include <unordered_set>
 #include <Eigen/Core>
 #include "belief/Profit.hpp"
+#include "belief/ProfitStream.hpp"
 #include "belief/Demand.hpp"
 #include "belief/Quality.hpp"
 
@@ -92,7 +93,7 @@ class BookMarket;
  * See creativity::belief::Demand for details.
  */
 class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
-    public virtual eris::interopt::Apply,
+    public virtual eris::interopt::OptApply,
     public virtual eris::intraopt::OptApplyReset,
     public virtual eris::intraopt::Initialize
 {
@@ -105,7 +106,8 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * \param b1 a vertex of the wrapping boundary box for the reader
          * \param b2 the vertex opposite `b1` of the wrapping boundary box for the reader
          * \param demand a per-period demand belief object
-         * \param profit a per-period profit belief object
+         * \param profit a lifetime profit belief object
+         * \param stream a profit temporal belief object
          * \param quality a quality belief object
          * \param cFixed the fixed cost of keeping a book on the market
          * \param cUnit the per-unit cost of producing copies of a book
@@ -113,7 +115,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          */
         Reader(
                 const eris::Position &pos, const eris::Position &b1, const eris::Position &b2,
-                belief::Demand &&demand, belief::Profit &&profit, belief::Quality &&quality,
+                belief::Demand &&demand, belief::Profit &&profit, belief::ProfitStream &&stream, belief::Quality &&quality,
                 const double &cFixed, const double &cUnit, const double &income
               );
 
@@ -160,9 +162,9 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
 
         /** Returns/accesses the library of books owned by this Reader.
          *
-         * \returns map where keys are the eris_id_t of the books and values are the realized
-         * quality of the books. */
-        const std::unordered_map<eris::eris_id_t, double>& library();
+         * \returns map where keys are the books and values are the realized quality of the books.
+         */
+        const std::unordered_map<eris::SharedMember<Book>, double>& library();
 
         /** Returns the set of Books that were purchased in the last period.
          *
@@ -171,9 +173,9 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          */
         const std::unordered_set<eris::SharedMember<Book>>& newBooks() const;
 
-        /** Returns a list of eris_id_t of books this reader wrote, in chronological order from
-         * earliest to latest. */
-        const std::vector<eris::eris_id_t>& wrote() const;
+        /** Returns a list of books this reader wrote, in chronological order from earliest to
+         * latest. */
+        const std::vector<eris::SharedMember<Book>>& wrote() const;
 
         /** Returns the unpenalized utility of reading the given book.  The utility is found by
          * adding together the distance polynomial value and the quality value of the book.  The
@@ -292,10 +294,8 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         static const std::vector<double> default_penalty_polynomial;
 
         /** The standard deviation of a written book.  A written book will be located at the
-         * reader's position plus independent draws from \f$N(0, s)\f$ in each dimension, where
-         * \f$s\f$ is the value of this parameter.  Note that this means the distance from the
-         * author is distributed as \f$\sqrt{\Chi^2_D}\f$, where \f$D\f$ is the number of
-         * dimensions.
+         * reader's position plus a draw from \f$N(0, s)\f$ in a random direction, where \f$s\f$ is
+         * the value of this parameter.
          *
          * Defaults to 0.5.
          */
@@ -334,8 +334,21 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          */
         void receiveProfits(eris::SharedMember<Book> book, const eris::Bundle &revenue);
 
-        /** In-between periods, the reader receives his income, randomly creates a book, and takes a
-         * random step. */
+        /** In-between periods, the reader optimizes by:
+         * - updates his beliefs based on characteristics of newly obtained books
+         * - receives non-book income
+         * - chooses whether or not to create a new book and, if so, the effort to expend on it
+         * - for all existing books still on the market, the author decides to keep or remove a book
+         *   from the market, and if keeping, the price is chosen
+         */
+        void interOptimize() override;
+
+        /** Applies inter-period optimization that are visible to other agents:
+         * - receives fixed, non-book income
+         * - creates a book (if decided upon in interOptimize()), removing the effort cost from the
+         *   just-received income.
+         * - takes a random step of distance N(0,0.25) in a random direction.
+         */
         void interApply() override;
 
         /// Updates the book market cache with any new books
@@ -368,26 +381,46 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
 
     protected:
         /// Belief about lifetime book profits
-        belief::Profit profit_belief_;
-        /// Belief about per-period demand
-        belief::Demand demand_belief_;
-        /// Belief about book quality
-        belief::Quality quality_belief_;
+        belief::Profit profit_belief_, ///< Belief about lifetime book profits
+            profit_belief_extrap_; ///< Beliefs about lifetime book profits using profit stream expectations
+        belief::ProfitStream prof_stream_belief_; ///< Belief about the time structure of profits
+        belief::Demand demand_belief_; ///< Belief about per-period demand
+        belief::Quality quality_belief_; ///< Belief about book quality
 
-        /** Updates all of the reader's beliefs.
+        /** Updates all of the reader's beliefs, in the following order:
+         * - book quality beliefs
+         * - per-period demand
+         * - profit stream temporal structure
+         * - lifetime profitability
+         * - lifetime profitability with extrapolation for still-in-market books
          *
-         * \sa updateDemandBelief
-         * \sa updateProfitBelief
-         * \sa updateProfitStreamBelief
          * \sa updateQualityBelief
+         * \sa updateDemandBelief
+         * \sa updateProfitStreamBelief
+         * \sa updateProfitBelief
          */
         void updateBeliefs();
 
+        /** Updates the quality model based on observations from the previous period.
+         */
+        void updateQualityBelief();
+
         /** Updates the demand equation belief based on book sales observed in the previous period.
+         *
+         * This includes each book as a single observation with its age at time of purchase.
+         *
+         * \todo Consider adding books for each period they survive (and past periods).  In other
+         * words, if the book is bought when \f$age=2\f$, also add data points for \f$age=0\f$ and
+         * \f$age=1\f$, and keep doing so into the future until the book leaves the market.
          */
         void updateDemandBelief();
 
-        /** Updates the profit equation belief based on observations from the previous period.
+        /** Updates the lifetime profit equation belief based on observations from the previous
+         * period.
+         *
+         * This also updates the lifetime profit extrapolation belief, using the just-updated profit
+         * belief as prior plus extrapolations (via the profit stream belief) for books that are
+         * still on the market.  The previous extrapolated profit belief is discarded.
          */
         void updateProfitBelief();
 
@@ -396,16 +429,14 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          */
         void updateProfitStreamBelief();
 
-        /** Updates the quality model based on observations from the previous period.
-         */
-        void updateQualityBelief();
-
+        /** Need a standard normal in various places. */
+        std::normal_distribution<double> stdnormal;
 
     private:
         std::vector<double> u_poly_ = Reader::default_polynomial;
         std::vector<double> pen_poly_ = Reader::default_penalty_polynomial;
         /// Map of books owned to realized quality of those books:
-        std::unordered_map<eris::eris_id_t, double> library_;
+        std::unordered_map<eris::SharedMember<Book>, double> library_;
         /// Reservations of books being purchased
         std::forward_list<eris::Market::Reservation> reservations_;
         /// set of books associated with reservations_
@@ -413,9 +444,11 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         /// Books purchased in the just-finished period
         std::unordered_set<eris::SharedMember<Book>> new_books_;
         /// Books written by this reader, in order from earliest to latest
-        std::vector<eris::eris_id_t> wrote_;
-        /// Cache of the set of book markets available
-        std::unordered_set<eris::SharedMember<BookMarket>> book_cache_;
+        std::vector<eris::SharedMember<Book>> wrote_;
+        /// Books written by this reader that are still on the market
+        std::unordered_set<eris::SharedMember<Book>> wrote_on_market_;
+        /// Cache of the set of books available
+        std::unordered_set<eris::SharedMember<Book>> book_cache_;
 
         // Track current and cumulative utility:
         double u_curr_, u_lifetime_;
@@ -425,6 +458,14 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
 
         // Per-period income
         double income_;
+
+        // Book prices for the upcoming period.  If a book currently on the market isn't in here,
+        // or has a negative price, it'll be removed from the market
+        std::unordered_map<eris::SharedMember<Book>, double> new_prices_;
+
+        // Whether to create, and the various attributes of that creation
+        bool create_ = false;
+        double create_effort_, create_quality_, create_price_;
 
 };
 
