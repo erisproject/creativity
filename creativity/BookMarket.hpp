@@ -13,7 +13,7 @@ class BookMarket : public eris::Market, public virtual eris::intraopt::Finish {
         /** Constructs a BookMarket that sells copies of the given Book with an initial price of
          * MONEY times p.  Books are created as needed at zero cost.
          */
-        BookMarket(const Book &b, const double &price);
+        BookMarket(eris::SharedMember<Book> b, double price);
 
         /** Returns price info.  Since price is constant, and there is no quantity limits,
          * this price into is simple: it's always feasible, and total is just quantity times price,
@@ -68,9 +68,9 @@ class BookMarket : public eris::Market, public virtual eris::intraopt::Finish {
         virtual void buy_(Reservation_ &res) override;
 
     private:
-        eris::eris_id_t book_;
+        eris::SharedMember<Book> book_;
         double price_;
-        // The sales of the book (these get transferred in the interApply phase)
+        // The income of the book (these get transferred in the interApply phase)
         eris::Bundle proceeds_;
 };
 

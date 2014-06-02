@@ -6,12 +6,12 @@ using namespace eris;
 
 namespace creativity {
 
-BookMarket::BookMarket(const Book &b, const double &price)
+BookMarket::BookMarket(SharedMember<Book> b, double price)
     : Market{{{ b, 1 }}, {{ MONEY, 1 }}}, book_{b}, price_{price}
 {}
 
 SharedMember<Book> BookMarket::book() {
-    return simGood<Book>(book_);
+    return book_;
 }
 
 BookMarket::price_info BookMarket::price(double q) const {
@@ -63,12 +63,11 @@ void BookMarket::buy_(Reservation_ &res) {
     if (res.state != ReservationState::pending)
         throw Reservation_::non_pending_exception();
 
-    auto book = simGood<Book>(book_);
-    auto lock = writeLock(book);
+    auto lock = writeLock(book_);
     Bundle &b = reservationBundle_(res);
 
     // Record the sale in the book status
-    book->sale(res.quantity, b[MONEY]);
+    book_->sale(res.quantity, b[MONEY]);
 
     // Transfer the money into the "proceeds" jar (which will eventually go to the author)
     b.transferApprox(b, proceeds_);
@@ -81,10 +80,9 @@ void BookMarket::buy_(Reservation_ &res) {
 }
 
 void BookMarket::intraFinish() {
-    auto bk = book();
-    auto author = bk->author();
-    auto lock = writeLock(bk, author);
-    author->receiveProfits(bk, proceeds_);
+    auto author = book_->author();
+    auto lock = writeLock(book_, author);
+    author->receiveProfits(book_, proceeds_);
     proceeds_.clear();
 }
 

@@ -81,33 +81,21 @@ GUI::~GUI() {
 }
 
 void GUI::thr_run() {
-    auto *main = widget<Gtk::Window>("window1");
+    main_window_ = std::shared_ptr<Gtk::Window>(widget<Gtk::Window>("window1"));
 
-    auto *run = widget<Gtk::Button>("btn_start");
-
-    run->signal_clicked().connect([this] {
+    widget<Gtk::Button>("btn_start")->signal_clicked().connect([this] {
         ERIS_DBG("run clicked");
-        std::vector<Parameter> params;
-        Parameter p;
-        p.param = ParamType::readers; p.ul = sb_int("set_readers"); params.push_back(p);
-        p.param = ParamType::dimensions; p.ul = sb_int("set_dimensions"); params.push_back(p);
-        p.param = ParamType::book_sd; p.dbl = sb("set_book_sd"); params.push_back(p);
-        p.param = ParamType::quality_draw_sd; p.dbl = sb("set_quality_draw_sd"); params.push_back(p);
-        p.param = ParamType::cost_fixed; p.dbl = sb("set_cost_fixed"); params.push_back(p);
-        p.param = ParamType::cost_unit; p.dbl = sb("set_cost_unit"); params.push_back(p);
-        p.param = ParamType::speed_limit; p.dur_ms = std::chrono::milliseconds{sb_int("set_speed")}; params.push_back(p);
-        p.param = ParamType::redraw; p.dur_ms = std::chrono::milliseconds{sb_int("set_redraw")}; params.push_back(p);
-        unsigned int threads;
-        widget<Gtk::ComboBox>("combo_threads")->get_active()->get_value(0, threads);
-        p.param = ParamType::threads; p.ul = (unsigned long)threads; params.push_back(p);
+        setupSim();
+        runSim();
+    });
 
-        queueEvent(Event::Type::setup, std::move(params));
-        queueEvent(Event::Type::run, sb_int("set_periods"));
-        ERIS_DBG("run events sent");
+    widget<Gtk::Button>("btn_init")->signal_clicked().connect([this] {
+        ERIS_DBG("init clicked");
+        setupSim();
     });
 
     widget<Gtk::Button>("btn_run")->signal_clicked().connect([this] {
-        queueEvent(Event::Type::run, sb_int("set_periods"));
+        runSim();
     });
 
     widget<Gtk::Button>("btn_pause")->signal_clicked().connect([this] {
@@ -140,78 +128,64 @@ void GUI::thr_run() {
     std::unique_lock<std::mutex> lock{mutex_};
 
     graph_ = std::unique_ptr<GUIGraphArea>(new GUIGraphArea{10., 10., -10., -10., sim_, *this});
-    main->add_events(Gdk::EventMask::BUTTON_PRESS_MASK);
+    graph_->add_events(Gdk::EventMask::BUTTON_PRESS_MASK);
 
-    // FIXME: change mouse to clickable when over readers/books?
+    hand_ = Gdk::Cursor::create(main_window_->get_display(), Gdk::HAND1);
+
+    motion_handler_ = [this](GdkEventMotion *event) -> bool {
+        // When the mouse moves over the image, change the cursor to a hand any time the cursor
+        // is within 5 pixels of a graph item (book, reader, etc.)
+        rt_point clicked(event->x, event->y);
+
+        std::vector<rt_val> nearest;
+        rtree_.query(boost::geometry::index::nearest(clicked, 1), std::back_inserter(nearest));
+        if (not nearest.empty() and boost::geometry::distance(nearest[0].first, clicked) <= 5)
+            main_window_->get_window()->set_cursor(hand_);
+        else
+            main_window_->get_window()->set_cursor();
+
+        return false;
+    };
+    graph_->add_events(Gdk::POINTER_MOTION_MASK);
+    motion_handler_conn_ = graph_->signal_motion_notify_event().connect(motion_handler_);
 
     graph_->signal_button_press_event().connect([this](GdkEventButton *event) -> bool {
-        // Calculate the *graph* position where the user clicked
-        auto c2g = graph_->graph_to_canvas();
-        c2g.invert();
+        rt_point clicked(event->x, event->y);
 
-        double x = event->x, y = event->y;
-        c2g.translate(x, y);
+        // Figure out the closest Reader and Book on the canvas relative to where the click happened
+        std::vector<rt_val> nearest;
+        rtree_.query(boost::geometry::index::nearest(clicked, 1), std::back_inserter(nearest));
+        if (nearest.empty() or boost::geometry::distance(nearest[0].first, clicked) > 5)
+            return false;
 
-        Position pos{{x, y}};
-        // Figure out the closest thing (Reader or Book) to where the click happened
-        SharedMember<Reader> reader;
-        SharedMember<Book> book;
-
-        for (auto &r : sim_->agents<Reader>())
-            if (not reader or r->distance(pos) < reader->distance(pos))
-                reader = r;
-        for (auto &r : sim_->goods<Book>())
-            if (not book or r->distance(pos) < book->distance(pos))
-                book = r;
-
-        double dist = std::min(reader->distance(pos), book->distance(pos));
-
-        // If not within 5 pixels of the closest thing, ignore.
-        if (dist > 5) return false;
-
-        if (reader->distance(pos) <= book->distance(pos)) {
-            // If a reader, open up and fill out the reader info dialog
-            auto dlg_reader = widget<Gtk::Dialog>("dlg_readerinfo");
-            widget<Gtk::Label>("vrd_id")->set_text(std::to_string(reader->id()));
-            std::ostringstream pos;
-            pos << "(" << std::setw(7) << std::showpoint << reader->position()[0] << "," << reader->position()[1] << ")";
-            widget<Gtk::Label>("vrd_pos")->set_text(pos.str());
-            widget<Gtk::Label>("vrd_u")->set_text(std::to_string(reader->u()));
-            widget<Gtk::Label>("vrd_ulife")->set_text(std::to_string(reader->uLifetime()));
-            widget<Gtk::Label>("vrd_libsize")->set_text(std::to_string(reader->library().size()));
-            widget<Gtk::Label>("vrd_libnew")->set_text(std::to_string(reader->newBooks().size()));
-            widget<Gtk::Label>("vrd_books")->set_text(std::to_string(reader->wrote().size()));
-            auto last_book = sim_->good<Book>(reader->wrote().back());
-            widget<Gtk::Label>("vrd_lastbookage")->set_text(std::to_string(last_book->age()));
-            dlg_reader->run();
-            dlg_reader->hide();
+        eris_id_t id = nearest[0].second->id();
+        auto already_open = info_windows_.find(id);
+        if (already_open != info_windows_.end()) {
+            // If the window is already active, just present it again
+            already_open->second.present();
         }
         else {
-            // If a book, open up and fill out the book info dialog
-            auto dlg_book = widget<Gtk::Dialog>("dlg_bookinfo");
-            widget<Gtk::Label>("vbk_id")->set_text(std::to_string(book->id()));
-            std::ostringstream pos;
-            pos << "(" << std::setw(7) << std::showpoint << book->position()[0] << "," << book->position()[1] << ")";
-            widget<Gtk::Label>("vbk_pos")->set_text(pos.str());
-            widget<Gtk::Label>("vbk_mkt")->set_text(book->hasMarket()
-                    ? std::to_string(book->market()->id())
-                    : "(not on market)"
-            );
-            widget<Gtk::Label>("vbk_p")->set_text(book->hasMarket()
-                    ? std::to_string(book->market()->price())
-                    : "(not on market)"
-            );
-            widget<Gtk::Label>("vbk_age")->set_text(std::to_string(book->age()));
-            widget<Gtk::Label>("vbk_sales")->set_text(std::to_string(book->lifeSales()));
-            unsigned long copies = 0;
-            for (auto &r : sim_->agents<Reader>()) {
-                if (r->library().count(book))
-                    copies++;
+            // Otherwise we need to create a new window
+            SharedMember<Reader> reader;
+            SharedMember<Book> book;
+            try {
+                reader = nearest[0].second;
             }
-            widget<Gtk::Label>("vbk_copies")->set_text(std::to_string(copies));
-            widget<Gtk::Label>("vbk_author")->set_text(std::to_string(book->author()));
-            dlg_book->run();
-            dlg_book->hide();
+            catch (std::bad_cast&) {
+                // Not a reader: must be a book
+                book = nearest[0].second;
+            }
+
+            if (reader) {
+                info_windows_.emplace(std::piecewise_construct,
+                        std::tuple<eris_id_t>{id},
+                        std::tuple<decltype(reader), decltype(main_window_)>{reader, main_window_});
+            }
+            else {
+                info_windows_.emplace(std::piecewise_construct,
+                        std::tuple<eris_id_t>{id},
+                        std::tuple<decltype(book), decltype(main_window_)>{book, main_window_});
+            }
         }
         return true;
     });
@@ -228,7 +202,7 @@ void GUI::thr_run() {
             cv_.notify_all();
             });
 
-    app_->run(*main);
+    app_->run(*main_window_);
 
     queueEvent(Event::Type::quit);
     lock.lock();
@@ -236,6 +210,7 @@ void GUI::thr_run() {
 }
 
 void GUI::thr_signal() {
+    ERIS_DBG("");
     std::unique_lock<std::mutex> lock(mutex_);
     // Keep track of the *last* state change we see, and whether or not we see a redraw (we want to
     // skip everything except the last).
@@ -250,6 +225,7 @@ void GUI::thr_signal() {
             case Signal::Type::redraw:
                 last_redraw = s;
                 break;
+            case Signal::Type::initialized:
             case Signal::Type::running:
             case Signal::Type::stopped:
                 last_state = s;
@@ -258,7 +234,7 @@ void GUI::thr_signal() {
                 last_progress = s;
                 break;
             case Signal::Type::error:
-                std::cerr << "Thr received error signal\n";
+                ERIS_DBG("Thr received error signal");
                 errors << s.message << "\n";
                 break;
         }
@@ -266,27 +242,63 @@ void GUI::thr_signal() {
     signal_queue_.clear();
     lock.unlock();
 
-    if (last_state.type == Signal::Type::running) {
-        std::cerr << "running signal received\n";
+    if (last_state.type == Signal::Type::initialized) {
+        ERIS_DBG("initialized signal received");
         widget<Gtk::Notebook>("nb_tabs")->set_current_page(1);
 
         // Disable spin buttons:
-        for (auto &widg : {"set_dimensions", "set_readers", "set_book_sd", "set_quality_draw_sd", "set_cost_fixed", "set_cost_unit", "set_speed"})
+        for (auto &widg : {"set_dimensions", "set_readers", "set_book_sd", "set_quality_draw_sd", "set_cost_fixed", "set_cost_unit"})
             widget<Gtk::SpinButton>(widg)->set_sensitive(false);
 
+        widget<Gtk::Button>("btn_init")->set_sensitive(false);
         widget<Gtk::Button>("btn_start")->set_sensitive(false);
+        widget<Gtk::Button>("btn_run")->set_visible(true);
+        widget<Gtk::Button>("btn_run")->set_sensitive(true);
+        widget<Gtk::Button>("btn_resume")->set_visible(false);
+        widget<Gtk::Button>("btn_pause")->set_visible(false);
+        widget<Gtk::Button>("btn_step")->set_sensitive(true);
+
+        ERIS_DBG("cool yo");
+    }
+    else if (last_state.type == Signal::Type::running) {
+        ERIS_DBG("running signal received");
+        widget<Gtk::Notebook>("nb_tabs")->set_current_page(1);
+
         widget<Gtk::Button>("btn_run")->set_visible(false);
         widget<Gtk::Button>("btn_run")->set_sensitive(true);
         widget<Gtk::Button>("btn_resume")->set_visible(false);
         widget<Gtk::Button>("btn_pause")->set_visible(true);
         widget<Gtk::Button>("btn_step")->set_sensitive(false);
+
+        // Disconnect motion handler while running
+        if (motion_handler_conn_) motion_handler_conn_.disconnect();
     }
     else if (last_state.type == Signal::Type::stopped) {
+        ERIS_DBG("stopped signal received");
         // Turn off pause and turn on either play or resume buttons
-        widget<Gtk::Button>("btn_run")->set_visible(last_state.boolean);
-        widget<Gtk::Button>("btn_resume")->set_visible(!last_state.boolean);
+        widget<Gtk::Button>("btn_run")->set_visible(!last_state.boolean);
+        widget<Gtk::Button>("btn_resume")->set_visible(last_state.boolean);
         widget<Gtk::Button>("btn_pause")->set_visible(false);
         widget<Gtk::Button>("btn_step")->set_sensitive(true);
+
+        // Stick all points into an rtree so that we can quickly find the nearest one (needed, in
+        // particular, for fast mouseovers).
+        rtree_.clear();
+        auto g2c = graph_->graph_to_canvas();
+        for (auto &r : sim_->agents<Reader>()) {
+            double x = r->position()[0], y = r->position()[1];
+            g2c.transform_point(x, y);
+            rtree_.insert(std::make_pair(rt_point{x, y}, SharedMember<Member>{r}));
+        }
+        for (auto &b : sim_->goods<Book>()) {
+            double x = b->position()[0], y = b->position()[1];
+            g2c.transform_point(x, y);
+            rtree_.insert(std::make_pair(rt_point{x, y}, SharedMember<Member>{b}));
+        }
+
+        // Reenable mouseover handler
+        if (not motion_handler_conn_)
+            motion_handler_conn_ = graph_->signal_motion_notify_event().connect(motion_handler_);
     }
     if (last_progress.type == Signal::Type::progress) {
         // .uls contains: t, end, readers, books
@@ -311,17 +323,18 @@ void GUI::thr_signal() {
     }
 
     if (last_redraw.type == Signal::Type::redraw) {
-        std::cerr << "queueing a redraw\n";
+        ERIS_DBG("queueing a redraw");
         if (graph_->get_is_drawable()) {
             graph_->queue_draw();
         }
         else {
-            std::cerr << "...but not visible, so skipping\n";
+            ERIS_DBG("...but not visible, so skipping");
             // Not currently drawable (perhaps not on visualization tab), so send back a fake redraw
             // event in case the caller is going to wait for a redraw to complete.
             queueEvent(Event::Type::redraw);
         }
     }
+    ERIS_DBG("signal handled.");
 }
 
 void GUI::queueSignal(Signal &&s) {
@@ -337,10 +350,36 @@ void GUI::queueSignal(Signal &&s) {
     }
 }
 
+void GUI::setupSim() {
+    std::vector<Parameter> params;
+    Parameter p;
+    p.param = ParamType::readers; p.ul = sb_int("set_readers"); params.push_back(p);
+    p.param = ParamType::dimensions; p.ul = sb_int("set_dimensions"); params.push_back(p);
+    p.param = ParamType::book_sd; p.dbl = sb("set_book_sd"); params.push_back(p);
+    p.param = ParamType::quality_draw_sd; p.dbl = sb("set_quality_draw_sd"); params.push_back(p);
+    p.param = ParamType::cost_fixed; p.dbl = sb("set_cost_fixed"); params.push_back(p);
+    p.param = ParamType::cost_unit; p.dbl = sb("set_cost_unit"); params.push_back(p);
+    p.param = ParamType::speed_limit; p.dbl = sb("set_speed"); params.push_back(p);
+    p.param = ParamType::redraw; p.dur_ms = std::chrono::milliseconds{sb_int("set_redraw")}; params.push_back(p);
+    unsigned int threads;
+    widget<Gtk::ComboBox>("combo_threads")->get_active()->get_value(0, threads);
+    p.param = ParamType::threads; p.ul = (unsigned long)threads; params.push_back(p);
+
+    queueEvent(Event::Type::setup, std::move(params));
+    ERIS_DBG("setup events sent");
+}
+
+void GUI::runSim() {
+    queueEvent(Event::Type::run, sb_int("set_periods"));
+    ERIS_DBG("run event sent");
+}
+
 void GUI::redraw(bool sync) {
     queueSignal(Signal::Type::redraw);
     if (sync) waitForEvent(Event::Type::redraw);
 }
+
+void GUI::initialized() { queueSignal(Signal::Type::initialized); }
 
 void GUI::running() { queueSignal(Signal::Type::running); }
 
@@ -351,7 +390,7 @@ void GUI::progress(const unsigned long &end, const double &speed) {
     queueSignal(std::move(s));
 }
 
-void GUI::stopped(bool done) { queueSignal({Signal::Type::stopped, done}); }
+void GUI::stopped(bool manual) { queueSignal({Signal::Type::stopped, manual}); }
 
 void GUI::error(std::string message) { queueSignal({ Signal::Type::error, message }); }
 
@@ -381,7 +420,7 @@ void GUI::waitForEvent(Event::Type t) {
         std::unique_lock<std::mutex> lock(mutex_);
         cv_.wait(lock, [this]() -> bool { return not event_queue_.empty(); });
         for (auto &e : event_queue_) {
-            std::cerr << "saw event\n";
+            ERIS_DBG("saw event");
             if (e.type == t) { done = true; break; }
         }
         processEvents_(lock);

@@ -27,7 +27,8 @@ class GUIGraphArea : public Gtk::DrawingArea, eris::noncopyable {
          */
         Cairo::Matrix graph_to_canvas() const;
 
-        /** Draws the current set of points/circles. */
+        /** Draws the current set of points/circles, and updates the data in any reader/book
+         * dialogs. */
         virtual bool on_draw(const Cairo::RefPtr<Cairo::Context> &cr) override;
 
         /** The types of points drawn by this class. */
@@ -44,18 +45,17 @@ class GUIGraphArea : public Gtk::DrawingArea, eris::noncopyable {
          * \param x the point x coordinate, in graph space
          * \param y the point y coordinate, in graph space
          * \param type the type of point to draw
+         * \param red the red component (0-1) of the colour
+         * \param green the green component (0-1) of the colour
+         * \param blue the blue component (0-1) of the colour
+         * \param alpha the alpha component (0-1) of the colour: 0 is transparent, 1 is opaque.
          * \param r this Reader's wrapping is taken into account when drawing the point, so that
          * points that overlap the boundary are drawn properly on both sides of the edge.
          * \param scale the scale of the point.  1 (the default) means default size.
          */
-        void drawPoint(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans,
-                double x, double y, const PointType &type, const eris::SharedMember<Reader> &r, const double &scale = 1.0);
-
-        /** Circle types supported by addCircle() */
-        enum class CircleType {
-            A, //!< Circle style A
-            B //!< Circle style B, will look different from A
-        };
+        void drawPoint(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans, double x, double y,
+                const PointType &type, double red, double green, double blue, double alpha,
+                const eris::SharedMember<Reader> &r, double scale = 1.0);
 
         /** Draws a circle.  Circles, however, are in graph space, not drawing area space, so
          * this is actually going to end up drawing ovals (unless the drawing area happens
@@ -65,10 +65,14 @@ class GUIGraphArea : public Gtk::DrawingArea, eris::noncopyable {
          * \param cx the center x coordinate, in graph space
          * \param cy the center y coordinate, in graph space
          * \param r the radius of the circle, in graph space
-         * \param type the type of circle to draw
+         * \param red the red component (0-1) of the colour
+         * \param green the green component (0-1) of the colour
+         * \param blue the blue component (0-1) of the colour
+         * \param alpha the alpha component (0-1) of the colour: 0 is transparent, 1 is opaque.
          */
         void drawCircle(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans,
-                const double &cx, const double &cy, const double &r, const CircleType &type);
+                double cx, double cy, double r,
+                double red, double green, double blue, double alpha);
 
         /// Spacing of axes tick marks.  2.0 means ticks at 2, 4, 6, etc.
         double tick_space = 1.0;

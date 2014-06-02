@@ -40,11 +40,19 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
          * Note that a reference to the author is stored internally: even if the author is removed
          * from the simulation, it will still be kept from destruction by this class.
          */
-        Book(eris::Position p, eris::SharedMember<Reader> author, unsigned long order, double initial_price,
-                double quality, std::function<double(const Book&, const Reader&)> qDraw);
+        Book(const eris::Position &p, eris::SharedMember<Reader> author, unsigned long order, double initial_price,
+                double quality, const std::function<double(const Book&, const Reader&)> &qDraw);
 
         /// Returns the age of the book, in simulation periods.
         unsigned long age() const;
+
+        /// Returns the simulation period in which the book was created
+        const unsigned long& created() const;
+
+        /** Returns the simulation period in which the book was removed from the market.  Should
+         * only be called if hasMarket() returns false.
+         */
+        const unsigned long& outOfPrint() const;
 
         /** Returns the order of this book in the author's set of books.  A value of 0 indicates
          * that this is the author's first book, 3 indicates an author's 4th book, etc.
@@ -89,7 +97,7 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         /// Returns the number of sales of this book so far in the current period
         unsigned long currSales() const;
 
-        /// Returns the number of sales in period `t`
+        /// Returns the number of sales in simulation period `t`
         unsigned long sales(unsigned long t) const;
 
         /// Returns the lifelong revenue of this book
@@ -98,7 +106,7 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         /// Returns the revenue of this book so far in the current period
         double currRevenue() const;
 
-        /// Returns the revenue earned by this book in period `t`
+        /// Returns the revenue earned by this book in simulation period `t`
         double revenue(unsigned long t) const;
 
         /** Increase the sales and revenue of this book for the current period.  This can safely be
@@ -123,7 +131,7 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         double qualityDraw(const Reader &reader);
 
     private:
-        unsigned long created_, copies_sold_total_;
+        unsigned long created_, out_of_print_, copies_sold_total_;
         double revenue_total_;
         std::map<unsigned long, unsigned long> copies_sold_;
         std::map<unsigned long, double> revenue_;

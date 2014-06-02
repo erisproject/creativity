@@ -11,8 +11,6 @@
 #include "belief/Demand.hpp"
 #include "belief/Quality.hpp"
 
-using Eigen::Vector3d;
-
 namespace creativity {
 
 class Book; // forward declaration
@@ -91,11 +89,39 @@ class BookMarket;
  * observed books.
  *
  * See creativity::belief::Demand for details.
+ *
+ * Eris optimization overview
+ * ==========================
+ * In terms of Eris stages, the decision processes are as follows:
+ *
+ * - inter-optimize:
+ *   - updates beliefs based on previous period activity
+ *   - using updated belief, decides whether to create, and if so, the effort to expend in creation
+ *   - for all authored books still on the market, decides whether to remove from the market, or to
+ *     keep on the market.  If the latter, also chooses the price for the upcoming period.
+ * - inter-apply:
+ *   - Receives external (non-book) income
+ *   - If creation was decided upon in inter-optimize, gives up the decided-upon effort level in
+ *     income and creates a book
+ *   - The author incurs the fixed cost for all books staying on the market (including a new one, if
+ *     just created).
+ *   - Takes a step of distance N(0,0.25) in a random direction
+ * - intra-initialize:
+ *   - (internal optimization; no visible effect).
+ * - intra-optimize:
+ *   - Decides on a set of unowned books to purchase based on expected utility gains.
+ * - intra-reset:
+ *   - Resets unowned book decision variables to perform reoptimization.  Currently not actually
+ *     invoked as nothing in the simulation performs intra-reoptimization.
+ * - intra-apply:
+ *   - Buys the books decided upon, if any.  Spends all leftover income on the numeraire good.
+ * - intra-finish (via BookMarket):
+ *   - The author receives all of the periods proceeds from the period.
  */
 class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
     public virtual eris::interopt::OptApply,
-    public virtual eris::intraopt::OptApplyReset,
-    public virtual eris::intraopt::Initialize
+    public virtual eris::intraopt::Initialize,
+    public virtual eris::intraopt::OptApplyReset
 {
     public:
         /** Constructor takes the reader position and the (wrapping) positional boundaries, new
@@ -316,7 +342,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * The default value is \f$\alpha = (-2.0, 4.0, 0.25)\f$, which is appropriate for a
          * 2-dimensional world and probably a poor choice for any other dimensionality.
          */
-        Vector3d creation_coefs{-2.0, 4.0, 0.25};
+        Eigen::Vector3d creation_coefs{-2.0, 4.0, 0.25};
 
         /** Returns the resulting quality of this reader exerting effort level `effort` to create a
          * book.
@@ -334,9 +360,19 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          */
         void receiveProfits(eris::SharedMember<Book> book, const eris::Bundle &revenue);
 
+        /// Read-only access to this reader's profit belief
+        const belief::Profit& profitBelief();
+        /// Read-only access to this reader's profit belief with profit stream extrapolations
+        const belief::Profit& profitExtrapBelief();
+        /// Read-only access to this reader's profit stream belief
+        const belief::ProfitStream& profitStreamBelief();
+        /// Read-only access to this reader's demand belief
+        const belief::Demand& demandBelief();
+        /// Read-only access to this reader's quality belief
+        const belief::Quality& qualityBelief();
+
         /** In-between periods, the reader optimizes by:
          * - updates his beliefs based on characteristics of newly obtained books
-         * - receives non-book income
          * - chooses whether or not to create a new book and, if so, the effort to expend on it
          * - for all existing books still on the market, the author decides to keep or remove a book
          *   from the market, and if keeping, the price is chosen
@@ -347,6 +383,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * - receives fixed, non-book income
          * - creates a book (if decided upon in interOptimize()), removing the effort cost from the
          *   just-received income.
+         * - Incurs fixed costs for each book on the market (including a new one, if created)
          * - takes a random step of distance N(0,0.25) in a random direction.
          */
         void interApply() override;
@@ -451,13 +488,13 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         std::unordered_set<eris::SharedMember<Book>> book_cache_;
 
         // Track current and cumulative utility:
-        double u_curr_, u_lifetime_;
+        double u_curr_ = 0, u_lifetime_ = 0;
 
         // Costs for creating copies of a book
-        double c_fixed_, c_unit_;
+        double c_fixed_ = 0, c_unit_ = 0;
 
         // Per-period income
-        double income_;
+        double income_ = 0;
 
         // Book prices for the upcoming period.  If a book currently on the market isn't in here,
         // or has a negative price, it'll be removed from the market
@@ -465,7 +502,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
 
         // Whether to create, and the various attributes of that creation
         bool create_ = false;
-        double create_effort_, create_quality_, create_price_;
+        double create_effort_ = 0, create_quality_ = 0, create_price_ = 0;
 
 };
 

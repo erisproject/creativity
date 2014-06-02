@@ -1,5 +1,6 @@
 #pragma once
-#include <creativity/belief/Linear.hpp>
+#include "creativity/belief/Linear.hpp"
+#include "creativity/Book.hpp"
 
 namespace creativity { namespace belief {
 
@@ -9,7 +10,9 @@ namespace creativity { namespace belief {
  * \f$\Pi_b = \beta_0 + \beta_1 q_b^D + \beta_2 firstBook + \beta_3 previousBooks + \beta_4 marketBooks + u\f$
  * where:
  * - \f$Pi_b\f$ is the lifetime profits of the book
- * - \f$q_b\f$ is the quality of the book, which must be non-negative
+ * - \f$q_b\f$ is the quality of the book.  Note that the exponentiation on this term is
+ *   sign-preserving even when \f$D\f$ is even: thus for \f$q_b = -0.5, D=2\f$ the relevant quantity
+ *   is \f$-0.25\f$.
  * - \f$D\f$ is the dimensionality of the modelled world (e.g. 2 for a two-dimensional world).
  *   \f$q_b\f$ is raised to the dimensionality because changes in it affect the radius of potential
  *   customers, with total customers being proportional to the radius raised to \f$D\f$.
@@ -35,7 +38,7 @@ class Profit : public Linear<5> {
          * \sa Linear::Linear
          */
         template <typename ...Args>
-        Profit(const unsigned int &D, Args &&...args)
+        Profit(unsigned int D, Args &&...args)
         : LinearBase{std::forward<Args>(args)...}, D_{D}
         {}
 
@@ -47,7 +50,7 @@ class Profit : public Linear<5> {
          * parameter also determines the `firstBook` dummy (`= 1` iff `previousBooks == 0`).
          * \param marketBooks the number of books on the market last period
          */
-        double predict(const double &q, const unsigned long &previousBooks, const unsigned long &marketBooks) const;
+        double predict(double q, unsigned long previousBooks, unsigned long marketBooks) const;
 
         /** Given `previousBooks` and `marketBooks` parameters, a function \f$q(\ell)\f$ that returns
          * expected quality for a given value \f$\ell\f$, and \f$\ell_{max}\f$, this numerically
@@ -76,12 +79,30 @@ class Profit : public Linear<5> {
          */
         double argmaxL(
                 const std::function<double(const double &)> q,
-                const unsigned long &previousBooks, const unsigned long &marketBooks,
-                const double &l_max
+                unsigned long previousBooks, unsigned long marketBooks,
+                double l_max
                 ) const;
 
+        /** Uses the current object's priors to generate a new object whose parameters are the
+         * posteriors of this object after incorporating new data.
+         *
+         * \param y a vector of new y data
+         * \param X a matrix of new X data
+         */
+        Profit update(const Ref<const VectorXd> &y, const Ref<const MatrixXKd> &X) const;
+
+        /** Given a book and perceived quality, this builds an X matrix row of profit data for that
+         * book.  This needs to be called after the period has advanced: typically in the
+         * inter-period optimization stage.
+         */
+        RowVectorKd profitRow(eris::SharedMember<Book> book, double quality) const;
+
+        // Used to track books already included in this object's information set
+        std::unordered_set<eris::eris_id_t> tracked;
+
     private:
-        Profit(LinearBase &&move, const unsigned int &D);
+        // Initialize a Profit from a Linear<>
+        Profit(unsigned int D, LinearBase &&base) : LinearBase{base}, D_{D} {}
 
         unsigned int D_;
 

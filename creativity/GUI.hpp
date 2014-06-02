@@ -10,7 +10,12 @@
 #include <unordered_map>
 #include <array>
 #include <list>
+#include <boost/geometry.hpp>
+#include <boost/geometry/geometries/point.hpp>
+#include <boost/geometry/geometries/box.hpp>
+#include <boost/geometry/index/rtree.hpp>
 #include "creativity/GUIGraphArea.hpp"
+#include "creativity/GUIInfoWindow.hpp"
 
 namespace sigc { SIGC_FUNCTORS_DEDUCE_RESULT_TYPE_WITH_DECLTYPE }
 
@@ -90,6 +95,11 @@ class GUI : eris::noncopyable {
          */
         void redraw(bool sync=false);
 
+        /** Sends a signal to the GUI thread that the simulation setup is complete.  The GUI will
+         * disable the various simulation setup options and start/initialize buttons and switch to
+         * the visualization tab. */
+        void initialized();
+
         /** Sends a signal to the GUI thread that the simulation has started or resumed running. */
         void running();
 
@@ -101,10 +111,11 @@ class GUI : eris::noncopyable {
         void progress(const unsigned long &end, const double &speed);
 
         /** Sends a signal to the GUI thread that the simulation has stopped running.
-         * \param done is true if this stopped because the run steps finished, false if this
-         * stoppage happened early.
+         *
+         * \param manual is true if this stopped because the user hit "Stop" during an active run, false
+         * otherwise (e.g. initialization without running, or the configured number of steps completed).
          */
-        void stopped(bool done);
+        void stopped(bool manual);
 
         /** Sends a signal to the GUI thread that an error has occurred.  Takes a string to display
          * in a dialog to the user. */
@@ -233,6 +244,9 @@ class GUI : eris::noncopyable {
         /// Will be true once the thread has finished setting itself up and started its mainloop.
         bool thread_running_{false};
 
+        /// Command-line parameters can override the gui.glade default values for settings
+        std::unordered_map<std::string, double> default_override_;
+
         /** Dispatcher for receiving a signal inside the GUI thread.  When this gets sent, the GUI
          * checks signal_queue_ for instructions and acts accordingly.
          */
@@ -257,7 +271,7 @@ class GUI : eris::noncopyable {
         class Signal {
             public:
                 /// The types of signal that can be sent to the GUI thread
-                enum class Type { redraw, running, progress, stopped, error, quit };
+                enum class Type { redraw, initialized, running, progress, stopped, error, quit };
 
                 /// The type of signal
                 Type type;
@@ -306,6 +320,15 @@ class GUI : eris::noncopyable {
          */
         void thr_run();
 
+        /** Sets up the simulation based on the current GUI parameter values.
+         */
+        void setupSim();
+
+        /** Starts the simulation (for however many periods specified in the "set_periods" GUI
+         * configuration option).  Must be preceeded by a call to setupSim();
+         */
+        void runSim();
+
         std::unique_ptr<GUIGraphArea> graph_;
 
         /** Obtains a widget from the current Gtk::Builder and returns it (as a pointer).
@@ -331,6 +354,18 @@ class GUI : eris::noncopyable {
 
         /** Handles a single event received from the GUI thread. */
         void handleEvent(const GUI::Event &event);
+
+        /** Currently open reader/book dialogs */
+        std::unordered_map<eris::eris_id_t, GUIInfoWindow> info_windows_;
+
+        typedef boost::geometry::model::point<double, 2, boost::geometry::cs::cartesian> rt_point;
+        typedef std::pair<rt_point, eris::SharedMember<eris::Member>> rt_val;
+        /** An rtree (regenerated each time the simulation stops/pauses) of reader/book points. */
+        boost::geometry::index::rtree<rt_val, boost::geometry::index::rstar<16>> rtree_;
+
+        std::function<bool(GdkEventMotion* event)> motion_handler_;
+        sigc::connection motion_handler_conn_;
+        Glib::RefPtr<Gdk::Cursor> hand_;
 };
 
 template <typename... Args>

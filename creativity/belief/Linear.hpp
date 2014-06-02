@@ -2,6 +2,7 @@
 #include <Eigen/Core>
 #include <Eigen/QR>
 #include <memory>
+#include <ostream>
 
 using Eigen::Matrix;
 using Eigen::MatrixXd;
@@ -72,9 +73,9 @@ class Linear {
          */
         Linear(
                 const Ref<const VectorKd> &beta_prior,
-                const double &s2_prior,
+                double s2_prior,
                 const Ref<const MatrixKd> &V_prior,
-                const double &n_prior,
+                double n_prior,
                 const std::shared_ptr<MatrixKd> &V_prior_inv = nullptr
         ) : beta_{beta_prior}, s2_{s2_prior}, V_{V_prior}, V_inv_{V_prior_inv}, n_{n_prior}, K_{beta_.rows()}
         {
@@ -95,10 +96,11 @@ class Linear {
         /// Virtual destructor
         virtual ~Linear() = default;
 
-        const VectorKd& DEBUG_betaPrior() { return beta_; }
-
-        // Let Eigen align things if necessary (this will only matter if KK=2 or KK=4)
-        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+        /** Accesses the value of the beta prior parameter.  Note that this is *not* necessarily the
+         * mean and should not be used for prediction; rather it simply returns the distribution
+         * parameter value used by the prior.
+         */
+        const VectorKd& betaPrior() const { return beta_; }
 
         /// Given a row vector of values, predicts using the current beta_ values.
         double predict(const Eigen::Ref<const RowVectorKd> &Xi) const {
@@ -108,6 +110,16 @@ class Linear {
 
         /// The number of parameters of the model
         const long& K() const { return K_; }
+
+        /** Overloaded so that a Linear model can be printed nicely with `std::cout << model`.
+         */
+        friend std::ostream& operator << (std::ostream &os, const Linear<KK>& b) {
+            os << "Linear<" << b.K() << "> model; prior beta:\n" << b.beta_;
+            return os;
+        }
+
+        // Let Eigen align things if necessary (this will only matter if KK=2 or KK=4)
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
     protected:
         /** Called during construction to verify that the given parameters are valid.  Subclasses

@@ -34,13 +34,14 @@ Cairo::Matrix GUIGraphArea::graph_to_canvas() const {
 }
 
 bool GUIGraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
-
+    ERIS_DBG("Starting draw");
     Gtk::Allocation allocation = get_allocation();
     const int width = allocation.get_width();
     const int height = allocation.get_height();
 
     // Lock out the simulation until we finish redrawing
     auto lock = sim_->runLock();
+    ERIS_DBG("Got sim lock");
 
     cr->save();
 
@@ -94,25 +95,26 @@ bool GUIGraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 
     SharedMember<Reader> token_reader; // Need to keep a reader for wrapping
 
+    ERIS_DBG("Drawing readers");
     cr->set_source_rgba(1, 0.55, 0, 0.5); // Lines from readers to purchased books
     for (auto &r : sim_->agents<Reader>()) {
         if (!token_reader) { token_reader = r; }
         double rx = r->position()[0], ry = r->position()[1];
-        drawPoint(cr, trans, rx, ry, PointType::X, r);
+        drawPoint(cr, trans, rx, ry, PointType::X, 1, 0, 0, 1, r);
 
         const double radius1 = 0.05 * (r->u() - 1000);
-        const double radius2 = 0.1 * r->newBooks().size();
         if (radius1 > 0) { // Utility > 1000 means some utility gain from books
-            drawCircle(cr, trans, rx, ry, radius1, CircleType::B);
+            drawCircle(cr, trans, rx, ry, radius1, .133, .545, .133, 0.5);
         }
-/*        if (radius2 > 0) { // Bought some books
-            drawCircle(cr, trans, rx, ry, radius2, CircleType::A);
+        const double radius2 = 0.1 * r->newBooks().size();
+        if (radius2 > 0) { // Bought some books
+            drawCircle(cr, trans, rx, ry, radius2, 1, .55, 0, 0.5);
             for (auto &book_id : r->newBooks()) {
                 auto b = sim_->good<Book>(book_id);
                 drawWrappingLine(cr, trans, r, b);
             }
             cr->stroke();
-        }*/
+        }
         // NB: rx, ry may be translated now
     }
 
@@ -123,7 +125,10 @@ bool GUIGraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
         const double scale = std::max(1.0, 3.0 - 0.3*b->age());
 
         // Draw book:
-        drawPoint(cr, trans, b->position()[0], b->position()[1], PointType::CROSS, token_reader, scale);
+        double br = 0, bg = .4, bb = 1; // Blue with a hint of green
+        if (not b->hasMarket())
+            br = bg = bb = 0;
+        drawPoint(cr, trans, b->position()[0], b->position()[1], PointType::CROSS, br, bg, bb, 1, token_reader, scale);
 
         drawWrappingLine(cr, trans, b->author(), b);
 
@@ -131,6 +136,18 @@ bool GUIGraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
     }
 
     cr->restore();
+
+    auto it = gui_.info_windows_.begin();
+    while (it != gui_.info_windows_.end()) {
+        if (not it->second.get_visible()) {
+            it = gui_.info_windows_.erase(it);
+        }
+        else {
+            it->second.refresh();
+            it++;
+        }
+    }
+
     gui_.queueEvent(GUI::Event::Type::redraw);
     return true;
 }
@@ -153,9 +170,12 @@ void GUIGraphArea::drawWrappingLine(const Cairo::RefPtr<Cairo::Context> &cr, con
     cr->restore(); // Undo transformation
 }
 
+#define RGBA red, green, blue, alpha
 void GUIGraphArea::drawPoint(
         const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans,
-        double x, double y, const PointType &type, const SharedMember<Reader> &r, const double &scale) {
+        double x, double y,
+        const PointType &type, double red, double green, double blue, double alpha,
+        const SharedMember<Reader> &r, double scale) {
 
     // The radius of the point
     const double pt_radius = point_size * scale;
@@ -175,24 +195,24 @@ void GUIGraphArea::drawPoint(
         // single-dimension edge wraps.  Corners are just like double-edged wraps, but *also* have
         // to wrap to the opposite corner.
         if (wrap_left and wrap_up) // Upper left
-            drawPoint(cr, trans, x+dim_x, y-dim_y, type, null_reader, scale); // Lower right
+            drawPoint(cr, trans, x+dim_x, y-dim_y, type, RGBA, null_reader, scale); // Lower right
         else if (wrap_left and wrap_down) // Lower left
-            drawPoint(cr, trans, x+dim_x, y+dim_y, type, null_reader, scale); // Upper right
+            drawPoint(cr, trans, x+dim_x, y+dim_y, type, RGBA, null_reader, scale); // Upper right
         else if (wrap_right and wrap_up) // Upper right
-            drawPoint(cr, trans, x-dim_x, y-dim_y, type, null_reader, scale); // Lower left
+            drawPoint(cr, trans, x-dim_x, y-dim_y, type, RGBA, null_reader, scale); // Lower left
         else if (wrap_right and wrap_down) // Lower right
-            drawPoint(cr, trans, x-dim_x, y+dim_y, type, null_reader, scale); // Upper left
+            drawPoint(cr, trans, x-dim_x, y+dim_y, type, RGBA, null_reader, scale); // Upper left
 
         // Now the edge mirroring
         if (wrap_left)
-            drawPoint(cr, trans, x+dim_x, y, type, null_reader, scale);
+            drawPoint(cr, trans, x+dim_x, y, type, RGBA, null_reader, scale);
         else if (wrap_right)
-            drawPoint(cr, trans, x-dim_x, y, type, null_reader, scale);
+            drawPoint(cr, trans, x-dim_x, y, type, RGBA, null_reader, scale);
         
         if (wrap_up)
-            drawPoint(cr, trans, x, y-dim_y, type, null_reader, scale);
+            drawPoint(cr, trans, x, y-dim_y, type, RGBA, null_reader, scale);
         else if (wrap_down)
-            drawPoint(cr, trans, x, y+dim_y, type, null_reader, scale);
+            drawPoint(cr, trans, x, y+dim_y, type, RGBA, null_reader, scale);
     }
 
     // Get the user-space coordinates of the point
@@ -207,7 +227,7 @@ void GUIGraphArea::drawPoint(
                 // We're drawing 45-degree lines, so get the linear distance on each dimension:
                 double edge = pt_radius * sqrt(2.0);
 
-                cr->set_source_rgb(1.0, 0, 0); // red
+                cr->set_source_rgba(RGBA);
 
                 cr->move_to(x-0.5*edge, y-0.5*edge); // Upper left
                 cr->rel_line_to(edge, edge); // ... line to bottom right
@@ -221,13 +241,13 @@ void GUIGraphArea::drawPoint(
                 // The SQUARE vertices are the the same as the X type, above
                 double edge = pt_radius * sqrt(2.0);
 
-                cr->set_source_rgb(0.5, 0, 1.0); // Purple
+                cr->set_source_rgba(RGBA);
                 cr->rectangle(x-0.5*edge, y-0.5*edge, edge, edge);
                 break;
             }
         case PointType::CROSS:
             {
-                cr->set_source_rgb(0.0, 0.4, 1.0); // Blue with a hint of green
+                cr->set_source_rgba(RGBA);
                 // Horizontal line:
                 cr->move_to(x - pt_radius, y);
                 cr->rel_line_to(2*pt_radius, 0);
@@ -244,7 +264,7 @@ void GUIGraphArea::drawPoint(
 }
 
 void GUIGraphArea::drawCircle(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans,
-        const double &cx, const double &cy, const double &r, const CircleType &type) {
+        double cx, double cy, double r, double red, double green, double blue, double alpha) {
     // Apply the full transformation: then we can just draw the circle in *graph* space which,
     // post-transformation, will be exactly the desired oval.
     cr->save();
@@ -267,14 +287,7 @@ void GUIGraphArea::drawCircle(const Cairo::RefPtr<Cairo::Context> &cr, const Cai
     cr->restore();
     cr->save();
     cr->set_line_width(2.0);
-    switch (type) {
-        case CircleType::A:
-            cr->set_source_rgba(1.0, 0.55, 0, 0.5); // Orange
-            break;
-        case CircleType::B:
-            cr->set_source_rgba(0.133, 0.545, 0.133, 0.5);
-            break;
-    }
+    cr->set_source_rgba(RGBA);
 
     cr->stroke();
     cr->restore();

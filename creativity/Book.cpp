@@ -1,24 +1,25 @@
 #include "creativity/Book.hpp"
 #include "creativity/BookMarket.hpp"
 #include "creativity/Reader.hpp"
+#include "creativity/common.hpp"
 
 using namespace eris;
 
 namespace creativity {
 
 Book::Book(
-        Position p,
+        const Position &p,
         SharedMember<Reader> author,
         unsigned long order,
         double initial_price,
         double quality,
-        std::function<double(const Book&, const Reader&)> qDraw)
+        const std::function<double(const Book&, const Reader&)> &qDraw)
     : WrappedPositional<Good::Discrete>(p, author->wrapLowerBound(), author->wrapUpperBound()),
-        author_{std::move(author)},
-        order_{std::move(order)},
-        init_price_{std::move(initial_price)},
-        quality_{std::move(quality)},
-        quality_draw_{std::move(qDraw)}
+        author_{author},
+        order_{order},
+        init_price_{initial_price},
+        quality_{quality},
+        quality_draw_{qDraw}
 {}
 
 void Book::added() {
@@ -31,18 +32,29 @@ void Book::added() {
     revenue_total_ = 0;
     revenue_.clear();
 
-    auto mkt = sim->create<BookMarket>(*this, init_price_);
-    NEW_BOOKS.push_back(mkt);
+    auto mkt = sim->create<BookMarket>(sharedSelf(), init_price_);
+    NEW_BOOKS.push_back(sharedSelf());
     market_ = mkt;
     dependsWeaklyOn(mkt);
 }
 
 void Book::weakDepRemoved(SharedMember<Member>, const eris::eris_id_t &old) {
-    if (old == market_) market_ = 0;
+    if (old == market_) {
+        market_ = 0;
+        out_of_print_ = simulation()->t();
+    }
 }
 
 unsigned long Book::age() const {
     return simulation()->t() - created_;
+}
+
+const unsigned long& Book::created() const {
+    return created_;
+}
+
+const unsigned long& Book::outOfPrint() const {
+    return out_of_print_;
 }
 
 const unsigned long& Book::order() const {

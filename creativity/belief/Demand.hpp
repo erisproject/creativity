@@ -36,7 +36,7 @@ namespace belief {
  * These constraints are combined with a natural conjugate prior for the purposes of updating the
  * beliefs via Bayesian econometrics.
  */
-class Demand : public Linear<7> {
+class Demand : public Linear<8> {
     public:
         /** Constructs a demand model with the given prior information.
          *
@@ -46,7 +46,7 @@ class Demand : public Linear<7> {
          * \sa Linear::Linear
          */
         template <typename ...Args>
-        Demand(const unsigned int &D, Args &&...args)
+        Demand(unsigned int D, Args &&...args)
         : LinearBase{std::forward<Args>(args)...}, D_{D}
         {}
 
@@ -61,8 +61,7 @@ class Demand : public Linear<7> {
          *
          * \throws std::domain_error if `P < 0` or `q < 0`.
          */
-        double predict(const double &P, const double &q, const unsigned long &S,
-                const unsigned long &otherBooks, const unsigned long &marketBooks) const;
+        double predict(double P, double q, unsigned long S, unsigned long otherBooks, unsigned long marketBooks) const;
 
         /** Given a set of model parameters (other than \f$P_b\f$) and an optional per-unit cost
          * (defaulting to 0), this returns the \f$P_b\f$ value that maximizes total profits:
@@ -114,8 +113,7 @@ class Demand : public Linear<7> {
          * (i.e. when `c > 0`).
          * \sa eris::single_peak_search for the numerical algorithm used.
          */
-        std::pair<double, double> argmaxP(const double &q, const unsigned long &S, const unsigned long &otherBooks, const unsigned long &marketBooks,
-                const double &c = 0.0) const;
+        std::pair<double, double> argmaxP(double q, unsigned long S, unsigned long otherBooks, unsigned long marketBooks, double c = 0.0) const;
 
         /** The maximum P that will be considered for argmaxP() when called with `c > 0`.  Only
          * needs to be adjusted if the optimal value of P could potential exceed the default of 10,000.
@@ -126,11 +124,21 @@ class Demand : public Linear<7> {
          * that book.  This needs to be called after the period has advanced: typically in the
          * inter-period optimization stage.
          */
-        RowVectorKd bookRow(eris::SharedMember<Book> book, double quality);
-        
+        RowVectorKd bookRow(eris::SharedMember<Book> book, double quality) const;
+
+        /** Uses the current object's priors to generate a new object whose parameters are the
+         * posteriors of this object after incorporating new data.
+         *
+         * \param y a vector of new y data
+         * \param X a matrix of new X data
+         */
+        Demand update(const Ref<const VectorXd> &y, const Ref<const MatrixXKd> &X) const;
+
     private:
         unsigned int D_;
 
+        // Initialize a Demand from a Linear<7>
+        Demand(unsigned int D, LinearBase &&base) : LinearBase{base}, D_{D} {}
 };
 
 }}

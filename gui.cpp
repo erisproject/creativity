@@ -20,21 +20,27 @@ using namespace eris;
 using namespace Eigen;
 
 int main(int argc, char *argv[1]) {
+    ERIS_DBG("WOO");
     Eris<Simulation> sim;
+    ERIS_DBG("WOO");
     MONEY = sim->create<Good::Continuous>();
+    ERIS_DBG("WOO");
     sim->create<NEW_BOOKS_Cleaner>();
 
+    ERIS_DBG("WOO");
     std::cerr << std::setprecision(16);
     std::cout << std::setprecision(16);
 
-    bool setup = false, stopped = false, step = false, quit = false;
+    ERIS_DBG("WOO");
+    bool setup = false, stopped = true, step = false, quit = false;
     unsigned long num_readers = 1000;
     double book_sd = 0.5, quality_draw_sd = 1.0;
     double cost_fixed = 20, cost_unit = 1, income = 1000;
-    unsigned long run_start = 0, run_end = 999;
-    std::chrono::milliseconds speed_limit{50};
+    unsigned long run_start = 0, run_end = 0;
+    double speed_limit = 0;
     std::chrono::milliseconds redraw{50};
 
+    ERIS_DBG("WOO");
 #define NONNEG_DOUBLE(VAR, DESC) \
     case GUI::ParamType::VAR: \
         if (p.dbl < 0) \
@@ -67,7 +73,7 @@ int main(int argc, char *argv[1]) {
                 redraw = p.dur_ms;
                 break;
             case GUI::ParamType::speed_limit:
-                speed_limit = p.dur_ms;
+                speed_limit = p.dbl;
                 break;
             case GUI::ParamType::threads:
                 sim->maxThreads(p.ul);
@@ -78,8 +84,9 @@ int main(int argc, char *argv[1]) {
                 setup = true;
                 break;
         }
-        ERIS_DBG("done");
+        ERIS_DBG("done setup");
     };
+    ERIS_DBG("WOO");
     auto on_run = [&](unsigned long periods) { // Run
         ERIS_DBG("run");
         if (not setup)
@@ -92,6 +99,7 @@ int main(int argc, char *argv[1]) {
     auto on_step = [&]() { step = true; };
     auto on_resume = [&]() { stopped = false; };
     auto on_quit = [&]() { quit = true; };
+    ERIS_DBG("WOO");
     GUI gui(sim, on_setup, on_run, on_stop, on_resume, on_step, on_quit);
 
     try {
@@ -101,6 +109,7 @@ int main(int argc, char *argv[1]) {
         std::cerr << "Unable to start gui: " << e.what() << "\n";
         throw;
     }
+    ERIS_DBG("WOO");
 
     auto &rng = eris::Random::rng();
     std::uniform_real_distribution<double> unif_01{0, 1};
@@ -112,8 +121,8 @@ int main(int argc, char *argv[1]) {
     }
 
     ERIS_DBG("Setting up readers");
-    VectorXd demand_beta{7}; demand_beta << 0, -2, 0.5, -0.1, 0, 0, 0;
-    MatrixXd demand_V = MatrixXd::Identity(7, 7);
+    VectorXd demand_beta{8}; demand_beta << 0, -2, 0.5, -0.1, 0, 0, 0, 0;
+    MatrixXd demand_V = MatrixXd::Identity(8, 8);
     double demand_s2 = 10, demand_n = 1;
     VectorXd profit_beta{5}; profit_beta << 0, 1, 0, 0, 0;
     MatrixXd profit_V = MatrixXd::Identity(5, 5);
@@ -137,6 +146,10 @@ int main(int argc, char *argv[1]) {
     }
     ERIS_DBG("Done with readers");
     auto readers = sim->agents<Reader>();
+
+    // Tell the GUI we're done with initialization
+    gui.initialized();
+    ERIS_DBG("here we go...!");
 
     gui.progress(run_end, 0);
     auto last_progress = std::chrono::high_resolution_clock::now();
@@ -195,19 +208,20 @@ int main(int argc, char *argv[1]) {
             }
 
             ERIS_DBG("");
-            auto sleep = speed_limit - (end - start);
-            if (not finished and sleep > zero_ms) {
-                std::this_thread::sleep_for(sleep);
+            if (not finished and speed_limit > 0) {
+
+                auto sleep = std::chrono::duration<double>{1.0/speed_limit} - (end - start);
+                if (sleep > zero_ms)
+                    std::this_thread::sleep_for(sleep);
+                // Else we're already slower than the speed limit
             }
-            ERIS_DBG("");
         }
-            ERIS_DBG("");
 
         // If the GUI told us to quit, just quit.
         if (quit) break;
 
         // Tell the GUI we finished
-        gui.stopped(sim->t() >= run_end);
+        gui.stopped(sim->t() < run_end);
 
         std::cerr << "waiting for more\n";
         // Wait for the GUI to tell us to do something else
