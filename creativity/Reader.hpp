@@ -5,7 +5,6 @@
 #include <string>
 #include <vector>
 #include <unordered_set>
-#include <boost/any.hpp>
 #include <Eigen/Core>
 #include "belief/Profit.hpp"
 #include "belief/ProfitStream.hpp"
