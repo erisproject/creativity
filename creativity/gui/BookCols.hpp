@@ -28,10 +28,17 @@ class BookCols : public Gtk::TreeModel::ColumnRecord {
          */
         virtual void appendRow(Glib::RefPtr<Gtk::ListStore> &ls, const eris::SharedMember<Book> &book) const;
 
-        Gtk::TreeModelColumn<unsigned long> id, author, age, sales, copies, lifetime;
-        Gtk::TreeModelColumn<double> quality, price, revenue;
-        Gtk::TreeModelColumn<bool> market;
-        Gtk::TreeModelColumn<std::string> position;
+        Gtk::TreeModelColumn<unsigned long> id, ///< column containing the book's simulation id
+            author, ///< column containing the book's author's simulation id
+            age, ///< column containing the book's age, in simulation periods
+            sales, ///< column containing the number of copies of the book sold
+            copies, ///< column containing the number of copies of the book in the simulation
+            lifetime; ///< column containing the number of periods this book was on the market
+        Gtk::TreeModelColumn<double> quality, ///< column containing the book's mean quality
+            price, ///< column containing the book's most recent price, or NaN for off-market books
+            revenue; ///< column containing the book's cumulative lifetime revenue
+        Gtk::TreeModelColumn<bool> market; ///< column containing whether the book is still on the market
+        Gtk::TreeModelColumn<std::string> position; ///< column containing the book's position
 };
 
 } }

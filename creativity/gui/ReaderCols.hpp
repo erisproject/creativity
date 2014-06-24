@@ -25,9 +25,14 @@ class ReaderCols : public Gtk::TreeModel::ColumnRecord {
          */
         void appendRow(Glib::RefPtr<Gtk::ListStore> &ls, const eris::SharedMember<Reader> &reader) const;
 
-        Gtk::TreeModelColumn<unsigned long> id, books_owned, books_new, books_written, book_latest_age;
-        Gtk::TreeModelColumn<std::string> position;
-        Gtk::TreeModelColumn<double> utility, u_life;
+        Gtk::TreeModelColumn<unsigned long> id, ///< column for reader id
+            books_owned, ///< column containing number of books owned
+            books_new, ///< column containing number of books obtained in the previous period
+            books_written, ///< column containing number of books authored by the reader
+            book_latest_age; ///< column containing the age of the most recently authored book
+        Gtk::TreeModelColumn<std::string> position; ///< column containing the reader position
+        Gtk::TreeModelColumn<double> utility, ///< column containing the reader's previous period utility
+            u_life; ///< column containing the reader's cumulative lifetime utility
 };
 
 } }
