@@ -1,5 +1,5 @@
-#include "creativity/GUIGraphArea.hpp"
-#include "creativity/GUI.hpp"
+#include "creativity/gui/GraphArea.hpp"
+#include "creativity/gui/GUI.hpp"
 #include "creativity/Reader.hpp"
 #include "creativity/Book.hpp"
 #include <eris/Random.hpp>
@@ -7,14 +7,14 @@
 
 using namespace eris;
 
-namespace creativity {
+namespace creativity { namespace gui {
 
-GUIGraphArea::GUIGraphArea(const double &top, const double &right, const double &bottom, const double &left,
+GraphArea::GraphArea(const double &top, const double &right, const double &bottom, const double &left,
         std::shared_ptr<Simulation> sim, GUI &gui) :
     sim_{sim}, gui_{gui}, bounds_{top,right,bottom,left}
 {}
 
-Cairo::Matrix GUIGraphArea::graph_to_canvas() const {
+Cairo::Matrix GraphArea::graph_to_canvas() const {
     Gtk::Allocation allocation = get_allocation();
     const int width = allocation.get_width();
     const int height = allocation.get_height();
@@ -33,15 +33,17 @@ Cairo::Matrix GUIGraphArea::graph_to_canvas() const {
     return trans;
 }
 
-bool GUIGraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
-    ERIS_DBG("Starting draw");
+bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
+    ERIS_TDBG("Starting draw");
     Gtk::Allocation allocation = get_allocation();
+    ERIS_TDBG("got allocation");
     const int width = allocation.get_width();
     const int height = allocation.get_height();
+    ERIS_TDBG("Getting lock");
 
     // Lock out the simulation until we finish redrawing
     auto lock = sim_->runLock();
-    ERIS_DBG("Got sim lock");
+    ERIS_TDBG("Got sim lock");
 
     cr->save();
 
@@ -137,6 +139,8 @@ bool GUIGraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
 
     cr->restore();
 
+    // Now go through any open reader/book info dialog windows: delete any that have been closed,
+    // and refresh the information on any still open.
     auto it = gui_.info_windows_.begin();
     while (it != gui_.info_windows_.end()) {
         if (not it->second.get_visible()) {
@@ -148,11 +152,19 @@ bool GUIGraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr) {
         }
     }
 
-    gui_.queueEvent(GUI::Event::Type::redraw);
+    // The lock and drawing might have taken some time, during which more redraw requests might have
+    // been queued up; if so, delete any leading ones (but not later ones because they might follow
+    // some other events that might require another redraw.)
+    auto q_it = gui_.signal_queue_.begin();
+    while (q_it != gui_.signal_queue_.end() and q_it->type == GUI::Signal::Type::redraw) {
+        q_it = gui_.signal_queue_.erase(q_it);
+    }
+
+    gui_.queueEvent(GUI::Event::Type::redraw_complete);
     return true;
 }
 
-void GUIGraphArea::drawWrappingLine(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans, const Reader &r, const Book &b) {
+void GraphArea::drawWrappingLine(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans, const Reader &r, const Book &b) {
     cr->save();
     cr->transform(trans);
     const auto &rp = r.position();
@@ -171,7 +183,7 @@ void GUIGraphArea::drawWrappingLine(const Cairo::RefPtr<Cairo::Context> &cr, con
 }
 
 #define RGBA red, green, blue, alpha
-void GUIGraphArea::drawPoint(
+void GraphArea::drawPoint(
         const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans,
         double x, double y,
         const PointType &type, double red, double green, double blue, double alpha,
@@ -263,7 +275,7 @@ void GUIGraphArea::drawPoint(
     cr->restore();
 }
 
-void GUIGraphArea::drawCircle(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans,
+void GraphArea::drawCircle(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans,
         double cx, double cy, double r, double red, double green, double blue, double alpha) {
     // Apply the full transformation: then we can just draw the circle in *graph* space which,
     // post-transformation, will be exactly the desired oval.
@@ -293,5 +305,5 @@ void GUIGraphArea::drawCircle(const Cairo::RefPtr<Cairo::Context> &cr, const Cai
     cr->restore();
 }
 
-}
+} }
 

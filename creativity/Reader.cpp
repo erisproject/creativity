@@ -6,19 +6,21 @@
 #include <map>
 
 using namespace eris;
+using namespace Eigen;
 
 namespace creativity {
 
 const std::vector<double> Reader::default_polynomial{{4., -1.}};
 const std::vector<double> Reader::default_penalty_polynomial{{0, 0, 0.25}};
+const std::vector<unsigned long> Reader::profit_stream_ages_{{1,2,3,4,5,7,10}};
 
 Reader::Reader(
         const Position &pos, const Position &b1, const Position &b2,
-        belief::Demand &&demand, belief::Profit &&profit, belief::ProfitStream &&stream, belief::Quality &&quality,
+        belief::Demand &&demand, belief::Profit &&profit, belief::Quality &&quality,
         const double &cFixed, const double &cUnit, const double &income
         )
     : WrappedPositional<agent::AssetAgent>(pos, b1, b2),
-    profit_belief_{std::move(profit)}, profit_belief_extrap_{profit_belief_}, prof_stream_belief_{std::move(stream)},
+    profit_belief_{std::move(profit)}, profit_belief_extrap_{profit_belief_},
     demand_belief_{std::move(demand)}, quality_belief_{std::move(quality)},
     c_fixed_{cFixed}, c_unit_{cUnit}, income_{income}
 {}
@@ -60,7 +62,7 @@ const double& Reader::uLifetime() const {
     return u_lifetime_;
 }
 const std::unordered_set<SharedMember<Book>>& Reader::newBooks() const {
-    return new_books_;
+    return library_new_;
 }
 
 const std::vector<SharedMember<Book>>& Reader::wrote() const {
@@ -107,16 +109,24 @@ void Reader::interOptimize() {
     // Update the various profit, demand, and quality beliefs
     updateBeliefs();
 
-    auto sim = simulation();
+    // Clear any "on-market" book references that aren't on the market anymore
+    auto it = library_market_.begin();
+    while (it != library_market_.end()) {
+        if (not (*it)->hasMarket())
+            it = library_market_.erase(it);
+        else
+            it++;
+    }
 
     double income_available = assets()[MONEY] + income_;
 
-    const double previous_books = wrote().size();
+    auto sim = simulation();
     const double market_books = sim->countMarkets<BookMarket>();
+    const double previous_books = wrote().size();
 
     // Figure out the expected profitability of each book; positive ones will be kept on the market
     std::map<double, std::vector<std::pair<SharedMember<Book>, double>>, std::greater<double>> profitability;
-    for (auto &book : wrote_on_market_) {
+    for (auto &book : wrote_market_) {
         auto book_mkt = book->market();
 
         auto max = demand_belief_.argmaxP(book->quality(), book->lifeSales(), previous_books-1, market_books, c_unit_);
@@ -164,15 +174,9 @@ void Reader::interOptimize() {
                 [this] (const double &l) -> double { return creationQuality(l); },
                 previous_books, market_books, assets()[MONEY] + income_ - c_fixed_
                 );
-        ERIS_DBGVAR(profit_belief_);
-        ERIS_DBGVAR(profit_belief_extrap_);
-        ERIS_DBGVAR(l_max);
         double quality = creationQuality(l_max);
 
-        ERIS_DBGVAR(quality);
-
         double exp_profit = profit_belief_.predict(quality, previous_books, market_books);
-        ERIS_DBGVAR(exp_profit);
 
         // If the optimal effort level gives a book with positive expected profits, do it:
         if (l_max < exp_profit) {
@@ -194,29 +198,18 @@ void Reader::interApply() {
     // to author)
     assets() += {MONEY, income_};
 
-    ERIS_DBG("WOO");
-
     SharedMember<Book> newbook;
     if (create_) {
         // The cost (think of this as an opportunity cost) of creating:
         assets() -= {MONEY, create_effort_ + c_fixed_};
 
-        ERIS_DBGVAR(assets());
-
         // The book is centered at the reader's position, plus some noise we add below
         Position bookPos{position()};
-
-        ERIS_DBGVAR(bookPos);
-        ERIS_DBGVAR(create_price_);
-        ERIS_DBGVAR(create_quality_);
 
         auto qdraw = [this] (const Book &book, const Reader &) -> double {
             return std::max(0.0, book.quality() + writer_quality_sd * stdnormal(Random::rng()));
         };
-        ERIS_DBG("hi");
         newbook = simulation()->create<Book>(bookPos, sharedSelf(), wrote_.size(), create_price_, create_quality_, qdraw);
-
-        ERIS_DBGVAR(newbook->id());
 
         /// If enabled, add some noise in a random direction to the position
         if (writer_book_sd > 0) {
@@ -225,16 +218,15 @@ void Reader::interApply() {
         }
 
         wrote_.push_back(newbook);
-        wrote_on_market_.insert(newbook);
+        wrote_market_.insert(newbook);
         library_.emplace(newbook, create_quality_);
+        library_market_.insert(newbook);
     }
 
-    ERIS_DBG("WOO");
     std::vector<SharedMember<Book>> remove;
-    for (auto &b : wrote_on_market_) {
+    for (auto &b : wrote_market_) {
         if (new_prices_.count(b) > 0) {
             // Set the new price
-            ERIS_DBG("Updating book[" << b->id() << "] price from " << b->market()->price() << " to " << new_prices_[b]);
             b->market()->setPrice(new_prices_[b]);
             assets() -= {MONEY, c_fixed_};
         }
@@ -245,12 +237,9 @@ void Reader::interApply() {
     }
 
     for (auto &b : remove) {
-        ERIS_DBG("Removing book[" << b->id() << "] (price was " << b->market()->price() << ") from the market");
-        wrote_on_market_.erase(b);
+        wrote_market_.erase(b);
         simulation()->remove(b->market());
     }
-
-    ERIS_DBG("");
 
     // Finally, move N(0,0.25) in a random direction
     std::normal_distribution<double> step_dist{0, 0.25};
@@ -287,9 +276,21 @@ void Reader::receiveProfits(SharedMember<Book> book, const Bundle &revenue) {
 
 const belief::Profit& Reader::profitBelief() { return profit_belief_; }
 const belief::Profit& Reader::profitExtrapBelief() { return profit_belief_extrap_; }
-const belief::ProfitStream& Reader::profitStreamBelief() { return prof_stream_belief_; }
 const belief::Demand& Reader::demandBelief() { return demand_belief_; }
 const belief::Quality& Reader::qualityBelief() { return quality_belief_; }
+const belief::ProfitStream& Reader::profitStreamBelief(unsigned long age) {
+    if (profit_stream_beliefs_.empty()) {
+        profit_stream_beliefs_.emplace(std::piecewise_construct,
+                std::tuple<unsigned long>(age),
+                std::tuple<belief::ProfitStream>(age));
+    }
+
+    auto it = profit_stream_beliefs_.upper_bound(age);
+    if (it == profit_stream_beliefs_.begin())
+        throw std::runtime_error("Invalid age (" + std::to_string(age) + ") passed to Reader::profitStreamBelief");
+    it--;
+    return it->second;
+}
 
 void Reader::updateBeliefs() {
     updateQualityBelief();
@@ -301,9 +302,8 @@ void Reader::updateBeliefs() {
 void Reader::updateQualityBelief() {
     // If we obtained any new books, update the demand belief with them
     if (not newBooks().empty()) {
-        ERIS_DBG("Updating quality beliefs; prior beta = " << quality_belief_.betaPrior());
         std::vector<SharedMember<Book>> books;
-        Eigen::VectorXd y(newBooks().size());
+        VectorXd y(newBooks().size());
         size_t i = 0;
         for (auto &a : newBooks()) {
             books.push_back(a);
@@ -311,68 +311,89 @@ void Reader::updateQualityBelief() {
         }
 
         quality_belief_ = quality_belief_.update(y, quality_belief_.bookData(books));
-        ERIS_DBG("post beta = " << quality_belief_.betaPrior());
     }
 }
 void Reader::updateDemandBelief() {
     if (not newBooks().empty()) {
-        ERIS_DBG("Updating demand beliefs; prior beta = " << demand_belief_.betaPrior());
         std::vector<SharedMember<Book>> books;
         VectorXd y(newBooks().size());
-        ERIS_DBG("f");
         MatrixXd X(newBooks().size(), demand_belief_.K());
-        ERIS_DBG("f");
         auto t = simulation()->t();
         size_t i = 0;
         for (auto &b : newBooks()) {
-            ERIS_DBG("g");
             y[i] = b->sales(t);
-            ERIS_DBG("g");
             X.row(i) = demand_belief_.bookRow(b, library_[b]);
-            ERIS_DBG("g");
+            i++;
         }
 
-        ERIS_DBG("update");
         demand_belief_ = demand_belief_.update(y, X);
     }
 }
 void Reader::updateProfitStreamBelief() {
-    std::vector<SharedMember<Book>> new_ps_books;
-    for (auto &bookq : library_) {
-        if (not bookq.first->hasMarket() and not prof_stream_belief_.tracked.count(bookq.first)) {
-            // The book is no longer on the market, but we haven't incorporated its profit
-            // stream information yet
-            new_ps_books.push_back(bookq.first);
+    // Map age into lists of just-left-market books of at least that age
+    std::map<unsigned long, std::vector<SharedMember<Book>>> just_left;
+    ERIS_DBGVAR(library_market_.size());
+    for (auto &book : library_market_) {
+        if (not book->hasMarket()) {
+            const unsigned long periods = book->marketPeriods();
+            // We only look for the predefined age values; this could potentially change to create
+            // new profit stream age models when we see books of longer ages.
+            for (unsigned long a : profit_stream_ages_) {
+                if (periods >= a)
+                    just_left[a].push_back(book);
+                else
+                    break;
+            }
         }
     }
 
-    if (not new_ps_books.empty()) {
-        int rows = prof_stream_belief_.K() * new_ps_books.size();
-        MatrixXd X(rows, prof_stream_belief_.K());
-        VectorXd y(rows);
-        size_t i = 0;
-        for (auto &book : new_ps_books) {
-            prof_stream_belief_.populate(book, y, X, i++);
+    ERIS_DBG("Updating profit stream beliefs with:");
+    for (auto jl : just_left) {
+        ERIS_DBG("    " << jl.first << ": " << jl.second.size() << " books");
+    }
+    ERIS_DBG(".");
+
+    for (auto &jl : just_left) {
+        const unsigned long &age = jl.first;
+        RowVectorXd y(jl.second.size());
+        MatrixXd X(jl.second.size(), age);
+
+        size_t row = 0;
+        for (auto &book : jl.second) {
+            double cumul_rev = 0;
+            unsigned long created = book->created();
+            for (unsigned long i = 0; i < age; i++) {
+                double r_i = book->revenue(created + i);
+                X(row, i) = r_i;
+                cumul_rev += r_i;
+            }
+            y[row] = book->lifeRevenue() - cumul_rev;
         }
 
-        prof_stream_belief_ = prof_stream_belief_.update(y, X);
+        // Create a new belief of the given size if none exists yet
+        if (profit_stream_beliefs_.count(age) == 0) {
+            profit_stream_beliefs_.emplace(std::piecewise_construct,
+                    std::tuple<unsigned long>(age),
+                    std::tuple<belief::ProfitStream>(age));
+        }
 
-        prof_stream_belief_.tracked.insert(new_ps_books.begin(), new_ps_books.end());
+        // Update the belief (existing or just-created) with the new data
+        profit_stream_beliefs_.at(age) = profit_stream_beliefs_.at(age).update(y, X);
     }
-    
 }
+
 void Reader::updateProfitBelief() {
     std::vector<SharedMember<Book>> new_prof_books, extrap_books;
-    for (auto &bookq : library_) {
-        if (bookq.first->hasMarket()) {
+    for (auto &book : library_market_) {
+        if (book->hasMarket()) {
             // The book is still on the market, so we'll have to extrapolate using profit stream
             // beliefs
-            extrap_books.push_back(bookq.first);
+            extrap_books.push_back(book);
         }
-        else if (not profit_belief_.tracked.count(bookq.first)) {
-            // The book is no longer on the market and we haven't yet incorporated its profit
-            // information.
-            new_prof_books.push_back(bookq.first);
+        else {
+            // The book just left the market (it's still in library_market_, from the previous
+            // period), so incorporate it into the profit belief.
+            new_prof_books.push_back(book);
         }
     }
 
@@ -384,11 +405,10 @@ void Reader::updateProfitBelief() {
         for (auto &book : new_prof_books) {
             y[i] = book->lifeRevenue();
             X.row(i) = profit_belief_.profitRow(book, library_[book]);
+            i++;
         }
 
         profit_belief_ = profit_belief_.update(y, X);
-
-        profit_belief_.tracked.insert(new_prof_books.begin(), new_prof_books.end());
     }
 
     // Extrapolate based on profit stream predictions for profit levels for books that are still on
@@ -403,8 +423,17 @@ void Reader::updateProfitBelief() {
 
         size_t i = 0;
         for (auto &book : extrap_books) {
-            y[i] = prof_stream_belief_.predict(book->lifeRevenue(), book->age());
-            X.row(i) = profit_belief_.profitRow(book, library_[book]);
+            // Look for the largest model that doesn't exceed the book's age, then use it for
+            // prediction
+            for (auto it = profit_stream_beliefs_.rbegin(); it != profit_stream_beliefs_.rend(); it++) {
+                if (it->first <= book->age() and it->second.n() >= 1) {
+                    // We have a winner:
+                    y[i] = it->second.predict(book);
+                    X.row(i) = profit_belief_.profitRow(book, library_[book]);
+                    i++;
+                    break;
+                }
+            }
         }
 
         // NB: extrapolation uses just-updated non-extrapolation as prior
@@ -471,7 +500,6 @@ void Reader::intraOptimize() {
 
         auto bm = book->market();
         lock.add(bm);
-        ERIS_DBG("Gonna buy a book!\n");
         // Perform some safety checks:
         // - if we've already added the book to the set of books to buy, don't add it again. (This
         //   should only be possible if there are multiple BookMarkets selling the same book).
@@ -480,7 +508,6 @@ void Reader::intraOptimize() {
         // - if we can't afford it, skip it.
         auto pinfo = bm->price(1);
         if (buy.count(book) == 0 and pinfo.feasible and pinfo.total <= money) {
-            ERIS_DBG("Buying that book!");
             buy.insert(book);
             double u_with_book = u(money - pinfo.total, buy);
             if (u_with_book < u_curr) {
@@ -506,15 +533,16 @@ void Reader::intraApply() {
     for (auto &book : reserved_books_) {
         double q = book->qualityDraw(*this);
         library_.emplace(book, q);
+        library_market_.insert(book);
     }
     reservations_.clear();
-    new_books_.clear();
-    std::swap(new_books_, reserved_books_); // Clear away into new_books_
+    library_new_.clear();
+    std::swap(library_new_, reserved_books_); // Clear away into new_books_
 
     // "Eat" any money leftover
     double money = assets().remove(MONEY);
     // Finalize utility
-    u_curr_ = u(money, new_books_);
+    u_curr_ = u(money, library_new_);
     u_lifetime_ += u_curr_;
 }
 void Reader::intraReset() {

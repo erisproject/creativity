@@ -14,12 +14,13 @@
 #include <boost/geometry/geometries/point.hpp>
 #include <boost/geometry/geometries/box.hpp>
 #include <boost/geometry/index/rtree.hpp>
-#include "creativity/GUIGraphArea.hpp"
-#include "creativity/GUIInfoWindow.hpp"
+#include "creativity/gui/GraphArea.hpp"
+#include "creativity/gui/InfoWindow.hpp"
+#include "creativity/gui/ReaderCols.hpp"
 
 namespace sigc { SIGC_FUNCTORS_DEDUCE_RESULT_TYPE_WITH_DECLTYPE }
 
-namespace creativity {
+namespace creativity { namespace gui {
 
 /** Class that runs a GUI in a thread, collecting its events into a queue to be processed
  * periodically (e.g. between iterations) via GUIShim.
@@ -180,7 +181,7 @@ class GUI : eris::noncopyable {
                     resume, ///< The user hit the "resume" button to unpause the simulation.
                     step, ///< The user hit the "step" button to unpause the simulation for one step.
                     quit, ///< Sent when the user quits the application
-                    redraw ///< Sent to indicate that a redraw is complete.  Used internally for redraw(true) calls.
+                    redraw_complete ///< Sent to indicate that a redraw is complete.  Used internally for redraw(true) calls.
                 };
 
                 /// Will be true if this is a fake Event indicating that no events are pending.
@@ -223,6 +224,10 @@ class GUI : eris::noncopyable {
          * received.
          */
         void waitForEvent(Event::Type t);
+
+        /** Utility method used by various GUI classes to convert a Position to a user-displayable string.
+         */
+        static std::string pos_to_string(const eris::Position &pos);
 
     private:
         /// The thread the GUI is running in.  Set during construction.
@@ -309,7 +314,7 @@ class GUI : eris::noncopyable {
         template <typename... Args>
         void queueEvent(Args&&... args);
 
-        friend class GUIGraphArea;
+        friend class GraphArea;
 
         /// Called by the GUI thread to process the signal queue
         void thr_signal();
@@ -320,6 +325,19 @@ class GUI : eris::noncopyable {
          */
         void thr_run();
 
+        /** Updates the reader information on the "Agents" tab.
+         */
+        void thr_update_readers();
+
+        /** Updates the book information on the "Books" tab.
+         */
+        void thr_update_books();
+
+        /** Opens a dialog for the given member, which must be either a Reader or a Book.  If the
+         * dialog is already open, it is presented again (which is window manager dependent, but
+         * generally means bringing to the top and/or focussing). */
+        void thr_info_dialog(eris::SharedMember<eris::Member> member);
+
         /** Sets up the simulation based on the current GUI parameter values.
          */
         void setupSim();
@@ -329,7 +347,18 @@ class GUI : eris::noncopyable {
          */
         void runSim();
 
-        std::unique_ptr<GUIGraphArea> graph_;
+        /** The custom graph area */
+        std::unique_ptr<GraphArea> graph_;
+
+        /** The various objects used for the Agents tab */
+        std::unique_ptr<ReaderCols> rdr_cols_;
+        Glib::RefPtr<Gtk::ListStore> rdr_list_;
+        std::unique_ptr<Gtk::TreeView> rdr_tree_;
+
+        /** The various objects used for the Books tab */
+        std::unique_ptr<BookCols> bk_cols_;
+        Glib::RefPtr<Gtk::ListStore> bk_list_;
+        std::unique_ptr<Gtk::TreeView> bk_tree_;
 
         /** Obtains a widget from the current Gtk::Builder and returns it (as a pointer).
          */
@@ -356,7 +385,7 @@ class GUI : eris::noncopyable {
         void handleEvent(const GUI::Event &event);
 
         /** Currently open reader/book dialogs */
-        std::unordered_map<eris::eris_id_t, GUIInfoWindow> info_windows_;
+        std::unordered_map<eris::eris_id_t, InfoWindow> info_windows_;
 
         typedef boost::geometry::model::point<double, 2, boost::geometry::cs::cartesian> rt_point;
         typedef std::pair<rt_point, eris::SharedMember<eris::Member>> rt_val;
@@ -376,4 +405,4 @@ void GUI::queueEvent(Args&&... args) {
     cv_.notify_all();
 }
 
-}
+} }

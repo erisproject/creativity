@@ -8,18 +8,21 @@
 namespace creativity {
 
 // forward declarations
-class GUI;
 class Reader;
 class Book;
 
+namespace gui {
+
+class GUI;
+
 /** Gtk drawing area upon which the simulation visualization is drawn.  */
-class GUIGraphArea : public Gtk::DrawingArea, eris::noncopyable {
+class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
     public:
         /** Creates a graph area that draws in the rectangle bounded by [`bottom', `top'] on the
          * vertical plane and [`left', `right'] on the horizontal plane.  Specifying a value of
          * bottom or left larger than top or bottom will flip the respective axis.
          */
-        GUIGraphArea(const double &top, const double &right, const double &bottom, const double &left,
+        GraphArea(const double &top, const double &right, const double &bottom, const double &left,
                 std::shared_ptr<eris::Simulation> sim, GUI &gui);
 
         /** Returns a Cairo::Matrix that translates graph coordinates into screen coordinates.  To
@@ -105,4 +108,4 @@ class GUIGraphArea : public Gtk::DrawingArea, eris::noncopyable {
         void drawWrappingLine(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans, const Reader &r, const Book &b);
 };
 
-}
+} }

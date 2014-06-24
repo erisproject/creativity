@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <unordered_set>
+#include <boost/any.hpp>
 #include <Eigen/Core>
 #include "belief/Profit.hpp"
 #include "belief/ProfitStream.hpp"
@@ -133,7 +134,6 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * \param b2 the vertex opposite `b1` of the wrapping boundary box for the reader
          * \param demand a per-period demand belief object
          * \param profit a lifetime profit belief object
-         * \param stream a profit temporal belief object
          * \param quality a quality belief object
          * \param cFixed the fixed cost of keeping a book on the market
          * \param cUnit the per-unit cost of producing copies of a book
@@ -141,7 +141,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          */
         Reader(
                 const eris::Position &pos, const eris::Position &b1, const eris::Position &b2,
-                belief::Demand &&demand, belief::Profit &&profit, belief::ProfitStream &&stream, belief::Quality &&quality,
+                belief::Demand &&demand, belief::Profit &&profit, belief::Quality &&quality,
                 const double &cFixed, const double &cUnit, const double &income
               );
 
@@ -364,8 +364,16 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         const belief::Profit& profitBelief();
         /// Read-only access to this reader's profit belief with profit stream extrapolations
         const belief::Profit& profitExtrapBelief();
-        /// Read-only access to this reader's profit stream belief
-        const belief::ProfitStream& profitStreamBelief();
+        /** Read-only access to this reader's profit stream belief for books with age `age`.  The
+         * returned object will be a belief::ProfitStream model with between 1 and `age` parameters.
+         * When a model for the requested age is not available the model with the highest age less
+         * than `age` is returned.
+         *
+         * If there are no models at all, a highly noninformative one for `age=1` is created and
+         * returned.
+         */
+        const belief::ProfitStream& profitStreamBelief(unsigned long age);
+
         /// Read-only access to this reader's demand belief
         const belief::Demand& demandBelief();
         /// Read-only access to this reader's quality belief
@@ -420,16 +428,23 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         /// Belief about lifetime book profits
         belief::Profit profit_belief_, ///< Belief about lifetime book profits
             profit_belief_extrap_; ///< Beliefs about lifetime book profits using profit stream expectations
-        belief::ProfitStream prof_stream_belief_; ///< Belief about the time structure of profits
         belief::Demand demand_belief_; ///< Belief about per-period demand
         belief::Quality quality_belief_; ///< Belief about book quality
+        /** Profit stream beliefs for books on market for various lengths of time.  E.g.
+         * `profit_stream_beliefs_[3]` is the model of future profits for books that stayed on the
+         * market for at least 3 periods.
+         */
+        std::map<unsigned long, belief::ProfitStream> profit_stream_beliefs_;
+
+        /// The different ages for profit_stream_beliefs
+        static const std::vector<unsigned long> profit_stream_ages_;
 
         /** Updates all of the reader's beliefs, in the following order:
          * - book quality beliefs
          * - per-period demand
-         * - profit stream temporal structure
+         * - profit stream models
          * - lifetime profitability
-         * - lifetime profitability with extrapolation for still-in-market books
+         * - lifetime profitability with profit stream extrapolation for still-in-market books
          *
          * \sa updateQualityBelief
          * \sa updateDemandBelief
@@ -474,16 +489,18 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         std::vector<double> pen_poly_ = Reader::default_penalty_polynomial;
         /// Map of books owned to realized quality of those books:
         std::unordered_map<eris::SharedMember<Book>, double> library_;
+        /// Books purchased in the just-finished period
+        std::unordered_set<eris::SharedMember<Book>> library_new_;
+        /// Set of books that are still on the market
+        std::unordered_set<eris::SharedMember<Book>> library_market_;
         /// Reservations of books being purchased
         std::forward_list<eris::Market::Reservation> reservations_;
         /// set of books associated with reservations_
         std::unordered_set<eris::SharedMember<Book>> reserved_books_;
-        /// Books purchased in the just-finished period
-        std::unordered_set<eris::SharedMember<Book>> new_books_;
         /// Books written by this reader, in order from earliest to latest
         std::vector<eris::SharedMember<Book>> wrote_;
         /// Books written by this reader that are still on the market
-        std::unordered_set<eris::SharedMember<Book>> wrote_on_market_;
+        std::unordered_set<eris::SharedMember<Book>> wrote_market_;
         /// Cache of the set of books available
         std::unordered_set<eris::SharedMember<Book>> book_cache_;
 

@@ -10,7 +10,7 @@ double Quality::predict(const Book &book) const {
     double price = 0;
     if (book.hasMarket())
         price = book.market()->price();
-    RowVectorXd X{K()};
+    RowVectorXd X(K());
     X << 1, book.order() == 0, book.order(), book.age(), price, price*book.age(), book.lifeSales();
     return LinearBase::predict(X);
 }

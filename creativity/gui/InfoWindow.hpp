@@ -7,26 +7,33 @@
 #include <gtkmm/grid.h>
 #include <gtkmm/label.h>
 #include <gtkmm/button.h>
+#include <gtkmm/liststore.h>
+#include <gtkmm/treeview.h>
+#include <gtkmm/scrolledwindow.h>
 #include <mutex>
 #include <memory>
+#include "creativity/gui/AuthoredBookCols.hpp"
 
 namespace creativity {
 
 // forward declarations
-class GUI;
 class Reader;
 class Book;
 
-/** Gtk dialog for showing reader or book info. */
-class GUIInfoWindow : public Gtk::Window {
-    public:
-        /** Constructs a new GUIInfoWindow of the given size displaying reader information.
-         */
-        GUIInfoWindow(eris::SharedMember<Reader> reader, std::shared_ptr<Gtk::Window> main_window);
+namespace gui {
 
-        /** Constructs a new GUIInfoWindow of the given size displaying book information.
+class GUI;
+
+/** Gtk dialog for showing reader or book info. */
+class InfoWindow : public Gtk::Window {
+    public:
+        /** Constructs a new InfoWindow of the given size displaying reader information.
          */
-        GUIInfoWindow(eris::SharedMember<Book> book, std::shared_ptr<Gtk::Window> main_window);
+        InfoWindow(eris::SharedMember<Reader> reader, std::shared_ptr<Gtk::Window> main_window);
+
+        /** Constructs a new InfoWindow of the given size displaying book information.
+         */
+        InfoWindow(eris::SharedMember<Book> book, std::shared_ptr<Gtk::Window> main_window);
 
         /** Refresh the information in the dialog. */
         void refresh();
@@ -41,9 +48,6 @@ class GUIInfoWindow : public Gtk::Window {
          */
         eris::SharedMember<Book> book;
     protected:
-        /// Converts a position to a string
-        static std::string pos_to_string(const eris::Position &pos);
-
         /// Updates a single value Gtk::Label text with the given string
         void updateValue(const std::string &code, const std::string &val);
         /// Updates a single value Gtk::Label text with the given unsigned long
@@ -58,6 +62,11 @@ class GUIInfoWindow : public Gtk::Window {
         std::list<Gtk::Grid> grids_;
         std::list<Gtk::Label> labels_;
         std::list<Gtk::Notebook> nbs_;
+        std::list<Gtk::ScrolledWindow> swins_;
+
+        AuthoredBookCols abc_;
+        Glib::RefPtr<Gtk::ListStore> bk_list_;
+        Gtk::TreeView bk_tree_;
 };
 
-}
+} }

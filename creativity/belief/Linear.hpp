@@ -58,35 +58,38 @@ class Linear {
         /// A typedef to this class (including template parameters)
         typedef Linear<KK> LinearBase;
 
-        /** Constructs a Linear model with the given priors.
+        /** Constructs a Linear model with the given parameters.  These parameters will be those
+         * used for the prior when updating.
          *
-         * \param beta_prior the coefficient means
-         * \param s2_prior the model \f$s^2\f$
-         * \param V_prior the model's V (\f$s^2 V\f$ is the distribution of \f$\beta\f$).
-         * \param n_prior the number of data points supporting the other values
-         * \param V_prior_inv A shared pointer to the inverse of `V_prior`, if already calculated.
-         * This should normally be omitted: the inverse will be calculated when needed.
+         * \param beta the coefficient mean parameters (which, because of restrictions, might not be
+         * the actual means).
+         * \param s2 the \f$\sigma^2\f$ value of the error term variance.  Typically the \f$\sigma^2\f$ estimate.
+         * \param V the model's V matrix (where \f$s^2 V\f$ is the distribution of \f$\beta\f$).
+         * \param n the number of data points supporting the other values (which can be a
+         * non-integer value).
+         * \param V_inv A shared pointer to the inverse of `V`, if already calculated.  This may be
+         * safely omitted: the inverse will be calculated when needed.
          *
-         * \throws std::runtime_error if any of (`K >= 1`, `V_.rows() == V_.cols()`, `K ==
-         * V_.rows()`) are not satisfied (where `K` is determined by the number of rows of
-         * `beta_prior`).
+         * \throws std::runtime_error if any of (`K >= 1`, `V.rows() == V.cols()`, `K == V.rows()`)
+         * are not satisfied (where `K` is determined by the number of rows of `beta`).
          */
         Linear(
-                const Ref<const VectorKd> &beta_prior,
-                double s2_prior,
-                const Ref<const MatrixKd> &V_prior,
-                double n_prior,
-                const std::shared_ptr<MatrixKd> &V_prior_inv = nullptr
-        ) : beta_{beta_prior}, s2_{s2_prior}, V_{V_prior}, V_inv_{V_prior_inv}, n_{n_prior}, K_{beta_.rows()}
+                const Ref<const VectorKd> &beta,
+                double s2,
+                const Ref<const MatrixKd> &V,
+                double n,
+                const std::shared_ptr<MatrixKd> &V_inv = nullptr
+        ) : beta_{beta}, s2_{s2}, V_{V}, V_inv_{V_inv}, n_{n}, K_(beta_.rows())
         {
             // If we're templated as a Dynamic size class, check that the given matrices conform (if
             // not dynamic, this is guaranteed by the fixed constructor parameter sizes).
             if (KK == Eigen::Dynamic) {
-                if (K() < 1) throw std::runtime_error("Linear model requires at least one parameter");
-                if (V_.rows() != V_.cols()) throw std::runtime_error("Linear requires square V_prior matrix");
-                if (K() != V_.rows()) throw std::runtime_error("Linear requires beta_prior and V_prior of same number of rows");
-                if (V_inv_ and (V_inv_->rows() != V_inv_->cols() or V_inv_->rows() != K()))
-                    throw std::runtime_error("Linear constructed with invalid prior inverse");
+                long k = K();
+                if (k < 1) throw std::runtime_error("Linear model requires at least one parameter");
+                if (V_.rows() != V_.cols()) throw std::runtime_error("Linear requires square V matrix");
+                if (k != V_.rows()) throw std::runtime_error("Linear requires beta and V of same number of rows");
+                if (V_inv_ and (V_inv_->rows() != V_inv_->cols() or V_inv_->rows() != k))
+                    throw std::runtime_error("Linear constructed with invalid V_inv");
             }
         }
 
@@ -96,11 +99,30 @@ class Linear {
         /// Virtual destructor
         virtual ~Linear() = default;
 
-        /** Accesses the value of the beta prior parameter.  Note that this is *not* necessarily the
-         * mean and should not be used for prediction; rather it simply returns the distribution
-         * parameter value used by the prior.
+        /** Accesses the base distribution means value of beta.  Note that this is *not* necessarily
+         * the mean of beta and should not be used for prediction; rather it simply returns the
+         * distribution parameter value used, which may well not be the mean if any of the beta
+         * values have data restrictions.
          */
-        const VectorKd& betaPrior() const { return beta_; }
+        const VectorKd& beta() const { return beta_; }
+
+        /** Accesses the s2 value of the model. */
+        const double& s2() const { return s2_; }
+
+        /** Accesses the n value of the model. */
+        const double& n() const { return n_; }
+
+        /** Accesses the V value of the model. */
+        const MatrixKd V() const { return V_; }
+
+        /** Accesses the inverse of the V value of the model.  If the inverse has not been
+         * calculated yet, this calculates and stores the value before returning it.
+         */
+        const MatrixKd Vinv() const { 
+            if (not V_inv_)
+                V_inv_ = std::allocate_shared<MatrixKd>(kd_allocator_, V_.colPivHouseholderQr().inverse());
+            return *V_inv_;
+        }
 
         /// Given a row vector of values, predicts using the current beta_ values.
         double predict(const Eigen::Ref<const RowVectorKd> &Xi) const {
@@ -109,7 +131,7 @@ class Linear {
         }
 
         /// The number of parameters of the model
-        const long& K() const { return K_; }
+        const size_t& K() const { return K_; }
 
         /** Overloaded so that a Linear model can be printed nicely with `std::cout << model`.
          */
@@ -141,25 +163,23 @@ class Linear {
         Linear<KK> update(const Ref<const VectorXd> &y, const Ref<const MatrixXKd> &X) const {
             if (y.rows() != X.rows())
                 throw std::runtime_error("update(y, X) failed: y and X are non-conformable");
-            if (X.cols() != K())
+            if (X.cols() != (long) K())
                 throw std::runtime_error("update(y, X) failed: X has wrong number of columns");
 
             MatrixXd Xt = X.transpose();
             MatrixXd XtX = Xt * X;
-            if (not V_inv_)
-                V_inv_ = std::allocate_shared<MatrixKd>(kd_allocator_, V_.colPivHouseholderQr().inverse());
 
             // Store (V^{-1} + X^\top X) in a shared pointer so that we can pass it along as V^{-1}
             // to the new Linear object so that if *it* needs an inverse, it can just use this
             // instead of having to reinvert to get back to this value.  This saves some
-            // computational time but more importantly, gives more accurate numerical results.
+            // computational time and, more importantly, gives more accurate numerical results.
             std::shared_ptr<MatrixKd> V_post_inv = std::allocate_shared<MatrixKd>(kd_allocator_,
-                    *V_inv_ + XtX
+                    Vinv() + XtX
             );
 
             MatrixKd V_post = V_post_inv->colPivHouseholderQr().inverse();
 
-            VectorKd beta_post = V_post * (*V_inv_ * beta_ + Xt * y);
+            VectorKd beta_post = V_post * (Vinv() * beta_ + Xt * y);
             double n_post = n_ + X.rows();
             VectorXd residuals = y - X * beta_;
             double s2_post = (n_ * s2_ + residuals.transpose() * (X * V_ * Xt + MatrixXd::Identity(X.rows(), X.rows())) * residuals) / n_post;
@@ -191,7 +211,7 @@ class Linear {
         static Eigen::aligned_allocator<MatrixKd> kd_allocator_;
 
     private:
-        long K_;
+        size_t K_;
 };
 
 template <int KK, typename Z> Eigen::aligned_allocator<Matrix<double, KK, KK>> Linear<KK, Z>::kd_allocator_{};

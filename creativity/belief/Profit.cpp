@@ -7,7 +7,7 @@
 namespace creativity { namespace belief {
 
 double Profit::predict(double q, unsigned long previousBooks, unsigned long marketBooks) const {
-    RowVectorKd X{K()};
+    RowVectorKd X(K());
     X << 1, std::copysign(std::pow(q, D_), q), previousBooks == 0 ? 1 : 0, previousBooks, marketBooks;
     return LinearBase::predict(X);
 }
@@ -34,7 +34,7 @@ Profit::RowVectorKd Profit::profitRow(eris::SharedMember<Book> book, double qual
     double first_book = prev_books == 0 ? 1 : 0;
     double market_books = book->simulation()->countMarkets<BookMarket>();
 
-    RowVectorKd Xi{K()};
+    RowVectorKd Xi(K());
     Xi << 1, std::pow(quality, D_), first_book, prev_books, market_books;
     return Xi;
 }

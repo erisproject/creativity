@@ -30,7 +30,7 @@ namespace creativity { namespace belief {
  */
 class Profit : public Linear<5> {
     public:
-        /** Constructs a demand model with the given prior information.
+        /** Constructs a profit model with the given parameter information.
          *
          * \param D the dimensionality of the world.
          * \param args prior arguments to forward to the base Linear constructor.
@@ -97,12 +97,10 @@ class Profit : public Linear<5> {
          */
         RowVectorKd profitRow(eris::SharedMember<Book> book, double quality) const;
 
-        // Used to track books already included in this object's information set
-        std::unordered_set<eris::eris_id_t> tracked;
-
     private:
         // Initialize a Profit from a Linear<>
-        Profit(unsigned int D, LinearBase &&base) : LinearBase{base}, D_{D} {}
+        Profit(unsigned int D, LinearBase &&base)
+            : LinearBase{base}, D_{D} {}
 
         unsigned int D_;
 

@@ -57,6 +57,12 @@ const unsigned long& Book::outOfPrint() const {
     return out_of_print_;
 }
 
+unsigned long Book::marketPeriods() const {
+    return hasMarket()
+        ? age()
+        : outOfPrint() - created();
+}
+
 const unsigned long& Book::order() const {
     return order_;
 }
@@ -102,6 +108,16 @@ double Book::revenue(unsigned long t) const {
     auto it = revenue_.find(t);
     if (it == revenue_.end()) return 0.0;
     return it->second;
+}
+
+unsigned long Book::copies() const {
+    unsigned long copies = 0;
+    SharedMember<Book> me{sharedSelf()};
+    for (auto &r : simulation()->agents<Reader>()) {
+        if (r->library().count(me))
+            copies++;
+    }
+    return copies;
 }
 
 bool Book::livingAuthor() const {

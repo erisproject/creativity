@@ -1,10 +1,12 @@
-#include "creativity/GUIInfoWindow.hpp"
+#include "creativity/gui/InfoWindow.hpp"
 #include "creativity/Book.hpp"
 #include "creativity/Reader.hpp"
+#include "creativity/gui/GUI.hpp"
 #include <iomanip>
 #include <gtkmm/box.h>
+#include <gtkmm/treemodelcolumn.h>
 
-namespace creativity {
+namespace creativity { namespace gui {
 
 using namespace eris;
 
@@ -53,8 +55,7 @@ using namespace eris;
 #define TIMES "&#xd7;"
 #define PI "&#x3c0;"
 
-
-GUIInfoWindow::GUIInfoWindow(eris::SharedMember<Reader> rdr, std::shared_ptr<Gtk::Window> main_window)
+InfoWindow::InfoWindow(eris::SharedMember<Reader> rdr, std::shared_ptr<Gtk::Window> main_window)
     : reader{rdr}
 {
     set_transient_for(*main_window);
@@ -85,37 +86,67 @@ GUIInfoWindow::GUIInfoWindow(eris::SharedMember<Reader> rdr, std::shared_ptr<Gtk
 
     NEW_TAB_GRID(grid_quality, beliefs, "Quality");
     LABEL_ROW(grid_quality, "Dependent variable", "<i>quality</i>");
+    DATA_ROW(grid_quality, "q_n", "n");
     std::vector<std::string> q_vars{{"constant", "I(firstBook)", "prevBooks", "age", "price", "price" TIMES "age", "copiesSold"}};
-    for (int i = 0; i < reader->qualityBelief().K(); i++)
+    for (size_t i = 0; i < reader->qualityBelief().K(); i++)
         DATA_ROW(grid_quality, "q_" + std::to_string(i), BETA "[" + q_vars[i] + "]");
 
     NEW_TAB_GRID(grid_profit, beliefs, "Profit");
     LABEL_ROW(grid_profit, "Dependent variable", "<i>lifetimeProfit</i>");
+    DATA_ROW(grid_profit, "p_n", "n");
     std::vector<std::string> p_vars{{"constant", "quality<sup>D</sup>", "I(firstBook)", "previousBooks", "marketBooks"}};
-    for (int i = 0; i < reader->profitBelief().K(); i++)
+    for (size_t i = 0; i < reader->profitBelief().K(); i++)
         DATA_ROW(grid_profit, "p_" + std::to_string(i), BETA "[" + p_vars[i] + "]");
 
     NEW_TAB_GRID(grid_demand, beliefs, "Demand");
-    LABEL_ROW(grid_demand, "Dependent variable", "<i>quantityDemanded</i>");
     COMMENT_ROW(grid_demand, "Note: this regression is for single-period demand");
+    LABEL_ROW(grid_demand, "Dependent variable", "<i>quantityDemanded</i>");
+    DATA_ROW(grid_demand, "d_n", "n");
     std::vector<std::string> d_vars{{"constant", "price<sup>D</sup>", "quality<sup>D</sup>", "prevSales", "age", "I(onlyBook)", "otherBooks", "marketBooks"}};
-    for (int i = 0; i < reader->demandBelief().K(); i++)
+    for (size_t i = 0; i < reader->demandBelief().K(); i++)
         DATA_ROW(grid_demand, "d_" + std::to_string(i), BETA "[" + d_vars[i] + "]");
 
-    NEW_TAB_GRID(grid_pstream, beliefs, "Profit stream");
-    LABEL_ROW(grid_pstream, "Dependent variable", "<i>profitRemaining</i>");
-    for (int i = 0; i < reader->profitStreamBelief().K(); i++) {
-        DATA_ROW(grid_pstream, "ps_" + std::to_string(i),
-                BETA "[" + (i == 0 ? "constant" : "I(age=" + std::to_string(i) + ") " TIMES " " PI "<sub>" + std::to_string(i-1) + "</sub>") + "]");
-    }
+    NEW_TAB_GRID(grid_pstream1, beliefs, "PStream 1");
+    LABEL_ROW(grid_pstream1, "Dependent variable", "<i>profitRemaining</i>");
+    DATA_ROW(grid_pstream1, "ps1_n", "n");
+    DATA_ROW(grid_pstream1, "ps1_0", BETA "[" PI "<sub>0</sub>]");
+
+    NEW_TAB_GRID(grid_pstream2, beliefs, "PStream 2");
+    LABEL_ROW(grid_pstream2, "Dependent variable", "<i>profitRemaining</i>");
+    DATA_ROW(grid_pstream2, "ps2_n", "n");
+    DATA_ROW(grid_pstream2, "ps2_0", BETA "[" PI "<sub>0</sub>]");
+    DATA_ROW(grid_pstream2, "ps2_1", BETA "[" PI "<sub>1</sub>]");
+
+    NEW_TAB_GRID(grid_pstream3, beliefs, "PStream 3");
+    LABEL_ROW(grid_pstream3, "Dependent variable", "<i>profitRemaining</i>");
+    DATA_ROW(grid_pstream3, "ps3_n", "n");
+    DATA_ROW(grid_pstream3, "ps3_0", BETA "[" PI "<sub>0</sub>]");
+    DATA_ROW(grid_pstream3, "ps3_1", BETA "[" PI "<sub>1</sub>]");
+    DATA_ROW(grid_pstream3, "ps3_2", BETA "[" PI "<sub>2</sub>]");
+
+    NEW_TAB_GRID(grid_pstream4, beliefs, "PStream 4");
+    LABEL_ROW(grid_pstream4, "Dependent variable", "<i>profitRemaining</i>");
+    DATA_ROW(grid_pstream4, "ps4_n", "n");
+    DATA_ROW(grid_pstream4, "ps4_0", BETA "[" PI "<sub>0</sub>]");
+    DATA_ROW(grid_pstream4, "ps4_1", BETA "[" PI "<sub>1</sub>]");
+    DATA_ROW(grid_pstream4, "ps4_2", BETA "[" PI "<sub>2</sub>]");
+    DATA_ROW(grid_pstream4, "ps4_3", BETA "[" PI "<sub>3</sub>]");
 
     NEW_TAB_GRID(grid_pextrap, beliefs, "Profit (extrap.)");
     LABEL_ROW(grid_pextrap, "Dependent variable", "<i>lifetimeProfit</i>");
-    for (int i = 0; i < reader->profitExtrapBelief().K(); i++)
+    DATA_ROW(grid_pextrap, "pe_n", "n");
+    for (size_t i = 0; i < reader->profitExtrapBelief().K(); i++)
         DATA_ROW(grid_pextrap, "pe_" + std::to_string(i), BETA "[" + p_vars[i] + "]");
     COMMENT_ROW(grid_pextrap, "<i>NB: regression includes still-on-market books using profit stream prediction</i>");
 
-    gpos = 0;
+    bk_list_ = Gtk::ListStore::create(abc_);
+    bk_tree_.set_model(bk_list_);
+    abc_.appendColumnsTo(bk_tree_);
+    bk_list_->set_sort_column(0, Gtk::SortType::SORT_DESCENDING);
+    swins_.emplace_back();
+    swins_.back().add(bk_tree_);
+    swins_.back().set_policy(Gtk::POLICY_NEVER, Gtk::POLICY_AUTOMATIC);
+    tabs.append_page(swins_.back(), "Authored Books");
 
     // Call refresh to actually set all the above values to the right thing:
     refresh();
@@ -125,7 +156,7 @@ GUIInfoWindow::GUIInfoWindow(eris::SharedMember<Reader> rdr, std::shared_ptr<Gtk
     show_all();
 }
 
-GUIInfoWindow::GUIInfoWindow(eris::SharedMember<Book> bk, std::shared_ptr<Gtk::Window> main_window)
+InfoWindow::InfoWindow(eris::SharedMember<Book> bk, std::shared_ptr<Gtk::Window> main_window)
     : book{bk}
 {
     set_transient_for(*main_window);
@@ -160,10 +191,10 @@ GUIInfoWindow::GUIInfoWindow(eris::SharedMember<Book> bk, std::shared_ptr<Gtk::W
     show_all();
 }
 
-void GUIInfoWindow::refresh() {
+void InfoWindow::refresh() {
     if (reader) {
         updateValue("id", reader->id());
-        updateValue("position", pos_to_string(reader->position()));
+        updateValue("position", GUI::pos_to_string(reader->position()));
         updateValue("utility", reader->u());
         updateValue("uLife", reader->uLifetime());
         updateValue("books", reader->library().size());
@@ -174,19 +205,35 @@ void GUIInfoWindow::refresh() {
                 : std::to_string(reader->wrote().back()->age()));
 
 #define UPDATE_LIN(PREFIX, BELIEF) \
-        for (int i = 0; i < reader->BELIEF().K(); i++) \
-            updateValue(PREFIX + std::to_string(i), reader->BELIEF().betaPrior()[i]);
+        updateValue(PREFIX "n", reader->BELIEF.n()); \
+        for (size_t i = 0; i < reader->BELIEF.K(); i++) \
+            updateValue(PREFIX + std::to_string(i), reader->BELIEF.beta()[i]);
 
-        UPDATE_LIN("q_", qualityBelief);
-        UPDATE_LIN("p_", profitBelief);
-        UPDATE_LIN("d_", demandBelief);
-        UPDATE_LIN("ps_", profitStreamBelief);
-        UPDATE_LIN("pe_", profitExtrapBelief);
+        UPDATE_LIN("q_", qualityBelief());
+        UPDATE_LIN("p_", profitBelief());
+        UPDATE_LIN("d_", demandBelief());
+        UPDATE_LIN("ps1_", profitStreamBelief(1));
+        for (size_t i : {2,3,4}) {
+            if (reader->profitStreamBelief(i).K() == i) {
+                UPDATE_LIN("ps" + std::to_string(i) + "_", profitStreamBelief(i));
+            }
+            else {
+                updateValue("ps" + std::to_string(i) + "_0", "N/A");
+            }
+        }
+        UPDATE_LIN("pe_", profitExtrapBelief());
+
+        // Update the books tree
+        bk_list_->clear();
+        auto end_it = reader->wrote().crend();
+        for (auto it = reader->wrote().crbegin(); it != end_it; it++)
+            abc_.appendRow(bk_list_, *it);
+
     }
     else {
         updateValue("id", book->id());
         updateValue("author", book->author()->id());
-        updateValue("position", pos_to_string(book->position()));
+        updateValue("position", GUI::pos_to_string(book->position()));
         if (book->hasMarket()) {
             updateValue("market", book->market()->id());
             updateValue("price", book->market()->price());
@@ -201,38 +248,23 @@ void GUIInfoWindow::refresh() {
         updateValue("revenueLast", book->currRevenue());
         updateValue("sales", book->lifeSales());
         updateValue("salesLast", book->currSales());
-
-        unsigned long copies = 0;
-        for (auto &r : book->simulation()->agents<Reader>()) {
-            if (r->library().count(book))
-                copies++;
-        }
-        updateValue("copies", copies);
+        updateValue("copies", book->copies());
     }
 }
 
-void GUIInfoWindow::updateValue(const std::string &code, const std::string &val) {
+void InfoWindow::updateValue(const std::string &code, const std::string &val) {
     fields_[code].second.set_text(val);
 }
-void GUIInfoWindow::updateValue(const std::string &code, unsigned long val) {
+void InfoWindow::updateValue(const std::string &code, unsigned long val) {
     updateValue(code, std::to_string(val));
 }
-void GUIInfoWindow::updateValue(const std::string &code, long val) {
+void InfoWindow::updateValue(const std::string &code, long val) {
     updateValue(code, std::to_string(val));
 }
-void GUIInfoWindow::updateValue(const std::string &code, double val) {
+void InfoWindow::updateValue(const std::string &code, double val) {
     updateValue(code, std::to_string(val));
 }
 
-std::string GUIInfoWindow::pos_to_string(const eris::Position &pos) {
-    std::ostringstream opos;
-    opos << "(" << std::setw(7) << std::showpoint;
-    for (size_t i = 0; i < pos.dimensions; i++) {
-        if (i > 0) opos << ",";
-        opos << pos[i];
-    }
-    opos << ")";
-    return opos.str();
-}
 
-}
+
+} }

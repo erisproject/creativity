@@ -1,4 +1,4 @@
-#include "creativity/GUI.hpp"
+#include "creativity/gui/GUI.hpp"
 #include "creativity/Reader.hpp"
 #include "creativity/Book.hpp"
 #include "creativity/common.hpp"
@@ -16,10 +16,12 @@
 #include <Eigen/Core>
 
 using namespace creativity;
+using namespace creativity::gui;
 using namespace eris;
 using namespace Eigen;
 
 int main(int argc, char *argv[1]) {
+    Eigen::initParallel();
     ERIS_DBG("WOO");
     Eris<Simulation> sim;
     ERIS_DBG("WOO");
@@ -130,15 +132,11 @@ int main(int argc, char *argv[1]) {
     VectorXd quality_beta{7}; quality_beta << 5, -1, 1, 0, 0, 0, 0.1;
     MatrixXd quality_V = MatrixXd::Identity(7, 7);
     double quality_s2 = 10, quality_n = 1;
-    VectorXd stream_beta = VectorXd::Zero(10);
-    MatrixXd stream_V = 1e10 * MatrixXd::Identity(10, 10);
-    double stream_s2 = 1e20, stream_n = 0.0001;
     for (auto i = 0UL; i < num_readers; i++) {
         auto r = sim->create<Reader>(Position{unif_pmb(rng), unif_pmb(rng)},
                 Position{-BOUNDARY,-BOUNDARY}, Position{BOUNDARY, BOUNDARY},
                 belief::Demand{2, demand_beta, demand_s2, demand_V, demand_n},
                 belief::Profit{2, profit_beta, profit_s2, profit_V, profit_n},
-                belief::ProfitStream{stream_beta, stream_s2, stream_V, stream_n},
                 belief::Quality{quality_beta, quality_s2, quality_V, quality_n},
                 cost_fixed, cost_unit, income
                 );

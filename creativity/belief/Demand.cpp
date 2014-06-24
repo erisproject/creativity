@@ -32,8 +32,6 @@ std::pair<double, double> Demand::argmaxP(double q, unsigned long S, unsigned lo
         return {std::pow(P_d, 1.0/D_), Xg + beta_[1] * P_d};
     }
 
-    ERIS_DBGVAR(beta_[1]);
-
     // Otherwise optimize numerically
     double p_opt = eris::single_peak_search([&c,&Xg,this] (double P) -> double {
             return (P - c) * (Xg + beta_[1] * std::pow(P, D_));
@@ -43,9 +41,7 @@ std::pair<double, double> Demand::argmaxP(double q, unsigned long S, unsigned lo
 
 
 Demand::RowVectorKd Demand::bookRow(eris::SharedMember<Book> book, double quality) const {
-    RowVectorKd row{K()};
-
-    ERIS_DBGVAR(K());
+    RowVectorKd row(K());
 
     auto t = book->simulation()->t() - 1;
     row << 1.0,
@@ -61,7 +57,6 @@ Demand::RowVectorKd Demand::bookRow(eris::SharedMember<Book> book, double qualit
 }
 
 Demand Demand::update(const Ref<const VectorXd> &y, const Ref<const MatrixXKd> &X) const {
-    ERIS_DBG("update");
     return Demand{D_, LinearBase::update(y, X)};
 }
 

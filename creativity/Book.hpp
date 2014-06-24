@@ -46,13 +46,23 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         /// Returns the age of the book, in simulation periods.
         unsigned long age() const;
 
-        /// Returns the simulation period in which the book was created
+        /** Returns the simulation period in which the book became available (i.e. the book was
+         * written between periods `created()-1` and `created()`.
+         */
         const unsigned long& created() const;
 
-        /** Returns the simulation period in which the book was removed from the market.  Should
-         * only be called if hasMarket() returns false.
+        /** Returns the first simulation period in which the book was no longer on the market.
+         * Should only be called if hasMarket() returns false.  `outOfPrint() - created()` is the
+         * number of periods the book was on the market.
          */
         const unsigned long& outOfPrint() const;
+
+        /** Returns the number of periods the book has been (or was) available on the market,
+         * including the current period (if the book is still on the market).  The value returned by
+         * this method increases by one each period of the simulation until the book exits the
+         * market, at which point it remains fixed.
+         */
+        unsigned long marketPeriods() const;
 
         /** Returns the order of this book in the author's set of books.  A value of 0 indicates
          * that this is the author's first book, 3 indicates an author's 4th book, etc.
@@ -108,6 +118,13 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
 
         /// Returns the revenue earned by this book in simulation period `t`
         double revenue(unsigned long t) const;
+
+        /** Queries the simulation for the number of copies of this book in existence.  This will
+         * always be at least one greater than `lifeSales()` because the author gets a (non-sale)
+         * copy upon creating the book, and may be much greater if there are non-market ways of
+         * obtaining copies of books.
+         */
+        unsigned long copies() const;
 
         /** Increase the sales and revenue of this book for the current period.  This can safely be
          * called multiple times per period.  Both the current sales/revenue values and global
