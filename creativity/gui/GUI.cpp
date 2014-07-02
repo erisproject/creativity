@@ -178,7 +178,7 @@ void GUI::thr_run() {
     bk_cols_->appendColumnsTo(*bk_tree_);
     bk_list_->set_sort_column(0, Gtk::SortType::SORT_DESCENDING);
     bk_tree_->signal_row_activated().connect([this] (const Gtk::TreeModel::Path &path, Gtk::TreeViewColumn*) -> void {
-            thr_info_dialog(sim_->agent(bk_list_->get_iter(path)->get_value(bk_cols_->id)));
+            thr_info_dialog(sim_->good(bk_list_->get_iter(path)->get_value(bk_cols_->id)));
     });
 
     widget<Gtk::ScrolledWindow>("win_bk")->add(*bk_tree_);
@@ -358,10 +358,10 @@ void GUI::thr_signal() {
     }
 
     if (last_redraw.type == Signal::Type::redraw) {
+        thr_update_readers();
+        thr_update_books();
         if (graph_->get_is_drawable()) {
             graph_->queue_draw();
-            thr_update_readers();
-            thr_update_books();
         }
         else {
             // Not currently drawable (perhaps not on visualization tab), so send back a fake redraw
