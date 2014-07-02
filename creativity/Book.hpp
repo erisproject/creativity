@@ -51,16 +51,26 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
          */
         const unsigned long& created() const;
 
-        /** Returns the first simulation period in which the book was no longer on the market.
-         * Should only be called if hasMarket() returns false.  `outOfPrint() - created()` is the
-         * number of periods the book was on the market.
+        /** Returns the first simulation period in which the book was no longer on the market.  The
+         * returned value should only be used if hasMarket() returns false.
+         *
+         * \sa hasMarket()
+         * \sa marketPeriods()
+         * \sa age()
          */
         const unsigned long& outOfPrint() const;
 
         /** Returns the number of periods the book has been (or was) available on the market,
          * including the current period (if the book is still on the market).  The value returned by
          * this method increases by one each period of the simulation until the book exits the
-         * market, at which point it remains fixed.
+         * market, from which point on it remains fixed.
+         *
+         * For on-market books, this equals `age() + 1`; for off-market books, this equals
+         * `outOfPrint() - created()`.
+         *
+         * \sa age()
+         * \sa outOfPrint()
+         * \sa created()
          */
         unsigned long marketPeriods() const;
 

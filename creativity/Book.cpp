@@ -59,7 +59,7 @@ const unsigned long& Book::outOfPrint() const {
 
 unsigned long Book::marketPeriods() const {
     return hasMarket()
-        ? age()
+        ? age() + 1 // Plus 1 to count the current period
         : outOfPrint() - created();
 }
 
