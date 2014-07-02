@@ -6,7 +6,17 @@ using Eigen::RowVectorXd;
 namespace creativity { namespace belief {
 
 ProfitStream::ProfitStream(size_t K)
-    : LinearBase(VectorXd::Zero(K), 1e20, 1e10 * MatrixXd::Identity(K, K), 1e-6)
+    : ProfitStream(VectorXd::Zero(K), 1.0, MatrixXd::Identity(K, K), 1e-6)
+{
+    beta_[K-1] = 1.0;
+}
+
+ProfitStream::ProfitStream(
+        const Ref<const VectorKd> &beta,
+        double s2,
+        const Ref<const MatrixKd> &V,
+        double n)
+    : LinearBase(beta, s2, V, n)
 {}
 
 double ProfitStream::predict(SharedMember<Book> book) const {

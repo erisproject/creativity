@@ -33,8 +33,30 @@ namespace creativity { namespace belief {
  */
 class ProfitStream : public Linear<> {
     public:
-        /// Constructor for creating a very-close-to-noninformative prior for a model of size `K`
+        /// No default constructor
+        ProfitStream() = delete;
+
+        /** Constructs a ProfitStream with a weak prior for a model of `K` parameters.  This model
+         * will have `beta` set to `0` for the first `K-1` parameters and `1` for the last
+         * parameter; `s2` will be set to 1; `V` will be set to an identity matrix, and `n` will be
+         * set to `1e-6`, so as to make this an extremely weak prior when used for generating a
+         * posterior.
+         */
         ProfitStream(size_t K);
+
+        /** Constructs a ProfitStream from the given model parameters.
+         *
+         * \param beta the model coefficients.
+         * \param s2 the \f$\sigma^2\f$ or \f$s^2\f$ value of the model.
+         * \param V the estimator covariance term, without the leading `s2` multiple; typically
+         * \f$(X\^topX)^{-1}\f$.
+         * \param n the number of observations behind this estimate.
+         */
+        ProfitStream(
+                const Ref<const VectorKd> &beta,
+                double s2,
+                const Ref<const MatrixKd> &V,
+                double n);
 
         /** Given a book, this uses the profit of the first \f$K\f$ periods the book has been on the
          * market to predict the remaining cumulative lifetime profit,
