@@ -282,7 +282,7 @@ const belief::ProfitStream& Reader::profitStreamBelief(unsigned long age) {
     if (profit_stream_beliefs_.empty()) {
         profit_stream_beliefs_.emplace(std::piecewise_construct,
                 std::tuple<unsigned long>(age),
-                std::tuple<belief::ProfitStream>(age));
+                std::tuple<size_t>(age));
     }
 
     auto it = profit_stream_beliefs_.upper_bound(age);
@@ -336,10 +336,17 @@ void Reader::updateProfitStreamBelief() {
     for (auto &book : library_market_) {
         if (not book->hasMarket()) {
             const unsigned long periods = book->marketPeriods();
-            // We only look for the predefined age values; this could potentially change to create
-            // new profit stream age models when we see books of longer ages.
+            // We only look for the predefined age values, and only include books with
+            // marketPeriods() strictly greater than the predefined age values (because a book on
+            // the market for x periods can only contribute to models with (x-1) past profit
+            // variables.
+            //
+            // TODO: this could potentially change to create new profit stream age models as we
+            // encounter books of longer ages.  One tricky thing to consider: if we have a book of
+            // age 6, should we really use, say, a n=1, age=6 model when we have, say, n=10, age=5
+            // and n=100, age=4 models also available?  Choose one?  Weighted average?
             for (unsigned long a : profit_stream_ages_) {
-                if (periods >= a)
+                if (periods > a)
                     just_left[a].push_back(book);
                 else
                     break;
@@ -372,9 +379,17 @@ void Reader::updateProfitStreamBelief() {
 
         // Create a new belief of the given size if none exists yet
         if (profit_stream_beliefs_.count(age) == 0) {
+            // We'll just make up a value that remaining profits are equal to the last period's
+            // profits, with some made up variance values.  This is certainly wrong, but it'll also
+            // be constructed with a weak prior which should quickly wash out from new observations.
+            VectorXd beta = VectorXd::Zero(age, 1);
+            double s2 = 1.0;
+            MatrixXd V = MatrixXd::Identity(beta.rows(), beta.rows());
+            double n = 1e-6; // So that this is very weak when used as a prior
+
             profit_stream_beliefs_.emplace(std::piecewise_construct,
                     std::tuple<unsigned long>(age),
-                    std::tuple<belief::ProfitStream>(age));
+                    std::tuple<size_t>(age));
         }
 
         // Update the belief (existing or just-created) with the new data
