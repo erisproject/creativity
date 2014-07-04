@@ -90,7 +90,7 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         /** When the market or author is removed from the simulation, record it by clearing the
          * stored author/market fields.
          */
-        void weakDepRemoved(eris::SharedMember<Member>, const eris::eris_id_t &old) override;
+        void weakDepRemoved(eris::SharedMember<Member>, eris::eris_id_t old) override;
 
         /** Returns true if this Book's author is still in the simulation, false otherwise. */
         bool livingAuthor() const;

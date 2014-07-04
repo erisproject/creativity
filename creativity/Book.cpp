@@ -38,7 +38,7 @@ void Book::added() {
     dependsWeaklyOn(mkt);
 }
 
-void Book::weakDepRemoved(SharedMember<Member>, const eris::eris_id_t &old) {
+void Book::weakDepRemoved(SharedMember<Member>, eris_id_t old) {
     if (old == market_) {
         market_ = 0;
         out_of_print_ = simulation()->t();
