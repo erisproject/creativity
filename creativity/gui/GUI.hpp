@@ -17,6 +17,7 @@
 #include "creativity/gui/GraphArea.hpp"
 #include "creativity/gui/InfoWindow.hpp"
 #include "creativity/gui/ReaderCols.hpp"
+#include "creativity/gui/ReaderStore.hpp"
 
 namespace sigc { SIGC_FUNCTORS_DEDUCE_RESULT_TYPE_WITH_DECLTYPE }
 
@@ -352,13 +353,19 @@ class GUI : eris::noncopyable {
 
         /** The various objects used for the Agents tab */
         std::unique_ptr<ReaderCols> rdr_cols_;
-        Glib::RefPtr<Gtk::ListStore> rdr_list_;
+        Glib::RefPtr<ReaderStore> rdr_list_;
         std::unique_ptr<Gtk::TreeView> rdr_tree_;
+        // The latest reader added (since new eris_id_t values are strictly increasing, we can use
+        // this to identify new readers).
+        eris::eris_id_t rdr_biggest_id_ = 0;
 
         /** The various objects used for the Books tab */
         std::unique_ptr<BookCols> bk_cols_;
         Glib::RefPtr<Gtk::ListStore> bk_list_;
         std::unique_ptr<Gtk::TreeView> bk_tree_;
+        // The latest book added (since new eris_id_t values are strictly increasing, we can use
+        // this to identify new books).
+        eris::eris_id_t bk_biggest_id_ = 0;
 
         /** Obtains a widget from the current Gtk::Builder and returns it (as a pointer).
          */

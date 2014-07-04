@@ -160,21 +160,36 @@ void GUI::thr_run() {
         return true;
     });
 
-    rdr_cols_ = std::unique_ptr<ReaderCols>(new ReaderCols);
-    rdr_list_ = Gtk::ListStore::create(*rdr_cols_);
-    rdr_tree_ = std::unique_ptr<Gtk::TreeView>(new Gtk::TreeView(rdr_list_));
-    rdr_cols_->appendColumnsTo(*rdr_tree_);
-    rdr_list_->set_sort_column(0, Gtk::SortType::SORT_ASCENDING);
+    ERIS_DBG("");
+    rdr_list_ = ReaderStore::create(sim_);
+    ERIS_DBG("");
+    rdr_tree_ = std::unique_ptr<Gtk::TreeView>(new Gtk::TreeView);
+    ERIS_DBG("");
+    rdr_tree_->set_model(rdr_list_);
+    ERIS_DBG("");
+    rdr_list_->appendColumnsTo(*rdr_tree_);
+    ERIS_DBG("");
+//    rdr_cols_->appendColumnsTo(*rdr_tree_);
+    ERIS_DBG("");
+    rdr_tree_->set_fixed_height_mode(true);
+    ERIS_DBG("");
+//    rdr_list_->set_sort_column(0, Gtk::SortType::SORT_ASCENDING);
+    ERIS_DBG("");
     rdr_tree_->signal_row_activated().connect([this] (const Gtk::TreeModel::Path &path, Gtk::TreeViewColumn*) -> void {
-            thr_info_dialog(sim_->agent(rdr_list_->get_iter(path)->get_value(rdr_cols_->id)));
+            ERIS_DBG("FIXME");
+            //thr_info_dialog(sim_->agent(rdr_list_->get_iter(path)->get_value(rdr_cols_->id)));
     });
 
+    ERIS_DBG("");
     widget<Gtk::ScrolledWindow>("win_rdr")->add(*rdr_tree_);
+    ERIS_DBG("");
     rdr_tree_->show();
+    ERIS_DBG("");
 
     bk_cols_ = std::unique_ptr<BookCols>(new BookCols);
     bk_list_ = Gtk::ListStore::create(*bk_cols_);
     bk_tree_ = std::unique_ptr<Gtk::TreeView>(new Gtk::TreeView(bk_list_));
+//    bk_tree_->set_fixed_height_mode(true);
     bk_cols_->appendColumnsTo(*bk_tree_);
     bk_list_->set_sort_column(0, Gtk::SortType::SORT_DESCENDING);
     bk_tree_->signal_row_activated().connect([this] (const Gtk::TreeModel::Path &path, Gtk::TreeViewColumn*) -> void {
@@ -205,17 +220,68 @@ void GUI::thr_run() {
 }
 
 void GUI::thr_update_readers() {
-    rdr_list_->clear();
+    rdr_list_->resync();
+    /*
+    ERIS_DBG("starting");
+
+    auto new_readers = sim_->agents<Reader>([this] (const Reader &r) -> bool { return r.id() > rdr_biggest_id_; });
+
+    // Save the current sort column and order
+    int sort_col;
+    Gtk::SortType sort_type;
+    rdr_list_->get_sort_column_id(sort_col, sort_type);
+    
+    // Freeze tree to prevent each row modification triggering notifications
+    rdr_tree_->freeze_child_notify();
+
+    // Detach model from the tree
+    rdr_tree_->unset_model();
+
+    // Turn off sorting
+    rdr_list_->set_sort_column(Gtk::TreeSortable::DEFAULT_UNSORTED_COLUMN_ID, sort_type);
+
+    ERIS_DBG("Sorting off; updating");
+    // Updating existing rows, removing if any reader isn't in the simulation anymore
+    for (auto row : rdr_list_->children()) {
+        eris_id_t id = row[rdr_cols_->id];
+        if (not sim_->hasAgent(id)) {
+            ERIS_DBG("FIXME: remove agent!");
+            throw std::runtime_error("FIXME: remove agent!");
+        }
+        else {
+            rdr_cols_->updateRow(row, sim_->agent<Reader>(id));
+        }
+    }
+
+
+    ERIS_DBG("adding new ones");
+
+    // Re-add all readers (whose info has almost always changed), potentially including new ones
     for (auto &r : sim_->agents<Reader>()) {
         rdr_cols_->appendRow(rdr_list_, r);
     }
+    ERIS_DBG("resorting");
+
+    // Turn sorting back on, which will resort everything again
+    //rdr_list_->set_sort_column(sort_col, sort_type);
+
+    ERIS_DBG("set_model");
+    // Reassociate the model with the tree, and thaw the tree
+    rdr_tree_->set_model(rdr_list_);
+    ERIS_DBG("thawing");
+    rdr_tree_->thaw_child_notify();
+
+    ERIS_DBG("finished");
+    */
 }
 
 void GUI::thr_update_books() {
+    ERIS_DBG("starting");
     bk_list_->clear();
     for (auto &b : sim_->goods<Book>()) {
         bk_cols_->appendRow(bk_list_, b);
     }
+    ERIS_DBG("finished");
 }
 
 void GUI::thr_info_dialog(SharedMember<Member> member) {
@@ -364,6 +430,7 @@ void GUI::thr_signal() {
             graph_->queue_draw();
         }
         else {
+            ERIS_DBG("Fake redraw (not currently drawable) completed.");
             // Not currently drawable (perhaps not on visualization tab), so send back a fake redraw
             // event in case the caller is going to wait for a redraw to complete.
             queueEvent(Event::Type::redraw_complete);
