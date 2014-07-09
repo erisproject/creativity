@@ -139,10 +139,15 @@ InfoWindow::InfoWindow(eris::SharedMember<Reader> rdr, std::shared_ptr<Gtk::Wind
         DATA_ROW(grid_pextrap, "pe_" + std::to_string(i), BETA "[" + p_vars[i] + "]");
     COMMENT_ROW(grid_pextrap, "<i>NB: regression includes still-on-market books using profit stream prediction</i>");
 
-    bk_list_ = Gtk::ListStore::create(abc_);
-    bk_tree_.set_model(bk_list_);
-    abc_.appendColumnsTo(bk_tree_);
-    bk_list_->set_sort_column(0, Gtk::SortType::SORT_DESCENDING);
+    bk_model_ = BookStore::create(reader->simulation(), reader);
+    bk_tree_.set_model(bk_model_);
+    bk_model_->appendColumnsTo(bk_tree_);
+    bk_tree_.set_fixed_height_mode(true);
+    bk_model_->set_sort_column(bk_model_->columns.id, Gtk::SortType::SORT_DESCENDING);
+    bk_tree_.signal_row_activated().connect([this] (const Gtk::TreeModel::Path &path, Gtk::TreeViewColumn*) -> void {
+            ERIS_DBG("FIXME: need to access GUI::thr_info_dialog??");
+            //thr_info_dialog(bk_model_->book(path));
+    });
     swins_.emplace_back();
     swins_.back().add(bk_tree_);
     swins_.back().set_policy(Gtk::POLICY_NEVER, Gtk::POLICY_AUTOMATIC);
@@ -224,11 +229,7 @@ void InfoWindow::refresh() {
         UPDATE_LIN("pe_", profitExtrapBelief());
 
         // Update the books tree
-        bk_list_->clear();
-        auto end_it = reader->wrote().crend();
-        for (auto it = reader->wrote().crbegin(); it != end_it; it++)
-            abc_.appendRow(bk_list_, *it);
-
+        bk_model_->resync();
     }
     else {
         updateValue("id", book->id());

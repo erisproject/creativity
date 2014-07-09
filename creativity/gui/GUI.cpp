@@ -186,18 +186,21 @@ void GUI::thr_run() {
     rdr_tree_->show();
     ERIS_DBG("");
 
-    bk_cols_ = std::unique_ptr<BookCols>(new BookCols);
-    bk_list_ = Gtk::ListStore::create(*bk_cols_);
-    bk_tree_ = std::unique_ptr<Gtk::TreeView>(new Gtk::TreeView(bk_list_));
-//    bk_tree_->set_fixed_height_mode(true);
-    bk_cols_->appendColumnsTo(*bk_tree_);
-    bk_list_->set_sort_column(0, Gtk::SortType::SORT_DESCENDING);
+    bk_model_ = BookStore::create(sim_);
+    bk_tree_ = std::unique_ptr<Gtk::TreeView>(new Gtk::TreeView);
+    bk_tree_->set_model(bk_model_);
+    bk_model_->appendColumnsTo(*bk_tree_);
+    bk_tree_->set_fixed_height_mode(true);
+    bk_model_->set_sort_column(bk_model_->columns.id, Gtk::SortType::SORT_DESCENDING);
     bk_tree_->signal_row_activated().connect([this] (const Gtk::TreeModel::Path &path, Gtk::TreeViewColumn*) -> void {
-            thr_info_dialog(sim_->good(bk_list_->get_iter(path)->get_value(bk_cols_->id)));
+            thr_info_dialog(bk_model_->book(path));
     });
 
+    ERIS_DBG("");
     widget<Gtk::ScrolledWindow>("win_bk")->add(*bk_tree_);
+    ERIS_DBG("");
     bk_tree_->show();
+    ERIS_DBG("");
 
 
     dispatcher_ = std::unique_ptr<Glib::Dispatcher>(new Glib::Dispatcher);
@@ -276,12 +279,7 @@ void GUI::thr_update_readers() {
 }
 
 void GUI::thr_update_books() {
-    ERIS_DBG("starting");
-    bk_list_->clear();
-    for (auto &b : sim_->goods<Book>()) {
-        bk_cols_->appendRow(bk_list_, b);
-    }
-    ERIS_DBG("finished");
+    bk_model_->resync();
 }
 
 void GUI::thr_info_dialog(SharedMember<Member> member) {

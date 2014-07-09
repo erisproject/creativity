@@ -12,7 +12,7 @@
 #include <gtkmm/scrolledwindow.h>
 #include <mutex>
 #include <memory>
-#include "creativity/gui/AuthoredBookCols.hpp"
+#include "creativity/gui/BookStore.hpp"
 
 namespace creativity {
 
@@ -64,8 +64,7 @@ class InfoWindow : public Gtk::Window {
         std::list<Gtk::Notebook> nbs_;
         std::list<Gtk::ScrolledWindow> swins_;
 
-        AuthoredBookCols abc_;
-        Glib::RefPtr<Gtk::ListStore> bk_list_;
+        Glib::RefPtr<BookStore> bk_model_;
         Gtk::TreeView bk_tree_;
 };
 
