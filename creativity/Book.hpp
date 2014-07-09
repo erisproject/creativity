@@ -133,6 +133,9 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
          * always be at least one greater than `lifeSales()` because the author gets a (non-sale)
          * copy upon creating the book, and may be much greater if there are non-market ways of
          * obtaining copies of books.
+         *
+         * This method call is expensive: it requires iterating the querying the library of every
+         * reader in the simulation.
          */
         unsigned long copies() const;
 
