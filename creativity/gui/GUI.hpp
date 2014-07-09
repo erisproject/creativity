@@ -16,7 +16,6 @@
 #include <boost/geometry/index/rtree.hpp>
 #include "creativity/gui/GraphArea.hpp"
 #include "creativity/gui/InfoWindow.hpp"
-#include "creativity/gui/ReaderCols.hpp"
 #include "creativity/gui/ReaderStore.hpp"
 #include "creativity/gui/BookStore.hpp"
 
@@ -353,12 +352,8 @@ class GUI : eris::noncopyable {
         std::unique_ptr<GraphArea> graph_;
 
         /** The various objects used for the Agents tab */
-        std::unique_ptr<ReaderCols> rdr_cols_;
-        Glib::RefPtr<ReaderStore> rdr_list_;
+        Glib::RefPtr<ReaderStore> rdr_model_;
         std::unique_ptr<Gtk::TreeView> rdr_tree_;
-        // The latest reader added (since new eris_id_t values are strictly increasing, we can use
-        // this to identify new readers).
-        eris::eris_id_t rdr_biggest_id_ = 0;
 
         /** The various objects used for the Books tab */
         Glib::RefPtr<BookStore> bk_model_;

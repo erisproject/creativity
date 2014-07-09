@@ -1,6 +1,7 @@
 #include "creativity/gui/ReaderStore.hpp"
 #include "creativity/gui/GUI.hpp"
 #include <gtkmm/treepath.h>
+#include <algorithm>
 
 using namespace eris;
 
@@ -10,9 +11,10 @@ namespace creativity { namespace gui {
 ReaderStore::ReaderStore(std::shared_ptr<Simulation> &&sim)
     : Glib::ObjectBase(typeid(ReaderStore)),
     Gtk::TreeModel(),
+    Gtk::TreeSortable(),
     Glib::Object(),
-    sim_{sim},
-    readers_{sim->agents<Reader>()}
+    sim_{std::move(sim)},
+    readers_{sim_->agents<Reader>()}
 {
     eris_id_t max_id = 0;
     for (auto &r : readers_)
@@ -26,6 +28,7 @@ Glib::RefPtr<ReaderStore> ReaderStore::create(std::shared_ptr<Simulation> sim) {
 }
 
 void ReaderStore::resync() {
+    ERIS_DBG("resyncing");
     bool deleted = false;
     for (auto &r : readers_) {
         if (r == 0) {
@@ -100,6 +103,12 @@ GType ReaderStore::get_column_type_vfunc(int index) const {
     return columns.types()[index];
 }
 
+SharedMember<Reader> ReaderStore::reader(const Path &path) const {
+    size_t i = path.back();
+    if (i >= readers_.size()) return SharedMember<Reader>();
+    return readers_[i];
+}
+
 bool ReaderStore::get_iter_vfunc(const Path &path, iterator& iter) const {
     size_t i = path.back();
     if (i >= readers_.size()) return false;
@@ -152,9 +161,6 @@ int ReaderStore::iter_n_root_children_vfunc() const {
     return (int) readers_.size();
 }
 
-// void ReaderStore::ref_node_vfunc(const iterator &iter) const {}
-//void ReaderStore::unref_node_vfunc(const iterator &iter) const {}
-
 Gtk::TreeModel::Path ReaderStore::get_path_vfunc(const iterator &iter) const {
     size_t i = (size_t) iter.gobj()->user_data;
     Gtk::TreeModel::Path ret;
@@ -190,7 +196,7 @@ void ReaderStore::get_value_vfunc(const iterator &iter, int column, Glib::ValueB
         value.init(v.gobj());
     }
     else if (column == columns.booksOwned.index() or column == columns.booksNew.index() or column == columns.booksWritten.index()
-            or column == columns.bookLastAge.index()) {
+            or column == columns.lastBookAge.index()) {
         Glib::Value<size_t> v;
         v.init(v.value_type());
         v.set(  column == columns.booksOwned.index() ? r->library().size() :
@@ -205,15 +211,136 @@ void ReaderStore::get_value_vfunc(const iterator &iter, int column, Glib::ValueB
     }
 }
 
+bool ReaderStore::get_sort_column_id_vfunc(int *sort_column_id, Gtk::SortType *order) const {
+    if (sort_column_id) *sort_column_id = sort_by_;
+    if (order) *order = sort_order_;
+    return not(sort_by_ == DEFAULT_UNSORTED_COLUMN_ID or sort_by_ == DEFAULT_SORT_COLUMN_ID);
+}
+
+void ReaderStore::set_sort_column_id_vfunc(int sort_column_id, Gtk::SortType order) {
+    ERIS_DBGVAR(sort_column_id);
+    bool ascending = (order == Gtk::SORT_ASCENDING);
+    ERIS_DBGVAR(ascending);
+    std::function<bool(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b)> compare;
+    if (sort_column_id == columns.id.index() || sort_column_id == DEFAULT_SORT_COLUMN_ID)
+        compare = ascending ? less_id : greater_id;
+    else if (sort_column_id == columns.posX.index())
+        compare = ascending ? less_posX : greater_posX;
+    else if (sort_column_id == columns.posY.index())
+        compare = ascending ? less_posY : greater_posY;
+    else if (sort_column_id == columns.posstr.index())
+        compare = ascending ? less_posstr : greater_posstr;
+    else if (sort_column_id == columns.u.index())
+        compare = ascending ? less_uCurr : greater_uCurr;
+    else if (sort_column_id == columns.uLifetime.index())
+        compare = ascending ? less_uLife : greater_uLife;
+    else if (sort_column_id == columns.booksOwned.index())
+        compare = ascending ? less_booksOwned : greater_booksOwned;
+    else if (sort_column_id == columns.booksNew.index())
+        compare = ascending ? less_booksNew : greater_booksNew;
+    else if (sort_column_id == columns.booksWritten.index())
+        compare = ascending ? less_booksWritten : greater_booksWritten;
+    else if (sort_column_id == columns.lastBookAge.index())
+        compare = ascending ? less_lastBookAge : greater_lastBookAge;
+
+    if (compare) {
+        // The rows_reordered signal needs a vector where v[new_pos] == old_pos,
+        // so store all the old positions before we sort.
+        std::unordered_map<eris_id_t, int> old_pos;
+        int i = 0;
+        for (auto &r : readers_)
+            old_pos[r] = i++;
+
+        sort_by_ = sort_column_id;
+        sort_order_ = order;
+        sort_column_changed();
+
+        std::stable_sort(readers_.begin(), readers_.end(), compare);
+
+        std::vector<int> new_order;
+        new_order.reserve(readers_.size());
+        for (auto &r : readers_)
+            new_order.push_back(old_pos[r]);
+
+        rows_reordered(Path(), new_order);
+    }
+}
+
+bool ReaderStore::less_id(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b) {
+    return a->id() < b->id();
+}
+bool ReaderStore::greater_id(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b) {
+    return a->id() > b->id();
+}
+bool ReaderStore::less_posX(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b) {
+    return a->position()[0] < b->position()[0];
+}
+bool ReaderStore::greater_posX(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b) {
+    return a->position()[0] > b->position()[0];
+}
+bool ReaderStore::less_posY(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b) {
+    return a->position()[1] < b->position()[1];
+}
+bool ReaderStore::greater_posY(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b) {
+    return a->position()[1] > b->position()[1];
+}
+// First x, then y for ties
+bool ReaderStore::less_posstr(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b) {
+    auto ax = a->position()[0], bx = b->position()[0];
+    return ax == bx ? a->position()[1] < b->position()[1] : ax < bx;
+}
+bool ReaderStore::greater_posstr(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b) {
+    auto ax = a->position()[0], bx = b->position()[0];
+    return ax == bx ? a->position()[1] > b->position()[1] : ax > bx;
+}
+bool ReaderStore::less_uCurr(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b) {
+    return a->u() < b->u();
+}
+bool ReaderStore::greater_uCurr(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b) {
+    return a->u() > b->u();
+}
+bool ReaderStore::less_uLife(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b) {
+    return a->uLifetime() < b->uLifetime();
+}
+bool ReaderStore::greater_uLife(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b) {
+    return a->uLifetime() > b->uLifetime();
+}
+bool ReaderStore::less_booksOwned(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b) {
+    return a->library().size() < b->library().size();
+}
+bool ReaderStore::greater_booksOwned(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b) {
+    return a->library().size() > b->library().size();
+}
+bool ReaderStore::less_booksNew(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b) {
+    return a->newBooks().size() < b->newBooks().size();
+}
+bool ReaderStore::greater_booksNew(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b) {
+    return a->newBooks().size() > b->newBooks().size();
+}
+bool ReaderStore::less_booksWritten(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b) {
+    return a->wrote().size() < b->wrote().size();
+}
+bool ReaderStore::greater_booksWritten(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b) {
+    return a->wrote().size() > b->wrote().size();
+}
+bool ReaderStore::less_lastBookAge(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b) {
+    return (a->wrote().empty() ? std::numeric_limits<unsigned long>::max() : a->wrote().back()->age())
+         < (b->wrote().empty() ? std::numeric_limits<unsigned long>::max() : b->wrote().back()->age());
+}
+bool ReaderStore::greater_lastBookAge(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b) {
+    return (a->wrote().empty() ? std::numeric_limits<unsigned long>::max() : a->wrote().back()->age())
+         > (b->wrote().empty() ? std::numeric_limits<unsigned long>::max() : b->wrote().back()->age());
+}
+
 void ReaderStore::appendColumnsTo(Gtk::TreeView &v) const {
     appendCol(v, "ID", columns.id, 100);
-    appendCol(v, "Position", columns.posstr, 150, false);
+    appendCol(v, "Position", columns.posstr, 150);
     appendCol(v, "Utility", columns.u, 100);
     appendCol(v, "Life Util.", columns.uLifetime, 100);
     appendCol(v, "Books", columns.booksOwned, 100);
     appendCol(v, "# New", columns.booksNew, 100);
     appendCol(v, "# Written", columns.booksWritten, 100);
-    appendCol(v, "Last wrote", columns.bookLastAge, 100);
+    appendCol(v, "Last wrote", columns.lastBookAge, 100);
 }
 
 }}
