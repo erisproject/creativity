@@ -70,6 +70,8 @@ target_link_libraries(creativity-gui creativity)
 
 install(FILES gui.glade creativity.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/creativity/gui.glade)
 
+file(COPY gui.glade creativity.svg DESTINATION ${CMAKE_BINARY_DIR})
+
 add_subdirectory(doc)
 
 add_subdirectory(scratch)

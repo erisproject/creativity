@@ -52,14 +52,25 @@ void GUI::start(int argc, char *argv[]) {
             Gio::APPLICATION_NON_UNIQUE);
     builder_ = Gtk::Builder::create();
 
-    std::string datadir(DATADIR);
+    std::list<std::string> datadirs;
+    datadirs.push_front(DATADIR);
+    datadirs.push_back(".");
     char *envdatadir = getenv("CREATIVITY_DATADIR");
     if (envdatadir) {
         std::string stddatadir(envdatadir);
-        if (stddatadir != "") datadir = stddatadir;
+        if (stddatadir != "") datadirs.push_front(stddatadir);
     }
 
-    builder_->add_from_file(datadir + "/gui.glade"); // May throw exception
+    bool gui_glade_loaded = false;
+    for (auto &dir : datadirs) {
+        if (Glib::file_test(dir + "/gui.glade", Glib::FILE_TEST_IS_REGULAR)) {
+            builder_->add_from_file(dir + "/gui.glade");
+            gui_glade_loaded = true;
+        }
+    }
+    if (not gui_glade_loaded) {
+        throw Glib::FileError(Glib::FileError::Code::NO_SUCH_ENTITY, "Unable to find gui.glade; try setting CREATIVITY_DATADIR to the directory containing gui.glade");
+    }
 
     gui_thread_ = std::thread(&GUI::thr_run, this);
 
