@@ -178,7 +178,7 @@ void GUI::thr_run() {
     rdr_tree_->set_fixed_height_mode(true);
     rdr_model_->set_sort_column(rdr_model_->columns.id, Gtk::SortType::SORT_ASCENDING);
     rdr_tree_->signal_row_activated().connect([this] (const Gtk::TreeModel::Path &path, Gtk::TreeViewColumn*) -> void {
-            thr_info_dialog(rdr_model_->reader(path));
+            thr_info_dialog(rdr_model_->member(path));
     });
 
     ERIS_DBG("");
@@ -194,7 +194,7 @@ void GUI::thr_run() {
     bk_tree_->set_fixed_height_mode(true);
     bk_model_->set_sort_column(bk_model_->columns.id, Gtk::SortType::SORT_DESCENDING);
     bk_tree_->signal_row_activated().connect([this] (const Gtk::TreeModel::Path &path, Gtk::TreeViewColumn*) -> void {
-            thr_info_dialog(bk_model_->book(path));
+            thr_info_dialog(bk_model_->member(path));
     });
 
     ERIS_DBG("");

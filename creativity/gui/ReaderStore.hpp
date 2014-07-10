@@ -1,9 +1,5 @@
 #pragma once
-#include <memory>
-#include <gtkmm/treemodel.h>
-#include <gtkmm/treesortable.h>
-#include <gtkmm/treeview.h>
-#include <eris/Simulation.hpp>
+#include "creativity/gui/MemberStore.hpp"
 #include "creativity/Reader.hpp"
 
 namespace creativity { namespace gui {
@@ -11,10 +7,8 @@ namespace creativity { namespace gui {
 /** Gtk::TreeModel::ColumnRecord subclass for handling Reader information in the list of readers in
  * the main GUI window.
  */
-class ReaderStore : public Gtk::TreeModel, public Gtk::TreeSortable, Glib::Object {
+class ReaderStore : public MemberStore<Reader>, Glib::Object {
     public:
-        ReaderStore() = delete;
-
         /** Interface class between a simulation's Readers and a Gtk::TreeView.  This internally
          * stores a vector of Readers which can be updated (if needed) by calling the update method.
          *
@@ -34,7 +28,7 @@ class ReaderStore : public Gtk::TreeModel, public Gtk::TreeSortable, Glib::Objec
 
         /** Sychronizes the list of readers with the stored Simulation. Typically called after a
          * simulation period runs. */
-        void resync();
+        virtual std::vector<eris::SharedMember<Reader>> resync_add() override;
 
         /** ColumnRecord object for a ReaderStore.  This object contains the columns for this Book
          * model.  This should not be used directly, but rather accessed via the public `columns`
@@ -61,63 +55,22 @@ class ReaderStore : public Gtk::TreeModel, public Gtk::TreeSortable, Glib::Objec
         ColRec columns;
 
         /** Takes a Gtk::TreeView and adds this object's columns to it. */
-        void appendColumnsTo(Gtk::TreeView &v) const;
-
-        /** Gets a Reader from a Path.  Returns an empty SharedMember if the Path is invalid. */
-        eris::SharedMember<Reader> reader(const Path &path) const;
+        void appendColumnsTo(Gtk::TreeView &v) const override;
 
     protected:
         /// Protected constructor; this object should be constructed using create().
         ReaderStore(std::shared_ptr<eris::Simulation> &&sim);
 
-        /** Returns Gtk::TreeModel flags (specifically, the LIST_ONLY flag). */
-        virtual Gtk::TreeModelFlags get_flags_vfunc() const override;
-        /** Returns `obj.columns.size()`, the number of reader model columns. */
-        virtual int get_n_columns_vfunc() const override;
-        /** Returns the column type of the given position.  See the list of virtual columns in the
-         * class description.
+        /** Returns the column type of the given position.  This is typically invoked via
+         * get_column_type, itself given a column member of the `.columns` ColRec object.
          *
          * \sa ReaderStore::ColRec
          */
         virtual GType get_column_type_vfunc(int index) const override;
 
-        /** Converts a path to an iterator.
-         *
-         * \param path the path (in)
-         * \param iter the iterator to set (out)
-         * \returns true and sets `iter` if the path refers to a valid element, returns false otherwise.
-         */
-        virtual bool get_iter_vfunc(const Path &path, iterator& iter) const override;
-        /** Takes an iterator, returns an iterator to the next item.
-         *
-         * \param iter the current element (in)
-         * \param iter_next the next element (out)
-         * \returns true and sets `iter_next` if `iter` is valid (i.e. the model hasn't changed
-         * since the iterator was created) and there is a next element; returns false otherwise.
-         */
-        virtual bool iter_next_vfunc(const iterator &iter, iterator &iter_next) const override;
-        /// Returns false always: ReaderStore elements cannot have children.
-        virtual bool iter_children_vfunc(const iterator&, iterator&) const override;
-        /// Returns false always: ReaderStore elemenets cannot have children/parents.
-        virtual bool iter_parent_vfunc(const iterator&, iterator&) const override;
-        /// Returns false always: ReaderStore elements cannot have children.
-        virtual bool iter_nth_child_vfunc(const iterator&, int, iterator&) const override;
-        /// Returns false always: ReaderStore elements cannot have children.
-        virtual bool iter_has_child_vfunc(const iterator &) const override;
-        /// Returns 0 always: ReaderStore elements have no children.
-        virtual int iter_n_children_vfunc(const iterator &) const override;
-        /** Obtains an iterator to the `n`th reader.
-         *
-         * \param n the index of the reader to access
-         * \param iter an iterator to set to the requested reader
-         * \returns true and sets iter if `n` is valid (i.e. there are at least `n+1` readers);
-         * false otherwise.
-         */
-        virtual bool iter_nth_root_child_vfunc(int n, iterator &iter) const override;
-        /// Returns the number of readers stored in this model.
-        virtual int iter_n_root_children_vfunc() const override;
-        /// Converts iterator `iter` into a Path.
-        virtual Path get_path_vfunc(const iterator &iter) const override;
+        /** Returns `obj.columns.size()`, the number of model columns. */
+        virtual int get_n_columns_vfunc() const override;
+
         /** Accesses a column value.
          *
          * \param iter a valid iterator referencing the row to access
@@ -128,17 +81,6 @@ class ReaderStore : public Gtk::TreeModel, public Gtk::TreeSortable, Glib::Objec
         virtual void get_value_vfunc(const iterator &iter, int column, Glib::ValueBase &value) const override;
 
         // TreeSortable overrides:
-
-        /** Accesses the current sort column and order.  Returns true if accessed sort_column_id
-         * refers to a specific column (instead of the Gtk magic unsorted and default order
-         * constants).
-         *
-         * \param sort_column_id a pointer in which to store the sort column.  May be a nullptr to
-         * skip accessing the sort column.
-         * \param order a pointer in which to store the sort order.  May be a nullptr to skip
-         * accessing the sort order.
-         */
-        virtual bool get_sort_column_id_vfunc(int *sort_column_id, Gtk::SortType *order) const override;
 
         /** Sets the model sort column and sort order.  If the sort_column and order differ from the
          * current values, the model data is resorted.  If resorting occurs, the sort_column_changed
@@ -155,16 +97,6 @@ class ReaderStore : public Gtk::TreeModel, public Gtk::TreeSortable, Glib::Objec
 
 
     private:
-        // The maximum reader eris_id_t currently in readers_, used to identify new readers during resync():
-        eris::eris_id_t max_id_;
-        std::shared_ptr<eris::Simulation> sim_;
-        std::vector<eris::SharedMember<Reader>> readers_;
-        // Tracks model changes by being incremented whenever such a change occurs
-        int stamp_ = 1;
-        // Default is unsorted
-        int sort_by_ = Gtk::TreeSortable::DEFAULT_UNSORTED_COLUMN_ID;
-        Gtk::SortType sort_order_ = Gtk::SORT_ASCENDING;
-
         // The various comparison functions; one of these gets passed to std::stable_sort.
         static bool less_id(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b);
         static bool greater_id(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b);
@@ -186,17 +118,6 @@ class ReaderStore : public Gtk::TreeModel, public Gtk::TreeSortable, Glib::Objec
         static bool greater_booksWritten(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b);
         static bool less_lastBookAge(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b);
         static bool greater_lastBookAge(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b);
-
-        // Appends a single column to the given view using the given label, width, and sortability.
-        template <typename T, typename = typename std::enable_if<std::is_base_of<Gtk::TreeModelColumnBase, T>::value>>
-        void appendCol(Gtk::TreeView &v, const std::string &label, T &col, int width, bool sortable = true) const {
-            v.append_column(label, col);
-            auto *c = v.get_column(v.get_n_columns()-1);
-            c->set_sizing(Gtk::TREE_VIEW_COLUMN_FIXED);
-            c->set_fixed_width(width);
-            if (sortable)
-                c->set_sort_column(col);
-        }
 
 };
 

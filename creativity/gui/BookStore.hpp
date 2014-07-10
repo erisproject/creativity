@@ -1,17 +1,13 @@
 #pragma once
-#include <memory>
-#include <gtkmm/treemodel.h>
-#include <gtkmm/treesortable.h>
-#include <gtkmm/treeview.h>
-#include <eris/Simulation.hpp>
 #include "creativity/Book.hpp"
+#include "creativity/gui/MemberStore.hpp"
 
 namespace creativity { namespace gui {
 
 /** Gtk::TreeModel::ColumnRecord subclass for handling Book information in the list of books in
  * the main GUI window, and the list of authored books on the reader dialog.
  */
-class BookStore : public Gtk::TreeModel, public Gtk::TreeSortable, Glib::Object {
+class BookStore : public MemberStore<Book>, Glib::Object {
     public:
         BookStore() = delete;
 
@@ -41,10 +37,9 @@ class BookStore : public Gtk::TreeModel, public Gtk::TreeSortable, Glib::Object 
          */
         static Glib::RefPtr<BookStore> create(std::shared_ptr<eris::Simulation> sim, eris::SharedMember<Reader> author = eris::SharedMember<Reader>());
 
-        /** Sychronizes the list of books.  Typically called after a simulation period runs.  This
-         * also resets any cached values of the copies column (which will be cached until the next
-         * resync() for performance reasons). */
-        void resync();
+        /** Sychronizes the list of books with the stored Simulation. Typically called after a
+         * simulation period runs. */
+        virtual std::vector<eris::SharedMember<Book>> resync_add() override;
 
         /** ColumnRecord object for a BookStore.  This object contains the columns for this Book
          * model.  This should not be used directly, but rather accessed via the public `columns`
@@ -52,11 +47,26 @@ class BookStore : public Gtk::TreeModel, public Gtk::TreeSortable, Glib::Object 
          */
         class ColRec : public Gtk::TreeModel::ColumnRecord {
             public:
-                Gtk::TreeModelColumn<eris::eris_id_t> id, author, market;
-                Gtk::TreeModelColumn<double> posX, posY, quality, price, revenue, revenueLifetime;
-                Gtk::TreeModelColumn<std::string> posstr;
-                Gtk::TreeModelColumn<size_t> age, sales, salesLifetime, copies, lifetime;
-                Gtk::TreeModelColumn<gboolean> hasMarket;
+                Gtk::TreeModelColumn<eris::eris_id_t> id; ///< Book ID
+                Gtk::TreeModelColumn<eris::eris_id_t> author; ///< Author ID
+                Gtk::TreeModelColumn<double> posX; ///< x coordinate of the book
+                Gtk::TreeModelColumn<double> posY; ///< y coordinate of the book
+                Gtk::TreeModelColumn<std::string> posstr; ///< position of the book as a string such as `(-7.16,0.440)`
+                Gtk::TreeModelColumn<double> quality; ///< quality parameter of the book (the mean of realized quality draws)
+                Gtk::TreeModelColumn<bool> hasMarket; ///< True if the book is currently on the market
+                Gtk::TreeModelColumn<eris::eris_id_t> market; ///< Market ID, 0 if not on market
+                Gtk::TreeModelColumn<double> price; ///< price of the book, or NaN if the book is not on the market
+                Gtk::TreeModelColumn<double> revenue; ///< revenue of the book in the current period
+                Gtk::TreeModelColumn<double> revenueLifetime; ///< Cumulative revenue of the book since its creation
+                Gtk::TreeModelColumn<size_t> age; ///< Age of the book in simulation periods since it was written
+                Gtk::TreeModelColumn<size_t> sales; ///< Copies sold in the current period
+                Gtk::TreeModelColumn<size_t> salesLifetime; ///< Lifetime copies sold
+                /** Copies that exist in the simulation.  This is at least one larger than the
+                 * number of lifetime sales because the author has a copy (which wasn't a sale); if
+                 * there is non-sale piracy, this value could be much greater than lifetime sales.
+                 */
+                Gtk::TreeModelColumn<size_t> copies;
+                Gtk::TreeModelColumn<size_t> lifetime; ///< Number of periods the book has been or was on the market
 
             private:
                 ColRec() {
@@ -75,17 +85,13 @@ class BookStore : public Gtk::TreeModel, public Gtk::TreeSortable, Glib::Object 
         /** Takes a Gtk::TreeView and adds this object's columns to it. */
         void appendColumnsTo(Gtk::TreeView &v) const;
 
-        /** Gets a Book from a Path.  Returns an empty SharedMember if the Path is invalid. */
-        eris::SharedMember<Book> book(const Path &path) const;
-
     protected:
         /// Protected constructor; this object should be constructed using create().
         BookStore(std::shared_ptr<eris::Simulation> &&sim, eris::SharedMember<Reader> &&author);
 
-        /** Returns Gtk::TreeModel flags (specifically, the LIST_ONLY flag). */
-        virtual Gtk::TreeModelFlags get_flags_vfunc() const override;
         /** Returns `obj.columns.size()`, the number of book model columns. */
         virtual int get_n_columns_vfunc() const override;
+
         /** Returns the column type of the given position.  See the list of virtual columns in the
          * class description.
          *
@@ -93,43 +99,6 @@ class BookStore : public Gtk::TreeModel, public Gtk::TreeSortable, Glib::Object 
          */
         virtual GType get_column_type_vfunc(int index) const override;
 
-        /** Converts a path to an iterator.
-         *
-         * \param path the path (in)
-         * \param iter the iterator to set (out)
-         * \returns true and sets `iter` if the path refers to a valid element, returns false otherwise.
-         */
-        virtual bool get_iter_vfunc(const Path &path, iterator& iter) const override;
-        /** Takes an iterator, returns an iterator to the next item.
-         *
-         * \param iter the current element (in)
-         * \param iter_next the next element (out)
-         * \returns true and sets `iter_next` if `iter` is valid (i.e. the model hasn't changed
-         * since the iterator was created) and there is a next element; returns false otherwise.
-         */
-        virtual bool iter_next_vfunc(const iterator &iter, iterator &iter_next) const override;
-        /// Returns false always: BookStore elements cannot have children.
-        virtual bool iter_children_vfunc(const iterator&, iterator&) const override;
-        /// Returns false always: BookStore elemenets cannot have children/parents.
-        virtual bool iter_parent_vfunc(const iterator&, iterator&) const override;
-        /// Returns false always: BookStore elements cannot have children.
-        virtual bool iter_nth_child_vfunc(const iterator&, int, iterator&) const override;
-        /// Returns false always: BookStore elements cannot have children.
-        virtual bool iter_has_child_vfunc(const iterator &) const override;
-        /// Returns 0 always: BookStore elements have no children.
-        virtual int iter_n_children_vfunc(const iterator &) const override;
-        /** Obtains an iterator to the `n`th book.
-         *
-         * \param n the index of the book to access
-         * \param iter an iterator to set to the requested book
-         * \returns true and sets iter if `n` is valid (i.e. there are at least `n+1` books);
-         * false otherwise.
-         */
-        virtual bool iter_nth_root_child_vfunc(int n, iterator &iter) const override;
-        /// Returns the number of books stored in this model.
-        virtual int iter_n_root_children_vfunc() const override;
-        /// Converts iterator `iter` into a Path.
-        virtual Path get_path_vfunc(const iterator &iter) const override;
         /** Accesses a column value.
          *
          * \param iter a valid iterator referencing the row to access
@@ -140,17 +109,6 @@ class BookStore : public Gtk::TreeModel, public Gtk::TreeSortable, Glib::Object 
         virtual void get_value_vfunc(const iterator &iter, int column, Glib::ValueBase &value) const override;
 
         // TreeSortable overrides:
-
-        /** Accesses the current sort column and order.  Returns true if accessed sort_column_id
-         * refers to a specific column (instead of the Gtk magic unsorted and default order
-         * constants).
-         *
-         * \param sort_column_id a pointer in which to store the sort column.  May be a nullptr to
-         * skip accessing the sort column.
-         * \param order a pointer in which to store the sort order.  May be a nullptr to skip
-         * accessing the sort order.
-         */
-        virtual bool get_sort_column_id_vfunc(int *sort_column_id, Gtk::SortType *order) const override;
 
         /** Sets the model sort column and sort order.  If the sort_column and order differ from the
          * current values, the model data is resorted.  If resorting occurs, the sort_column_changed
@@ -167,18 +125,10 @@ class BookStore : public Gtk::TreeModel, public Gtk::TreeSortable, Glib::Object 
 
 
     private:
-        // The maximum book eris_id_t currently in books_, used to identify new books during resync():
-        eris::eris_id_t max_id_;
-        std::shared_ptr<eris::Simulation> sim_;
+        // If set to an actual Reader, this is an author-specific list; otherwise it's a global list
         eris::SharedMember<Reader> author_;
-        std::vector<eris::SharedMember<Book>> books_;
-        // Cache copies until the next resync() because book->copies is an expensive call
+        // Cache copies until the next resync_add() because book->copies() is an expensive call
         mutable std::unordered_map<eris::eris_id_t, unsigned long> copies_cache_;
-        // Tracks model changes by being incremented whenever such a change occurs
-        int stamp_ = 1;
-        // Default is unsorted
-        int sort_by_ = Gtk::TreeSortable::DEFAULT_UNSORTED_COLUMN_ID;
-        Gtk::SortType sort_order_ = Gtk::SORT_ASCENDING;
 
         // The various comparison functions; one of these gets passed to std::stable_sort.
 #define LESS_GREATER_METHODS(col) \
@@ -203,18 +153,6 @@ class BookStore : public Gtk::TreeModel, public Gtk::TreeSortable, Glib::Object 
         // Needs to be non-static (need cache access)
         bool less_copies(const eris::SharedMember<Book> &a, const eris::SharedMember<Book> &b);
         bool greater_copies(const eris::SharedMember<Book> &a, const eris::SharedMember<Book> &b);
-
-        // Appends a single column to the given view using the given label, width, and sortability.
-        template <typename T, typename = typename std::enable_if<std::is_base_of<Gtk::TreeModelColumnBase, T>::value>>
-        void appendCol(Gtk::TreeView &v, const std::string &label, T &col, int width, bool sortable = true) const {
-            v.append_column(label, col);
-            auto *c = v.get_column(v.get_n_columns()-1);
-            c->set_sizing(Gtk::TREE_VIEW_COLUMN_FIXED);
-            c->set_fixed_width(width);
-            if (sortable)
-                c->set_sort_column(col);
-        }
-
 };
 
 }}
