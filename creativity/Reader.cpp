@@ -268,7 +268,7 @@ double Reader::penalty(unsigned long n) const {
     return evalPolynomial(n, pen_poly_);
 }
 
-const std::unordered_map<SharedMember<Book>, double>& Reader::library() { return library_; }
+const std::unordered_map<SharedMember<Book>, double>& Reader::library() const { return library_; }
 
 void Reader::receiveProfits(SharedMember<Book> book, const Bundle &revenue) {
     assets() += revenue - Bundle{MONEY, book->currSales() * c_unit_};

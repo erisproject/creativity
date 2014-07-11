@@ -189,7 +189,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          *
          * \returns map where keys are the books and values are the realized quality of the books.
          */
-        const std::unordered_map<eris::SharedMember<Book>, double>& library();
+        const std::unordered_map<eris::SharedMember<Book>, double>& library() const;
 
         /** Returns the set of Books that were purchased in the last period.
          *
