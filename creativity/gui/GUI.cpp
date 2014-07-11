@@ -126,8 +126,8 @@ void GUI::thr_run() {
         iter->set_value(0, i);
         iter->set_value(1, std::to_string(i) + " threads");
     }
-    //thrbox->set_active(*(thrlist->children().rbegin()));
-    thrbox->set_active(*(thrlist->children().begin()));
+    thrbox->set_active(*(thrlist->children().rbegin()));
+    //thrbox->set_active(*(thrlist->children().begin()));
 
     Gtk::Viewport *vis;
     builder_->get_widget("view_vis", vis);
@@ -181,11 +181,8 @@ void GUI::thr_run() {
             thr_info_dialog(rdr_model_->member(path));
     });
 
-    ERIS_DBG("");
     widget<Gtk::ScrolledWindow>("win_rdr")->add(*rdr_tree_);
-    ERIS_DBG("");
     rdr_tree_->show();
-    ERIS_DBG("");
 
     bk_model_ = BookStore::create(sim_);
     bk_tree_ = std::unique_ptr<Gtk::TreeView>(new Gtk::TreeView);
@@ -197,12 +194,8 @@ void GUI::thr_run() {
             thr_info_dialog(bk_model_->member(path));
     });
 
-    ERIS_DBG("");
     widget<Gtk::ScrolledWindow>("win_bk")->add(*bk_tree_);
-    ERIS_DBG("");
     bk_tree_->show();
-    ERIS_DBG("");
-
 
     dispatcher_ = std::unique_ptr<Glib::Dispatcher>(new Glib::Dispatcher);
     dispatcher_->connect([this] { thr_signal(); });
@@ -225,58 +218,6 @@ void GUI::thr_run() {
 
 void GUI::thr_update_readers() {
     rdr_model_->resync();
-    /*
-    ERIS_DBG("starting");
-
-    auto new_readers = sim_->agents<Reader>([this] (const Reader &r) -> bool { return r.id() > rdr_biggest_id_; });
-
-    // Save the current sort column and order
-    int sort_col;
-    Gtk::SortType sort_type;
-    rdr_model_->get_sort_column_id(sort_col, sort_type);
-    
-    // Freeze tree to prevent each row modification triggering notifications
-    rdr_tree_->freeze_child_notify();
-
-    // Detach model from the tree
-    rdr_tree_->unset_model();
-
-    // Turn off sorting
-    rdr_model_->set_sort_column(Gtk::TreeSortable::DEFAULT_UNSORTED_COLUMN_ID, sort_type);
-
-    ERIS_DBG("Sorting off; updating");
-    // Updating existing rows, removing if any reader isn't in the simulation anymore
-    for (auto row : rdr_model_->children()) {
-        eris_id_t id = row[rdr_cols_->id];
-        if (not sim_->hasAgent(id)) {
-            ERIS_DBG("FIXME: remove agent!");
-            throw std::runtime_error("FIXME: remove agent!");
-        }
-        else {
-            rdr_cols_->updateRow(row, sim_->agent<Reader>(id));
-        }
-    }
-
-
-    ERIS_DBG("adding new ones");
-
-    // Re-add all readers (whose info has almost always changed), potentially including new ones
-    for (auto &r : sim_->agents<Reader>()) {
-        rdr_cols_->appendRow(rdr_model_, r);
-    }
-    ERIS_DBG("resorting");
-
-    // Turn sorting back on, which will resort everything again
-    //rdr_model_->set_sort_column(sort_col, sort_type);
-
-    ERIS_DBG("set_model");
-    // Reassociate the model with the tree, and thaw the tree
-    rdr_tree_->set_model(rdr_model_);
-    ERIS_DBG("thawing");
-    rdr_tree_->thaw_child_notify();
-
-    ERIS_DBG("finished");
-    */
 }
 
 void GUI::thr_update_books() {
