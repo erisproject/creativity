@@ -4,14 +4,14 @@
 #include <unordered_map>
 #include <eris/types.hpp>
 #include <eris/Position.hpp>
+#include <eris/noncopyable.hpp>
+#include "creativity/Reader.hpp"
 
-namespace creativity {
-class Reader; // Forward declaration
-namespace state {
+namespace creativity { namespace state {
 
 /** Records the various variables associated with a reader.  This is basically a container class
  * with a constructor that copies the current state of a given Reader. */
-class ReaderState final {
+class ReaderState final : private eris::noncopyable {
     public:
         /** Constructs a new ReaderState without setting any of its values (they will be default
          * initialized).
@@ -48,6 +48,15 @@ class ReaderState final {
 
         /// Lifetime cumulative utility up to and including the current period.
         double uLifetime;
+
+        /// Agent beliefs, copied out at the time the ReaderState object is created
+        struct {
+            belief::Profit profit; ///< Profit beliefs
+            belief::Profit profit_extrap; ///< Profit beliefs using extrapolation for on-market books
+            belief::Demand demand; ///< Single-period demand belief
+            belief::Quality quality; ///< Quality belief
+            std::map<unsigned long, belief::ProfitStream> profit_stream; ///< Profit stream beliefs
+        } belief;
 };
 
 }}

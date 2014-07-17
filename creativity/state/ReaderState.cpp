@@ -8,7 +8,15 @@ ReaderState::ReaderState(const Reader &r) :
     t{r.simulation()->t()},
     position{r.position()},
     u{r.u()},
-    uLifetime{r.uLifetime()}
+    uLifetime{r.uLifetime()},
+    belief{
+        .profit = r.profitBelief(),
+        .profit_extrap = r.profitExtrapBelief(),
+        .demand = r.demandBelief(),
+        .quality = r.qualityBelief(),
+        .profit_stream = r.profitStreamBeliefs()
+    }
+
 {
     library.reserve(r.library().size());
     for (auto &bq : r.library()) {
