@@ -111,6 +111,11 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
          */
         eris::SharedMember<BookMarket> market() const;
 
+        /** Returns the current market price of this book.  If this book is not on the market,
+         * returns a quiet NaN instead.
+         */
+        double price() const;
+
         /// Returns the lifelong number of sales of this book
         unsigned long lifeSales() const;
 

@@ -136,6 +136,12 @@ SharedMember<BookMarket> Book::market() const {
     return simMarket<BookMarket>(market_);
 }
 
+double Book::price() const {
+    return hasMarket()
+        ? market()->price()
+        : std::numeric_limits<double>::quiet_NaN();
+}
+
 const double& Book::quality() const {
     return quality_;
 }
