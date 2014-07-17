@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <eris/types.hpp>
 #include <eris/Position.hpp>
+#include <eris/noncopyable.hpp>
 
 namespace creativity {
 class Book; // forward declaration
@@ -10,17 +11,17 @@ namespace state {
 
 /** Records the various variables associated with a book.  This is basically a container class
  * with a constructor that copies the current state of a given Book. */
-class BookState final {
+class BookState final : private eris::noncopyable {
     public:
         /** Constructs a new BookState without setting any of its values (they will be default
          * initialized).
          */
         BookState() = default;
 
-        /// Constructs a new BookState, settings its values using the given Reader.
-        BookState(const Book &r);
+        /// Constructs a new BookState, settings its values using the given Book.
+        BookState(const Book &b);
 
-        /// Unique simulation ID of the reader
+        /// Unique simulation ID of the book
         eris::eris_id_t id;
 
         /// The simulation period this state represents.
@@ -29,7 +30,7 @@ class BookState final {
         /// The author of this book
         eris::eris_id_t author;
 
-        /// Position of the reader
+        /// Position of the book
         eris::Position position;
 
         /// The quality parameter of this book, which is the mean of reader quality draws.

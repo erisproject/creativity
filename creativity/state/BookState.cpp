@@ -11,7 +11,7 @@ BookState::BookState(const Book &b) :
     position{b.position()},
     quality{b.quality()},
     market{b.hasMarket()},
-    price{b.hasMarket() ? b.market()->price() : std::numeric_limits<double>::quiet_NaN()},
+    price{b.price()},
     revenue{b.currRevenue()},
     revenueLifetime{b.lifeRevenue()},
     sales{b.currSales()},
