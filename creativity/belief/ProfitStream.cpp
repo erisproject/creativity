@@ -8,6 +8,7 @@ namespace creativity { namespace belief {
 ProfitStream::ProfitStream(size_t K)
     : ProfitStream(VectorXd::Zero(K), 1.0, MatrixXd::Identity(K, K), 1e-6)
 {
+    if (K == 0) throw std::domain_error("Unable to create ProfitStream belief with K=0 parameters");
     beta_[K-1] = 1.0;
 }
 
