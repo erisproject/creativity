@@ -194,12 +194,10 @@
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
                 <child>
-                  <object class="GtkLabel" id="lbl_readers">
+                  <object class="GtkLabel" id="lbl_showing">
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
-                    <property name="xalign">1</property>
-                    <property name="xpad">2</property>
-                    <property name="label" translatable="yes">Readers:</property>
+                    <property name="label" translatable="yes"> Showing: </property>
                   </object>
                   <packing>
                     <property name="expand">False</property>
@@ -208,14 +206,10 @@
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkLabel" id="status_readers">
+                  <object class="GtkComboBoxText" id="combo_state">
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
-                    <property name="xalign">0</property>
-                    <property name="label" translatable="yes">0</property>
-                    <property name="ellipsize">end</property>
-                    <property name="width_chars">6</property>
-                    <property name="max_width_chars">6</property>
+                    <property name="active">0</property>
                   </object>
                   <packing>
                     <property name="expand">False</property>
@@ -224,12 +218,10 @@
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkLabel" id="lbl_books">
+                  <object class="GtkLabel" id="lbl_of_total">
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
-                    <property name="xalign">1</property>
-                    <property name="xpad">2</property>
-                    <property name="label" translatable="yes">Books:</property>
+                    <property name="label" translatable="yes"> of </property>
                   </object>
                   <packing>
                     <property name="expand">False</property>
@@ -238,14 +230,11 @@
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkLabel" id="status_books">
+                  <object class="GtkLabel" id="lbl_total">
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
-                    <property name="xalign">0</property>
+                    <property name="margin_right">3</property>
                     <property name="label" translatable="yes">0</property>
-                    <property name="ellipsize">end</property>
-                    <property name="width_chars">5</property>
-                    <property name="max_width_chars">5</property>
                   </object>
                   <packing>
                     <property name="expand">False</property>
@@ -254,12 +243,13 @@
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkLabel" id="lbl_speed">
+                  <object class="GtkButton" id="btn_prev">
+                    <property name="label">gtk-go-back</property>
                     <property name="visible">True</property>
-                    <property name="can_focus">False</property>
-                    <property name="xalign">1</property>
-                    <property name="xpad">2</property>
-                    <property name="label" translatable="yes">Speed:</property>
+                    <property name="can_focus">True</property>
+                    <property name="receives_default">True</property>
+                    <property name="use_stock">True</property>
+                    <property name="always_show_image">True</property>
                   </object>
                   <packing>
                     <property name="expand">False</property>
@@ -268,15 +258,13 @@
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkLabel" id="status_speed">
+                  <object class="GtkButton" id="btn_next">
+                    <property name="label">gtk-go-forward</property>
                     <property name="visible">True</property>
-                    <property name="can_focus">False</property>
-                    <property name="xalign">1</property>
-                    <property name="label" translatable="yes">0</property>
-                    <property name="justify">right</property>
-                    <property name="ellipsize">end</property>
-                    <property name="width_chars">7</property>
-                    <property name="max_width_chars">7</property>
+                    <property name="can_focus">True</property>
+                    <property name="receives_default">True</property>
+                    <property name="use_stock">True</property>
+                    <property name="always_show_image">True</property>
                   </object>
                   <packing>
                     <property name="expand">False</property>
@@ -285,16 +273,62 @@
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkLabel" id="lbl_speed_units">
+                  <object class="GtkButton" id="btn_last">
+                    <property name="label">gtk-goto-last</property>
                     <property name="visible">True</property>
-                    <property name="can_focus">False</property>
-                    <property name="xpad">2</property>
-                    <property name="label" translatable="yes">periods / second</property>
+                    <property name="can_focus">True</property>
+                    <property name="receives_default">True</property>
+                    <property name="use_stock">True</property>
+                    <property name="always_show_image">True</property>
                   </object>
                   <packing>
                     <property name="expand">False</property>
                     <property name="fill">True</property>
                     <property name="position">6</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="lbl_speed">
+                    <property name="visible">True</property>
+                    <property name="can_focus">False</property>
+                    <property name="margin_left">3</property>
+                    <property name="xalign">1</property>
+                    <property name="xpad">2</property>
+                    <property name="label" translatable="yes">Speed:</property>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">True</property>
+                    <property name="position">7</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="status_speed">
+                    <property name="visible">True</property>
+                    <property name="can_focus">False</property>
+                    <property name="xalign">1</property>
+                    <property name="label" translatable="yes">N/A</property>
+                    <property name="justify">right</property>
+                    <property name="ellipsize">end</property>
+                    <property name="width_chars">7</property>
+                    <property name="max_width_chars">7</property>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">True</property>
+                    <property name="position">8</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="lbl_speed_units">
+                    <property name="visible">True</property>
+                    <property name="can_focus">False</property>
+                    <property name="label" translatable="yes"> Hz</property>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">True</property>
+                    <property name="position">9</property>
                   </packing>
                 </child>
               </object>
@@ -952,7 +986,13 @@
                     <property name="hscrollbar_policy">never</property>
                     <property name="shadow_type">in</property>
                     <child>
-                      <placeholder/>
+                      <object class="GtkTreeView" id="tv_bk_init">
+                        <property name="visible">True</property>
+                        <property name="can_focus">True</property>
+                        <child internal-child="selection">
+                          <object class="GtkTreeSelection" id="treeview-selection1"/>
+                        </child>
+                      </object>
                     </child>
                   </object>
                   <packing>
@@ -977,7 +1017,13 @@
                     <property name="hscrollbar_policy">never</property>
                     <property name="shadow_type">in</property>
                     <child>
-                      <placeholder/>
+                      <object class="GtkTreeView" id="tv_rdr_init">
+                        <property name="visible">True</property>
+                        <property name="can_focus">True</property>
+                        <child internal-child="selection">
+                          <object class="GtkTreeSelection" id="treeview-selection3"/>
+                        </child>
+                      </object>
                     </child>
                   </object>
                   <packing>
@@ -1052,34 +1098,5 @@
         </child>
       </object>
     </child>
-  </object>
-  <object class="GtkListStore" id="tree_agents">
-    <columns>
-      <!-- column-name tv_a_id -->
-      <column type="gulong"/>
-      <!-- column-name tv_a_u -->
-      <column type="gdouble"/>
-      <!-- column-name tv_a_u_life -->
-      <column type="gdouble"/>
-      <!-- column-name tv_a_books_owned -->
-      <column type="gulong"/>
-      <!-- column-name tv_a_books_new -->
-      <column type="gulong"/>
-      <!-- column-name tv_a_books_written -->
-      <column type="gulong"/>
-      <!-- column-name tv_a_books_written_latest_age -->
-      <column type="gulong"/>
-    </columns>
-    <data>
-      <row>
-        <col id="0">0</col>
-        <col id="1">0</col>
-        <col id="2">0</col>
-        <col id="3">0</col>
-        <col id="4">0</col>
-        <col id="5">0</col>
-        <col id="6">0</col>
-      </row>
-    </data>
   </object>
 </interface>

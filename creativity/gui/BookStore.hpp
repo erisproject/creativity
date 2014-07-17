@@ -1,5 +1,4 @@
 #pragma once
-#include "creativity/Book.hpp"
 #include "creativity/gui/MemberStore.hpp"
 
 namespace creativity { namespace gui {
@@ -7,7 +6,7 @@ namespace creativity { namespace gui {
 /** Gtk::TreeModel::ColumnRecord subclass for handling Book information in the list of books in
  * the main GUI window, and the list of authored books on the reader dialog.
  */
-class BookStore : public MemberStore<Book>, Glib::Object {
+class BookStore : public MemberStore<state::BookState>, Glib::Object {
     public:
         BookStore() = delete;
 
@@ -24,22 +23,17 @@ class BookStore : public MemberStore<Book>, Glib::Object {
          * - price (NaN if not on market)
          * - revenue
          * - revenueLifetime
-         * - hasMarket (true if on market, false otherwise)
-         * - market ID (0 if not on market)
+         * - market (true if on market, false otherwise)
          * - age
          * - sales
          * - salesLifetime
          * - copies
          * - lifetime (# periods on market)
          *
-         * \param sim the simulation object containing the books to list
-         * \param author the author whose books to list.  Omit to list all simulation books.
+         * \param state the simulation state object containing the books to list
+         * \param author the author whose books to list.  Omit to list all state books.
          */
-        static Glib::RefPtr<BookStore> create(std::shared_ptr<eris::Simulation> sim, eris::SharedMember<Reader> author = eris::SharedMember<Reader>());
-
-        /** Sychronizes the list of books with the stored Simulation. Typically called after a
-         * simulation period runs. */
-        virtual std::vector<eris::SharedMember<Book>> resync_add() override;
+        static Glib::RefPtr<BookStore> create(const state::State &state, eris::eris_id_t author = 0);
 
         /** ColumnRecord object for a BookStore.  This object contains the columns for this Book
          * model.  This should not be used directly, but rather accessed via the public `columns`
@@ -53,8 +47,7 @@ class BookStore : public MemberStore<Book>, Glib::Object {
                 Gtk::TreeModelColumn<double> posY; ///< y coordinate of the book
                 Gtk::TreeModelColumn<std::string> posstr; ///< position of the book as a string such as `(-7.16,0.440)`
                 Gtk::TreeModelColumn<double> quality; ///< quality parameter of the book (the mean of realized quality draws)
-                Gtk::TreeModelColumn<bool> hasMarket; ///< True if the book is currently on the market
-                Gtk::TreeModelColumn<eris::eris_id_t> market; ///< Market ID, 0 if not on market
+                Gtk::TreeModelColumn<bool> market; ///< True if the book is currently on the market
                 Gtk::TreeModelColumn<double> price; ///< price of the book, or NaN if the book is not on the market
                 Gtk::TreeModelColumn<double> revenue; ///< revenue of the book in the current period
                 Gtk::TreeModelColumn<double> revenueLifetime; ///< Cumulative revenue of the book since its creation
@@ -70,7 +63,7 @@ class BookStore : public MemberStore<Book>, Glib::Object {
 
             private:
                 ColRec() {
-                    add(id); add(author); add(market); add(hasMarket); add(posX); add(posY); add(posstr);
+                    add(id); add(author); add(market); add(posX); add(posY); add(posstr);
                     add(quality); add(price); add(revenue); add(revenueLifetime);
                     add(age); add(sales); add(salesLifetime); add(copies); add(lifetime);
                 }
@@ -87,7 +80,7 @@ class BookStore : public MemberStore<Book>, Glib::Object {
 
     protected:
         /// Protected constructor; this object should be constructed using create().
-        BookStore(std::shared_ptr<eris::Simulation> &&sim, eris::SharedMember<Reader> &&author);
+        BookStore(const state::State &state, eris::eris_id_t author = 0);
 
         /** Returns `obj.columns.size()`, the number of book model columns. */
         virtual int get_n_columns_vfunc() const override;
@@ -125,19 +118,16 @@ class BookStore : public MemberStore<Book>, Glib::Object {
 
 
     private:
-        // If set to an actual Reader, this is an author-specific list; otherwise it's a global list
-        eris::SharedMember<Reader> author_;
-        // Cache copies until the next resync_add() because book->copies() is an expensive call
-        mutable std::unordered_map<eris::eris_id_t, unsigned long> copies_cache_;
+        // If non-zero, this is an author-specific list; otherwise it's a global list
+        const eris::eris_id_t author_ = 0;
 
         // The various comparison functions; one of these gets passed to std::stable_sort.
 #define LESS_GREATER_METHODS(col) \
-        static bool less_##col(const eris::SharedMember<Book> &a, const eris::SharedMember<Book> &b); \
-        static bool greater_##col(const eris::SharedMember<Book> &a, const eris::SharedMember<Book> &b);
+        static bool less_##col(const state::BookState &a, const state::BookState &b); \
+        static bool greater_##col(const state::BookState &a, const state::BookState &b);
         LESS_GREATER_METHODS(id)
         LESS_GREATER_METHODS(author)
         LESS_GREATER_METHODS(market)
-        LESS_GREATER_METHODS(hasMarket)
         LESS_GREATER_METHODS(posX)
         LESS_GREATER_METHODS(posY)
         LESS_GREATER_METHODS(quality)
@@ -149,10 +139,8 @@ class BookStore : public MemberStore<Book>, Glib::Object {
         LESS_GREATER_METHODS(sales)
         LESS_GREATER_METHODS(salesLifetime)
         LESS_GREATER_METHODS(lifetime)
+        LESS_GREATER_METHODS(copies)
 #undef LESS_GREATER_METHODS
-        // Needs to be non-static (need cache access)
-        bool less_copies(const eris::SharedMember<Book> &a, const eris::SharedMember<Book> &b);
-        bool greater_copies(const eris::SharedMember<Book> &a, const eris::SharedMember<Book> &b);
 };
 
 }}

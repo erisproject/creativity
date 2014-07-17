@@ -12,7 +12,7 @@ namespace creativity {
 
 const std::vector<double> Reader::default_polynomial{{4., -1.}};
 const std::vector<double> Reader::default_penalty_polynomial{{0, 0, 0.25}};
-const std::vector<unsigned long> Reader::profit_stream_ages_{{1,2,3,4,5,7,10}};
+const std::vector<unsigned long> Reader::profit_stream_ages{{1,2,4,8}};
 
 Reader::Reader(
         const Position &pos, const Position &b1, const Position &b2,
@@ -22,6 +22,7 @@ Reader::Reader(
     : WrappedPositional<agent::AssetAgent>(pos, b1, b2),
     profit_belief_{std::move(profit)}, profit_belief_extrap_{profit_belief_},
     demand_belief_{std::move(demand)}, quality_belief_{std::move(quality)},
+    profit_stream_beliefs_{{1, 1}},
     c_fixed_{cFixed}, c_unit_{cUnit}, income_{income}
 {}
 
@@ -274,22 +275,22 @@ void Reader::receiveProfits(SharedMember<Book> book, const Bundle &revenue) {
     assets() += revenue - Bundle{MONEY, book->currSales() * c_unit_};
 }
 
-const belief::Profit& Reader::profitBelief() { return profit_belief_; }
-const belief::Profit& Reader::profitExtrapBelief() { return profit_belief_extrap_; }
-const belief::Demand& Reader::demandBelief() { return demand_belief_; }
-const belief::Quality& Reader::qualityBelief() { return quality_belief_; }
-const belief::ProfitStream& Reader::profitStreamBelief(unsigned long age) {
-    if (profit_stream_beliefs_.empty()) {
-        profit_stream_beliefs_.emplace(std::piecewise_construct,
-                std::tuple<unsigned long>(age),
-                std::tuple<size_t>(age));
-    }
-
+const belief::Profit& Reader::profitBelief() const { return profit_belief_; }
+const belief::Profit& Reader::profitExtrapBelief() const { return profit_belief_extrap_; }
+const belief::Demand& Reader::demandBelief() const { return demand_belief_; }
+const belief::Quality& Reader::qualityBelief() const { return quality_belief_; }
+const belief::ProfitStream& Reader::profitStreamBelief(unsigned long age) const {
+    // Get the first belief > age
     auto it = profit_stream_beliefs_.upper_bound(age);
     if (it == profit_stream_beliefs_.begin())
+        // This probably means age=0 got passed in, since profit_stream_beliefs_ starts with a 1.
         throw std::runtime_error("Invalid age (" + std::to_string(age) + ") passed to Reader::profitStreamBelief");
+    // upper_bound gives first greater than the given value, so we need to back up one:
     it--;
     return it->second;
+}
+const std::map<unsigned long, belief::ProfitStream>& Reader::profitStreamBeliefs() const {
+    return profit_stream_beliefs_;
 }
 
 void Reader::updateBeliefs() {
@@ -332,7 +333,6 @@ void Reader::updateDemandBelief() {
 void Reader::updateProfitStreamBelief() {
     // Map age into lists of just-left-market books of at least that age
     std::map<unsigned long, std::vector<SharedMember<Book>>> just_left;
-    ERIS_DBGVAR(library_market_.size());
     for (auto &book : library_market_) {
         if (not book->hasMarket()) {
             const unsigned long periods = book->marketPeriods();
@@ -345,7 +345,7 @@ void Reader::updateProfitStreamBelief() {
             // encounter books of longer ages.  One tricky thing to consider: if we have a book of
             // age 6, should we really use, say, a n=1, age=6 model when we have, say, n=10, age=5
             // and n=100, age=4 models also available?  Choose one?  Weighted average?
-            for (unsigned long a : profit_stream_ages_) {
+            for (unsigned long a : profit_stream_ages) {
                 if (periods > a)
                     just_left[a].push_back(book);
                 else
@@ -353,12 +353,6 @@ void Reader::updateProfitStreamBelief() {
             }
         }
     }
-
-    ERIS_DBG("Updating profit stream beliefs with:");
-    for (auto jl : just_left) {
-        ERIS_DBG("    " << jl.first << ": " << jl.second.size() << " books");
-    }
-    ERIS_DBG(".");
 
     for (auto &jl : just_left) {
         const unsigned long &age = jl.first;
@@ -379,13 +373,9 @@ void Reader::updateProfitStreamBelief() {
 
         // Create a new belief of the given size if none exists yet
         if (profit_stream_beliefs_.count(age) == 0) {
-            // We'll just make up a value that remaining profits are equal to the last period's
-            // profits, with some made up variance values.  This is certainly wrong, but it'll also
-            // be constructed with a weak prior which should quickly wash out from new observations.
+            // We'll just use a highly noninformative prior, so the update below will determine
+            // almost everything.
             VectorXd beta = VectorXd::Zero(age, 1);
-            double s2 = 1.0;
-            MatrixXd V = MatrixXd::Identity(beta.rows(), beta.rows());
-            double n = 1e-6; // So that this is very weak when used as a prior
 
             profit_stream_beliefs_.emplace(std::piecewise_construct,
                     std::tuple<unsigned long>(age),

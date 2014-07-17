@@ -1,6 +1,7 @@
 #pragma once
-#include <eris/Simulation.hpp>
 #include <eris/noncopyable.hpp>
+#include <eris/Position.hpp>
+#include <eris/WrappedPositional.hpp>
 #include <gtkmm/drawingarea.h>
 #include <mutex>
 #include <memory>
@@ -15,15 +16,16 @@ namespace gui {
 
 class GUI;
 
-/** Gtk drawing area upon which the simulation visualization is drawn.  */
+/** Gtk drawing area upon which the simulation state visualization is drawn.  */
 class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
     public:
+        GraphArea() = delete;
+
         /** Creates a graph area that draws in the rectangle bounded by [`bottom', `top'] on the
          * vertical plane and [`left', `right'] on the horizontal plane.  Specifying a value of
          * bottom or left larger than top or bottom will flip the respective axis.
          */
-        GraphArea(const double &top, const double &right, const double &bottom, const double &left,
-                std::shared_ptr<eris::Simulation> sim, GUI &gui);
+        GraphArea(const double &top, const double &right, const double &bottom, const double &left, GUI &gui);
 
         /** Returns a Cairo::Matrix that translates graph coordinates into screen coordinates.  To
          * go the other way, invert this matrix.
@@ -52,13 +54,11 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
          * \param green the green component (0-1) of the colour
          * \param blue the blue component (0-1) of the colour
          * \param alpha the alpha component (0-1) of the colour: 0 is transparent, 1 is opaque.
-         * \param r this Reader's wrapping is taken into account when drawing the point, so that
-         * points that overlap the boundary are drawn properly on both sides of the edge.
          * \param scale the scale of the point.  1 (the default) means default size.
+         * \param virt whether this is a virtual (i.e. wrapping) point. Internal use only.
          */
         void drawPoint(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans, double x, double y,
-                const PointType &type, double red, double green, double blue, double alpha,
-                const eris::SharedMember<Reader> &r, double scale = 1.0);
+                const PointType &type, double red, double green, double blue, double alpha, double scale = 1.0, bool virt = false);
 
         /** Draws a circle.  Circles, however, are in graph space, not drawing area space, so
          * this is actually going to end up drawing ovals (unless the drawing area happens
@@ -92,10 +92,10 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
          */
         double point_size = 5.0;
     private:
-        // simulation object
-        std::shared_ptr<eris::Simulation> sim_;
         // The parent GUI
         GUI &gui_;
+        // Helper object for doing wrapping calculations
+        eris::WrappedPositionalBase wpb_;
         // The bounds of the graph
         struct {
             double top; ///< the top graph boundary 
@@ -103,9 +103,14 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
             double bottom; ///< the bottom graph boundary
             double left; ///< the left graph boundary
         } bounds_;
-        // Sets up one or more (wrapping) lines between the reader to the book, but does not
-        // actually draw it with stroke().  The reader's wrapping is used.
-        void drawWrappingLine(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans, const Reader &r, const Book &b);
+
+        // Cache of image surfaces; these save redrawing when transitioning between states
+        std::vector<Cairo::RefPtr<Cairo::ImageSurface>> drawing_cache_;
+        int drawing_cache_width_ = 0, drawing_cache_height_ = 0;
+
+        // Sets up one or more (wrapping) lines between two points, but does not actually draw it
+        // with stroke().
+        void drawWrappingLine(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans, const eris::Position &from, const eris::Position &to);
 };
 
 } }

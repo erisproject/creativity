@@ -124,9 +124,13 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
     public virtual eris::intraopt::OptApplyReset
 {
     public:
+        Reader() = delete; ///< Not default constructible
+
         /** Constructor takes the reader position and the (wrapping) positional boundaries, new
-         * model objects for lifetime profit and per-period demand, and the fixed and per-unit costs
-         * of copies.
+         * belief objects for demand, profit, and quality, and the fixed and per-unit costs of
+         * copies.
+         *
+         * ProfitStream beliefs start off with a highly non-informative prior for age=1.
          *
          * \param pos the initial position of the reader
          * \param b1 a vertex of the wrapping boundary box for the reader
@@ -360,9 +364,9 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         void receiveProfits(eris::SharedMember<Book> book, const eris::Bundle &revenue);
 
         /// Read-only access to this reader's profit belief
-        const belief::Profit& profitBelief();
+        const belief::Profit& profitBelief() const;
         /// Read-only access to this reader's profit belief with profit stream extrapolations
-        const belief::Profit& profitExtrapBelief();
+        const belief::Profit& profitExtrapBelief() const;
         /** Read-only access to this reader's profit stream belief for books with age `age`.  The
          * returned object will be a belief::ProfitStream model with between 1 and `age` parameters.
          * When a model for the requested age is not available the model with the highest age less
@@ -371,12 +375,24 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * If there are no models at all, a highly noninformative one for `age=1` is created and
          * returned.
          */
-        const belief::ProfitStream& profitStreamBelief(unsigned long age);
+        const belief::ProfitStream& profitStreamBelief(unsigned long age) const;
+
+        /** Returns the map of all current profit stream beliefs.  The keys of the map are the
+         * minimum age for which the belief applies and the value is the actual belief with `age`
+         * (i.e. the key) parameters.
+         */
+        const std::map<unsigned long, belief::ProfitStream>& profitStreamBeliefs() const;
+
+        /** The different ages that will be considered for profit_stream_beliefs.  Note that these
+         * aren't won't actually have associated beliefs until a book of the given market age is
+         * observed: these are only the possible age model sizes that will be used.
+         */
+        static const std::vector<unsigned long> profit_stream_ages;
 
         /// Read-only access to this reader's demand belief
-        const belief::Demand& demandBelief();
+        const belief::Demand& demandBelief() const;
         /// Read-only access to this reader's quality belief
-        const belief::Quality& qualityBelief();
+        const belief::Quality& qualityBelief() const;
 
         /** In-between periods, the reader optimizes by:
          * - updates his beliefs based on characteristics of newly obtained books
@@ -424,7 +440,6 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         void intraReset() override;
 
     protected:
-        /// Belief about lifetime book profits
         belief::Profit profit_belief_, ///< Belief about lifetime book profits
             profit_belief_extrap_; ///< Beliefs about lifetime book profits using profit stream expectations
         belief::Demand demand_belief_; ///< Belief about per-period demand
@@ -434,9 +449,6 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * market for at least 3 periods.
          */
         std::map<unsigned long, belief::ProfitStream> profit_stream_beliefs_;
-
-        /// The different ages for profit_stream_beliefs
-        static const std::vector<unsigned long> profit_stream_ages_;
 
         /** Updates all of the reader's beliefs, in the following order:
          * - book quality beliefs

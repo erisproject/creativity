@@ -1,16 +1,15 @@
 #pragma once
 #include "creativity/gui/MemberStore.hpp"
-#include "creativity/Reader.hpp"
+#include "creativity/state/State.hpp"
 
 namespace creativity { namespace gui {
 
 /** Gtk::TreeModel::ColumnRecord subclass for handling Reader information in the list of readers in
  * the main GUI window.
  */
-class ReaderStore : public MemberStore<Reader>, Glib::Object {
+class ReaderStore : public MemberStore<state::ReaderState>, private Glib::Object {
     public:
-        /** Interface class between a simulation's Readers and a Gtk::TreeView.  This internally
-         * stores a vector of Readers which can be updated (if needed) by calling the update method.
+        /** Interface class between a simulation state's Reader information and a Gtk::TreeView.
          *
          * This exposes 9 columns:
          * - ID
@@ -24,11 +23,7 @@ class ReaderStore : public MemberStore<Reader>, Glib::Object {
          * - books written
          * - age of most recently written book (simulation age if no books written)
          */
-        static Glib::RefPtr<ReaderStore> create(std::shared_ptr<eris::Simulation> sim);
-
-        /** Sychronizes the list of readers with the stored Simulation. Typically called after a
-         * simulation period runs. */
-        virtual std::vector<eris::SharedMember<Reader>> resync_add() override;
+        static Glib::RefPtr<ReaderStore> create(const state::State &state);
 
         /** ColumnRecord object for a ReaderStore.  This object contains the columns for this Book
          * model.  This should not be used directly, but rather accessed via the public `columns`
@@ -59,7 +54,7 @@ class ReaderStore : public MemberStore<Reader>, Glib::Object {
 
     protected:
         /// Protected constructor; this object should be constructed using create().
-        ReaderStore(std::shared_ptr<eris::Simulation> &&sim);
+        ReaderStore(const state::State &state);
 
         /** Returns the column type of the given position.  This is typically invoked via
          * get_column_type, itself given a column member of the `.columns` ColRec object.
@@ -98,26 +93,26 @@ class ReaderStore : public MemberStore<Reader>, Glib::Object {
 
     private:
         // The various comparison functions; one of these gets passed to std::stable_sort.
-        static bool less_id(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b);
-        static bool greater_id(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b);
-        static bool less_posX(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b);
-        static bool greater_posX(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b);
-        static bool less_posY(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b);
-        static bool greater_posY(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b);
-        static bool less_posstr(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b);
-        static bool greater_posstr(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b);
-        static bool less_uCurr(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b);
-        static bool greater_uCurr(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b);
-        static bool less_uLife(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b);
-        static bool greater_uLife(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b);
-        static bool less_booksOwned(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b);
-        static bool greater_booksOwned(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b);
-        static bool less_booksNew(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b);
-        static bool greater_booksNew(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b);
-        static bool less_booksWritten(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b);
-        static bool greater_booksWritten(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b);
-        static bool less_lastBookAge(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b);
-        static bool greater_lastBookAge(const eris::SharedMember<Reader> &a, const eris::SharedMember<Reader> &b);
+        static bool less_id(const state::ReaderState &a, const state::ReaderState &b);
+        static bool greater_id(const state::ReaderState &a, const state::ReaderState &b);
+        static bool less_posX(const state::ReaderState &a, const state::ReaderState &b);
+        static bool greater_posX(const state::ReaderState &a, const state::ReaderState &b);
+        static bool less_posY(const state::ReaderState &a, const state::ReaderState &b);
+        static bool greater_posY(const state::ReaderState &a, const state::ReaderState &b);
+        static bool less_posstr(const state::ReaderState &a, const state::ReaderState &b);
+        static bool greater_posstr(const state::ReaderState &a, const state::ReaderState &b);
+        static bool less_uCurr(const state::ReaderState &a, const state::ReaderState &b);
+        static bool greater_uCurr(const state::ReaderState &a, const state::ReaderState &b);
+        static bool less_uLife(const state::ReaderState &a, const state::ReaderState &b);
+        static bool greater_uLife(const state::ReaderState &a, const state::ReaderState &b);
+        static bool less_booksOwned(const state::ReaderState &a, const state::ReaderState &b);
+        static bool greater_booksOwned(const state::ReaderState &a, const state::ReaderState &b);
+        static bool less_booksNew(const state::ReaderState &a, const state::ReaderState &b);
+        static bool greater_booksNew(const state::ReaderState &a, const state::ReaderState &b);
+        static bool less_booksWritten(const state::ReaderState &a, const state::ReaderState &b);
+        static bool greater_booksWritten(const state::ReaderState &a, const state::ReaderState &b);
+        bool less_lastBookAge(const state::ReaderState &a, const state::ReaderState &b) const;
+        bool greater_lastBookAge(const state::ReaderState &a, const state::ReaderState &b) const;
 
 };
 

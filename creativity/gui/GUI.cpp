@@ -8,10 +8,13 @@
 #include <iomanip>
 
 using namespace eris;
+using namespace creativity::state;
+using namespace std::placeholders;
 
 namespace creativity { namespace gui {
 
-GUI::GUI(std::shared_ptr<Simulation> sim,
+GUI::GUI(const std::vector<std::shared_ptr<State>> &states,
+        std::mutex &state_mutex,
         std::function<void(Parameter)> setup,
         std::function<void(unsigned int count)> run,
         std::function<void()> stop,
@@ -19,7 +22,8 @@ GUI::GUI(std::shared_ptr<Simulation> sim,
         std::function<void()> step,
         std::function<void()> quit)
     :
-        sim_{sim},
+        states_{states},
+        state_mutex_{state_mutex},
         on_setup_{std::move(setup)},
         on_run_{std::move(run)},
         on_stop_{std::move(stop)},
@@ -29,13 +33,6 @@ GUI::GUI(std::shared_ptr<Simulation> sim,
 {}
 
 GUI::Exception::Exception(const std::string &what) : std::runtime_error(what) {}
-
-template<class T>
-T* GUI::widget(const std::string &widget_name) {
-    T* widget;
-    builder_->get_widget(widget_name, widget);
-    return widget;
-}
 
 double GUI::sb(const std::string &widget_name) {
     return widget<Gtk::SpinButton>(widget_name)->get_value();
@@ -119,15 +116,30 @@ void GUI::thr_run() {
         queueEvent(Event::Type::step);
     });
 
-    auto thrbox = widget<Gtk::ComboBox>("combo_threads");
-    auto thrlist = Glib::RefPtr<Gtk::ListStore>::cast_static(thrbox->get_model());
+    auto thrbox = widget<Gtk::ComboBoxText>("combo_threads");
+    int default_threads = 0;
     for (unsigned int i = 2; i <= std::thread::hardware_concurrency(); i++) {
-        auto iter = thrlist->append();
-        iter->set_value(0, i);
-        iter->set_value(1, std::to_string(i) + " threads");
+        thrbox->append(std::to_string(i) + " threads");
+        default_threads = i;
     }
-    thrbox->set_active(*(thrlist->children().rbegin()));
-    //thrbox->set_active(*(thrlist->children().begin()));
+    thrbox->set_active(default_threads);
+    //thrbox->set_active(0);
+    // FIXME: change num threads when changing thrbox
+    // FIXME,2: disable thrbox while running, reenable while stopped
+
+    widget<Gtk::ComboBox>("combo_state")->signal_changed().connect([this] {
+        thr_set_state(widget<Gtk::ComboBox>("combo_state")->get_active_row_number());
+    });
+
+    widget<Gtk::Button>("btn_prev")->signal_clicked().connect([this] {
+        if (state_curr_ > 0) thr_set_state(state_curr_ - 1);
+    });
+    widget<Gtk::Button>("btn_next")->signal_clicked().connect([this] {
+        if (state_curr_ + 1 < state_num_) thr_set_state(state_curr_ + 1);
+    });
+    widget<Gtk::Button>("btn_last")->signal_clicked().connect([this] {
+        thr_set_state(state_num_ - 1);
+    });
 
     Gtk::Viewport *vis;
     builder_->get_widget("view_vis", vis);
@@ -136,18 +148,18 @@ void GUI::thr_run() {
     // mainloop is running.
     std::unique_lock<std::mutex> lock{mutex_};
 
-    graph_ = std::unique_ptr<GraphArea>(new GraphArea{10., 10., -10., -10., sim_, *this});
+    graph_ = std::unique_ptr<GraphArea>(new GraphArea{10., 10., -10., -10., *this});
     graph_->add_events(Gdk::EventMask::BUTTON_PRESS_MASK);
 
     hand_ = Gdk::Cursor::create(main_window_->get_display(), Gdk::HAND1);
 
     motion_handler_ = [this](GdkEventMotion *event) -> bool {
-        // When the mouse moves over the image, change the cursor to a hand any time the cursor
-        // is within 5 pixels of a graph item (book, reader, etc.)
         rt_point clicked(event->x, event->y);
 
-        std::vector<rt_val> nearest;
-        rtree_.query(boost::geometry::index::nearest(clicked, 1), std::back_inserter(nearest));
+        // When the mouse moves over the image, change the cursor to a hand any time the cursor
+        // is within 5 pixels of a graph item (book, reader, etc.)
+        auto nearest = thr_nearest(clicked);
+
         if (not nearest.empty() and boost::geometry::distance(nearest[0].first, clicked) <= 5)
             main_window_->get_window()->set_cursor(hand_);
         else
@@ -162,8 +174,8 @@ void GUI::thr_run() {
         rt_point clicked(event->x, event->y);
 
         // Figure out the closest Reader and Book on the canvas relative to where the click happened
-        std::vector<rt_val> nearest;
-        rtree_.query(boost::geometry::index::nearest(clicked, 1), std::back_inserter(nearest));
+        auto nearest = thr_nearest(clicked);
+
         if (nearest.empty() or boost::geometry::distance(nearest[0].first, clicked) > 5)
             return false;
 
@@ -171,31 +183,41 @@ void GUI::thr_run() {
         return true;
     });
 
-    rdr_model_ = ReaderStore::create(sim_);
+    // FIXME: cache visualization drawing into an off-screen buffer (but delete cache and redo if window size changes)
+
+    rdr_win_ = widget<Gtk::ScrolledWindow>("win_rdr");
+    bk_win_ = widget<Gtk::ScrolledWindow>("win_bk");
+    /*
+    // We need a (fake) initial state here to add the columns to the tree
+    State blank_state;
+    auto initial_rdr_model = ReaderStore::create(blank_state);
+
     rdr_tree_ = std::unique_ptr<Gtk::TreeView>(new Gtk::TreeView);
-    rdr_tree_->set_model(rdr_model_);
-    rdr_model_->appendColumnsTo(*rdr_tree_);
+    initial_rdr_model->appendColumnsTo(*rdr_tree_);
     rdr_tree_->set_fixed_height_mode(true);
-    rdr_model_->set_sort_column(rdr_model_->columns.id, Gtk::SortType::SORT_ASCENDING);
+
     rdr_tree_->signal_row_activated().connect([this] (const Gtk::TreeModel::Path &path, Gtk::TreeViewColumn*) -> void {
-            thr_info_dialog(rdr_model_->member(path));
+        thr_info_dialog(rdr_models_[state_curr_]->member(path).id);
     });
 
     widget<Gtk::ScrolledWindow>("win_rdr")->add(*rdr_tree_);
     rdr_tree_->show();
+    */
 
-    bk_model_ = BookStore::create(sim_);
+    /*
+    auto initial_bk_model = BookStore::create(blank_state);
     bk_tree_ = std::unique_ptr<Gtk::TreeView>(new Gtk::TreeView);
-    bk_tree_->set_model(bk_model_);
-    bk_model_->appendColumnsTo(*bk_tree_);
+    initial_bk_model->appendColumnsTo(*bk_tree_);
     bk_tree_->set_fixed_height_mode(true);
-    bk_model_->set_sort_column(bk_model_->columns.id, Gtk::SortType::SORT_DESCENDING);
     bk_tree_->signal_row_activated().connect([this] (const Gtk::TreeModel::Path &path, Gtk::TreeViewColumn*) -> void {
-            thr_info_dialog(bk_model_->member(path));
+        thr_info_dialog(bk_models_[state_curr_]->member(path).id);
     });
+
+    bk_tree_->debug_window = widget<Gtk::ScrolledWindow>("win_bk");
 
     widget<Gtk::ScrolledWindow>("win_bk")->add(*bk_tree_);
     bk_tree_->show();
+    */
 
     dispatcher_ = std::unique_ptr<Glib::Dispatcher>(new Glib::Dispatcher);
     dispatcher_->connect([this] { thr_signal(); });
@@ -216,61 +238,225 @@ void GUI::thr_run() {
     dispatcher_.reset();
 }
 
-void GUI::thr_update_readers() {
-    rdr_model_->resync();
+void GUI::thr_set_state(unsigned long t) {
+    if (t == state_curr_ or state_num_ == 0) return;
+
+    std::shared_ptr<State> state;
+    {
+        auto lock = stateLock();
+        state = states_.at(t); // Will throw if `t` is invalid
+        // Enlarge if necessary
+#define RESIZE_TO(RESIZE, SOURCE) if (RESIZE.size() < SOURCE.size()) RESIZE.resize(SOURCE.size())
+        RESIZE_TO(rdr_models_, states_);
+        RESIZE_TO(rdr_trees_, states_);
+        RESIZE_TO(bk_models_, states_);
+        RESIZE_TO(bk_trees_, states_);
+        RESIZE_TO(rtrees_, states_);
+#undef RESIZE_TO
+    }
+
+    // Values may be null pointers--if so, create new model stores
+    if (not rdr_models_[t]) rdr_models_[t] = ReaderStore::create(*state);
+    if (not bk_models_[t]) bk_models_[t] = BookStore::create(*state);
+
+    Gtk::TreeModel::Path rdr_select, bk_select;
+
+    if (state_curr_ == (unsigned long) -1) {
+        // This is the first state, replacing the window initialization fake state.
+        //
+        // Apply default sort orders (readers go in ID ascending, books go by age ascending).  Do
+        // this here rather that {Reader,Book}Store::create because the sort order will be copied to
+        // new state transitions; if the user changes the sort order, it's that new order rather
+        // than this default order that we want to apply.
+        rdr_models_[t]->set_sort_column(rdr_models_[t]->columns.id, Gtk::SortType::SORT_ASCENDING);
+        bk_models_[t]->set_sort_column(bk_models_[t]->columns.age, Gtk::SortType::SORT_ASCENDING);
+    }
+    else {
+        // Transitioning from one (actual) state to another: preserve sort order and reader/book
+        // selection from the old treeview&model to the newly selected treeview&model.
+        int old_sort_col, new_sort_col;
+        Gtk::SortType old_sort_order, new_sort_order;
+
+        // Readers:
+        rdr_models_[state_curr_]->get_sort_column_id(old_sort_col, old_sort_order);
+        rdr_models_[t]->get_sort_column_id(new_sort_col, new_sort_order);
+        if (old_sort_col != new_sort_col or old_sort_order != new_sort_order)
+            rdr_models_[t]->set_sort_column(old_sort_col, old_sort_order);
+
+        // Books:
+        bk_models_[state_curr_]->get_sort_column_id(old_sort_col, old_sort_order);
+        bk_models_[t]->get_sort_column_id(new_sort_col, new_sort_order);
+        if (old_sort_col != new_sort_col or old_sort_order != new_sort_order)
+            bk_models_[t]->set_sort_column(old_sort_col, old_sort_order);
+
+        // Figure out if a reader/book is selected so that we can also select it in the new model
+        auto rdr_sel_iter = rdr_trees_[state_curr_]->get_selection()->get_selected();
+        if (rdr_sel_iter) {
+            auto selected_id = rdr_models_[state_curr_]->member(rdr_sel_iter).id;
+            rdr_select = rdr_models_[t]->find(selected_id, rdr_sel_iter);
+        }
+
+        auto bk_sel_iter = bk_trees_[state_curr_]->get_selection()->get_selected();
+        if (bk_sel_iter) {
+            auto selected_id = bk_models_[state_curr_]->member(bk_sel_iter).id;
+            bk_select = bk_models_[t]->find(selected_id, bk_sel_iter);
+        }
+
+    }
+
+    // Make sure we have properly set up Gtk::TreeView references and not null pointers
+    if (not rdr_trees_[t]) {
+        auto *tv = new Gtk::TreeView;
+        rdr_models_[t]->appendColumnsTo(*tv);
+        tv->set_fixed_height_mode(true);
+        tv->signal_row_activated().connect([this] (const Gtk::TreeModel::Path &path, Gtk::TreeViewColumn*) -> void {
+            thr_info_dialog(rdr_models_[state_curr_]->member(path).id);
+        });
+        tv->set_model(rdr_models_[t]);
+        tv->show();
+        rdr_trees_[t].reset(tv);
+    }
+    if (not bk_trees_[t]) {
+        auto *tv = new Gtk::TreeView;
+        bk_models_[t]->appendColumnsTo(*tv);
+        tv->set_fixed_height_mode(true);
+        tv->signal_row_activated().connect([this] (const Gtk::TreeModel::Path &path, Gtk::TreeViewColumn*) -> void {
+            thr_info_dialog(bk_models_[state_curr_]->member(path).id);
+        });
+        tv->set_model(bk_models_[t]);
+        tv->show();
+        bk_trees_[t].reset(tv);
+    }
+
+
+    // Apply the previous selection to the new treeviews
+    if (rdr_select.empty())
+        rdr_trees_[t]->get_selection()->unselect_all();
+    else {
+        rdr_trees_[t]->get_selection()->select(rdr_select);
+        rdr_trees_[t]->scroll_to_row(rdr_select);
+    }
+
+    if (bk_select.empty())
+        bk_trees_[t]->get_selection()->unselect_all();
+    else {
+        bk_trees_[t]->get_selection()->select(bk_select);
+        bk_trees_[t]->scroll_to_row(bk_select);
+    }
+
+    // Replace the current treeview in the window with the new one
+    rdr_win_->remove();
+    rdr_win_->add(*rdr_trees_[t]);
+
+    bk_win_->remove();
+    bk_win_->add(*bk_trees_[t]);
+
+    if (rtrees_[t].empty()) {
+        // Stick all points into an rtree so that we can quickly find the nearest one (needed, in
+        // particular, for fast mouseovers).
+        auto &rt = rtrees_[t];
+        auto g2c = graph_->graph_to_canvas();
+        for (auto &r : state->readers) {
+            double x = r.second.position[0], y = r.second.position[1];
+            g2c.transform_point(x, y);
+            rt.insert(std::make_pair(rt_point{x, y}, r.second.id));
+        }
+        for (auto &b : state->books) {
+            double x = b.second.position[0], y = b.second.position[1];
+            g2c.transform_point(x, y);
+            rt.insert(std::make_pair(rt_point{x, y}, b.second.id));
+        }
+    }
+
+    // Now go through any open reader/book info dialog windows: delete any that have been closed,
+    // and refresh the information on any still open.
+    std::vector<eris_id_t> del;
+    // NB: can't do this in a single pass without the extra erase() lookups: the iteration order of
+    // unordered_map after an .erase() isn't guaranteed to be the same until C++14 (C++11 only
+    // guarantees that iterators remain valid, but not necessarily in the same order).
+    for (auto &w : info_windows_) {
+        if (w.second.get_visible())
+            w.second.refresh(*state);
+        else
+            del.push_back(w.first);
+    }
+    for (auto &d : del) {
+        info_windows_.erase(d);
+    }
+
+    state_curr_ = t;
+    // This must be *after* state_curr_ gets updated, otherwise it'll trigger a recursive call
+    widget<Gtk::ComboBox>("combo_state")->set_active(t);
+    widget<Gtk::Label>("lbl_tab_agents")->set_text("Agents (" + std::to_string(state->readers.size()) + ")");
+    widget<Gtk::Label>("lbl_tab_books")->set_text("Books (" + std::to_string(state->books.size()) + ")");
+
+    widget<Gtk::Button>("btn_prev")->set_sensitive(state_curr_ > 0);
+    widget<Gtk::Button>("btn_next")->set_sensitive(state_curr_ + 1 < state_num_);
+    widget<Gtk::Button>("btn_last")->set_sensitive(state_curr_ + 1 < state_num_);
+
+    if (graph_->get_is_drawable()) graph_->queue_draw();
 }
 
-void GUI::thr_update_books() {
-    bk_model_->resync();
+std::vector<GUI::rt_val> GUI::thr_nearest(const rt_point &point, int n) {
+    std::vector<rt_val> nearest;
+    if (state_num_ > 0)
+        rtrees_[state_curr_].query(boost::geometry::index::nearest(point, n), std::back_inserter(nearest));
+    return nearest;
 }
 
-void GUI::thr_info_dialog(SharedMember<Member> member) {
-    auto already_open = info_windows_.find(member->id());
+std::unique_lock<std::mutex> GUI::stateLock() {
+    return std::unique_lock<std::mutex>(state_mutex_);
+}
+
+void GUI::thr_info_dialog(eris_id_t member_id) {
+    auto already_open = info_windows_.find(member_id);
     if (already_open != info_windows_.end()) {
         // If the window is already active, just present it again
         already_open->second.present();
     }
     else {
-        // Otherwise we need to create a new window
-        SharedMember<Reader> reader;
-        SharedMember<Book> book;
-        try {
-            reader = member;
-        }
-        catch (std::bad_cast&) {
-            // Not a reader: must be a book (if this throws again, don't catch it)
-            book = member;
+        std::shared_ptr<State> state;
+        {
+            auto l = stateLock();
+            state = states_[state_curr_];
         }
 
-        if (reader) {
+        if (state->readers.count(member_id)) {
             info_windows_.emplace(std::piecewise_construct,
-                    std::tuple<eris_id_t>{reader},
-                    std::tuple<decltype(reader), decltype(main_window_)>{reader, main_window_});
+                    std::tuple<eris_id_t>{member_id},
+                    std::tuple<decltype(*state)&, decltype(main_window_), eris_id_t, std::function<void(eris_id_t)>>{
+                        *state, main_window_, member_id, std::bind(&GUI::thr_info_dialog, this, _1)});
+        }
+        else if (state->books.count(member_id)) {
+            info_windows_.emplace(std::piecewise_construct,
+                    std::tuple<eris_id_t>{member_id},
+                    std::tuple<decltype(*state)&, decltype(main_window_), eris_id_t>{*state, main_window_, member_id});
         }
         else {
-            info_windows_.emplace(std::piecewise_construct,
-                    std::tuple<eris_id_t>{book},
-                    std::tuple<decltype(book), decltype(main_window_)>{book, main_window_});
+            throw std::out_of_range("thr_info_dialog: requested member id does not exist");
         }
+
     }
 }
 
 void GUI::thr_signal() {
     std::unique_lock<std::mutex> lock(mutex_);
-    // Keep track of the *last* state change we see, and whether or not we see a redraw (we want to
-    // skip everything except the last).
+    // Keep track of the *last* state change we see, and whether or not we see a new_states signal
+    // (we want to skip everything except the last).
     std::stringstream errors;
-    Signal last_state{Signal::Type::quit}, last_progress{Signal::Type::quit}, last_redraw{Signal::Type::quit};
+    bool init = false;
+    Signal last_state{Signal::Type::quit}, last_progress{Signal::Type::quit}, last_new_states{Signal::Type::quit};
     for (Signal &s : signal_queue_) {
         switch (s.type) {
             case Signal::Type::quit:
                 app_->quit();
                 return;
                 break;
-            case Signal::Type::redraw:
-                last_redraw = s;
+            case Signal::Type::new_states:
+                last_new_states = s;
                 break;
             case Signal::Type::initialized:
+                init = true;
             case Signal::Type::running:
             case Signal::Type::stopped:
                 last_state = s;
@@ -287,7 +473,7 @@ void GUI::thr_signal() {
     signal_queue_.clear();
     lock.unlock();
 
-    if (last_state.type == Signal::Type::initialized) {
+    if (init) {
         widget<Gtk::Notebook>("nb_tabs")->set_current_page(1);
 
         // Disable spin buttons:
@@ -301,7 +487,6 @@ void GUI::thr_signal() {
         widget<Gtk::Button>("btn_resume")->set_visible(false);
         widget<Gtk::Button>("btn_pause")->set_visible(false);
         widget<Gtk::Button>("btn_step")->set_sensitive(true);
-
     }
     else if (last_state.type == Signal::Type::running) {
         widget<Gtk::Notebook>("nb_tabs")->set_current_page(1);
@@ -311,9 +496,6 @@ void GUI::thr_signal() {
         widget<Gtk::Button>("btn_resume")->set_visible(false);
         widget<Gtk::Button>("btn_pause")->set_visible(true);
         widget<Gtk::Button>("btn_step")->set_sensitive(false);
-
-        // Disconnect motion handler while running
-        if (motion_handler_conn_) motion_handler_conn_.disconnect();
     }
     else if (last_state.type == Signal::Type::stopped) {
         // Turn off pause and turn on either play or resume buttons
@@ -321,34 +503,14 @@ void GUI::thr_signal() {
         widget<Gtk::Button>("btn_resume")->set_visible(last_state.boolean);
         widget<Gtk::Button>("btn_pause")->set_visible(false);
         widget<Gtk::Button>("btn_step")->set_sensitive(true);
-
-        // Stick all points into an rtree so that we can quickly find the nearest one (needed, in
-        // particular, for fast mouseovers).
-        rtree_.clear();
-        auto g2c = graph_->graph_to_canvas();
-        for (auto &r : sim_->agents<Reader>()) {
-            double x = r->position()[0], y = r->position()[1];
-            g2c.transform_point(x, y);
-            rtree_.insert(std::make_pair(rt_point{x, y}, SharedMember<Member>{r}));
-        }
-        for (auto &b : sim_->goods<Book>()) {
-            double x = b->position()[0], y = b->position()[1];
-            g2c.transform_point(x, y);
-            rtree_.insert(std::make_pair(rt_point{x, y}, SharedMember<Member>{b}));
-        }
-
-        // Reenable mouseover handler
-        if (not motion_handler_conn_)
-            motion_handler_conn_ = graph_->signal_motion_notify_event().connect(motion_handler_);
     }
     if (last_progress.type == Signal::Type::progress) {
-        // .uls contains: t, end, readers, books
+        // Progress bar update
+        // .uls contains: t, end
         // .doubles has: speed
         auto progress = widget<Gtk::ProgressBar>("progress_stage");
         progress->set_text(std::to_string(last_progress.uls[0]) + " / " + std::to_string(last_progress.uls[1]));
         progress->set_fraction((double) last_progress.uls[0] / (double) last_progress.uls[1]);
-        widget<Gtk::Label>("status_readers")->set_text(std::to_string(last_progress.uls[2]));
-        widget<Gtk::Label>("status_books")->set_text(std::to_string(last_progress.uls[3]));
         std::ostringstream speed;
         speed << std::setw(7) << std::showpoint << last_progress.doubles[0];
 
@@ -363,21 +525,36 @@ void GUI::thr_signal() {
         dlg_error->hide();
     }
 
-    if (last_redraw.type == Signal::Type::redraw) {
-        thr_update_readers();
-        thr_update_books();
-        if (graph_->get_is_drawable()) {
-            graph_->queue_draw();
+    if (last_new_states.type == Signal::Type::new_states) {
+        auto old_state_num = state_num_;
+
+        {
+            auto lock = stateLock();
+            state_num_ = states_.size();
         }
-        else {
-            ERIS_DBG("Fake redraw (not currently drawable) completed.");
-            // Not currently drawable (perhaps not on visualization tab), so send back a fake redraw
-            // event in case the caller is going to wait for a redraw to complete.
-            queueEvent(Event::Type::redraw_complete);
+
+        if (state_num_ > old_state_num) {
+            // - 1 here because we don't really count 0 as a stage
+            widget<Gtk::Label>("lbl_total")->set_text(std::to_string(state_num_-1));
+
+            // In case the next/last buttons are disable, reactivate them
+            widget<Gtk::Button>("btn_next")->set_sensitive(true);
+            widget<Gtk::Button>("btn_last")->set_sensitive(true);
+
+            auto periods = widget<Gtk::ComboBoxText>("combo_state");
+            for (unsigned long t = old_state_num; t < state_num_; t++) {
+                periods->append(std::to_string(t));
+            }
+
+            // If the user was on the last state, switch them to the new last state.
+            if (old_state_num == 0 or state_curr_ == old_state_num - 1)
+                thr_set_state(state_num_-1);
         }
+
+        // FIXME: do I need to bother with this?
+        queueEvent(Event::Type::new_states_acknowledged);
     }
 }
-
 
 void GUI::queueSignal(Signal &&s) {
     std::unique_lock<std::mutex> lock(mutex_);
@@ -402,9 +579,8 @@ void GUI::setupSim() {
     p.param = ParamType::cost_fixed; p.dbl = sb("set_cost_fixed"); params.push_back(p);
     p.param = ParamType::cost_unit; p.dbl = sb("set_cost_unit"); params.push_back(p);
     p.param = ParamType::speed_limit; p.dbl = sb("set_speed"); params.push_back(p);
-    p.param = ParamType::redraw; p.dur_ms = std::chrono::milliseconds{sb_int("set_redraw")}; params.push_back(p);
-    unsigned int threads;
-    widget<Gtk::ComboBox>("combo_threads")->get_active()->get_value(0, threads);
+    int threads = widget<Gtk::ComboBoxText>("combo_threads")->get_active_row_number();
+    if (threads < 0) threads = 0; // -1 means no item selected (shouldn't be possible, but just in case)
     p.param = ParamType::threads; p.ul = (unsigned long)threads; params.push_back(p);
 
     queueEvent(Event::Type::setup, std::move(params));
@@ -414,18 +590,21 @@ void GUI::runSim() {
     queueEvent(Event::Type::run, sb_int("set_periods"));
 }
 
-void GUI::redraw(bool sync) {
-    queueSignal(Signal::Type::redraw);
-    if (sync) waitForEvent(Event::Type::redraw_complete);
+void GUI::new_states(bool sync) {
+    queueSignal(Signal::Type::new_states);
+    if (sync) waitForEvent(Event::Type::new_states_acknowledged);
 }
 
-void GUI::initialized() { queueSignal(Signal::Type::initialized); }
+void GUI::initialized() {
+    queueSignal(Signal::Type::new_states);
+    queueSignal(Signal::Type::initialized);
+}
 
 void GUI::running() { queueSignal(Signal::Type::running); }
 
-void GUI::progress(const unsigned long &end, const double &speed) {
+void GUI::progress(unsigned long t, unsigned long end, double speed) {
     Signal s{Signal::Type::progress};
-    s.uls = {sim_->t(), end, sim_->countAgents<Reader>(), sim_->countGoods<Book>()};
+    s.uls = {t, end};
     s.doubles = {speed};
     queueSignal(std::move(s));
 }

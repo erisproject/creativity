@@ -4,7 +4,7 @@
 #include <gtkmm/treesortable.h>
 #include <gtkmm/treeview.h>
 #include <gtkmm/treepath.h>
-#include <eris/Simulation.hpp>
+#include "creativity/state/State.hpp"
 
 namespace creativity { namespace gui {
 
@@ -12,7 +12,10 @@ namespace creativity { namespace gui {
  *
  * Note: the implementing class *must* inherit from Glib::ObjectBase and call the
  * Glib::ObjectBase(typeid(CLASS)) constructor to register the type with Glib.
- * */
+ *
+ * \param M the state type being represented by this MemberStore such as `BookState` or
+ * `ReaderState`.
+ */
 template <class M>
 class MemberStore : public Gtk::TreeModel, public Gtk::TreeSortable {
     public:
@@ -21,25 +24,54 @@ class MemberStore : public Gtk::TreeModel, public Gtk::TreeSortable {
         /** Takes a Gtk::TreeView and adds this object's columns to it. */
         virtual void appendColumnsTo(Gtk::TreeView &v) const = 0;
 
-        /** Gets the Member from a Path.  Returns an empty SharedMember if the Path is invalid. */
-        eris::SharedMember<M> member(const Path &path) const;
+        /** Gets the M Member from a Path.  Throws an exception if the Path is invalid. */
+        const M& member(const Path &path) const;
 
-        /** Resynchronizes the member list from the simulation.  This calls resync_remove() and
-         * resync_changed, and resync_add() to get members to remove/add and notify of changes, then
-         * takes the appropriate actions to remove/add them.  This also updates max_id_ if any of
-         * the resync_add() members have an id larger than the current max_id_ value. */
-        void resync();
+        /** Gets the M Member from an iterator.  Throws an exception if the iterator is invalid. */
+        const M& member(const iterator &iter) const;
+
+        /** Returns the Path to the member with the given id.  Returns an empty path if the id was
+         * not found.
+         *
+         * This does a linear search of the current member list.
+         *
+         * \param hint if provided as a non-zero, this checks the given position first for a match
+         * before starting a linear search.  This is a useful optimization when finding across
+         * models that are expected to contain the same elements in the same order.
+         */
+        Path find(eris::eris_id_t id, size_t hint = 0) const;
+
+        /** Returns the Path to the member with the given id.  The `hint` iterator is used to
+         * determine the position to check first; if it doesn't match the requested ID, a linear
+         * search of all members is performed.
+         *
+         * \sa find(eris::eris_id_t, size_t)
+         */
+        Path find(eris::eris_id_t id, const iterator &iter) const;
+
+        /** Returns the Path to the member with the given id.  The `hint` path is used to determine
+         * the position to check first; if it doesn't match the requested ID, a linear search of all
+         * members is performed.
+         *
+         * \sa find(eris::eris_id_t, size_t)
+         */
+        Path find(eris::eris_id_t id, const Path &hint) const;
 
     protected:
         /** Protected constructor; this object should be constructed from a subclass, typically via
          * the subclass's static create() method.
          *
-         * \param sim a shared pointer value to the simulation object.
+         * Subclasses must inherit from Glib::ObjectBase and call the
+         * Glib::ObjectBase(typeid(CLASS)) constructor to register the type with Glib.  See
+         * gui/ReaderStore.hpp for an example.
          *
-         * \sa MemberStore
+         * \param state a reference to a simulation state object.  The object's lifespan should
+         * exceed the lifespan of the MemberStore-derived object.
+         *
+         * \sa ReaderStore
          * \sa BookStore
          */
-        MemberStore(std::shared_ptr<eris::Simulation> &&sim);
+        MemberStore(const state::State &state);
 
         /** Returns Gtk::TreeModel flags (specifically, the LIST_ONLY flag). */
         virtual Gtk::TreeModelFlags get_flags_vfunc() const override;
@@ -120,21 +152,6 @@ class MemberStore : public Gtk::TreeModel, public Gtk::TreeSortable {
          */
         virtual void set_sort_column_id_vfunc(int sort_column_id, Gtk::SortType order) override = 0;
 
-        /// Returns a vector of new members to add to the model.  Called by resync().
-        virtual std::vector<eris::SharedMember<M>> resync_add() = 0;
-
-        /** Returns a set of members_ indices that should be removed from the model.  Called by
-         * resync().  The default implementation returns any members that have an id() of 0 (which
-         * indicates that a members doesn't belong to the simulation), but subclasses may override
-         * this.
-         */
-        virtual std::unordered_set<size_t> resync_remove();
-
-        /** Calls row_changed() on every row in the model.  Can be overridden to provide alternate
-         * behaviour.
-         */
-        virtual void resync_changed();
-
         /** Called by subclasses, typically in set_sort_column_id_vfunc, to resort the current list
          * of members using the given function.  This uses std::stable_sort, which means the current
          * order is maintained for any members that are equal according to the given comparison
@@ -151,7 +168,7 @@ class MemberStore : public Gtk::TreeModel, public Gtk::TreeSortable {
          * \param order the new sort order
          */
         virtual void sort_members(
-                std::function<bool(const eris::SharedMember<M> &a, const eris::SharedMember<M> &b)> &compare,
+                std::function<bool(const M &a, const M &b)> &compare,
                 int sort_column_id,
                 Gtk::SortType order);
 
@@ -166,14 +183,10 @@ class MemberStore : public Gtk::TreeModel, public Gtk::TreeSortable {
                 c->set_sort_column(col);
         }
 
-        /** Can be used by subclasses to track the maximum member eris_id_t currently in members_,
-         * so as to identify new members during resync().
-         */
-        eris::eris_id_t max_id_ = 0;
-        /// The simulation.
-        std::shared_ptr<eris::Simulation> sim_;
+        /// The state.
+        const state::State &state_;
         /// The vector of members.
-        std::vector<eris::SharedMember<M>> members_;
+        std::vector<std::reference_wrapper<const M>> members_;
         /// Tracks model changes by being incremented whenever such a change occurs
         int stamp_ = 1;
 
@@ -184,22 +197,39 @@ class MemberStore : public Gtk::TreeModel, public Gtk::TreeSortable {
         Gtk::SortType sort_order_ = Gtk::SORT_ASCENDING;
 };
 
-template <class M> MemberStore<M>::MemberStore(std::shared_ptr<eris::Simulation> &&sim)
-    : //Glib::ObjectBase(typeid(MemberStore<M>)),
-    //Gtk::TreeModel(),
-    //Gtk::TreeSortable(),
-    //Glib::Object(),
-    sim_{std::move(sim)}
-{}
+template <class M> MemberStore<M>::MemberStore(const state::State &state) : state_{state} {}
 
 template <class M> Gtk::TreeModelFlags MemberStore<M>::get_flags_vfunc() const {
     return Gtk::TREE_MODEL_LIST_ONLY;
 }
 
-template <class M> eris::SharedMember<M> MemberStore<M>::member(const Path &path) const {
-    size_t i = path.back();
-    if (i >= members_.size()) return eris::SharedMember<M>();
-    return members_[i];
+template <class M> const M& MemberStore<M>::member(const Path &path) const {
+    return members_.at(path.back());
+}
+
+template <class M> const M& MemberStore<M>::member(const iterator &iter) const {
+    return members_.at((size_t) iter.gobj()->user_data);
+}
+
+template <class M> Gtk::TreeModel::Path MemberStore<M>::find(eris::eris_id_t id, size_t hint) const {
+    Gtk::TreeModel::Path p;
+    if (hint > 0 and hint < members_.size() and members_[hint].get().id == id) {
+        p.push_back(hint);
+        return p;
+    }
+    for (size_t i = 0; i < members_.size(); i++) {
+        if (members_[i].get().id == id) {
+            p.push_back(i);
+            return p;
+        }
+    }
+    return p;
+}
+template <class M> Gtk::TreeModel::Path MemberStore<M>::find(eris::eris_id_t id, const iterator &hint) const {
+    return find(id, (size_t) hint.gobj()->user_data);
+}
+template <class M> Gtk::TreeModel::Path MemberStore<M>::find(eris::eris_id_t id, const Path &hint) const {
+    return find(id, hint.empty() ? 0 : hint.back());
 }
 
 template <class M> bool MemberStore<M>::get_iter_vfunc(const Path &path, iterator& iter) const {
@@ -213,11 +243,11 @@ template <class M> bool MemberStore<M>::get_iter_vfunc(const Path &path, iterato
 
 template <class M> bool MemberStore<M>::iter_next_vfunc(const iterator &iter, iterator &iter_next) const {
     if (iter.get_stamp() != stamp_) return false;
-    size_t i = (size_t) iter.gobj()->user_data;
+    size_t i = 1 + (size_t) iter.gobj()->user_data;
     if (i >= members_.size()) return false;
 
     iter_next.set_stamp(stamp_);
-    iter_next.gobj()->user_data = (void*) ++i;
+    iter_next.gobj()->user_data = (void*) i;
     return true;
 }
 
@@ -268,7 +298,7 @@ template <class M> bool MemberStore<M>::get_sort_column_id_vfunc(int *sort_colum
 }
 
 template <class M> void MemberStore<M>::sort_members(
-                std::function<bool(const eris::SharedMember<M> &a, const eris::SharedMember<M> &b)> &compare,
+                std::function<bool(const M &a, const M &b)> &compare,
                 int sort_column_id,
                 Gtk::SortType order) {
     if (not compare) return;
@@ -277,8 +307,8 @@ template <class M> void MemberStore<M>::sort_members(
     // so store all the old positions before we sort.
     std::unordered_map<eris::eris_id_t, int> old_pos;
     int i = 0;
-    for (auto &r : members_)
-        old_pos[r] = i++;
+    for (const M &m : members_)
+        old_pos[m.id] = i++;
 
     if (sort_by_ != sort_column_id or sort_order_ != order) {
         sort_by_ = sort_column_id;
@@ -288,90 +318,19 @@ template <class M> void MemberStore<M>::sort_members(
 
     std::stable_sort(members_.begin(), members_.end(), compare);
 
+    // The sort invalidates our tree iterators, so increment the stamp
+    stamp_++;
+
     std::vector<int> new_order;
     new_order.reserve(members_.size());
     bool actual_reordering = false;
-    for (auto &r : members_) {
-        if (not actual_reordering and old_pos[r] != (int) new_order.size()) actual_reordering = true;
-        new_order.push_back(old_pos[r]);
+    for (const M &m : members_) {
+        if (not actual_reordering and old_pos[m.id] != (int) new_order.size()) actual_reordering = true;
+        new_order.push_back(old_pos[m.id]);
     }
 
     // If sorting actually changed anything, fire the rows-reordered signal
     if (actual_reordering) rows_reordered(Path(), new_order);
-}
-
-template <class M> void MemberStore<M>::resync() {
-    auto remove = resync_remove();
-
-    // If we're deleting, we have to copy out the whole vector, and will have to send out
-    // row_deleted signals for the removed rows.
-    if (not remove.empty()) {
-        std::vector<eris::SharedMember<M>> pruned_readers;
-        for (size_t i = 0; i < members_.size(); i++) {
-            if (not remove.count(i)) {
-                pruned_readers.push_back(std::move(members_[i]));
-            }
-        }
-        // Swap the pruned list into the actual list and increment the validity stamp
-        members_ = std::move(pruned_readers);
-        stamp_++;
-
-        // Send the row deleted signals
-        for (auto &i : remove) {
-            Path p;
-            p.push_back(i);
-            row_deleted(p);
-        }
-    }
-
-    resync_changed();
-
-    auto add = resync_add();
-
-    if (not add.empty()) {
-        size_t start_at = members_.size();
-        members_.reserve(start_at + add.size());
-        // Append the new readers
-        for (auto &m : add) {
-            if (m->id() > max_id_) max_id_ = m->id();
-            members_.push_back(std::move(m));
-        }
-
-        if (remove.empty()) stamp_++; // If we removed some elements then we already incremented the stamp_
-
-        // Send row_inserted signals for the new rows/readers
-        for (size_t i = start_at; i < members_.size(); i++) {
-            Path p;
-            p.push_back(i);
-            iterator it;
-            it.gobj()->user_data = (void*) i;
-            row_inserted(p, it);
-        }
-
-        // Finally resort the list (because the new elements won't be in the right locations)
-        set_sort_column(sort_by_, sort_order_);
-    }
-}
-
-template <class M> std::unordered_set<size_t> MemberStore<M>::resync_remove() {
-    std::unordered_set<size_t> remove;
-    size_t i = 0;
-    for (auto &m : members_) {
-        if (m == 0) remove.insert(i);
-        i++;
-    }
-    return remove;
-}
-
-template <class M> void MemberStore<M>::resync_changed() {
-    for (size_t i = 0; i < members_.size(); i++) {
-        Path path;
-        path.push_back(i);
-        iterator iter;
-        iter.set_stamp(stamp_);
-        iter.gobj()->user_data = (void*) i;
-        row_changed(path, iter);
-    }
 }
 
 }}

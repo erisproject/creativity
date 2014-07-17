@@ -6,6 +6,7 @@
 #include "creativity/belief/Profit.hpp"
 #include "creativity/belief/ProfitStream.hpp"
 #include "creativity/belief/Quality.hpp"
+#include "creativity/state/State.hpp"
 #include <eris/Eris.hpp>
 #include <eris/Simulation.hpp>
 #include <eris/Random.hpp>
@@ -17,32 +18,27 @@
 
 using namespace creativity;
 using namespace creativity::gui;
+using namespace creativity::state;
 using namespace eris;
 using namespace Eigen;
 
 int main(int argc, char *argv[1]) {
     Eigen::initParallel();
-    ERIS_DBG("WOO");
     Eris<Simulation> sim;
-    ERIS_DBG("WOO");
     MONEY = sim->create<Good::Continuous>();
-    ERIS_DBG("WOO");
     sim->create<NEW_BOOKS_Cleaner>();
 
-    ERIS_DBG("WOO");
     std::cerr << std::setprecision(16);
     std::cout << std::setprecision(16);
 
-    ERIS_DBG("WOO");
     bool setup = false, stopped = true, step = false, quit = false;
     unsigned long num_readers = 1000;
     double book_sd = 0.5, quality_draw_sd = 1.0;
     double cost_fixed = 20, cost_unit = 1, income = 1000;
     unsigned long run_start = 0, run_end = 0;
     double speed_limit = 0;
-    std::chrono::milliseconds redraw{50};
+    std::chrono::milliseconds sync_speed{50};
 
-    ERIS_DBG("WOO");
 #define NONNEG_DOUBLE(VAR, DESC) \
     case GUI::ParamType::VAR: \
         if (p.dbl < 0) \
@@ -52,7 +48,6 @@ int main(int argc, char *argv[1]) {
 
     // Set up handlers for user actions in the GUI
     auto on_setup = [&](GUI::Parameter p) { // Setup
-        ERIS_DBG("");
         switch (p.param) {
             case GUI::ParamType::begin:
                 setup = false;
@@ -71,9 +66,6 @@ int main(int argc, char *argv[1]) {
             NONNEG_DOUBLE(quality_draw_sd, "Quality standard deviation");
             NONNEG_DOUBLE(cost_fixed, "Fixed cost");
             NONNEG_DOUBLE(cost_unit, "Unit cost");
-            case GUI::ParamType::redraw:
-                redraw = p.dur_ms;
-                break;
             case GUI::ParamType::speed_limit:
                 speed_limit = p.dbl;
                 break;
@@ -86,11 +78,9 @@ int main(int argc, char *argv[1]) {
                 setup = true;
                 break;
         }
-        ERIS_DBG("done setup");
     };
-    ERIS_DBG("WOO");
+
     auto on_run = [&](unsigned long periods) { // Run
-        ERIS_DBG("run");
         if (not setup)
             throw std::logic_error{"Event error: RUN before successful SETUP"};
         run_start = sim->t();
@@ -101,8 +91,11 @@ int main(int argc, char *argv[1]) {
     auto on_step = [&]() { step = true; };
     auto on_resume = [&]() { stopped = false; };
     auto on_quit = [&]() { quit = true; };
-    ERIS_DBG("WOO");
-    GUI gui(sim, on_setup, on_run, on_stop, on_resume, on_step, on_quit);
+
+    std::vector<std::shared_ptr<State>> states;
+    std::mutex state_mutex;
+
+    GUI gui(states, state_mutex, on_setup, on_run, on_stop, on_resume, on_step, on_quit);
 
     try {
         gui.start(argc, argv);
@@ -111,7 +104,6 @@ int main(int argc, char *argv[1]) {
         std::cerr << "Unable to start gui: " << e.what() << "\n";
         throw;
     }
-    ERIS_DBG("WOO");
 
     auto &rng = eris::Random::rng();
     std::uniform_real_distribution<double> unif_01{0, 1};
@@ -143,30 +135,31 @@ int main(int argc, char *argv[1]) {
         r->writer_book_sd = book_sd;
     }
     ERIS_DBG("Done with readers");
-    auto readers = sim->agents<Reader>();
+
+
+    {
+        std::unique_lock<std::mutex>(state_mutex);
+        states.emplace_back(std::make_shared<State>(sim));
+    }
 
     // Tell the GUI we're done with initialization
     gui.initialized();
     ERIS_DBG("here we go...!");
 
-    gui.progress(run_end, 0);
+    gui.progress(0, run_end, 0);
     auto last_progress = std::chrono::high_resolution_clock::now();
     auto last_progress_t = sim->t();
-    gui.redraw(true);
 
-    // If redraw is 0, we use 
     constexpr auto zero_ms = std::chrono::milliseconds::zero();
-    const auto never = std::chrono::time_point<std::chrono::high_resolution_clock>::max();
     constexpr auto progress_freq = std::chrono::milliseconds{50};
 
     std::chrono::time_point<std::chrono::high_resolution_clock> start, end,
-        next_sync{redraw == zero_ms ? never : std::chrono::high_resolution_clock::now() + redraw};
+        next_sync{std::chrono::high_resolution_clock::now() + sync_speed};
 
     std::chrono::time_point<std::chrono::high_resolution_clock> next_progress{
         std::chrono::high_resolution_clock::now() + progress_freq};
 
     while (not quit) {
-        std::cerr << "asfafasdf\n";
         if (sim->t() < run_end) {
             // Tell the GUI we've started running.
             gui.running();
@@ -174,20 +167,25 @@ int main(int argc, char *argv[1]) {
         while (not quit and (step or (not stopped and sim->t() < run_end))) {
             start = std::chrono::high_resolution_clock::now();
 
-            std::cerr << "running\n";
+            ERIS_DBG("running");
             sim->run();
-            std::cerr << "done running\n";
+            ERIS_DBG("done running");
+
+            {
+                std::unique_lock<std::mutex> lock(state_mutex);
+                states.emplace_back(std::make_shared<State>(sim));
+            }
 
             if (step) step = false;
 
             bool finished = stopped or sim->t() >= run_end;
             ERIS_DBG("");
             end = std::chrono::high_resolution_clock::now();
-            // Only update the progress and check events every 50ms
+
             if (finished or end >= next_progress) {
                 auto now_t = sim->t();
                 double speed = (double) (now_t - last_progress_t) / std::chrono::duration<double>{end - last_progress}.count();
-                gui.progress(run_end, speed);
+                gui.progress(now_t, run_end, speed);
                 last_progress = end;
                 last_progress_t = now_t;
                 gui.checkEvents();
@@ -199,13 +197,12 @@ int main(int argc, char *argv[1]) {
             // Make sure stopped hasn't changed:
             if (not finished and stopped) finished = true;
 
-            // Only trigger a redraw and event check at most once every 50ms, or if we're done
+            // Only tell the GUI about new states at most once every 50ms, or if we're done
             if (finished or end >= next_sync) {
-                gui.redraw(true);
-                next_sync = redraw == zero_ms ? never : end + redraw;
+                gui.new_states();
+                next_sync = end + sync_speed;
             }
 
-            ERIS_DBG("");
             if (not finished and speed_limit > 0) {
 
                 auto sleep = std::chrono::duration<double>{1.0/speed_limit} - (end - start);
@@ -225,6 +222,10 @@ int main(int argc, char *argv[1]) {
         // Wait for the GUI to tell us to do something else
         gui.waitEvents();
         std::cerr << "got more\n";
+
+        // Update this so that the speed is right (otherwise however long waitEvents() waits for the
+        // user waits would be included in the calculation).
+        last_progress = std::chrono::high_resolution_clock::now();
     }
     std::cerr << "running off the bottom of main\n";
 }

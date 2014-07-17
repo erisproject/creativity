@@ -1,5 +1,4 @@
 #pragma once
-#include <eris/Simulation.hpp>
 #include <thread>
 #include <mutex>
 #include <condition_variable>
@@ -18,6 +17,7 @@
 #include "creativity/gui/InfoWindow.hpp"
 #include "creativity/gui/ReaderStore.hpp"
 #include "creativity/gui/BookStore.hpp"
+#include "creativity/state/State.hpp"
 
 namespace sigc { SIGC_FUNCTORS_DEDUCE_RESULT_TYPE_WITH_DECLTYPE }
 
@@ -34,10 +34,14 @@ class GUI : eris::noncopyable {
          * called.
          */
         GUI(
-                /** The simulation object this GUI is for; the simulation is not expected to be
-                 * populated yet. Typically called with an Eris<Simulation> object (which is
-                 * castable to an std::shared_ptr) */
-                std::shared_ptr<eris::Simulation> eris,
+                /** The simulation state vector.  This is expected to be updated at the end of each
+                 * simulation period, and will be used in the GUI to display the simulation.
+                 */
+                const std::vector<std::shared_ptr<state::State>> &states,
+
+                /** Mutex guarding the provided `states` vector. */
+                std::mutex &state_mutex,
+
                 /** A function to call with the GUI simulation parameters (in a series of
                  * GUI.Parameter structs) when the user configures the simulation via the GUI.  This
                  * function should set up the simulation but not start it: it will be followed
@@ -47,17 +51,22 @@ class GUI : eris::noncopyable {
                  * invalid) the function should throw a GUI::Exception; the .what() value of the
                  * exception will be displayed to the user as an error message. */
                 std::function<void(Parameter param)> setup,
+
                 /** Called to run the simulation for count periods. */
                 std::function<void(unsigned int rounds)> run,
+
                 /** Called when the user hits the stop button in the GUI. This should pause the
                  * current simulation run loop until either resume or run are called. */
                 std::function<void()> stop,
+
                 /** Called when the user resumes the simulation in the GUI after having stopped it.
                  * This should resume running of the current simulation run loop (if there are
                  * iterations remaining). */
                 std::function<void()> resume,
+
                 /** Called when the user wishes to step forward one period then stop. */
                 std::function<void()> step,
+
                 /** Called when the user quits the GUI. */
                 std::function<void()> quit
         );
@@ -86,31 +95,32 @@ class GUI : eris::noncopyable {
          */
         void waitEvents();
 
-        /** Signals the GUI thread that the visual objects have been updated and the graph needs to
-         * be redrawn.  Note that this is not, by default, synchronous: if the GUI thread is
-         * currently busy, the redraw might not actually happen until it becomes idle.  It is also
-         * collapsed: if multiple redraw() signals are queued, the thread ignores all but the last
-         * one.
+        /** Signals the GUI thread that one or more states have been completed.  The GUI will record
+         * the new number of states.  If the user was viewing the most recent state, the GUI will be
+         * updated to display the new most recent state, otherwise the GUI remains on the current
+         * state.
          *
-         * If the optional parameter is given and true, this blocks until the thread finishes a
-         * redraw.
+         * If the optional parameter is given and true, this blocks until the thread finishes
+         * recording the new state.
          */
-        void redraw(bool sync=false);
+        void new_states(bool sync=false);
 
         /** Sends a signal to the GUI thread that the simulation setup is complete.  The GUI will
          * disable the various simulation setup options and start/initialize buttons and switch to
-         * the visualization tab. */
+         * the visualization tab.  The `states` variable given to the constructor must have been
+         * initialized with the initial simulation state: this method sends a new_states signal, to
+         * let the GUI thread know that there is a new state. */
         void initialized();
 
         /** Sends a signal to the GUI thread that the simulation has started or resumed running. */
         void running();
 
         /** Signals the GUI thread of a progress update.
-         * \param end the last simulation stage of the current run
+         * \param t the current simulation state
+         * \param end the simulation stage at which the current run will stop
          * \param speed the speed (in iterations per second)
-         * Other progress variables are read from the simulation.
          */
-        void progress(const unsigned long &end, const double &speed);
+        void progress(unsigned long t, unsigned long end, double speed);
 
         /** Sends a signal to the GUI thread that the simulation has stopped running.
          *
@@ -139,8 +149,6 @@ class GUI : eris::noncopyable {
             cost_unit,
             /// Sets the simulation speed limit in `.dur_ms`
             speed_limit,
-            /// Sets the minimum redraw period in `.dur_ms`
-            redraw,
             /// Number of threads to use in `.ul`
             threads,
             /// Sent by the GUI to indicate that some parameters are being changed.
@@ -182,7 +190,8 @@ class GUI : eris::noncopyable {
                     resume, ///< The user hit the "resume" button to unpause the simulation.
                     step, ///< The user hit the "step" button to unpause the simulation for one step.
                     quit, ///< Sent when the user quits the application
-                    redraw_complete ///< Sent to indicate that a redraw is complete.  Used internally for redraw(true) calls.
+                    // FIXME: is the following needed?
+                    new_states_acknowledged ///< Sent to indicate that new states have been recognized.  Used internally for new_states(true) calls.
                 };
 
                 /// Will be true if this is a fake Event indicating that no events are pending.
@@ -262,6 +271,9 @@ class GUI : eris::noncopyable {
          * mutex also handles synchronization during thread startup and guards access to the queue
          * of events (setup, run, etc.) emitted by the GUI and status variable accessed by the
          * GUI.  It also guards dispatcher_, which the thread deletes when it quits.
+         *
+         * It does *not* guard access to the actual simulation state (readers/books): that is
+         * guarded by `state_mutex_`.
          */
         std::mutex mutex_;
 
@@ -277,7 +289,7 @@ class GUI : eris::noncopyable {
         class Signal {
             public:
                 /// The types of signal that can be sent to the GUI thread
-                enum class Type { redraw, initialized, running, progress, stopped, error, quit };
+                enum class Type { new_states, initialized, running, progress, stopped, error, quit };
 
                 /// The type of signal
                 Type type;
@@ -326,18 +338,30 @@ class GUI : eris::noncopyable {
          */
         void thr_run();
 
-        /** Updates the reader information on the "Agents" tab.
+        /** Called to update the GUI tabs to display the state at the given time.
          */
-        void thr_update_readers();
+        void thr_set_state(unsigned long t);
 
-        /** Updates the book information on the "Books" tab.
+        /** The state currently be displayed. */
+        unsigned long state_curr_ = (unsigned long) -1;
+
+        /** The current number of states known to the GUI.  `states_.size() >= state_num_` is
+         * guaranteeded to be true.  There may be more in the states_ variable if the GUI hasn't
+         * received or processed the notification.
          */
-        void thr_update_books();
+        unsigned long state_num_ = 0;
+
+        /** Obtains and returns a lock on the state mutex.
+         */
+        std::unique_lock<std::mutex> stateLock();
 
         /** Opens a dialog for the given member, which must be either a Reader or a Book.  If the
          * dialog is already open, it is presented again (which is window manager dependent, but
-         * generally means bringing to the top and/or focussing). */
-        void thr_info_dialog(eris::SharedMember<eris::Member> member);
+         * generally means bringing to the top and/or focussing).
+         *
+         * \throws std::out_of_range if `member_id` does not exist in the current state
+         */
+        void thr_info_dialog(eris::eris_id_t member_id);
 
         /** Sets up the simulation based on the current GUI parameter values.
          */
@@ -351,18 +375,32 @@ class GUI : eris::noncopyable {
         /** The custom graph area */
         std::unique_ptr<GraphArea> graph_;
 
+        /** Reference to the simulation state snapshots variable. The index is the simulation
+         * period. */
+        const std::vector<std::shared_ptr<state::State>> &states_;
+
+        /** Reference to mutex controlling access to `states_` */
+        std::mutex &state_mutex_;
+
         /** The various objects used for the Agents tab */
-        Glib::RefPtr<ReaderStore> rdr_model_;
-        std::unique_ptr<Gtk::TreeView> rdr_tree_;
+        Gtk::ScrolledWindow *rdr_win_;
+        std::vector<Glib::RefPtr<ReaderStore>> rdr_models_;
+        std::vector<std::unique_ptr<Gtk::TreeView>> rdr_trees_;
 
         /** The various objects used for the Books tab */
-        Glib::RefPtr<BookStore> bk_model_;
-        std::unique_ptr<Gtk::TreeView> bk_tree_;
+        Gtk::ScrolledWindow *bk_win_;
+        std::vector<Glib::RefPtr<BookStore>> bk_models_;
+        std::vector<std::unique_ptr<Gtk::TreeView>> bk_trees_;
 
         /** Obtains a widget from the current Gtk::Builder and returns it (as a pointer).
          */
         template <class T>
-        T* widget(const std::string &widget_name);
+        typename std::enable_if<std::is_base_of<Gtk::Widget, T>::value, T*>::type
+        widget(const std::string &widget_name) {
+            T* widget;
+            builder_->get_widget(widget_name, widget);
+            return widget;
+        }
 
         /** Returns the value of a Gtk::SpinButton. */
         double sb(const std::string &widget_name);
@@ -370,8 +408,6 @@ class GUI : eris::noncopyable {
         /** Returns the value of a Gtk::SpinButton as an int. */
         int sb_int(const std::string &widget_name);
 
-        /// The simulation object
-        std::shared_ptr<eris::Simulation> sim_;
         // The callbacks for GUI thread events
         std::function<void(GUI::Parameter)> on_setup_;
         std::function<void(unsigned int count)> on_run_;
@@ -387,9 +423,18 @@ class GUI : eris::noncopyable {
         std::unordered_map<eris::eris_id_t, InfoWindow> info_windows_;
 
         typedef boost::geometry::model::point<double, 2, boost::geometry::cs::cartesian> rt_point;
-        typedef std::pair<rt_point, eris::SharedMember<eris::Member>> rt_val;
-        /** An rtree (regenerated each time the simulation stops/pauses) of reader/book points. */
-        boost::geometry::index::rtree<rt_val, boost::geometry::index::rstar<16>> rtree_;
+        typedef std::pair<rt_point, eris::eris_id_t> rt_val;
+        /** rtrees of reader/book points for each state. */
+        std::vector<boost::geometry::index::rtree<rt_val, boost::geometry::index::rstar<16>>> rtrees_;
+
+        /** Returns the `n` nearest points/eris_id_t pairs to the given rt_point.  May returns fewer
+         * than `n` (including 0) if there are not `n` points within `radius` pixels.
+         *
+         * \param point the point around which to search
+         * \param n the maximum number of rt_vals to return; the first element is the closest point.
+         * Defaults to 1.
+         */
+        std::vector<rt_val> thr_nearest(const rt_point &point, int n = 1);
 
         std::function<bool(GdkEventMotion* event)> motion_handler_;
         sigc::connection motion_handler_conn_;
