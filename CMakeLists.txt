@@ -68,9 +68,12 @@ endforeach()
 add_executable(creativity-gui gui.cpp)
 target_link_libraries(creativity-gui creativity)
 
-install(FILES gui.glade creativity.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/creativity/gui.glade)
+# Copy the glade and icon to the install datadir
+install(FILES gui.glade creativity.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/creativity/)
 
-file(COPY gui.glade creativity.svg DESTINATION ${CMAKE_BINARY_DIR})
+# Also copy them into the build dir (so that running ./creativity-gui from build/ works)
+configure_file(gui.glade ${CMAKE_BINARY_DIR}/gui.glade COPYONLY)
+configure_file(creativity.svg ${CMAKE_BINARY_DIR}/creativity.svg COPYONLY)
 
 add_subdirectory(doc)
 
