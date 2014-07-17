@@ -4,7 +4,9 @@
 
 namespace creativity { namespace state {
 
-BookState::BookState(const Book &b) :
+BookState::BookState(const Book &b) : BookState(b, b.copies()) {}
+
+BookState::BookState(const Book &b, unsigned long num_copies) :
     id{b.id()},
     t{b.simulation()->t()},
     author{b.author()->id()},
@@ -16,7 +18,7 @@ BookState::BookState(const Book &b) :
     revenueLifetime{b.lifeRevenue()},
     sales{b.currSales()},
     salesLifetime{b.lifeSales()},
-    copies{b.copies()},
+    copies{num_copies},
     age{b.age()},
     lifetime{b.marketPeriods()}
 {}

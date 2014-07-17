@@ -21,6 +21,12 @@ class BookState final : private eris::noncopyable {
         /// Constructs a new BookState, settings its values using the given Book.
         BookState(const Book &b);
 
+        /** Constructs a new BookState, additionally specifying the number of copies of this book in
+         * the simulation.  This saves a call to the `b.copies()` method, which is expensive, and is
+         * thus useful where the copies of a book can be obtained more efficiently.
+         */
+        BookState(const Book &b, unsigned long num_copies);
+
         /// Unique simulation ID of the book
         eris::eris_id_t id;
 
