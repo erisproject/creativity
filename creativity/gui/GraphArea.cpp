@@ -37,6 +37,13 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
     const int width = allocation.get_width();
     const int height = allocation.get_height();
 
+    if (gui_.state_num_ == 0) {
+        // No states at all: just draw a blank screen
+        cr_grapharea->set_source_rgb(1,1,1);
+        cr_grapharea->paint();
+        return true;
+    }
+
     if (drawing_cache_width_ != width || drawing_cache_height_ != height) {
         drawing_cache_.clear();
         drawing_cache_width_ = width;
