@@ -31,10 +31,16 @@ class ReaderStore : public MemberStore<state::ReaderState>, private Glib::Object
          */
         class ColRec : public Gtk::TreeModel::ColumnRecord {
             public:
-                Gtk::TreeModelColumn<eris::eris_id_t> id;
-                Gtk::TreeModelColumn<double> posX, posY, u, uLifetime;
-                Gtk::TreeModelColumn<std::string> posstr;
-                Gtk::TreeModelColumn<size_t> booksOwned, booksNew, booksWritten, lastBookAge;
+                Gtk::TreeModelColumn<eris::eris_id_t> id; ///< ID of the reader
+                Gtk::TreeModelColumn<double> posX, ///< X coordinate of the reader
+                    posY, ///< y coordinate of the reader
+                    u, ///< Current period utility of the reader
+                    uLifetime; ///< Cumulative lifetime utility of the reader
+                Gtk::TreeModelColumn<std::string> posstr; ///< position of the book as a string such as `(-7.16,0.440)`
+                Gtk::TreeModelColumn<size_t> booksOwned, ///< Number of books possessed by this reader
+                    booksNew, ///< Number of books acquired in the current period
+                    booksWritten, ///< Number of books authored by this reader
+                    lastBookAge; ///< Age of the most recently written book, or simulation age if `booksWritten == 0`
 
             private:
                 ColRec() {
