@@ -550,9 +550,6 @@ void GUI::thr_signal() {
             if (old_state_num == 0 or state_curr_ == old_state_num - 1)
                 thr_set_state(state_num_-1);
         }
-
-        // FIXME: do I need to bother with this?
-        queueEvent(Event::Type::new_states_acknowledged);
     }
 }
 
@@ -590,9 +587,8 @@ void GUI::runSim() {
     queueEvent(Event::Type::run, sb_int("set_periods"));
 }
 
-void GUI::new_states(bool sync) {
+void GUI::new_states() {
     queueSignal(Signal::Type::new_states);
-    if (sync) waitForEvent(Event::Type::new_states_acknowledged);
 }
 
 void GUI::initialized() {

@@ -103,11 +103,8 @@ class GUI : eris::noncopyable {
          * the new number of states.  If the user was viewing the most recent state, the GUI will be
          * updated to display the new most recent state, otherwise the GUI remains on the current
          * state.
-         *
-         * If the optional parameter is given and true, this blocks until the thread finishes
-         * recording the new state.
          */
-        void new_states(bool sync=false);
+        void new_states();
 
         /** Sends a signal to the GUI thread that the simulation setup is complete.  The GUI will
          * disable the various simulation setup options and start/initialize buttons and switch to
@@ -193,9 +190,7 @@ class GUI : eris::noncopyable {
                     stop, ///< The user hit the "stop" button to pause the simulation.
                     resume, ///< The user hit the "resume" button to unpause the simulation.
                     step, ///< The user hit the "step" button to unpause the simulation for one step.
-                    quit, ///< Sent when the user quits the application
-                    // FIXME: is the following needed?
-                    new_states_acknowledged ///< Sent to indicate that new states have been recognized.  Used internally for new_states(true) calls.
+                    quit ///< Sent when the user quits the application
                 };
 
                 /// Will be true if this is a fake Event indicating that no events are pending.
