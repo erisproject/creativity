@@ -4,11 +4,15 @@
 #include <condition_variable>
 #include <memory>
 #include <glibmm/dispatcher.h>
-// gtkmm gives a overloaded virtual warning: ignore it.
+#ifdef __clang__
+// Loading gtkmm.h gives a overloaded virtual warning: ignore it.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Woverloaded-virtual"
+#endif
 #include <gtkmm.h>
+#ifdef __clang__
 #pragma clang diagnostic pop
+#endif
 #include <eris/noncopyable.hpp>
 #include <unordered_map>
 #include <array>
@@ -136,28 +140,17 @@ class GUI : eris::noncopyable {
 
         /// Parameter types for a Parameter.
         enum class ParamType {
-            /// Sets the number of dimensions in `.ul`
-            dimensions,
-            /// Sets the number of readers in `.ul`
-            readers,
-            /// Sets the book location standard deviation in `.dbl`
-            book_sd,
-            /// Sets the perceived quality standard deviation in `.dbl`
-            quality_draw_sd,
-            /// Sets the fixed cost of keeping a book on the market in `.dbl`
-            cost_fixed,
-            /// Sets the per-unit cost of copies of a book in `.dbl`
-            cost_unit,
-            /// Sets the simulation speed limit in `.dur_ms`
-            speed_limit,
-            /// Number of threads to use in `.ul`
-            threads,
-            /// Sent by the GUI to indicate that some parameters are being changed.
-            begin,
-            /// Fired when setup ends unsuccessfully because when one or more setup parameters threw exceptions
-            erred,
-            /// Fired when setup ends successfully (no setup parameter threw an exception)
-            finished
+            dimensions, ///< Sets the number of dimensions in `.ul`
+            readers, ///< Sets the number of readers in `.ul`
+            book_sd, ///< Sets the book location standard deviation in `.dbl`
+            quality_draw_sd, ///< Sets the perceived quality standard deviation in `.dbl`
+            cost_fixed, ///< Sets the fixed cost of keeping a book on the market in `.dbl`
+            cost_unit, ///< Sets the per-unit cost of copies of a book in `.dbl`
+            seed, ///< Sets the seed value for eris::Random::seed in `.ul`
+            threads, ///< Number of threads to use in `.ul`
+            begin, ///< Sent by the GUI to indicate that some parameters are being changed.
+            erred, ///< Fired when setup ends unsuccessfully because when one or more setup parameters threw exceptions
+            finished ///< Fired when setup ends successfully (no setup parameter threw an exception)
         };
         /** The parameter struct for passing a configured value back from the GUI.  The GUI always
          * sends a `begin` followed by zero or more settings then either `erred` or `finished` (the

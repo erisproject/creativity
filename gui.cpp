@@ -41,6 +41,7 @@ int main(int argc, char *argv[1]) {
 
 #define NONNEG_DOUBLE(VAR, DESC) \
     case GUI::ParamType::VAR: \
+        if (setup) throw std::runtime_error("Cannot change " DESC " after initial setup"); \
         if (p.dbl < 0) \
             throw std::domain_error{DESC " `" + std::to_string(p.dbl) + "' is invalid"}; \
         VAR = p.dbl; \
@@ -49,36 +50,41 @@ int main(int argc, char *argv[1]) {
     // Set up handlers for user actions in the GUI
     auto on_setup = [&](GUI::Parameter p) { // Setup
         switch (p.param) {
+            case GUI::ParamType::finished:
+                setup = true;
+                break;
             case GUI::ParamType::begin:
-                setup = false;
+            case GUI::ParamType::erred:
                 break;
             case GUI::ParamType::dimensions:
+                if (setup) throw std::runtime_error("Cannot change dimensions after initial setup");
                 if (p.ul != 2)
                     throw std::domain_error{"Cannot yet handle dimensions ≠ 2"};
                 // FIXME
                 break;
             case GUI::ParamType::readers:
+                if (setup) throw std::runtime_error("Cannot change readers after initial setup");
                 if (p.ul < 1)
                     throw std::domain_error{"Must have at least one reader"};
                 num_readers = p.ul;
+                break;
+            case GUI::ParamType::seed:
+                if (setup) throw std::runtime_error("Cannot change seed after initial setup");
+                eris::Random::seed(p.ul);
                 break;
             NONNEG_DOUBLE(book_sd, "Book standard deviation");
             NONNEG_DOUBLE(quality_draw_sd, "Quality standard deviation");
             NONNEG_DOUBLE(cost_fixed, "Fixed cost");
             NONNEG_DOUBLE(cost_unit, "Unit cost");
-            case GUI::ParamType::speed_limit:
-                speed_limit = p.dbl;
-                break;
             case GUI::ParamType::threads:
+                // This is the only setting that *can* be changed after the initial setup.  This
+                // will throw if currently running, but that's okay: the GUI isn't allowed to send
+                // it if the simulation is currently running.
                 sim->maxThreads(p.ul);
-                break;
-            case GUI::ParamType::erred:
-                break;
-            case GUI::ParamType::finished:
-                setup = true;
                 break;
         }
     };
+#undef NONNEG_DOUBLE
 
     auto on_run = [&](unsigned long periods) { // Run
         if (not setup)

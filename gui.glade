@@ -20,6 +20,12 @@
     <property name="step_increment">0.10000000000000001</property>
     <property name="page_increment">1</property>
   </object>
+  <object class="GtkAdjustment" id="adjust_density">
+    <property name="lower">0.01</property>
+    <property name="upper">9.9900000000000002</property>
+    <property name="step_increment">0.01</property>
+    <property name="page_increment">1</property>
+  </object>
   <object class="GtkAdjustment" id="adjust_dim">
     <property name="lower">1</property>
     <property name="upper">1000</property>
@@ -44,11 +50,6 @@
     <property name="lower">1</property>
     <property name="upper">1000000</property>
     <property name="value">1000</property>
-    <property name="step_increment">1</property>
-    <property name="page_increment">100</property>
-  </object>
-  <object class="GtkAdjustment" id="adjust_speed">
-    <property name="upper">1000</property>
     <property name="step_increment">1</property>
     <property name="page_increment">100</property>
   </object>
@@ -472,141 +473,6 @@
                                           </packing>
                                         </child>
                                         <child>
-                                          <object class="GtkLabel" id="label7">
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">False</property>
-                                            <property name="xalign">0</property>
-                                            <property name="label" translatable="yes">Creation st.dev.</property>
-                                          </object>
-                                          <packing>
-                                            <property name="left_attach">0</property>
-                                            <property name="top_attach">2</property>
-                                          </packing>
-                                        </child>
-                                        <child>
-                                          <object class="GtkSpinButton" id="set_book_sd">
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">True</property>
-                                            <property name="invisible_char">●</property>
-                                            <property name="text" translatable="yes">2</property>
-                                            <property name="adjustment">adjust_book_sd</property>
-                                            <property name="digits">2</property>
-                                            <property name="snap_to_ticks">True</property>
-                                            <property name="numeric">True</property>
-                                            <property name="update_policy">if-valid</property>
-                                            <property name="value">0.5</property>
-                                          </object>
-                                          <packing>
-                                            <property name="left_attach">1</property>
-                                            <property name="top_attach">2</property>
-                                          </packing>
-                                        </child>
-                                        <child>
-                                          <object class="GtkLabel" id="comment5">
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">False</property>
-                                            <property name="xalign">0</property>
-                                            <property name="label" translatable="yes">New books are created at the reader's location plus noise with this st.dev.</property>
-                                            <attributes>
-                                              <attribute name="style" value="italic"/>
-                                            </attributes>
-                                          </object>
-                                          <packing>
-                                            <property name="left_attach">2</property>
-                                            <property name="top_attach">2</property>
-                                          </packing>
-                                        </child>
-                                        <child>
-                                          <object class="GtkLabel" id="label1">
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">False</property>
-                                            <property name="xalign">0</property>
-                                            <property name="label" translatable="yes">Quality st.dev.</property>
-                                          </object>
-                                          <packing>
-                                            <property name="left_attach">0</property>
-                                            <property name="top_attach">3</property>
-                                          </packing>
-                                        </child>
-                                        <child>
-                                          <object class="GtkSpinButton" id="set_quality_draw_sd">
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">True</property>
-                                            <property name="invisible_char">●</property>
-                                            <property name="text" translatable="yes">0.50</property>
-                                            <property name="adjustment">adjust_quality_draw_sd</property>
-                                            <property name="digits">2</property>
-                                            <property name="snap_to_ticks">True</property>
-                                            <property name="numeric">True</property>
-                                            <property name="update_policy">if-valid</property>
-                                            <property name="value">0.5</property>
-                                          </object>
-                                          <packing>
-                                            <property name="left_attach">1</property>
-                                            <property name="top_attach">3</property>
-                                          </packing>
-                                        </child>
-                                        <child>
-                                          <object class="GtkLabel" id="comment3">
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">False</property>
-                                            <property name="xalign">0</property>
-                                            <property name="label" translatable="yes">Book quality is assessed as true quality plus noise with this st.dev.</property>
-                                            <attributes>
-                                              <attribute name="style" value="italic"/>
-                                            </attributes>
-                                          </object>
-                                          <packing>
-                                            <property name="left_attach">2</property>
-                                            <property name="top_attach">3</property>
-                                          </packing>
-                                        </child>
-                                        <child>
-                                          <object class="GtkLabel" id="label5">
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">False</property>
-                                            <property name="xalign">0</property>
-                                            <property name="label" translatable="yes">Cost (fixed)</property>
-                                          </object>
-                                          <packing>
-                                            <property name="left_attach">0</property>
-                                            <property name="top_attach">4</property>
-                                          </packing>
-                                        </child>
-                                        <child>
-                                          <object class="GtkSpinButton" id="set_cost_fixed">
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">True</property>
-                                            <property name="invisible_char">●</property>
-                                            <property name="text" translatable="yes">0.50</property>
-                                            <property name="adjustment">adjust_cost_fixed</property>
-                                            <property name="digits">2</property>
-                                            <property name="snap_to_ticks">True</property>
-                                            <property name="numeric">True</property>
-                                            <property name="update_policy">if-valid</property>
-                                            <property name="value">20</property>
-                                          </object>
-                                          <packing>
-                                            <property name="left_attach">1</property>
-                                            <property name="top_attach">4</property>
-                                          </packing>
-                                        </child>
-                                        <child>
-                                          <object class="GtkLabel" id="comment4">
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">False</property>
-                                            <property name="xalign">0</property>
-                                            <property name="label" translatable="yes">The fixed per-period cost of keeping a book on the market.</property>
-                                            <attributes>
-                                              <attribute name="style" value="italic"/>
-                                            </attributes>
-                                          </object>
-                                          <packing>
-                                            <property name="left_attach">2</property>
-                                            <property name="top_attach">4</property>
-                                          </packing>
-                                        </child>
-                                        <child>
                                           <object class="GtkLabel" id="label10">
                                             <property name="visible">True</property>
                                             <property name="can_focus">False</property>
@@ -615,7 +481,7 @@
                                           </object>
                                           <packing>
                                             <property name="left_attach">0</property>
-                                            <property name="top_attach">5</property>
+                                            <property name="top_attach">6</property>
                                           </packing>
                                         </child>
                                         <child>
@@ -633,7 +499,7 @@
                                           </object>
                                           <packing>
                                             <property name="left_attach">1</property>
-                                            <property name="top_attach">5</property>
+                                            <property name="top_attach">6</property>
                                           </packing>
                                         </child>
                                         <child>
@@ -648,7 +514,187 @@
                                           </object>
                                           <packing>
                                             <property name="left_attach">2</property>
+                                            <property name="top_attach">6</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="label5">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <property name="xalign">0</property>
+                                            <property name="label" translatable="yes">Cost (fixed)</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">0</property>
                                             <property name="top_attach">5</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkSpinButton" id="set_cost_fixed">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">True</property>
+                                            <property name="invisible_char">●</property>
+                                            <property name="text" translatable="yes">0.50</property>
+                                            <property name="adjustment">adjust_cost_fixed</property>
+                                            <property name="digits">2</property>
+                                            <property name="snap_to_ticks">True</property>
+                                            <property name="numeric">True</property>
+                                            <property name="update_policy">if-valid</property>
+                                            <property name="value">20</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">1</property>
+                                            <property name="top_attach">5</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="comment4">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <property name="xalign">0</property>
+                                            <property name="label" translatable="yes">The fixed per-period cost of keeping a book on the market.</property>
+                                            <attributes>
+                                              <attribute name="style" value="italic"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">2</property>
+                                            <property name="top_attach">5</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="label1">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <property name="xalign">0</property>
+                                            <property name="label" translatable="yes">Quality st.dev.</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">0</property>
+                                            <property name="top_attach">4</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="comment3">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <property name="xalign">0</property>
+                                            <property name="label" translatable="yes">Book quality is assessed as true quality plus noise with this st.dev.</property>
+                                            <attributes>
+                                              <attribute name="style" value="italic"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">2</property>
+                                            <property name="top_attach">4</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkSpinButton" id="set_quality_draw_sd">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">True</property>
+                                            <property name="invisible_char">●</property>
+                                            <property name="text" translatable="yes">0.50</property>
+                                            <property name="adjustment">adjust_quality_draw_sd</property>
+                                            <property name="digits">2</property>
+                                            <property name="snap_to_ticks">True</property>
+                                            <property name="numeric">True</property>
+                                            <property name="update_policy">if-valid</property>
+                                            <property name="value">0.5</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">1</property>
+                                            <property name="top_attach">4</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="label7">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <property name="xalign">0</property>
+                                            <property name="label" translatable="yes">Creation st.dev.</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">0</property>
+                                            <property name="top_attach">3</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkSpinButton" id="set_book_sd">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">True</property>
+                                            <property name="invisible_char">●</property>
+                                            <property name="text" translatable="yes">2</property>
+                                            <property name="adjustment">adjust_book_sd</property>
+                                            <property name="digits">2</property>
+                                            <property name="snap_to_ticks">True</property>
+                                            <property name="numeric">True</property>
+                                            <property name="update_policy">if-valid</property>
+                                            <property name="value">0.5</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">1</property>
+                                            <property name="top_attach">3</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="comment5">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <property name="xalign">0</property>
+                                            <property name="label" translatable="yes">New books are created at the reader's location plus noise with this st.dev.</property>
+                                            <attributes>
+                                              <attribute name="style" value="italic"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">2</property>
+                                            <property name="top_attach">3</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="label8">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <property name="xalign">0</property>
+                                            <property name="label" translatable="yes">Density</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">0</property>
+                                            <property name="top_attach">2</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="comment7">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <property name="xalign">0</property>
+                                            <property name="label" translatable="yes">Average readers per square unit; this determines the simulation boundaries.</property>
+                                            <attributes>
+                                              <attribute name="style" value="italic"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">2</property>
+                                            <property name="top_attach">2</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkSpinButton" id="set_readers1">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">True</property>
+                                            <property name="invisible_char">●</property>
+                                            <property name="text" translatable="yes">20</property>
+                                            <property name="adjustment">adjust_density</property>
+                                            <property name="digits">2</property>
+                                            <property name="snap_to_ticks">True</property>
+                                            <property name="numeric">True</property>
+                                            <property name="update_policy">if-valid</property>
+                                            <property name="value">1</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">1</property>
+                                            <property name="top_attach">2</property>
                                           </packing>
                                         </child>
                                       </object>
@@ -728,34 +774,6 @@
                                           </packing>
                                         </child>
                                         <child>
-                                          <object class="GtkLabel" id="periods1">
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">False</property>
-                                            <property name="xalign">0</property>
-                                            <property name="label" translatable="yes">Speed limit</property>
-                                          </object>
-                                          <packing>
-                                            <property name="left_attach">0</property>
-                                            <property name="top_attach">2</property>
-                                          </packing>
-                                        </child>
-                                        <child>
-                                          <object class="GtkSpinButton" id="set_speed">
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">True</property>
-                                            <property name="tooltip_text" translatable="yes">0 = unlimited</property>
-                                            <property name="invisible_char">●</property>
-                                            <property name="text" translatable="yes">1000</property>
-                                            <property name="adjustment">adjust_speed</property>
-                                            <property name="snap_to_ticks">True</property>
-                                            <property name="numeric">True</property>
-                                          </object>
-                                          <packing>
-                                            <property name="left_attach">1</property>
-                                            <property name="top_attach">2</property>
-                                          </packing>
-                                        </child>
-                                        <child>
                                           <object class="GtkLabel" id="comment_threads">
                                             <property name="visible">True</property>
                                             <property name="can_focus">False</property>
@@ -785,21 +803,6 @@
                                           </packing>
                                         </child>
                                         <child>
-                                          <object class="GtkLabel" id="comment_speed">
-                                            <property name="visible">True</property>
-                                            <property name="can_focus">False</property>
-                                            <property name="xalign">0</property>
-                                            <property name="label" translatable="yes">Maximum speed (in periods per second) of the simulation.</property>
-                                            <attributes>
-                                              <attribute name="style" value="italic"/>
-                                            </attributes>
-                                          </object>
-                                          <packing>
-                                            <property name="left_attach">2</property>
-                                            <property name="top_attach">2</property>
-                                          </packing>
-                                        </child>
-                                        <child>
                                           <object class="GtkComboBoxText" id="combo_threads">
                                             <property name="visible">True</property>
                                             <property name="can_focus">False</property>
@@ -811,6 +814,49 @@
                                           <packing>
                                             <property name="left_attach">1</property>
                                             <property name="top_attach">0</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="lbl_seed">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <property name="xalign">0</property>
+                                            <property name="label" translatable="yes">Random Seed</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">0</property>
+                                            <property name="top_attach">2</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkEntry" id="set_seed">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">True</property>
+                                            <property name="max_length">20</property>
+                                            <property name="width_chars">10</property>
+                                            <property name="caps_lock_warning">False</property>
+                                            <property name="secondary_icon_stock">gtk-refresh</property>
+                                            <property name="secondary_icon_tooltip_text" translatable="yes">For reproducible results you must also run without threads.</property>
+                                            <property name="input_purpose">number</property>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">1</property>
+                                            <property name="top_attach">2</property>
+                                          </packing>
+                                        </child>
+                                        <child>
+                                          <object class="GtkLabel" id="comment_seed">
+                                            <property name="visible">True</property>
+                                            <property name="can_focus">False</property>
+                                            <property name="xalign">0</property>
+                                            <property name="label" translatable="yes">The random seed.  For reproducible results, you must also turn disable CPU Threads.</property>
+                                            <attributes>
+                                              <attribute name="style" value="italic"/>
+                                            </attributes>
+                                          </object>
+                                          <packing>
+                                            <property name="left_attach">2</property>
+                                            <property name="top_attach">2</property>
                                           </packing>
                                         </child>
                                       </object>

@@ -3,6 +3,7 @@
 #include "creativity/Reader.hpp"
 #include "creativity/Book.hpp"
 #include "creativity/BookMarket.hpp"
+#include <eris/Random.hpp>
 #include <iostream>
 #include <cstdlib>
 #include <iomanip>
@@ -69,6 +70,10 @@ void GUI::start(int argc, char *argv[]) {
         throw Glib::FileError(Glib::FileError::Code::NO_SUCH_ENTITY, "Unable to find gui.glade; try setting CREATIVITY_DATADIR to the directory containing gui.glade");
     }
 
+    // Have to set the initial seed value *before* starting the GUI thread, because we want the
+    // seed() call to affect the main thread, not the GUI thread.
+    widget<Gtk::Entry>("set_seed")->set_text(std::to_string(eris::Random::seed()));
+
     gui_thread_ = std::thread(&GUI::thr_run, this);
 
     // Wait for the thread to finish its startup before returning
@@ -123,9 +128,20 @@ void GUI::thr_run() {
         default_threads = i;
     }
     thrbox->set_active(default_threads);
-    //thrbox->set_active(0);
-    // FIXME: change num threads when changing thrbox
-    // FIXME,2: disable thrbox while running, reenable while stopped
+    thrbox->signal_changed().connect([this] {
+        int threads = widget<Gtk::ComboBoxText>("combo_threads")->get_active_row_number();
+
+        std::vector<Parameter> params;
+        Parameter p;
+        p.param = ParamType::threads;
+        p.ul = threads;
+        queueEvent(Event::Type::setup, std::move(params));
+    });
+
+    widget<Gtk::Entry>("set_seed")->signal_icon_press().connect([this](Gtk::EntryIconPosition icon_position, const GdkEventButton*) -> void {
+        if (icon_position == Gtk::EntryIconPosition::ENTRY_ICON_SECONDARY)
+            widget<Gtk::Entry>("set_seed")->set_text(std::to_string(std::random_device{}()));
+    });
 
     widget<Gtk::ComboBox>("combo_state")->signal_changed().connect([this] {
         thr_set_state(widget<Gtk::ComboBox>("combo_state")->get_active_row_number());
@@ -183,41 +199,8 @@ void GUI::thr_run() {
         return true;
     });
 
-    // FIXME: cache visualization drawing into an off-screen buffer (but delete cache and redo if window size changes)
-
     rdr_win_ = widget<Gtk::ScrolledWindow>("win_rdr");
     bk_win_ = widget<Gtk::ScrolledWindow>("win_bk");
-    /*
-    // We need a (fake) initial state here to add the columns to the tree
-    State blank_state;
-    auto initial_rdr_model = ReaderStore::create(blank_state);
-
-    rdr_tree_ = std::unique_ptr<Gtk::TreeView>(new Gtk::TreeView);
-    initial_rdr_model->appendColumnsTo(*rdr_tree_);
-    rdr_tree_->set_fixed_height_mode(true);
-
-    rdr_tree_->signal_row_activated().connect([this] (const Gtk::TreeModel::Path &path, Gtk::TreeViewColumn*) -> void {
-        thr_info_dialog(rdr_models_[state_curr_]->member(path).id);
-    });
-
-    widget<Gtk::ScrolledWindow>("win_rdr")->add(*rdr_tree_);
-    rdr_tree_->show();
-    */
-
-    /*
-    auto initial_bk_model = BookStore::create(blank_state);
-    bk_tree_ = std::unique_ptr<Gtk::TreeView>(new Gtk::TreeView);
-    initial_bk_model->appendColumnsTo(*bk_tree_);
-    bk_tree_->set_fixed_height_mode(true);
-    bk_tree_->signal_row_activated().connect([this] (const Gtk::TreeModel::Path &path, Gtk::TreeViewColumn*) -> void {
-        thr_info_dialog(bk_models_[state_curr_]->member(path).id);
-    });
-
-    bk_tree_->debug_window = widget<Gtk::ScrolledWindow>("win_bk");
-
-    widget<Gtk::ScrolledWindow>("win_bk")->add(*bk_tree_);
-    bk_tree_->show();
-    */
 
     dispatcher_ = std::unique_ptr<Glib::Dispatcher>(new Glib::Dispatcher);
     dispatcher_->connect([this] { thr_signal(); });
@@ -496,6 +479,8 @@ void GUI::thr_signal() {
         widget<Gtk::Button>("btn_resume")->set_visible(false);
         widget<Gtk::Button>("btn_pause")->set_visible(true);
         widget<Gtk::Button>("btn_step")->set_sensitive(false);
+
+        widget<Gtk::ComboBox>("combo_threads")->set_sensitive(false);
     }
     else if (last_state.type == Signal::Type::stopped) {
         // Turn off pause and turn on either play or resume buttons
@@ -503,6 +488,8 @@ void GUI::thr_signal() {
         widget<Gtk::Button>("btn_resume")->set_visible(last_state.boolean);
         widget<Gtk::Button>("btn_pause")->set_visible(false);
         widget<Gtk::Button>("btn_step")->set_sensitive(true);
+
+        widget<Gtk::ComboBox>("combo_threads")->set_sensitive(true);
     }
     if (last_progress.type == Signal::Type::progress) {
         // Progress bar update
@@ -575,7 +562,7 @@ void GUI::setupSim() {
     p.param = ParamType::quality_draw_sd; p.dbl = sb("set_quality_draw_sd"); params.push_back(p);
     p.param = ParamType::cost_fixed; p.dbl = sb("set_cost_fixed"); params.push_back(p);
     p.param = ParamType::cost_unit; p.dbl = sb("set_cost_unit"); params.push_back(p);
-    p.param = ParamType::speed_limit; p.dbl = sb("set_speed"); params.push_back(p);
+    p.param = ParamType::seed; p.ul = std::stoul(widget<Gtk::Entry>("set_seed")->get_text()); params.push_back(p);
     int threads = widget<Gtk::ComboBoxText>("combo_threads")->get_active_row_number();
     if (threads < 0) threads = 0; // -1 means no item selected (shouldn't be possible, but just in case)
     p.param = ParamType::threads; p.ul = (unsigned long)threads; params.push_back(p);
