@@ -56,7 +56,7 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
     if (not drawing_cache_[gui_.state_curr_]) {
         auto cr = Cairo::Context::create(
                 drawing_cache_[gui_.state_curr_] = Cairo::ImageSurface::create(Cairo::FORMAT_RGB24, width, height)
-                );
+        );
 
         std::shared_ptr<State> state;
 
@@ -77,7 +77,66 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
 
         auto trans = graph_to_canvas();
 
-        // Add axes
+        // Things get draw here in order from least to most important (since later things are drawn
+        // on top of earlier things).  This means we have to loop over the same vector a few times,
+        // unfortunately.
+
+        // Draw lines from readers to newly purchased books.
+        cr->set_source_rgba(1, 0.55, 0, 0.5);
+        for (auto &rpair : state->readers) {
+            auto &r = rpair.second;
+
+            for (auto &book_id : r.newBooks) {
+                auto &b = state->books.at(book_id);
+                drawWrappingLine(cr, trans, r.position, b.position);
+            }
+        }
+        cr->stroke();
+
+        // Draw books.  On-market books are blue, off-market books are gray.  Newer books are
+        // larger than older books.
+        for (auto &bpair : state->books) {
+            auto &b = bpair.second;
+            // Give new books a larger cross: a brand new book gets a point 3 times as large; this
+            // scaling decreases linearly to the regular size at a 10-period old book.
+            const double scale = std::max(1.0, 3.0 - 0.3*b.age);
+
+            // Draw book:
+            double br = 0, bg = .4, bb = 1; // Blue with a hint of green
+            if (not b.market) br = bg = bb = 0.5; // Off-market: gray.
+            drawPoint(cr, trans, b.position[0], b.position[1], PointType::CROSS, br, bg, bb, 1, scale);
+        }
+
+        // Readers have green utility circles, indicating how much about the base 1000 utility the
+        // reader was in the period.
+        for (auto &rpair : state->readers) {
+            auto &r = rpair.second;
+            double rx = r.position[0], ry = r.position[1];
+            const double radius1 = 0.05 * (r.u - 1000);
+            if (radius1 > 0) { // Utility > 1000 means some utility gain from books
+                drawCircle(cr, trans, rx, ry, radius1, .133, .545, .133, 0.5);
+            }
+        }
+
+        // Lines from each book to its author
+        cr->set_source_rgba(0.5, 0.2, 0.5, 0.5);
+        for (auto &bpair : state->books) {
+            auto &b = bpair.second;
+            drawWrappingLine(cr, trans, state->readers.at(b.author).position, b.position);
+        }
+        cr->stroke();
+
+        // Draw readers, red x's.
+        for (auto &rpair : state->readers) {
+            auto &r = rpair.second;
+            double rx = r.position[0], ry = r.position[1];
+            // Draw the reader
+            drawPoint(cr, trans, rx, ry, PointType::X, 1, 0, 0, 1);
+
+            // NB: rx, ry may be translated now
+        }
+
+        // Add axes (last, so that they are on top)
         double zero_x = 0, zero_y = 0;
         trans.transform_point(zero_x, zero_y);
         // Round the transformed location to the nearest .5 value; it'll be ever so slighly inaccurate,
@@ -128,49 +187,6 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
             cr->rel_line_to(curr_tick_size, 0);
         }
         cr->stroke();
-
-        //SharedMember<Reader> token_reader; // Need to keep a reader for wrapping
-
-        cr->set_source_rgba(1, 0.55, 0, 0.5); // Lines from readers to purchased books
-        for (auto &rpair : state->readers) {
-            auto &r = rpair.second;
-            //if (!token_reader) { token_reader = r; }
-            double rx = r.position[0], ry = r.position[1];
-            drawPoint(cr, trans, rx, ry, PointType::X, 1, 0, 0, 1);
-
-            const double radius1 = 0.05 * (r.u - 1000);
-            if (radius1 > 0) { // Utility > 1000 means some utility gain from books
-                drawCircle(cr, trans, rx, ry, radius1, .133, .545, .133, 0.5);
-            }
-            const double radius2 = 0.1 * r.newBooks.size();
-            if (radius2 > 0) { // Bought some books
-                drawCircle(cr, trans, rx, ry, radius2, 1, .55, 0, 0.5);
-                for (auto &book_id : r.newBooks) {
-                    auto &b = state->books.at(book_id);
-                    drawWrappingLine(cr, trans, r.position, b.position);
-                }
-                cr->stroke();
-            }
-            // NB: rx, ry may be translated now
-        }
-
-        cr->set_source_rgba(0.5, 0.2, 0.5, 0.5); // Colour for lines from books to their author
-        for (auto &bpair : state->books) {
-            auto &b = bpair.second;
-            // Give new books a larger cross: a brand new book gets a point 3 times as large; this
-            // scaling decreases linearly to the regular size at a 10-period old book.
-            const double scale = std::max(1.0, 3.0 - 0.3*b.age);
-
-            // Draw book:
-            double br = 0, bg = .4, bb = 1; // Blue with a hint of green
-            if (not b.market)
-                br = bg = bb = 0;
-            drawPoint(cr, trans, b.position[0], b.position[1], PointType::CROSS, br, bg, bb, 1, scale);
-
-            drawWrappingLine(cr, trans, state->readers.at(b.author).position, b.position);
-
-            cr->stroke();
-        }
 
         cr->restore();
     }
