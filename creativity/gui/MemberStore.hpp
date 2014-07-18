@@ -33,11 +33,15 @@ class MemberStore : public Gtk::TreeModel, public Gtk::TreeSortable {
         /** Returns the Path to the member with the given id.  Returns an empty path if the id was
          * not found.
          *
-         * This does a linear search of the current member list.
+         * This does a linear search of the current member list.  If the optional `hint` is given,
+         * locations near `hint` are checked first; otherwise this does a linear search beginning
+         * from 0.
          *
-         * \param hint if provided as a non-zero, this checks the given position first for a match
-         * before starting a linear search.  This is a useful optimization when finding across
-         * models that are expected to contain the same elements in the same order.
+         * \param id the id to compare against members_[i].id to find the element's position.
+         * \param hint if provided as a non-zero, this starts looking at and near the given
+         * position, iterating outward in both directions.  This is a useful optimization when
+         * calling find() on a model that has a reasonable chance of having the elements in the same
+         * (or nearby) positions.
          */
         Path find(eris::eris_id_t id, size_t hint = 0) const;
 
@@ -172,7 +176,16 @@ class MemberStore : public Gtk::TreeModel, public Gtk::TreeSortable {
                 int sort_column_id,
                 Gtk::SortType order);
 
-        // Appends a single column to the given view using the given label, width, and sortability.
+        /** Appends a single column to the given view using the given label, width, and sortability.
+         *
+         * \param v the TreeView to add the column to
+         * \param label the string for the column header
+         * \param col the model column object, typically a member of `store.columns` such as
+         * `readerstore.columns.id`.
+         * \param width the fixed width of the column
+         * \param sortable if omitted (or true) the column will be user-sortable by clicking on the
+         * column header; if specified explicitly as false, user sorting will be disabled.
+         */
         template <typename T, typename = typename std::enable_if<std::is_base_of<Gtk::TreeModelColumnBase, T>::value>>
         void appendCol(Gtk::TreeView &v, const std::string &label, T &col, int width, bool sortable = true) const {
             v.append_column(label, col);
@@ -183,7 +196,7 @@ class MemberStore : public Gtk::TreeModel, public Gtk::TreeSortable {
                 c->set_sort_column(col);
         }
 
-        /// The state.
+        /// The state this MemberStore represents.
         const state::State &state_;
         /// The vector of members.
         std::vector<std::reference_wrapper<const M>> members_;
@@ -213,14 +226,25 @@ template <class M> const M& MemberStore<M>::member(const iterator &iter) const {
 
 template <class M> Gtk::TreeModel::Path MemberStore<M>::find(eris::eris_id_t id, size_t hint) const {
     Gtk::TreeModel::Path p;
-    if (hint > 0 and hint < members_.size() and members_[hint].get().id == id) {
-        p.push_back(hint);
-        return p;
-    }
-    for (size_t i = 0; i < members_.size(); i++) {
-        if (members_[i].get().id == id) {
-            p.push_back(i);
-            return p;
+    const long max = members_.size();
+    // Loop through members_ starting at hint with two counters: one starting at hint and going down
+    // to 0, the other starting at hint+1 and going up to max.  This makes us search positions
+    // closer to hint first.
+    long a = hint, b = hint + 1;
+    while (b < max or a >= 0) {
+        if (a >= 0) {
+            if (members_[a].get().id == id) {
+                p.push_back(a);
+                break;
+            }
+            a--;
+        }
+        if (b < max) {
+            if (members_[b].get().id == id) {
+                p.push_back(b);
+                break;
+            }
+            b++;
         }
     }
     return p;
