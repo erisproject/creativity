@@ -32,7 +32,8 @@ int main(int argc, char *argv[1]) {
     std::cout << std::setprecision(16);
 
     bool setup = false, stopped = true, step = false, quit = false;
-    unsigned long num_readers = 1000;
+    unsigned long num_readers = 1000, dimensions = 2;
+    double density = 1.0;
     double book_sd = 0.5, quality_draw_sd = 1.0;
     double cost_fixed = 20, cost_unit = 1, income = 1000;
     unsigned long run_start = 0, run_end = 0;
@@ -67,6 +68,12 @@ int main(int argc, char *argv[1]) {
                 if (p.ul < 1)
                     throw std::domain_error{"Must have at least one reader"};
                 num_readers = p.ul;
+                break;
+            case GUI::ParamType::density:
+                if (setup) throw std::runtime_error("Cannot change density after initial setup");
+                if (p.dbl <= 0)
+                    throw std::domain_error{"Density must be positive"};
+                density = p.dbl;
                 break;
             case GUI::ParamType::seed:
                 if (setup) throw std::runtime_error("Cannot change seed after initial setup");
@@ -112,13 +119,27 @@ int main(int argc, char *argv[1]) {
     }
 
     auto &rng = eris::Random::rng();
-    std::uniform_real_distribution<double> unif_01{0, 1};
-    std::uniform_real_distribution<double> unif_pmb{-BOUNDARY, BOUNDARY};
 
     while (!setup) {
         gui.waitEvents();
         if (quit) return 0;
     }
+
+    // Calculate the boundaries from the density.  Total hypervolume is (2*BOUNDARY)^(dimensions),
+    // so to achieve `density` we need BOUNDARY set as the solution to:
+    //     density = readers / ((2*BOUNDARY)^(dimensions))
+    // thus:
+    BOUNDARY = 0.5 *
+        (dimensions == 1 ? num_readers/density :
+         dimensions == 2 ? std::sqrt(num_readers/density) :
+         dimensions == 3 ? std::cbrt(num_readers/density) :
+         std::pow(num_readers/density, 1.0/dimensions));
+
+    ERIS_DBGVAR(num_readers);
+    ERIS_DBGVAR(density);
+    ERIS_DBGVAR(BOUNDARY);
+
+    std::uniform_real_distribution<double> unif_pmb{-BOUNDARY, BOUNDARY};
 
     ERIS_DBG("Setting up readers");
     VectorXd demand_beta{8}; demand_beta << 0, -2, 0.5, -0.1, 0, 0, 0, 0;

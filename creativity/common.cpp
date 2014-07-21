@@ -5,6 +5,8 @@ namespace creativity {
 
 eris::SharedMember<eris::Good::Continuous> MONEY;
 
+double BOUNDARY;
+
 std::vector<eris::SharedMember<Book>> NEW_BOOKS, AGE_ONE_BOOKS;
 
 void NEW_BOOKS_Cleaner::intraFinish() {

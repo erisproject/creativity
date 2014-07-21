@@ -9,8 +9,8 @@ using namespace creativity::state;
 
 namespace creativity { namespace gui {
 
-GraphArea::GraphArea(const double &top, const double &right, const double &bottom, const double &left, GUI &gui) :
-    gui_{gui}, wpb_({0.0,0.0}, {-BOUNDARY, -BOUNDARY}, {BOUNDARY, BOUNDARY}), bounds_{top,right,bottom,left}
+GraphArea::GraphArea(GUI &gui) :
+    gui_{gui}, wpb_({0.0,0.0})
 {}
 
 Cairo::Matrix GraphArea::graph_to_canvas() const {
@@ -18,16 +18,14 @@ Cairo::Matrix GraphArea::graph_to_canvas() const {
     const int width = allocation.get_width();
     const int height = allocation.get_height();
 
-    // The second of these is typically negative, which is correct because "up" in the graph
-    // translates to a lower coordinate on the screen (since positive y coordinates are down the
-    // screen).
-    const double gwidth = bounds_.right - bounds_.left,
-          gheight = bounds_.bottom - bounds_.top;
+    // The second of these is negative, which is correct because "up" in the graph translates to a
+    // lower coordinate on the screen (since positive y coordinates are down the screen).
+    const double gwidth = 2*BOUNDARY, gheight = -2*BOUNDARY;
 
     // Build a transformation that converts from positions to canvas coordinates
     auto trans = Cairo::identity_matrix();
     trans.scale(width / gwidth, height / gheight);
-    trans.translate(-bounds_.left, -bounds_.top);
+    trans.translate(BOUNDARY, -BOUNDARY);
 
     return trans;
 }
@@ -139,13 +137,13 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
         // Add axes (last, so that they are on top)
         double zero_x = 0, zero_y = 0;
         trans.transform_point(zero_x, zero_y);
-        // Round the transformed location to the nearest .5 value; it'll be ever so slighly inaccurate,
-        // but will give a single pixel line instead of a double-width, blurry line that results from
-        // positioning at an integer.
-        zero_x = std::round(zero_x + 0.5) - 0.5;
-        zero_y = std::round(zero_y + 0.5) - 0.5;
 
-        cr->set_line_width(1.0);
+        // Round the transformed location to the nearest value; it'll be ever so slighly inaccurate,
+        // but will give a double pixel line instead of a slightly blurry line (from partial pixel coverage).
+        zero_x = std::round(zero_x);
+        zero_y = std::round(zero_y);
+
+        cr->set_line_width(2.0);
         cr->set_source_rgb(0,0,0);
         cr->move_to(zero_x, 0);
         cr->line_to(zero_x, height);
@@ -156,9 +154,8 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
 
         // Tick marks
         cr->set_line_width(1.0);
-        const double tick_max_x = std::max(std::abs(bounds_.right), std::abs(bounds_.left));
         int tick_num = 0;
-        for (double gx = tick_space; gx <= tick_max_x; gx += tick_space) {
+        for (double gx = tick_space; gx <= BOUNDARY; gx += tick_space) {
             const double curr_tick_size = (++tick_num % tick_big) ? tick_size : 3*tick_size;
             double x = gx, y = 0;
             trans.transform_point(x, y);
@@ -171,9 +168,8 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
             cr->move_to(x, y - curr_tick_size/2.0);
             cr->rel_line_to(0, curr_tick_size);
         }
-        const double tick_max_y = std::max(std::abs(bounds_.top), std::abs(bounds_.bottom));
         tick_num = 0;
-        for (double gy = tick_space; gy <= tick_max_y; gy += tick_space) {
+        for (double gy = tick_space; gy <= BOUNDARY; gy += tick_space) {
             const double curr_tick_size = (++tick_num % tick_big) ? tick_size : 3*tick_size;
             double x = 0, y = gy;
             trans.transform_point(x, y);
@@ -202,6 +198,9 @@ void GraphArea::drawWrappingLine(const Cairo::RefPtr<Cairo::Context> &cr, const 
     cr->transform(trans);
     const double x_span = 2*BOUNDARY;
     const double y_span = 2*BOUNDARY;
+    if (not wpb_.wrapped(0)) {
+        wpb_ = WrappedPositionalBase({0.0,0.0}, {-BOUNDARY, -BOUNDARY}, {BOUNDARY, BOUNDARY});
+    }
     wpb_.moveTo(from);
     auto v = wpb_.vectorTo(to);
     // There are nine virtual points the author can take; draw a line from each of them (at most

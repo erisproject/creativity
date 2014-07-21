@@ -25,7 +25,7 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
          * vertical plane and [`left', `right'] on the horizontal plane.  Specifying a value of
          * bottom or left larger than top or bottom will flip the respective axis.
          */
-        GraphArea(const double &top, const double &right, const double &bottom, const double &left, GUI &gui);
+        GraphArea(GUI &gui);
 
         /** Returns a Cairo::Matrix that translates graph coordinates into screen coordinates.  To
          * go the other way, invert this matrix.
@@ -96,13 +96,6 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
         GUI &gui_;
         // Helper object for doing wrapping calculations
         eris::WrappedPositionalBase wpb_;
-        // The bounds of the graph
-        struct {
-            double top; ///< the top graph boundary 
-            double right; ///< the right graph boundary
-            double bottom; ///< the bottom graph boundary
-            double left; ///< the left graph boundary
-        } bounds_;
 
         // Cache of image surfaces; these save redrawing when transitioning between states
         std::vector<Cairo::RefPtr<Cairo::ImageSurface>> drawing_cache_;

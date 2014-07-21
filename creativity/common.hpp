@@ -10,10 +10,10 @@ namespace creativity {
 /// The money good.  Set when created.
 extern eris::SharedMember<eris::Good::Continuous> MONEY;
 
-/** The reader boundary (from 0, in each dimension).  If readers attempt to move off the boundary,
- * they "wrap", coming in the opposite side(s).
+/** The reader boundary (from 0, in each dimension).  Set when the simulation is initialized.  If
+ * readers attempt to move off the boundary, they "wrap", coming in the opposite side(s).
  */
-constexpr double BOUNDARY = 10;
+extern double BOUNDARY;
 
 class Book; // Forward declaration
 

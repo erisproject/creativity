@@ -164,7 +164,7 @@ void GUI::thr_run() {
     // mainloop is running.
     std::unique_lock<std::mutex> lock{mutex_};
 
-    graph_ = std::unique_ptr<GraphArea>(new GraphArea{10., 10., -10., -10., *this});
+    graph_ = std::unique_ptr<GraphArea>(new GraphArea(*this));
     graph_->add_events(Gdk::EventMask::BUTTON_PRESS_MASK);
 
     hand_ = Gdk::Cursor::create(main_window_->get_display(), Gdk::HAND1);
@@ -558,6 +558,7 @@ void GUI::setupSim() {
     Parameter p;
     p.param = ParamType::readers; p.ul = sb_int("set_readers"); params.push_back(p);
     p.param = ParamType::dimensions; p.ul = sb_int("set_dimensions"); params.push_back(p);
+    p.param = ParamType::density; p.dbl = sb("set_density"); params.push_back(p);
     p.param = ParamType::book_sd; p.dbl = sb("set_book_sd"); params.push_back(p);
     p.param = ParamType::quality_draw_sd; p.dbl = sb("set_quality_draw_sd"); params.push_back(p);
     p.param = ParamType::cost_fixed; p.dbl = sb("set_cost_fixed"); params.push_back(p);

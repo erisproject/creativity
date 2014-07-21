@@ -142,6 +142,7 @@ class GUI : eris::noncopyable {
         enum class ParamType {
             dimensions, ///< Sets the number of dimensions in `.ul`
             readers, ///< Sets the number of readers in `.ul`
+            density, ///< Sets the density of readers per unit^dimensions
             book_sd, ///< Sets the book location standard deviation in `.dbl`
             quality_draw_sd, ///< Sets the perceived quality standard deviation in `.dbl`
             cost_fixed, ///< Sets the fixed cost of keeping a book on the market in `.dbl`

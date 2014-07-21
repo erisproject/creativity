@@ -680,7 +680,7 @@
                                           </packing>
                                         </child>
                                         <child>
-                                          <object class="GtkSpinButton" id="set_readers1">
+                                          <object class="GtkSpinButton" id="set_density">
                                             <property name="visible">True</property>
                                             <property name="can_focus">True</property>
                                             <property name="invisible_char">●</property>
