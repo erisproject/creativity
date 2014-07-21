@@ -135,10 +135,6 @@ int main(int argc, char *argv[1]) {
          dimensions == 3 ? std::cbrt(num_readers/density) :
          std::pow(num_readers/density, 1.0/dimensions));
 
-    ERIS_DBGVAR(num_readers);
-    ERIS_DBGVAR(density);
-    ERIS_DBGVAR(BOUNDARY);
-
     std::uniform_real_distribution<double> unif_pmb{-BOUNDARY, BOUNDARY};
 
     ERIS_DBG("Setting up readers");
