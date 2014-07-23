@@ -28,8 +28,13 @@ namespace creativity { namespace belief {
  * These constraints are combined with a natural conjugate prior for the purposes of updating the
  * beliefs via Bayesian econometrics.
  */
-class Profit : public Linear<5> {
+class Profit : public Linear {
     public:
+        /** Default constructor: note that default constructed objects are not valid models.
+         * \sa belief::Linear::Linear()
+         */
+        Profit() = default;
+
         /** Constructs a profit model with the given parameter information.
          *
          * \param D the dimensionality of the world.
@@ -39,7 +44,7 @@ class Profit : public Linear<5> {
          */
         template <typename ...Args>
         Profit(unsigned int D, Args &&...args)
-        : LinearBase{std::forward<Args>(args)...}, D_{D}
+        : Linear{std::forward<Args>(args)...}, D_{D}
         {}
 
         /** Given a set of model parameters, this returns an expected value \f$\Pi_b\f$, the
@@ -89,18 +94,18 @@ class Profit : public Linear<5> {
          * \param y a vector of new y data
          * \param X a matrix of new X data
          */
-        Profit update(const Ref<const VectorXd> &y, const Ref<const MatrixXKd> &X) const;
+        Profit update(const Eigen::Ref<const Eigen::VectorXd> &y, const Eigen::Ref<const Eigen::MatrixXd> &X) const;
 
         /** Given a book and perceived quality, this builds an X matrix row of profit data for that
          * book.  This needs to be called after the period has advanced: typically in the
          * inter-period optimization stage.
          */
-        RowVectorKd profitRow(eris::SharedMember<Book> book, double quality) const;
+        Eigen::RowVectorXd profitRow(eris::SharedMember<Book> book, double quality) const;
 
     private:
         // Initialize a Profit from a Linear<>
-        Profit(unsigned int D, LinearBase &&base)
-            : LinearBase{base}, D_{D} {}
+        Profit(unsigned int D, Linear &&base)
+            : Linear{base}, D_{D} {}
 
         unsigned int D_;
 

@@ -7,12 +7,14 @@ using Eigen::RowVectorXd;
 
 namespace creativity { namespace belief {
 
+using namespace Eigen;
+
 double Demand::predict(double P, double q, unsigned long S, unsigned long otherBooks, unsigned long marketBooks) const {
     if (P < 0) throw std::domain_error("Demand::predict: P cannot be < 0");
-    RowVectorKd X;
+    RowVectorXd X;
     X << 1, std::pow(P, D_), std::copysign(std::pow(q, D_), q), S, 0, otherBooks == 0 ? 1 : 0, otherBooks, marketBooks;
 
-    return LinearBase::predict(X);
+    return Linear::predict(X);
 }
 
 std::pair<double, double> Demand::argmaxP(double q, unsigned long S, unsigned long otherBooks, unsigned long marketBooks, double c) const {
@@ -40,8 +42,8 @@ std::pair<double, double> Demand::argmaxP(double q, unsigned long S, unsigned lo
 }
 
 
-Demand::RowVectorKd Demand::bookRow(eris::SharedMember<Book> book, double quality) const {
-    RowVectorKd row(K());
+RowVectorXd Demand::bookRow(eris::SharedMember<Book> book, double quality) const {
+    RowVectorXd row(K());
 
     auto t = book->simulation()->t() - 1;
     row << 1.0,
@@ -56,8 +58,8 @@ Demand::RowVectorKd Demand::bookRow(eris::SharedMember<Book> book, double qualit
     return row;
 }
 
-Demand Demand::update(const Ref<const VectorXd> &y, const Ref<const MatrixXKd> &X) const {
-    return Demand{D_, LinearBase::update(y, X)};
+Demand Demand::update(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X) const {
+    return Demand{D_, Linear::update(y, X)};
 }
 
 }}

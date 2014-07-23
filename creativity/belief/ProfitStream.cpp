@@ -5,7 +5,9 @@ using Eigen::RowVectorXd;
 
 namespace creativity { namespace belief {
 
-ProfitStream::ProfitStream(size_t K)
+using namespace Eigen;
+
+ProfitStream::ProfitStream(unsigned int K)
     : ProfitStream(VectorXd::Zero(K), 1.0, MatrixXd::Identity(K, K), 1e-6)
 {
     if (K == 0) throw std::domain_error("Unable to create ProfitStream belief with K=0 parameters");
@@ -13,11 +15,11 @@ ProfitStream::ProfitStream(size_t K)
 }
 
 ProfitStream::ProfitStream(
-        const Ref<const VectorKd> &beta,
+        const Ref<const VectorXd> &beta,
         double s2,
-        const Ref<const MatrixKd> &V,
+        const Ref<const MatrixXd> &V,
         double n)
-    : LinearBase(beta, s2, V, n)
+    : Linear(beta, s2, V, n)
 {}
 
 double ProfitStream::predict(SharedMember<Book> book) const {
@@ -26,11 +28,11 @@ double ProfitStream::predict(SharedMember<Book> book) const {
         X[i] = book->revenue(book->created() + i);
     }
 
-    return LinearBase::predict(X);
+    return Linear::predict(X);
 }
 
-ProfitStream ProfitStream::update(const Ref<const VectorXd> &y, const Ref<const MatrixXKd> &X) const {
-    return ProfitStream{LinearBase::update(y, X)};
+ProfitStream ProfitStream::update(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X) const {
+    return ProfitStream{Linear::update(y, X)};
 }
 
 

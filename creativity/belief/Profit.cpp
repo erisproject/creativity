@@ -6,10 +6,12 @@
 
 namespace creativity { namespace belief {
 
+using namespace Eigen;
+
 double Profit::predict(double q, unsigned long previousBooks, unsigned long marketBooks) const {
-    RowVectorKd X(K());
+    RowVectorXd X(K());
     X << 1, std::copysign(std::pow(q, D_), q), previousBooks == 0 ? 1 : 0, previousBooks, marketBooks;
-    return LinearBase::predict(X);
+    return Linear::predict(X);
 }
 
 double Profit::argmaxL(
@@ -29,18 +31,18 @@ double Profit::argmaxL(
     return eris::single_peak_search(profit, 0, l_max);
 }
 
-Profit::RowVectorKd Profit::profitRow(eris::SharedMember<Book> book, double quality) const {
+RowVectorXd Profit::profitRow(eris::SharedMember<Book> book, double quality) const {
     double prev_books = book->order();
     double first_book = prev_books == 0 ? 1 : 0;
     double market_books = book->simulation()->countMarkets<BookMarket>();
 
-    RowVectorKd Xi(K());
+    RowVectorXd Xi(K());
     Xi << 1, std::pow(quality, D_), first_book, prev_books, market_books;
     return Xi;
 }
 
-Profit Profit::update(const Ref<const VectorXd> &y, const Ref<const MatrixXKd> &X) const {
-    return Profit{D_, LinearBase::update(y, X)};
+Profit Profit::update(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X) const {
+    return Profit{D_, Linear::update(y, X)};
 }
 
 

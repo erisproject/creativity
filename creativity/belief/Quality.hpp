@@ -28,9 +28,16 @@ namespace belief {
  * The model is updated using Bayesian econometrics as new books (and realized quality values of
  * those books) are obtained.
  */
-class Quality : public Linear<7> {
+class Quality : public Linear {
     public:
-        using LinearBase::Linear;
+        /** Default constructor: note that default constructed objects are not valid models.
+         * \sa belief::Linear::Linear()
+         */
+        Quality() = default;
+
+        template <typename ...Args>
+        Quality(Args &&...args) : Linear{std::forward<Args>(args)...}
+        {}
 
         /** Given a book, this returns \f$\widehat q_b\f$, the expected quality of the book.
          *
@@ -44,13 +51,13 @@ class Quality : public Linear<7> {
          * \param y a vector of new y data
          * \param X a matrix of new X data
          */
-        Quality update(const Ref<const VectorXd> &y, const Ref<const MatrixXKd> &X) const;
+        Quality update(const Eigen::Ref<const Eigen::VectorXd> &y, const Eigen::Ref<const Eigen::MatrixXd> &X) const;
 
         /** Given a container of books, this builds an X matrix of data representing those books.
          */
         template <class Container, typename = typename std::enable_if<std::is_same<typename Container::value_type, eris::SharedMember<Book>>::value>::type>
-        MatrixXKd bookData(const Container books) {
-            MatrixXKd X(books.size(), K());
+        Eigen::MatrixXd bookData(const Container books) {
+            Eigen::MatrixXd X(books.size(), K());
             size_t i = 0;
             for (const eris::SharedMember<Book> &book : books) {
                 X(i, 0) = 1;
@@ -67,7 +74,7 @@ class Quality : public Linear<7> {
         }
     private:
         // Initialize a Quality from a Linear<7>
-        Quality(LinearBase &&base) : LinearBase{base} {}
+        Quality(Linear &&base) : Linear{base} {}
 };
 
 }}

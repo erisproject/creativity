@@ -36,8 +36,13 @@ namespace belief {
  * These constraints are combined with a natural conjugate prior for the purposes of updating the
  * beliefs via Bayesian econometrics.
  */
-class Demand : public Linear<8> {
+class Demand : public Linear {
     public:
+        /** Default constructor: note that default constructed objects are not valid models.
+         * \sa belief::Linear::Linear()
+         */
+        Demand() = default;
+
         /** Constructs a demand model with the given prior information.
          *
          * \param D the dimensionality of the world.
@@ -47,7 +52,7 @@ class Demand : public Linear<8> {
          */
         template <typename ...Args>
         Demand(unsigned int D, Args &&...args)
-        : LinearBase{std::forward<Args>(args)...}, D_{D}
+        : Linear{std::forward<Args>(args)...}, D_{D}
         {}
 
         /** Given a set of model parameters, this returns an expected value \f$Q_b\f$, the number of sales.
@@ -124,7 +129,7 @@ class Demand : public Linear<8> {
          * that book.  This needs to be called after the period has advanced: typically in the
          * inter-period optimization stage.
          */
-        RowVectorKd bookRow(eris::SharedMember<Book> book, double quality) const;
+        Eigen::RowVectorXd bookRow(eris::SharedMember<Book> book, double quality) const;
 
         /** Uses the current object's priors to generate a new object whose parameters are the
          * posteriors of this object after incorporating new data.
@@ -132,13 +137,13 @@ class Demand : public Linear<8> {
          * \param y a vector of new y data
          * \param X a matrix of new X data
          */
-        Demand update(const Ref<const VectorXd> &y, const Ref<const MatrixXKd> &X) const;
+        Demand update(const Eigen::Ref<const Eigen::VectorXd> &y, const Eigen::Ref<const Eigen::MatrixXd> &X) const;
 
     private:
         unsigned int D_;
 
         // Initialize a Demand from a Linear<7>
-        Demand(unsigned int D, LinearBase &&base) : LinearBase{base}, D_{D} {}
+        Demand(unsigned int D, Linear &&base) : Linear{base}, D_{D} {}
 };
 
 }}

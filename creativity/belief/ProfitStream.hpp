@@ -4,9 +4,6 @@
 #include <eris/algorithms.hpp>
 #include <unordered_set>
 
-using Eigen::VectorXd;
-using Eigen::MatrixXd;
-
 namespace creativity { namespace belief {
 
 /** This class represents an author's belief about the lifetime profits of a book based on partial
@@ -31,10 +28,12 @@ namespace creativity { namespace belief {
  * This restriction with a natural conjugate prior is used for the purposes of updating the beliefs
  * via Bayesian econometrics.
  */
-class ProfitStream : public Linear<> {
+class ProfitStream : public Linear {
     public:
-        /// No default constructor
-        ProfitStream() = delete;
+        /** Default constructor: note that default constructed objects are not valid models.
+         * \sa belief::Linear::Linear()
+         */
+        ProfitStream() = default;
 
         /** Constructs a ProfitStream with a weak prior for a model of `K` parameters.  This model
          * will have `beta` set to `0` for the first `K-1` parameters and `1` for the last
@@ -42,7 +41,7 @@ class ProfitStream : public Linear<> {
          * set to `1e-6`, so as to make this an extremely weak prior when used for generating a
          * posterior.
          */
-        ProfitStream(size_t K);
+        ProfitStream(unsigned int K);
 
         /** Constructs a ProfitStream from the given model parameters.
          *
@@ -53,9 +52,9 @@ class ProfitStream : public Linear<> {
          * \param n the number of observations behind this estimate.
          */
         ProfitStream(
-                const Ref<const VectorKd> &beta,
+                const Eigen::Ref<const Eigen::VectorXd> &beta,
                 double s2,
-                const Ref<const MatrixKd> &V,
+                const Eigen::Ref<const Eigen::MatrixXd> &V,
                 double n);
 
         /** Given a book, this uses the profit of the first \f$K\f$ periods the book has been on the
@@ -73,7 +72,7 @@ class ProfitStream : public Linear<> {
          * \param y a vector of new y data
          * \param X a matrix of new X data
          */
-        ProfitStream update(const Ref<const VectorXd> &y, const Ref<const MatrixXKd> &X) const;
+        ProfitStream update(const Eigen::Ref<const Eigen::VectorXd> &y, const Eigen::Ref<const Eigen::MatrixXd> &X) const;
 
     protected:
         /// Ensures that all beta values are non-negative
@@ -81,7 +80,7 @@ class ProfitStream : public Linear<> {
 
     private:
         // Initialize a ProfitStream from a Linear<K>
-        ProfitStream(LinearBase &&base) : LinearBase{std::move(base)} {}
+        ProfitStream(Linear &&base) : Linear{std::move(base)} {}
 };
 
 }}
