@@ -37,7 +37,7 @@ class InfoWindow : public Gtk::Window {
          *
          * \throws std::out_of_range if the reader or book doesn't exist in the passed-in state.
          */
-        InfoWindow(const state::State &state, std::shared_ptr<Gtk::Window> main_window,
+        InfoWindow(std::shared_ptr<const state::State> state, std::shared_ptr<Gtk::Window> main_window,
                 eris::eris_id_t reader_id, std::function<void(eris::eris_id_t)> open_info_dialog);
 
         /** Constructs a new InfoWindow displaying book information.
@@ -48,7 +48,7 @@ class InfoWindow : public Gtk::Window {
          * passed-in state, its values will be set to "N/A".  (This is allowed because the book
          * window can be refresh()ed to another state where the book may or may not exist).
          */
-        InfoWindow(const state::State &state, std::shared_ptr<Gtk::Window> main_window,
+        InfoWindow(std::shared_ptr<const state::State> state, std::shared_ptr<Gtk::Window> main_window,
                 eris::eris_id_t book_id);
 
         /** The reader id about which this dialog is displaying details, or 0 if this is a book
@@ -62,7 +62,7 @@ class InfoWindow : public Gtk::Window {
         const eris::eris_id_t book;
 
         /** Refresh the information in the dialog using the given simulation state. */
-        void refresh(const state::State &state);
+        void refresh(std::shared_ptr<const state::State> state);
 
     protected:
         /// Sets up the dialog window properties, associates it with the parent, etc.

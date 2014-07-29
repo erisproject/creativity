@@ -1,6 +1,7 @@
 #include "creativity/BookMarket.hpp"
 #include "creativity/Reader.hpp"
 #include "creativity/Book.hpp"
+#include <random>
 
 using namespace eris;
 

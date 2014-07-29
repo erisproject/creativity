@@ -23,7 +23,7 @@ class ReaderStore : public MemberStore<state::ReaderState>, private Glib::Object
          * - books written
          * - age of most recently written book (simulation age if no books written)
          */
-        static Glib::RefPtr<ReaderStore> create(const state::State &state);
+        static Glib::RefPtr<ReaderStore> create(std::shared_ptr<const state::State> state);
 
         /** ColumnRecord object for a ReaderStore.  This object contains the columns for this Book
          * model.  This should not be used directly, but rather accessed via the public `columns`
@@ -32,20 +32,20 @@ class ReaderStore : public MemberStore<state::ReaderState>, private Glib::Object
         class ColRec : public Gtk::TreeModel::ColumnRecord {
             public:
                 Gtk::TreeModelColumn<eris::eris_id_t> id; ///< ID of the reader
-                Gtk::TreeModelColumn<double> posX, ///< X coordinate of the reader
-                    posY, ///< y coordinate of the reader
+                Gtk::TreeModelColumn<double> pos_x, ///< X coordinate of the reader
+                    pos_y, ///< y coordinate of the reader
                     u, ///< Current period utility of the reader
-                    uLifetime; ///< Cumulative lifetime utility of the reader
-                Gtk::TreeModelColumn<std::string> posstr; ///< position of the book as a string such as `(-7.16,0.440)`
-                Gtk::TreeModelColumn<size_t> booksOwned, ///< Number of books possessed by this reader
-                    booksNew, ///< Number of books acquired in the current period
-                    booksWritten, ///< Number of books authored by this reader
-                    lastBookAge; ///< Age of the most recently written book, or simulation age if `booksWritten == 0`
+                    u_lifetime; ///< Cumulative lifetime utility of the reader
+                Gtk::TreeModelColumn<std::string> pos_str; ///< position of the book as a string such as `(-7.16,0.440)`
+                Gtk::TreeModelColumn<size_t> books_owned, ///< Number of books possessed by this reader
+                    books_new, ///< Number of books acquired in the current period
+                    books_written, ///< Number of books authored by this reader
+                    last_book_age; ///< Age of the most recently written book, or simulation age if `booksWritten == 0`
 
             private:
                 ColRec() {
-                    add(id); add(posX); add(posY); add(posstr); add(u); add(uLifetime);
-                    add(booksOwned); add(booksNew); add(booksWritten); add(lastBookAge);
+                    add(id); add(pos_x); add(pos_y); add(pos_str); add(u); add(u_lifetime);
+                    add(books_owned); add(books_new); add(books_written); add(last_book_age);
                 }
                 friend class ReaderStore;
         };
@@ -60,7 +60,7 @@ class ReaderStore : public MemberStore<state::ReaderState>, private Glib::Object
 
     protected:
         /// Protected constructor; this object should be constructed using create().
-        ReaderStore(const state::State &state);
+        ReaderStore(std::shared_ptr<const state::State> &&state);
 
         /** Returns the column type of the given position.  This is typically invoked via
          * get_column_type, itself given a column member of the `.columns` ColRec object.
@@ -99,26 +99,21 @@ class ReaderStore : public MemberStore<state::ReaderState>, private Glib::Object
 
     private:
         // The various comparison functions; one of these gets passed to std::stable_sort.
-        static bool less_id(const state::ReaderState &a, const state::ReaderState &b);
-        static bool greater_id(const state::ReaderState &a, const state::ReaderState &b);
-        static bool less_posX(const state::ReaderState &a, const state::ReaderState &b);
-        static bool greater_posX(const state::ReaderState &a, const state::ReaderState &b);
-        static bool less_posY(const state::ReaderState &a, const state::ReaderState &b);
-        static bool greater_posY(const state::ReaderState &a, const state::ReaderState &b);
-        static bool less_posstr(const state::ReaderState &a, const state::ReaderState &b);
-        static bool greater_posstr(const state::ReaderState &a, const state::ReaderState &b);
-        static bool less_uCurr(const state::ReaderState &a, const state::ReaderState &b);
-        static bool greater_uCurr(const state::ReaderState &a, const state::ReaderState &b);
-        static bool less_uLife(const state::ReaderState &a, const state::ReaderState &b);
-        static bool greater_uLife(const state::ReaderState &a, const state::ReaderState &b);
-        static bool less_booksOwned(const state::ReaderState &a, const state::ReaderState &b);
-        static bool greater_booksOwned(const state::ReaderState &a, const state::ReaderState &b);
-        static bool less_booksNew(const state::ReaderState &a, const state::ReaderState &b);
-        static bool greater_booksNew(const state::ReaderState &a, const state::ReaderState &b);
-        static bool less_booksWritten(const state::ReaderState &a, const state::ReaderState &b);
-        static bool greater_booksWritten(const state::ReaderState &a, const state::ReaderState &b);
-        bool less_lastBookAge(const state::ReaderState &a, const state::ReaderState &b) const;
-        bool greater_lastBookAge(const state::ReaderState &a, const state::ReaderState &b) const;
+#define LESS_GREATER_METHODS(col) \
+        static bool less_##col(const state::ReaderState &a, const state::ReaderState &b); \
+        static bool greater_##col(const state::ReaderState &a, const state::ReaderState &b);
+        LESS_GREATER_METHODS(id)
+        LESS_GREATER_METHODS(pos_x)
+        LESS_GREATER_METHODS(pos_y)
+        LESS_GREATER_METHODS(pos_str)
+        LESS_GREATER_METHODS(u)
+        LESS_GREATER_METHODS(u_lifetime)
+        LESS_GREATER_METHODS(books_owned)
+        LESS_GREATER_METHODS(books_new)
+        LESS_GREATER_METHODS(books_written)
+#undef LESS_GREATER_METHODS
+        bool less_last_book_age(const state::ReaderState &a, const state::ReaderState &b) const;
+        bool greater_last_book_age(const state::ReaderState &a, const state::ReaderState &b) const;
 
 };
 

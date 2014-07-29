@@ -14,7 +14,7 @@ using namespace std::placeholders;
 
 namespace creativity { namespace gui {
 
-GUI::GUI(const std::vector<std::shared_ptr<State>> &states,
+GUI::GUI(const std::unique_ptr<Storage> &states,
         std::mutex &state_mutex,
         std::function<void(Parameter)> setup,
         std::function<void(unsigned int count)> run,
@@ -95,6 +95,73 @@ GUI::~GUI() {
 
 void GUI::thr_run() {
     main_window_ = std::shared_ptr<Gtk::Window>(widget<Gtk::Window>("window1"));
+
+    // When the "load" radio button is activated, disable all the new simulation parameter fields
+    widget<Gtk::RadioButton>("radio_load")->signal_clicked().connect([this] {
+        widget<Gtk::Frame>("fr_agents")->set_sensitive(false);
+        widget<Gtk::Frame>("fr_data")->set_sensitive(false);
+        widget<Gtk::Frame>("fr_run")->set_sensitive(false);
+    });
+    // Undo the above when "New simulation" is activated
+    widget<Gtk::RadioButton>("radio_new")->signal_clicked().connect([this] {
+        widget<Gtk::Frame>("fr_agents")->set_sensitive(true);
+        widget<Gtk::Frame>("fr_data")->set_sensitive(true);
+        widget<Gtk::Frame>("fr_run")->set_sensitive(true);
+    });
+    // Clicking the load file chooser button directly first fires the load radio, triggering the above
+    widget<Gtk::Button>("btn_load")->signal_clicked().connect([this] {
+        widget<Gtk::RadioButton>("radio_load")->set_active(true);
+
+        Gtk::FileChooserDialog fdlg(*main_window_, "Select simulation data output file", Gtk::FILE_CHOOSER_ACTION_OPEN);
+        fdlg.set_modal(true);
+        fdlg.set_urgency_hint(true);
+        fdlg.set_skip_taskbar_hint(true);
+        fdlg.add_button(Gtk::Stock::CANCEL, Gtk::RESPONSE_CANCEL);
+        fdlg.add_button(Gtk::Stock::OPEN, Gtk::RESPONSE_ACCEPT);
+        fdlg.set_filter(fileFilter());
+        if (load_ != "")
+            fdlg.set_filename(load_);
+        else
+            fdlg.set_current_folder(".");
+
+        auto result = fdlg.run();
+        if (result == Gtk::RESPONSE_ACCEPT) {
+            load_ = fdlg.get_filename();
+            loadSim();
+        }
+        else {
+            load_ = "";
+        }
+    });
+
+    // Clicking the save file chooser likewise fires the save radio, then also starts up the file
+    // chooser dialog.
+    widget<Gtk::Button>("btn_choose_save")->signal_clicked().connect([this] {
+        widget<Gtk::RadioButton>("radio_save")->set_active(true);
+        Gtk::FileChooserDialog fdlg(*main_window_, "Select simulation data output file", Gtk::FILE_CHOOSER_ACTION_SAVE);
+        fdlg.set_do_overwrite_confirmation(true);
+        fdlg.set_modal(true);
+        fdlg.set_urgency_hint(true);
+        fdlg.set_skip_taskbar_hint(true);
+        fdlg.add_button(Gtk::Stock::CANCEL,Gtk::RESPONSE_CANCEL);
+        fdlg.add_button(Gtk::Stock::SAVE,Gtk::RESPONSE_ACCEPT);
+        fdlg.set_filter(fileFilter());
+        if (save_ != "")
+            fdlg.set_filename(save_);
+        else {
+            fdlg.set_current_folder(".");
+            fdlg.set_current_name("creativity-" + widget<Gtk::Entry>("set_seed")->get_text() + ".crstate");
+        }
+
+        auto result = fdlg.run();
+        if (result == Gtk::RESPONSE_ACCEPT) {
+            save_ = fdlg.get_filename();
+        }
+        else {
+            save_ = "";
+        }
+        widget<Gtk::Label>("lbl_save")->set_text(save_ == "" ? "(no file selected)" : save_);
+    });
 
     widget<Gtk::Button>("btn_start")->signal_clicked().connect([this] {
         setupSim();
@@ -224,23 +291,22 @@ void GUI::thr_run() {
 void GUI::thr_set_state(unsigned long t) {
     if (t == state_curr_ or state_num_ == 0) return;
 
-    std::shared_ptr<State> state;
+    std::shared_ptr<const State> state;
     {
         auto lock = stateLock();
-        state = states_.at(t); // Will throw if `t` is invalid
+        state = (*states_)[t]; // Will throw if `t` is invalid
+
         // Enlarge if necessary
-#define RESIZE_TO(RESIZE, SOURCE) if (RESIZE.size() < SOURCE.size()) RESIZE.resize(SOURCE.size())
-        RESIZE_TO(rdr_models_, states_);
-        RESIZE_TO(rdr_trees_, states_);
-        RESIZE_TO(bk_models_, states_);
-        RESIZE_TO(bk_trees_, states_);
-        RESIZE_TO(rtrees_, states_);
-#undef RESIZE_TO
+        if (rdr_models_.size() < states_->size()) rdr_models_.resize(states_->size());
+        if (rdr_trees_.size() < states_->size()) rdr_trees_.resize(states_->size());
+        if (bk_models_.size() < states_->size()) bk_models_.resize(states_->size());
+        if (bk_trees_.size() < states_->size()) bk_trees_.resize(states_->size());
+        if (rtrees_.size() < states_->size()) rtrees_.resize(states_->size());
     }
 
     // Values may be null pointers--if so, create new model stores
-    if (not rdr_models_[t]) rdr_models_[t] = ReaderStore::create(*state);
-    if (not bk_models_[t]) bk_models_[t] = BookStore::create(*state);
+    if (not rdr_models_[t]) rdr_models_[t] = ReaderStore::create(state);
+    if (not bk_models_[t]) bk_models_[t] = BookStore::create(state);
 
     Gtk::TreeModel::Path rdr_select, bk_select;
 
@@ -359,7 +425,7 @@ void GUI::thr_set_state(unsigned long t) {
     // guarantees that iterators remain valid, but not necessarily in the same order).
     for (auto &w : info_windows_) {
         if (w.second.get_visible())
-            w.second.refresh(*state);
+            w.second.refresh(state);
         else
             del.push_back(w.first);
     }
@@ -387,6 +453,15 @@ std::vector<GUI::rt_val> GUI::thr_nearest(const rt_point &point, int n) {
     return nearest;
 }
 
+decltype(Gtk::FileFilter::create()) GUI::fileFilter() const {
+    if (not ff_) {
+        ff_ = Gtk::FileFilter::create();
+        ff_->set_name("Creativity simulation state files");
+        ff_->add_pattern("*.crstate");
+    }
+    return ff_;
+}
+
 std::unique_lock<std::mutex> GUI::stateLock() {
     return std::unique_lock<std::mutex>(state_mutex_);
 }
@@ -398,22 +473,22 @@ void GUI::thr_info_dialog(eris_id_t member_id) {
         already_open->second.present();
     }
     else {
-        std::shared_ptr<State> state;
+        std::shared_ptr<const State> state;
         {
             auto l = stateLock();
-            state = states_[state_curr_];
+            state = (*states_)[state_curr_];
         }
 
         if (state->readers.count(member_id)) {
             info_windows_.emplace(std::piecewise_construct,
                     std::tuple<eris_id_t>{member_id},
-                    std::tuple<decltype(*state)&, decltype(main_window_), eris_id_t, std::function<void(eris_id_t)>>{
-                        *state, main_window_, member_id, std::bind(&GUI::thr_info_dialog, this, _1)});
+                    std::tuple<decltype(state), decltype(main_window_), eris_id_t, std::function<void(eris_id_t)>>{
+                        state, main_window_, member_id, std::bind(&GUI::thr_info_dialog, this, _1)});
         }
         else if (state->books.count(member_id)) {
             info_windows_.emplace(std::piecewise_construct,
                     std::tuple<eris_id_t>{member_id},
-                    std::tuple<decltype(*state)&, decltype(main_window_), eris_id_t>{*state, main_window_, member_id});
+                    std::tuple<decltype(state), decltype(main_window_), eris_id_t>{state, main_window_, member_id});
         }
         else {
             throw std::out_of_range("thr_info_dialog: requested member id does not exist");
@@ -428,9 +503,12 @@ void GUI::thr_signal() {
     // (we want to skip everything except the last).
     std::stringstream errors;
     bool init = false;
-    Signal last_state{Signal::Type::quit}, last_progress{Signal::Type::quit}, last_new_states{Signal::Type::quit};
+    Signal last_state, last_progress, last_new_states;
     for (Signal &s : signal_queue_) {
         switch (s.type) {
+            case Signal::Type::none:
+                throw std::logic_error("Thread received invalid signal with type=none");
+                break;
             case Signal::Type::quit:
                 app_->quit();
                 return;
@@ -448,7 +526,6 @@ void GUI::thr_signal() {
                 last_progress = s;
                 break;
             case Signal::Type::error:
-                ERIS_DBG("Thr received error signal");
                 errors << s.message << "\n";
                 break;
         }
@@ -460,7 +537,7 @@ void GUI::thr_signal() {
         widget<Gtk::Notebook>("nb_tabs")->set_current_page(1);
 
         // Disable spin buttons:
-        for (auto &widg : {"set_dimensions", "set_readers", "set_book_sd", "set_quality_draw_sd", "set_cost_fixed", "set_cost_unit"})
+        for (auto &widg : {"set_dimensions", "set_readers", "set_density", "set_book_sd", "set_quality_draw_sd", "set_cost_fixed", "set_cost_unit"})
             widget<Gtk::SpinButton>(widg)->set_sensitive(false);
 
         widget<Gtk::Button>("btn_init")->set_sensitive(false);
@@ -517,7 +594,7 @@ void GUI::thr_signal() {
 
         {
             auto lock = stateLock();
-            state_num_ = states_.size();
+            state_num_ = states_->size();
         }
 
         if (state_num_ > old_state_num) {
@@ -533,9 +610,14 @@ void GUI::thr_signal() {
                 periods->append(std::to_string(t));
             }
 
-            // If the user was on the last state, switch them to the new last state.
-            if (old_state_num == 0 or state_curr_ == old_state_num - 1)
+            // If the new_state signal doesn't carry a state instruction, and the user was already
+            // on the last state, switch to the new last state:
+            if (last_new_states.uls.empty() and (old_state_num == 0 or state_curr_ == old_state_num - 1))
                 thr_set_state(state_num_-1);
+        }
+
+        if (not last_new_states.uls.empty()) {
+            thr_set_state(std::min(state_num_-1, last_new_states.uls[0]));
         }
     }
 }
@@ -553,6 +635,24 @@ void GUI::queueSignal(Signal &&s) {
     }
 }
 
+void GUI::loadSim() {
+    std::vector<Parameter> params;
+    Parameter p;
+    int threads = widget<Gtk::ComboBoxText>("combo_threads")->get_active_row_number();
+    if (threads < 0) threads = 0; // -1 means no item selected (shouldn't be possible, but just in case)
+    p.param = ParamType::threads; p.ul = (unsigned long)threads; params.push_back(p);
+
+    if (load_ == "") throw std::runtime_error("loadSim() called without load_ set to file to load");
+
+    p.param = ParamType::load; p.ptr = &load_; params.push_back(p);
+
+    queueEvent(Event::Type::setup, std::move(params));
+
+    // Disable all the simulation controls, since loading is read-only
+    widget<Gtk::Box>("box_settings")->set_sensitive(false);
+    widget<Gtk::Box>("box_controls")->set_sensitive(false);
+}
+
 void GUI::setupSim() {
     std::vector<Parameter> params;
     Parameter p;
@@ -568,6 +668,10 @@ void GUI::setupSim() {
     if (threads < 0) threads = 0; // -1 means no item selected (shouldn't be possible, but just in case)
     p.param = ParamType::threads; p.ul = (unsigned long)threads; params.push_back(p);
 
+    if (save_ != "") {
+        p.param = ParamType::save_as; p.ptr = &save_; params.push_back(p);
+    }
+
     queueEvent(Event::Type::setup, std::move(params));
 }
 
@@ -575,8 +679,10 @@ void GUI::runSim() {
     queueEvent(Event::Type::run, sb_int("set_periods"));
 }
 
-void GUI::new_states() {
-    queueSignal(Signal::Type::new_states);
+void GUI::newStates(unsigned long switch_to) {
+    queueSignal((switch_to == (unsigned long)-1)
+            ? Signal::Type::new_states
+            : Signal(Signal::Type::new_states, switch_to));
 }
 
 void GUI::initialized() {
@@ -597,13 +703,12 @@ void GUI::stopped(bool manual) { queueSignal({Signal::Type::stopped, manual}); }
 
 void GUI::error(std::string message) { queueSignal({ Signal::Type::error, message }); }
 
-GUI::Event::Event() : none{true} {}
 GUI::Event::Event(Event::Type t) : type{t} {}
 GUI::Event::Event(Event::Type t, std::vector<Parameter> &&p)
     : type{t}, parameters{std::move(p)} {}
-GUI::Event::Event(Event::Type t, const unsigned long &ulval)
+GUI::Event::Event(Event::Type t, unsigned long ulval)
     : type{t}, ul{ulval} {}
-GUI::Event::operator bool() { return not none; }
+GUI::Event::operator bool() { return type != Type::none; }
 
 void GUI::checkEvents() {
     std::unique_lock<std::mutex> lock(mutex_);

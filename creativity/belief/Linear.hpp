@@ -26,14 +26,33 @@ class Linear {
         Linear(Linear &&move) : Linear(move) {}
         /// Default copy constructor
         Linear(const Linear &copy) = default;
-        /** Move assignment operator for Eigen versions before 3.3.  Eigen 3.2 and earlier don't
-         * have proper move support, so for Eigen <3.3 we work around it by changing move assignment
-         * into copy assignment (which is, of course, much less efficient).
-         */
-        //Linear& operator=(Linear &&move) { return operator=(move); }
         /// Default copy assignment operator
         Linear& operator=(const Linear &copy) = default;
 #endif
+
+        /** Constructs a Linear model of `K` parameters and initializes the various variables (beta,
+         * s2, V, n) with highly noninformative priors; specifically this model will initialize
+         * parameters with:
+         *     beta = 0 vector
+         *     s2 = `NONINFORMATIVE_S2` (currently 1e-6)
+         *     V = identity matrix
+         *     n = `NONINFORMATIVE_N` (currently 1e-6)
+         *
+         * Unlike calling the full parameter constructor with the above values, this also keeps
+         * track of the fact that the model is non-informative, which has two effects:
+         *
+         * - the first update() call with return a model with `n` set to the number of rows in the
+         *   updated data without adding the initial small n value.
+         * - noninformative() will return true.
+         */
+        Linear(unsigned int K);
+
+        // NB: if changing these constants, also change the above constructor documentation
+        static constexpr double
+            /// The value of `n` for a noninformative model constructed using `Linear(unsigned int)`
+            NONINFORMATIVE_N = 1e-6,
+            /// The value of `s2` for a noninformative model constructed using `Linear(unsigned int)`
+            NONINFORMATIVE_S2 = 1e-6;
 
         /** Constructs a Linear model with the given parameters.  These parameters will be those
          * used for the prior when updating.
@@ -41,7 +60,7 @@ class Linear {
          * \param beta the coefficient mean parameters (which, because of restrictions, might not be
          * the actual means).
          * \param s2 the \f$\sigma^2\f$ value of the error term variance.  Typically the \f$\sigma^2\f$ estimate.
-         * \param V the model's V matrix (where \f$s^2 V\f$ is the distribution of \f$\beta\f$).
+         * \param V the model's V matrix (where \f$s^2 V\f$ is the variance matrix of \f$\beta\f$).
          * \param n the number of data points supporting the other values (which can be a
          * non-integer value).
          * \param V_inv A shared pointer to the inverse of `V`, if already calculated.  If the
@@ -76,6 +95,13 @@ class Linear {
         /// Virtual destructor
         virtual ~Linear() = default;
 
+        /** Virtual method called during construction to verify the model size.  If this returns a
+         * non-zero value, the given parameters (beta, V for the regular constructor, K for the
+         * noninformative constructor) must agree with the returned value.  If this returns 0, beta
+         * and V must agree with each other, but any model size >= 1 will be accepted.
+         */
+        virtual unsigned int fixedModelSize() const;
+
 #define NO_EMPTY_MODEL if (K_ == 0) { throw std::logic_error("Cannot use default constructed model object as a model"); }
         /** Accesses the base distribution means value of beta.  Note that this is *not* necessarily
          * the mean of beta and should not be used for prediction; rather it simply returns the
@@ -106,6 +132,12 @@ class Linear {
          */
         const unsigned int& K() const { return K_; }
 
+        /** Returns true if this model with initialized as a non-informative prior.
+         *
+         * \sa Linear(unsigned int)
+         */
+        const bool& noninformative() const;
+
         /** Overloaded so that a Linear model can be printed nicely with `std::cout << model`.
          */
         friend std::ostream& operator << (std::ostream &os, const Linear &b);
@@ -117,8 +149,8 @@ class Linear {
          */
         virtual void verifyParameters() const;
 
-        /** Uses the stored prior parameters and the provided data to generate a new linear object
-         * with posterior parameters.
+        /** Using the stored parameters as a prior, uses the provided data to generate a new linear
+         * object with posterior parameters.
          *
          * \param X the new X data
          * \param y the new y data
@@ -143,6 +175,13 @@ class Linear {
 
         /// The number of data points supporting this model, which need not be an integer.
         double n_;
+
+        /** True if this model was initialized as a non-informative prior.  Any subclasses changing
+         * beta/s2/etc. must take care to reset this appropriately.
+         *
+         * \sa Linear(unsigned int)
+         */
+        bool noninformative_{false};
 
     private:
         // The model size.  If 0, this is a default-constructed object which isn't a valid model.

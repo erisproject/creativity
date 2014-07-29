@@ -33,7 +33,7 @@ class BookStore : public MemberStore<state::BookState>, Glib::Object {
          * \param state the simulation state object containing the books to list
          * \param author the author whose books to list.  Omit to list all state books.
          */
-        static Glib::RefPtr<BookStore> create(const state::State &state, eris::eris_id_t author = 0);
+        static Glib::RefPtr<BookStore> create(std::shared_ptr<const state::State> state, eris::eris_id_t author = 0);
 
         /** ColumnRecord object for a BookStore.  This object contains the columns for this Book
          * model.  This should not be used directly, but rather accessed via the public `columns`
@@ -43,17 +43,17 @@ class BookStore : public MemberStore<state::BookState>, Glib::Object {
             public:
                 Gtk::TreeModelColumn<eris::eris_id_t> id; ///< Book ID
                 Gtk::TreeModelColumn<eris::eris_id_t> author; ///< Author ID
-                Gtk::TreeModelColumn<double> posX; ///< x coordinate of the book
-                Gtk::TreeModelColumn<double> posY; ///< y coordinate of the book
-                Gtk::TreeModelColumn<std::string> posstr; ///< position of the book as a string such as `(-7.16,0.440)`
+                Gtk::TreeModelColumn<double> pos_x; ///< x coordinate of the book
+                Gtk::TreeModelColumn<double> pos_y; ///< y coordinate of the book
+                Gtk::TreeModelColumn<std::string> pos_str; ///< position of the book as a string such as `(-7.16,0.440)`
                 Gtk::TreeModelColumn<double> quality; ///< quality parameter of the book (the mean of realized quality draws)
                 Gtk::TreeModelColumn<bool> market; ///< True if the book is currently on the market
                 Gtk::TreeModelColumn<double> price; ///< price of the book, or NaN if the book is not on the market
                 Gtk::TreeModelColumn<double> revenue; ///< revenue of the book in the current period
-                Gtk::TreeModelColumn<double> revenueLifetime; ///< Cumulative revenue of the book since its creation
+                Gtk::TreeModelColumn<double> revenue_lifetime; ///< Cumulative revenue of the book since its creation
                 Gtk::TreeModelColumn<size_t> age; ///< Age of the book in simulation periods since it was written
                 Gtk::TreeModelColumn<size_t> sales; ///< Copies sold in the current period
-                Gtk::TreeModelColumn<size_t> salesLifetime; ///< Lifetime copies sold
+                Gtk::TreeModelColumn<size_t> sales_lifetime; ///< Lifetime copies sold
                 /** Copies that exist in the simulation.  This is at least one larger than the
                  * number of lifetime sales because the author has a copy (which wasn't a sale); if
                  * there is non-sale piracy, this value could be much greater than lifetime sales.
@@ -63,9 +63,9 @@ class BookStore : public MemberStore<state::BookState>, Glib::Object {
 
             private:
                 ColRec() {
-                    add(id); add(author); add(market); add(posX); add(posY); add(posstr);
-                    add(quality); add(price); add(revenue); add(revenueLifetime);
-                    add(age); add(sales); add(salesLifetime); add(copies); add(lifetime);
+                    add(id); add(author); add(market); add(pos_x); add(pos_y); add(pos_str);
+                    add(quality); add(price); add(revenue); add(revenue_lifetime);
+                    add(age); add(sales); add(sales_lifetime); add(copies); add(lifetime);
                 }
                 friend class BookStore;
         };
@@ -80,7 +80,7 @@ class BookStore : public MemberStore<state::BookState>, Glib::Object {
 
     protected:
         /// Protected constructor; this object should be constructed using create().
-        BookStore(const state::State &state, eris::eris_id_t author = 0);
+        BookStore(std::shared_ptr<const state::State> &&state, eris::eris_id_t author);
 
         /** Returns `obj.columns.size()`, the number of book model columns. */
         virtual int get_n_columns_vfunc() const override;
@@ -128,16 +128,16 @@ class BookStore : public MemberStore<state::BookState>, Glib::Object {
         LESS_GREATER_METHODS(id)
         LESS_GREATER_METHODS(author)
         LESS_GREATER_METHODS(market)
-        LESS_GREATER_METHODS(posX)
-        LESS_GREATER_METHODS(posY)
+        LESS_GREATER_METHODS(pos_x)
+        LESS_GREATER_METHODS(pos_y)
+        LESS_GREATER_METHODS(pos_str)
         LESS_GREATER_METHODS(quality)
         LESS_GREATER_METHODS(price)
         LESS_GREATER_METHODS(revenue)
-        LESS_GREATER_METHODS(revenueLifetime)
-        LESS_GREATER_METHODS(posstr)
+        LESS_GREATER_METHODS(revenue_lifetime)
         LESS_GREATER_METHODS(age)
         LESS_GREATER_METHODS(sales)
-        LESS_GREATER_METHODS(salesLifetime)
+        LESS_GREATER_METHODS(sales_lifetime)
         LESS_GREATER_METHODS(lifetime)
         LESS_GREATER_METHODS(copies)
 #undef LESS_GREATER_METHODS

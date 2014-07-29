@@ -4,6 +4,7 @@
 #include <eris/Random.hpp>
 #include <algorithm>
 #include <map>
+#include <random>
 
 using namespace eris;
 using namespace Eigen;
@@ -12,18 +13,18 @@ namespace creativity {
 
 const std::vector<double> Reader::default_polynomial{{4., -1.}};
 const std::vector<double> Reader::default_penalty_polynomial{{0, 0, 0.25}};
-const std::vector<unsigned long> Reader::profit_stream_ages{{1,2,4,8}};
+const std::vector<unsigned int> Reader::profit_stream_ages{{1,2,4,8}};
 
 Reader::Reader(
         const Position &pos, const Position &b1, const Position &b2,
         belief::Demand &&demand, belief::Profit &&profit, belief::Quality &&quality,
-        const double &cFixed, const double &cUnit, const double &income
+        double cFixed, double cUnit, double inc
         )
     : WrappedPositional<agent::AssetAgent>(pos, b1, b2),
+    cost_fixed{cFixed}, cost_unit{cUnit}, income{inc},
     profit_belief_{std::move(profit)}, profit_belief_extrap_{profit_belief_},
     demand_belief_{std::move(demand)}, quality_belief_{std::move(quality)},
-    profit_stream_beliefs_{{1, 1}},
-    c_fixed_{cFixed}, c_unit_{cUnit}, income_{income}
+    profit_stream_beliefs_{{1, 1}}
 {}
 
 void Reader::uPolynomial(std::vector<double> coef) {
@@ -119,7 +120,7 @@ void Reader::interOptimize() {
             it++;
     }
 
-    double income_available = assets()[MONEY] + income_;
+    double income_available = assets()[MONEY] + income;
 
     auto sim = simulation();
     const double market_books = sim->countMarkets<BookMarket>();
@@ -130,10 +131,10 @@ void Reader::interOptimize() {
     for (auto &book : wrote_market_) {
         auto book_mkt = book->market();
 
-        auto max = demand_belief_.argmaxP(book->quality(), book->lifeSales(), previous_books-1, market_books, c_unit_);
+        auto max = demand_belief_.argmaxP(book->quality(), book->lifeSales(), previous_books-1, market_books, cost_unit);
         const double &p = max.first;
         const double &q = max.second;
-        const double profit = (p - c_unit_) * q - c_fixed_;
+        const double profit = (p - cost_unit) * q - cost_fixed;
 
         if (profit > 0) {
             // Profitable to keep this book on the market, so do so
@@ -146,16 +147,16 @@ void Reader::interOptimize() {
     // Anything with a negative expected profit or costs that can't be covered will be removed from
     // the market.  Note that the costs calculated here aren't actually incurred until interApply().
     new_prices_.clear();
-    while (income_available >= c_fixed_ and not profitability.empty()) {
+    while (income_available >= cost_fixed and not profitability.empty()) {
         auto &books = profitability.begin()->second;
-        if (income_available < c_fixed_ * books.size())
+        if (income_available < cost_fixed * books.size())
             // We don't have enough to do all the books at this profitability level, so shuffle them
             // so that we choose randomly
             std::shuffle(books.begin(), books.end(), Random::rng());
 
         for (auto &b : books) {
-            if (income_available < c_fixed_) break;
-            income_available -= c_fixed_;
+            if (income_available < cost_fixed) break;
+            income_available -= cost_fixed;
             new_prices_.emplace(b.first, b.second);
         }
     }
@@ -170,10 +171,10 @@ void Reader::interOptimize() {
     // Find the l that maximizes creation profit given current wealth (which would have come from
     // past sales, if non-zero) plus the fixed income we're about to receive, minus whatever we
     // decided to spend above to keep books on the market.
-    if (income_available >= c_fixed_) {
+    if (income_available >= cost_fixed) {
         double l_max = profit_belief_extrap_.argmaxL(
                 [this] (const double &l) -> double { return creationQuality(l); },
-                previous_books, market_books, assets()[MONEY] + income_ - c_fixed_
+                previous_books, market_books, assets()[MONEY] + income - cost_fixed
                 );
         double quality = creationQuality(l_max);
 
@@ -182,9 +183,9 @@ void Reader::interOptimize() {
         // If the optimal effort level gives a book with positive expected profits, do it:
         if (l_max < exp_profit) {
             // We're going to create, so calculate the optimal first-period price.  It's possible that
-            // we get back c_unit_ (and so predicted profit is non-positive); write the book anyway:
+            // we get back cost_unit (and so predicted profit is non-positive); write the book anyway:
             // perhaps profits are expected to come in later periods?
-            auto max = demand_belief_.argmaxP(quality, 0, wrote_.size()-1, market_books, c_unit_);
+            auto max = demand_belief_.argmaxP(quality, 0, wrote_.size()-1, market_books, cost_unit);
             create_price_ = max.first;
             create_quality_ = quality;
             create_effort_ = l_max;
@@ -197,12 +198,12 @@ void Reader::interApply() {
     // Give potential income (this has to be before authorship decision, since authorship requires
     // giving up some potential income: actual income will be this amount minus whatever is given up
     // to author)
-    assets() += {MONEY, income_};
+    assets() += {MONEY, income};
 
     SharedMember<Book> newbook;
     if (create_) {
         // The cost (think of this as an opportunity cost) of creating:
-        assets() -= {MONEY, create_effort_ + c_fixed_};
+        assets() -= {MONEY, create_effort_ + cost_fixed};
 
         // The book is centered at the reader's position, plus some noise we add below
         Position bookPos{position()};
@@ -229,7 +230,7 @@ void Reader::interApply() {
         if (new_prices_.count(b) > 0) {
             // Set the new price
             b->market()->setPrice(new_prices_[b]);
-            assets() -= {MONEY, c_fixed_};
+            assets() -= {MONEY, cost_fixed};
         }
         else if (not create_ or b != newbook) {
             // No new price, which means we remove the book from the market
@@ -272,14 +273,14 @@ double Reader::penalty(unsigned long n) const {
 const std::unordered_map<SharedMember<Book>, double>& Reader::library() const { return library_; }
 
 void Reader::receiveProfits(SharedMember<Book> book, const Bundle &revenue) {
-    assets() += revenue - Bundle{MONEY, book->currSales() * c_unit_};
+    assets() += revenue - Bundle{MONEY, book->currSales() * cost_unit};
 }
 
 const belief::Profit& Reader::profitBelief() const { return profit_belief_; }
 const belief::Profit& Reader::profitExtrapBelief() const { return profit_belief_extrap_; }
 const belief::Demand& Reader::demandBelief() const { return demand_belief_; }
 const belief::Quality& Reader::qualityBelief() const { return quality_belief_; }
-const belief::ProfitStream& Reader::profitStreamBelief(unsigned long age) const {
+const belief::ProfitStream& Reader::profitStreamBelief(unsigned int age) const {
     // Get the first belief > age
     auto it = profit_stream_beliefs_.upper_bound(age);
     if (it == profit_stream_beliefs_.begin())
@@ -289,7 +290,7 @@ const belief::ProfitStream& Reader::profitStreamBelief(unsigned long age) const 
     it--;
     return it->second;
 }
-const std::map<unsigned long, belief::ProfitStream>& Reader::profitStreamBeliefs() const {
+const std::map<unsigned int, belief::ProfitStream>& Reader::profitStreamBeliefs() const {
     return profit_stream_beliefs_;
 }
 
@@ -332,7 +333,7 @@ void Reader::updateDemandBelief() {
 }
 void Reader::updateProfitStreamBelief() {
     // Map age into lists of just-left-market books of at least that age
-    std::map<unsigned long, std::vector<SharedMember<Book>>> just_left;
+    std::map<unsigned int, std::vector<SharedMember<Book>>> just_left;
     for (auto &book : library_market_) {
         if (not book->hasMarket()) {
             const unsigned long periods = book->marketPeriods();
@@ -345,7 +346,7 @@ void Reader::updateProfitStreamBelief() {
             // encounter books of longer ages.  One tricky thing to consider: if we have a book of
             // age 6, should we really use, say, a n=1, age=6 model when we have, say, n=10, age=5
             // and n=100, age=4 models also available?  Choose one?  Weighted average?
-            for (unsigned long a : profit_stream_ages) {
+            for (auto a : profit_stream_ages) {
                 if (periods > a)
                     just_left[a].push_back(book);
                 else
@@ -355,7 +356,7 @@ void Reader::updateProfitStreamBelief() {
     }
 
     for (auto &jl : just_left) {
-        const unsigned long &age = jl.first;
+        const auto &age = jl.first;
         RowVectorXd y(jl.second.size());
         MatrixXd X(jl.second.size(), age);
 
@@ -363,7 +364,7 @@ void Reader::updateProfitStreamBelief() {
         for (auto &book : jl.second) {
             double cumul_rev = 0;
             unsigned long created = book->created();
-            for (unsigned long i = 0; i < age; i++) {
+            for (unsigned int i = 0; i < age; i++) {
                 double r_i = book->revenue(created + i);
                 X(row, i) = r_i;
                 cumul_rev += r_i;
@@ -377,9 +378,10 @@ void Reader::updateProfitStreamBelief() {
             // almost everything.
             VectorXd beta = VectorXd::Zero(age, 1);
 
-            profit_stream_beliefs_.emplace(std::piecewise_construct,
-                    std::tuple<unsigned long>(age),
-                    std::tuple<size_t>(age));
+            profit_stream_beliefs_.emplace(age, age);
+           /* std::piecewise_construct,
+                    std::tuple<unsigned int>(age),
+                    std::tuple<unsigned int>(age));*/
         }
 
         // Update the belief (existing or just-created) with the new data

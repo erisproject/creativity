@@ -8,6 +8,8 @@ namespace creativity { namespace belief {
 
 using namespace Eigen;
 
+unsigned int Quality::fixedModelSize() const { return 7; }
+
 double Quality::predict(const Book &book) const {
     double price = 0;
     if (book.hasMarket())

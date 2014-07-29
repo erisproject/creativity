@@ -56,15 +56,15 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
                 drawing_cache_[gui_.state_curr_] = Cairo::ImageSurface::create(Cairo::FORMAT_RGB24, width, height)
         );
 
-        std::shared_ptr<State> state;
+        std::shared_ptr<const State> state;
 
         {
             // Lock the state vector while we grab the state
             auto lock = gui_.stateLock();
-            if (gui_.states_.empty())
+            if (gui_.states_->empty())
                 state = std::make_shared<State>();
             else
-                state = gui_.states_[gui_.state_curr_];
+                state = (*gui_.states_)[gui_.state_curr_];
         }
 
         cr->save();
@@ -84,7 +84,7 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
         for (auto &rpair : state->readers) {
             auto &r = rpair.second;
 
-            for (auto &book_id : r.newBooks) {
+            for (auto &book_id : r.new_books) {
                 auto &b = state->books.at(book_id);
                 drawWrappingLine(cr, trans, r.position, b.position);
             }

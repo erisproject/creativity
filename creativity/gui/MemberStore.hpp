@@ -75,7 +75,7 @@ class MemberStore : public Gtk::TreeModel, public Gtk::TreeSortable {
          * \sa ReaderStore
          * \sa BookStore
          */
-        MemberStore(const state::State &state);
+        MemberStore(std::shared_ptr<const state::State> &&state);
 
         /** Returns Gtk::TreeModel flags (specifically, the LIST_ONLY flag). */
         virtual Gtk::TreeModelFlags get_flags_vfunc() const override;
@@ -197,8 +197,8 @@ class MemberStore : public Gtk::TreeModel, public Gtk::TreeSortable {
         }
 
         /// The state this MemberStore represents.
-        const state::State &state_;
-        /// The vector of members.
+        const std::shared_ptr<const state::State> state_;
+        /// The vector of members.  Subclasses need to add all member references to this vector.
         std::vector<std::reference_wrapper<const M>> members_;
         /// Tracks model changes by being incremented whenever such a change occurs
         int stamp_ = 1;
@@ -210,7 +210,7 @@ class MemberStore : public Gtk::TreeModel, public Gtk::TreeSortable {
         Gtk::SortType sort_order_ = Gtk::SORT_ASCENDING;
 };
 
-template <class M> MemberStore<M>::MemberStore(const state::State &state) : state_{state} {}
+template <class M> MemberStore<M>::MemberStore(std::shared_ptr<const state::State> &&state) : state_{std::move(state)} {}
 
 template <class M> Gtk::TreeModelFlags MemberStore<M>::get_flags_vfunc() const {
     return Gtk::TREE_MODEL_LIST_ONLY;

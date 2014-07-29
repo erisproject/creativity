@@ -7,7 +7,8 @@
 #include "creativity/belief/ProfitStream.hpp"
 #include "creativity/belief/Quality.hpp"
 #include "creativity/state/State.hpp"
-#include <eris/Eris.hpp>
+#include "creativity/state/MemoryStorage.hpp"
+#include "creativity/state/FileStorage.hpp"
 #include <eris/Simulation.hpp>
 #include <eris/Random.hpp>
 #include <eris/intraopt/FixedIncome.hpp>
@@ -24,7 +25,7 @@ using namespace Eigen;
 
 int main(int argc, char *argv[1]) {
     Eigen::initParallel();
-    Eris<Simulation> sim;
+    auto sim = Simulation::spawn();
     MONEY = sim->create<Good::Continuous>();
     sim->create<NEW_BOOKS_Cleaner>();
 
@@ -39,6 +40,8 @@ int main(int argc, char *argv[1]) {
     unsigned long run_start = 0, run_end = 0;
     double speed_limit = 0;
     std::chrono::milliseconds sync_speed{50};
+    bool save_to_file = false, load_from_file = false;
+    std::unique_ptr<Storage> storage(new MemoryStorage());
 
 #define NONNEG_DOUBLE(VAR, DESC) \
     case GUI::ParamType::VAR: \
@@ -79,6 +82,27 @@ int main(int argc, char *argv[1]) {
                 if (setup) throw std::runtime_error("Cannot change seed after initial setup");
                 eris::Random::seed(p.ul);
                 break;
+            case GUI::ParamType::load:
+                if (setup) throw std::runtime_error("Cannot load after initial setup");
+                if (save_to_file) throw std::runtime_error("Error: setup specified both load and save file");
+                storage = std::unique_ptr<Storage>(new FileStorage(*reinterpret_cast<std::string*>(p.ptr), FileStorage::MODE::READONLY));
+                if (storage->size() == 0)
+                    throw std::runtime_error("Unable to load file: file has no states");
+                if (storage->dimensions() != 2)
+                    throw std::runtime_error("Unable to load file: dimensions != 2");
+                if (storage->boundary() <= 0)
+                    throw std::runtime_error("Unable to load file: file has invalid non-positive boundary value");
+                BOUNDARY = storage->boundary();
+                load_from_file = true;
+                break;
+            case GUI::ParamType::save_as:
+                // FIXME: this could actually be handled when already setup: it should be possible
+                // to copy the current Storage object into the new FileStorage.
+                if (setup) throw std::runtime_error("Cannot change file after initial setup");
+                if (load_from_file) throw std::runtime_error("Error: setup specified both load and save file");
+                storage = std::unique_ptr<Storage>(new FileStorage(*reinterpret_cast<std::string*>(p.ptr), FileStorage::MODE::OVERWRITE));
+                save_to_file = true;
+                break;
             NONNEG_DOUBLE(book_sd, "Book standard deviation");
             NONNEG_DOUBLE(quality_draw_sd, "Quality standard deviation");
             NONNEG_DOUBLE(cost_fixed, "Fixed cost");
@@ -95,7 +119,9 @@ int main(int argc, char *argv[1]) {
 
     auto on_run = [&](unsigned long periods) { // Run
         if (not setup)
-            throw std::logic_error{"Event error: RUN before successful SETUP"};
+            throw std::logic_error("Event error: RUN before successful SETUP");
+        if (load_from_file)
+            throw std::logic_error("Error: simulation state is readonly");
         run_start = sim->t();
         run_end = run_start + periods;
         stopped = false;
@@ -105,10 +131,9 @@ int main(int argc, char *argv[1]) {
     auto on_resume = [&]() { stopped = false; };
     auto on_quit = [&]() { quit = true; };
 
-    std::vector<std::shared_ptr<State>> states;
-    std::mutex state_mutex;
+    std::mutex storage_mutex;
 
-    GUI gui(states, state_mutex, on_setup, on_run, on_stop, on_resume, on_step, on_quit);
+    GUI gui(storage, storage_mutex, on_setup, on_run, on_stop, on_resume, on_step, on_quit);
 
     try {
         gui.start(argc, argv);
@@ -123,6 +148,16 @@ int main(int argc, char *argv[1]) {
     while (!setup) {
         gui.waitEvents();
         if (quit) return 0;
+    }
+
+    if (load_from_file) {
+        // We're in read-only mode, which means we do nothing but wait for the GUI to quit.
+        gui.initialized();
+        gui.newStates(0);
+        while (not quit) {
+            gui.waitEvents();
+        }
+        return 0;
     }
 
     // Calculate the boundaries from the density.  Total hypervolume is (2*BOUNDARY)^(dimensions),
@@ -161,8 +196,8 @@ int main(int argc, char *argv[1]) {
 
 
     {
-        std::unique_lock<std::mutex>(state_mutex);
-        states.emplace_back(std::make_shared<State>(sim));
+        std::unique_lock<std::mutex> lock(storage_mutex);
+        storage->emplace_back(sim);
     }
 
     // Tell the GUI we're done with initialization
@@ -195,14 +230,15 @@ int main(int argc, char *argv[1]) {
             ERIS_DBG("done running");
 
             {
-                std::unique_lock<std::mutex> lock(state_mutex);
-                states.emplace_back(std::make_shared<State>(sim));
+                std::unique_lock<std::mutex> lock(storage_mutex);
+                ERIS_DBG("Adding simulation state to storage...");
+                storage->emplace_back(sim);
+                ERIS_DBG("done");
             }
 
             if (step) step = false;
 
             bool finished = stopped or sim->t() >= run_end;
-            ERIS_DBG("");
             end = std::chrono::high_resolution_clock::now();
 
             if (finished or end >= next_progress) {
@@ -222,7 +258,7 @@ int main(int argc, char *argv[1]) {
 
             // Only tell the GUI about new states at most once every 50ms, or if we're done
             if (finished or end >= next_sync) {
-                gui.new_states();
+                gui.newStates();
                 next_sync = end + sync_speed;
             }
 

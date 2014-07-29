@@ -55,6 +55,9 @@ class Demand : public Linear {
         : Linear{std::forward<Args>(args)...}, D_{D}
         {}
 
+        /// This model has 8 parameters
+        virtual unsigned int fixedModelSize() const override;
+
         /** Given a set of model parameters, this returns an expected value \f$Q_b\f$, the number of sales.
          *
          * \param P the price of a copy of the book
@@ -142,7 +145,7 @@ class Demand : public Linear {
     private:
         unsigned int D_;
 
-        // Initialize a Demand from a Linear<7>
+        // Initialize a Demand from a Linear object of the correct size
         Demand(unsigned int D, Linear &&base) : Linear{base}, D_{D} {}
 };
 

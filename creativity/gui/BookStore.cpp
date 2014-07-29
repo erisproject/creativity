@@ -9,27 +9,27 @@ using namespace creativity::state;
 
 namespace creativity { namespace gui {
     
-BookStore::BookStore(const State &state, eris_id_t author)
-    : Glib::ObjectBase(typeid(BookStore)), MemberStore(state),
+BookStore::BookStore(std::shared_ptr<const State> &&state, eris_id_t author)
+    : Glib::ObjectBase(typeid(BookStore)), MemberStore(std::move(state)),
     author_{author}
 {
     if (author) {
-        auto &wrote = state_.readers.at(author).wrote;
+        auto &wrote = state_->readers.at(author).wrote;
         members_.reserve(wrote.size());
         for (auto &bid : wrote) {
-            members_.emplace_back(state_.books.at(bid));
+            members_.emplace_back(state_->books.at(bid));
         }
     }
     else {
-        members_.reserve(state_.books.size());
-        for (auto &m : state_.books) {
+        members_.reserve(state_->books.size());
+        for (auto &m : state_->books) {
             members_.emplace_back(m.second);
         }
     }
 }
 
-Glib::RefPtr<BookStore> BookStore::create(const State &state, eris_id_t author) {
-    return Glib::RefPtr<BookStore>(new BookStore(state, author));
+Glib::RefPtr<BookStore> BookStore::create(std::shared_ptr<const State> state, eris_id_t author) {
+    return Glib::RefPtr<BookStore>(new BookStore(std::move(state), author));
 }
 
 int BookStore::get_n_columns_vfunc() const {
@@ -51,16 +51,16 @@ void BookStore::get_value_vfunc(const iterator &iter, int column, Glib::ValueBas
         v.set(column == columns.id.index() ? b.id : b.author);
         value.init(v.gobj());
     }
-    else if (column == columns.posX.index() or column == columns.posY.index() or column == columns.quality.index() or column == columns.price.index()
-            or column == columns.revenue.index() or column == columns.revenueLifetime.index()) {
+    else if (column == columns.pos_x.index() or column == columns.pos_y.index() or column == columns.quality.index() or column == columns.price.index()
+            or column == columns.revenue.index() or column == columns.revenue_lifetime.index()) {
         Glib::Value<double> v;
         v.init(v.value_type());
-        v.set(  column == columns.posX.index() ? b.position[0] :
-                column == columns.posY.index() ? b.position[1] :
+        v.set(  column == columns.pos_x.index() ? b.position[0] :
+                column == columns.pos_y.index() ? b.position[1] :
                 column == columns.quality.index() ? b.quality :
                 column == columns.price.index() ? b.price :
                 column == columns.revenue.index() ? b.revenue :
-                b.revenueLifetime
+                b.revenue_lifetime
              );
         value.init(v.gobj());
     }
@@ -70,19 +70,19 @@ void BookStore::get_value_vfunc(const iterator &iter, int column, Glib::ValueBas
         v.set(b.market);
         value.init(v.gobj());
     }
-    else if (column == columns.posstr.index()) {
+    else if (column == columns.pos_str.index()) {
         Glib::Value<std::string> v;
         v.init(v.value_type());
         v.set(GUI::pos_to_string(b.position));
         value.init(v.gobj());
     }
-    else if (column == columns.age.index() or column == columns.sales.index() or column == columns.salesLifetime.index()
+    else if (column == columns.age.index() or column == columns.sales.index() or column == columns.sales_lifetime.index()
             or column == columns.lifetime.index() or column == columns.copies.index()) {
         Glib::Value<size_t> v;
         v.init(v.value_type());
         v.set(  column == columns.age.index() ? b.age :
                 column == columns.sales.index() ? b.sales :
-                column == columns.salesLifetime.index() ? b.salesLifetime :
+                column == columns.sales_lifetime.index() ? b.sales_lifetime :
                 column == columns.lifetime.index() ? b.lifetime :
                 b.copies
              );
@@ -102,16 +102,16 @@ void BookStore::set_sort_column_id_vfunc(int sort_column_id, Gtk::SortType order
         compare = ascending ? less_id : greater_id;
     ELSE_IF_COL(author);
     ELSE_IF_COL(market);
-    ELSE_IF_COL(posX);
-    ELSE_IF_COL(posY);
-    ELSE_IF_COL(posstr);
+    ELSE_IF_COL(pos_x);
+    ELSE_IF_COL(pos_y);
+    ELSE_IF_COL(pos_str);
     ELSE_IF_COL(quality);
     ELSE_IF_COL(price);
     ELSE_IF_COL(revenue);
-    ELSE_IF_COL(revenueLifetime);
+    ELSE_IF_COL(revenue_lifetime);
     ELSE_IF_COL(age);
     ELSE_IF_COL(sales);
-    ELSE_IF_COL(salesLifetime);
+    ELSE_IF_COL(sales_lifetime);
     ELSE_IF_COL(lifetime);
     ELSE_IF_COL(copies);
 #undef ELSE_IF_COL
@@ -119,33 +119,31 @@ void BookStore::set_sort_column_id_vfunc(int sort_column_id, Gtk::SortType order
     sort_members(compare, sort_column_id, order);
 }
 
-#define LESS_GREATER(COL, ACCESS) \
-bool BookStore::less_##COL(const BookState &a, const BookState &b) { \
-    return a.ACCESS < b.ACCESS; \
-} \
-bool BookStore::greater_##COL(const BookState &a, const BookState &b) { \
-    return a.ACCESS > b.ACCESS; \
-}
-LESS_GREATER(id, id)
-LESS_GREATER(posX, position[0])
-LESS_GREATER(posY, position[1])
-LESS_GREATER(author, author)
-LESS_GREATER(quality, quality)
-LESS_GREATER(revenue, revenue)
-LESS_GREATER(revenueLifetime, revenueLifetime)
-LESS_GREATER(age, age)
-LESS_GREATER(sales, sales)
-LESS_GREATER(salesLifetime, salesLifetime)
-LESS_GREATER(lifetime, lifetime)
-LESS_GREATER(market, market)
-LESS_GREATER(copies, copies)
+#define LESS_GREATER_A(COL, ACCESS) \
+bool BookStore::less_##COL   (const BookState &a, const BookState &b) { return a.ACCESS < b.ACCESS; } \
+bool BookStore::greater_##COL(const BookState &a, const BookState &b) { return a.ACCESS > b.ACCESS; }
+#define LESS_GREATER(FIELD) LESS_GREATER_A(FIELD, FIELD)
+LESS_GREATER(id)
+LESS_GREATER_A(pos_x, position[0])
+LESS_GREATER_A(pos_y, position[1])
+LESS_GREATER(author)
+LESS_GREATER(quality)
+LESS_GREATER(revenue)
+LESS_GREATER(revenue_lifetime)
+LESS_GREATER(age)
+LESS_GREATER(sales)
+LESS_GREATER(sales_lifetime)
+LESS_GREATER(lifetime)
+LESS_GREATER(market)
+LESS_GREATER(copies)
 #undef LESS_GREATER
+#undef LESS_GREATER_A
 // First x, then y for ties
-bool BookStore::less_posstr(const BookState &a, const BookState &b) {
+bool BookStore::less_pos_str(const BookState &a, const BookState &b) {
     auto ax = a.position[0], bx = b.position[0];
     return ax == bx ? a.position[1] < b.position[1] : ax < bx;
 }
-bool BookStore::greater_posstr(const BookState &a, const BookState &b) {
+bool BookStore::greater_pos_str(const BookState &a, const BookState &b) {
     auto ax = a.position[0], bx = b.position[0];
     return ax == bx ? a.position[1] > b.position[1] : ax > bx;
 }
@@ -162,14 +160,14 @@ bool BookStore::greater_price(const BookState &a, const BookState &b) {
 
 void BookStore::appendColumnsTo(Gtk::TreeView &v) const {
     appendCol(v, "ID", columns.id, 50);
-    appendCol(v, "Position", columns.posstr, 100);
+    appendCol(v, "Position", columns.pos_str, 110);
     if (not author_) appendCol(v, "Author", columns.author, 80);
     appendCol(v, "Age", columns.age, 65);
     appendCol(v, "Quality", columns.quality, 85);
     appendCol(v, "Mkt?", columns.market, 65);
     appendCol(v, "Price", columns.price, 75);
-    appendCol(v, "Rev.", columns.revenueLifetime, 75);
-    appendCol(v, "Sales", columns.salesLifetime, 75);
+    appendCol(v, "Rev.", columns.revenue_lifetime, 75);
+    appendCol(v, "Sales", columns.sales_lifetime, 75);
     appendCol(v, "Copies", columns.copies, 80);
     appendCol(v, "Life", columns.lifetime, 65);
 }

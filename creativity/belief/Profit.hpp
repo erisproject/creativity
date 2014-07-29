@@ -47,6 +47,9 @@ class Profit : public Linear {
         : Linear{std::forward<Args>(args)...}, D_{D}
         {}
 
+        /// This model has 5 parameters
+        virtual unsigned int fixedModelSize() const override;
+
         /** Given a set of model parameters, this returns an expected value \f$\Pi_b\f$, the
          * lifetime profit of the book.
          *

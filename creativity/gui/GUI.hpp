@@ -26,6 +26,7 @@
 #include "creativity/gui/ReaderStore.hpp"
 #include "creativity/gui/BookStore.hpp"
 #include "creativity/state/State.hpp"
+#include "creativity/state/Storage.hpp"
 
 namespace sigc { SIGC_FUNCTORS_DEDUCE_RESULT_TYPE_WITH_DECLTYPE }
 
@@ -42,10 +43,10 @@ class GUI : eris::noncopyable {
          * called.
          */
         GUI(
-                /** The simulation state vector.  This is expected to be updated at the end of each
-                 * simulation period, and will be used in the GUI to display the simulation.
+                /** The simulation state storage object.  This is expected to be updated at the end
+                 * of each simulation period, and will be used in the GUI to display the simulation.
                  */
-                const std::vector<std::shared_ptr<state::State>> &states,
+                const std::unique_ptr<state::Storage> &states,
 
                 /** Mutex guarding the provided `states` vector. */
                 std::mutex &state_mutex,
@@ -107,8 +108,12 @@ class GUI : eris::noncopyable {
          * the new number of states.  If the user was viewing the most recent state, the GUI will be
          * updated to display the new most recent state, otherwise the GUI remains on the current
          * state.
+         *
+         * The optional parameter allows the main thread to instruct the GUI to switch to the given
+         * state; if omitted, the GUI switches to the last state if the user was already there
+         * before the signal, and otherwise doesn't change the state.
          */
-        void new_states();
+        void newStates(unsigned long switch_to = (unsigned long) -1);
 
         /** Sends a signal to the GUI thread that the simulation setup is complete.  The GUI will
          * disable the various simulation setup options and start/initialize buttons and switch to
@@ -147,6 +152,8 @@ class GUI : eris::noncopyable {
             quality_draw_sd, ///< Sets the perceived quality standard deviation in `.dbl`
             cost_fixed, ///< Sets the fixed cost of keeping a book on the market in `.dbl`
             cost_unit, ///< Sets the per-unit cost of copies of a book in `.dbl`
+            save_as, ///< The file to save simulation data to (will be overwritten)
+            load, ///< The file to load existing simulation data from
             seed, ///< Sets the seed value for eris::Random::seed in `.ul`
             threads, ///< Number of threads to use in `.ul`
             begin, ///< Sent by the GUI to indicate that some parameters are being changed.
@@ -161,7 +168,7 @@ class GUI : eris::noncopyable {
         struct Parameter {
             /// The parameter type
             ParamType param;
-            /// A value of various types
+            /// A value of various primitive types
             union {
                 bool bl;
                 unsigned long ul;
@@ -170,6 +177,7 @@ class GUI : eris::noncopyable {
                 int i;
                 double dbl;
                 std::chrono::milliseconds dur_ms;
+                void *ptr;
             };
         };
 
@@ -184,21 +192,17 @@ class GUI : eris::noncopyable {
                     stop, ///< The user hit the "stop" button to pause the simulation.
                     resume, ///< The user hit the "resume" button to unpause the simulation.
                     step, ///< The user hit the "step" button to unpause the simulation for one step.
-                    quit ///< Sent when the user quits the application
+                    quit, ///< Sent when the user quits the application
+                    none ///< Fake Event indicating that no events are pending
                 };
 
-                /// Will be true if this is a fake Event indicating that no events are pending.
-                bool none;
-
                 /** True if this is actually an event, false if this reflects that there are no
-                 * events pending.
+                 * events pending (that is, an event with `type = Event::Type::none`).
                  */
                 operator bool();
 
-                /** The type of the event.  Only valid if the Event object evaluates in boolean
-                 * context to true (or, equivalently, none is false).
-                 */
-                Type type;
+                /// The type of the event.
+                Type type = Type::none;
 
                 /** Will be set to a list of configured GUI::Parameters if this is a setup event.
                  * The `begin` and `finished` GUI::Parameter meta-values are *not* included.
@@ -213,14 +217,14 @@ class GUI : eris::noncopyable {
             private:
                 friend class GUI;
                 /// Default constructor: the "no events" event
-                Event();
+                Event() = default;
                 /// Constructs an event with no parameters or value
                 Event(Type t);
                 /// Constructs an event with Parameters.  The vector should not contain
                 /// begin/finished parameter events; these will be sent appropriately.
                 Event(Type t, std::vector<Parameter> &&p);
                 /// Constructs an event with an unsigned long value
-                Event(Type t, const unsigned long &ul);
+                Event(Type t, unsigned long ul);
         };
 
         /** Processes events sent by the GUI until at least one event of the given type has been
@@ -278,14 +282,30 @@ class GUI : eris::noncopyable {
          */
         void processEvents_(std::unique_lock<decltype(mutex_)> &lock);
 
-        /** Signal class to send a signal with a tuple of arbitrary data. */
+        /** Signal class to send a signal with various types of data from the main thread to the GUI. */
         class Signal {
             public:
                 /// The types of signal that can be sent to the GUI thread
-                enum class Type { new_states, initialized, running, progress, stopped, error, quit };
+                enum class Type {
+                    /** The main thread may have added new states to the state storage; the GUI
+                     * should lock it and update associated internal variables if necessary.  This
+                     * state may optionally includes a single value in `.uls` indicating a state
+                     * number the GUI should switch to; if this value is omitted, the GUI will
+                     * switch to the last state if the user was already on the last state, and
+                     * otherwise not change the current state.
+                     */
+                    new_states,
+                    initialized, ///< The main thread is finished with initial setup
+                    running, ///< The main thread has started or resumed running
+                    progress, ///< Updates the current progress in the GUI
+                    stopped, ///< The main thread has stopped
+                    error, ///< The main thread encountered an error (typically during setup)
+                    quit, ///< The GUI object is being destroyed and should terminate
+                    none ///< Placeholder signal, set when a Signal is default constructed
+                };
 
                 /// The type of signal
-                Type type;
+                Type type = Type::none;
 
                 /// Possible string associated with the signal.
                 std::string message;
@@ -296,13 +316,18 @@ class GUI : eris::noncopyable {
                 /// Doubles
                 std::vector<double> doubles;
 
-                Signal() = delete;
+                /// Default constructor: constructs a signal with type set to Signal::Type::none
+                Signal() = default;
                 /// Signal without data (NB: this implicitly means any Signal::Type can be cast to a Signal):
                 Signal(Type type) : type(type) {}
                 /// Signal with a message:
                 Signal(Type type, const std::string &message) : type{type}, message{message} {}
                 /// Signal with boolean
                 Signal(Type type, bool b) : type{type}, boolean{b} {}
+                /// Signal with a single double value
+                Signal(Type type, double d) : type{type}, doubles(1, d) {}
+                /// Signal with a single unsigned long value
+                Signal(Type type, unsigned long ul) : type{type}, uls(1, ul) {}
         };
 
         /// The queue of signals that have been sent to but not yet processed by the GUI thread
@@ -356,7 +381,11 @@ class GUI : eris::noncopyable {
          */
         void thr_info_dialog(eris::eris_id_t member_id);
 
-        /** Sets up the simulation based on the current GUI parameter values.
+        /** Loads an existing simulation output and settings from the currently selected file.
+         */
+        void loadSim();
+
+        /** Sets up a new simulation based on the current GUI parameter values.
          */
         void setupSim();
 
@@ -370,7 +399,7 @@ class GUI : eris::noncopyable {
 
         /** Reference to the simulation state snapshots variable. The index is the simulation
          * period. */
-        const std::vector<std::shared_ptr<state::State>> &states_;
+        const std::unique_ptr<state::Storage> &states_;
 
         /** Reference to mutex controlling access to `states_` */
         std::mutex &state_mutex_;
@@ -400,6 +429,17 @@ class GUI : eris::noncopyable {
 
         /** Returns the value of a Gtk::SpinButton as an int. */
         int sb_int(const std::string &widget_name);
+
+        /** Storage for the "save as" and "load" filenames; pointers to these are sent back when
+         * needed to the main thread.
+         */
+        std::string save_, load_;
+
+        // The file filter.  Access via fileFilter().
+        mutable Glib::RefPtr<Gtk::FileFilter> ff_;
+
+        /** Returns a file filter for *.crstate files. */
+        decltype(ff_) fileFilter() const;
 
         // The callbacks for GUI thread events
         std::function<void(GUI::Parameter)> on_setup_;

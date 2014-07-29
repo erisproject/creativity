@@ -8,6 +8,8 @@ namespace creativity { namespace belief {
 
 using namespace Eigen;
 
+unsigned int Profit::fixedModelSize() const { return 5; }
+
 double Profit::predict(double q, unsigned long previousBooks, unsigned long marketBooks) const {
     RowVectorXd X(K());
     X << 1, std::copysign(std::pow(q, D_), q), previousBooks == 0 ? 1 : 0, previousBooks, marketBooks;

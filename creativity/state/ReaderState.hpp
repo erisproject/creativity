@@ -10,22 +10,21 @@
 namespace creativity { namespace state {
 
 /** Records the various variables associated with a reader.  This is basically a container class
- * with a constructor that copies the current state of a given Reader. */
-class ReaderState final : private eris::noncopyable {
+ * with a constructor that copies the current state of a given Reader.
+ */
+class ReaderState final {
     public:
-        /** Constructs a new ReaderState without setting any of its values (they will be default
-         * initialized).
-         */
-        ReaderState() = default;
-
         /// Constructs a new ReaderState, settings its values using the given Reader.
         ReaderState(const Reader &r);
 
+        /** Constructs a new blank ReaderState for a reader with a position of the given number of
+         * dimensions.  All values will be default initialized.  (The number of dimensions is needed
+         * for Position initialization).
+         */
+        ReaderState(const unsigned int dimensions);
+
         /// Unique simulation ID of the reader
         eris::eris_id_t id;
-
-        /// The simulation period this state represents.
-        unsigned long t;
 
         /// Position of the reader
         eris::Position position;
@@ -36,7 +35,7 @@ class ReaderState final : private eris::noncopyable {
         std::unordered_map<eris::eris_id_t, double> library;
 
         /** A set of book IDs that were newly obtained in the given period. */
-        std::unordered_set<eris::eris_id_t> newBooks;
+        std::unordered_set<eris::eris_id_t> new_books;
 
         /** The list of book id's of books that were written by this author, in order from oldest to
          * newest.
@@ -47,16 +46,23 @@ class ReaderState final : private eris::noncopyable {
         double u;
 
         /// Lifetime cumulative utility up to and including the current period.
-        double uLifetime;
+        double u_lifetime;
 
-        /// Agent beliefs, copied out at the time the ReaderState object is created
-        struct {
-            belief::Profit profit; ///< Profit beliefs
-            belief::Profit profit_extrap; ///< Profit beliefs using extrapolation for on-market books
-            belief::Demand demand; ///< Single-period demand belief
-            belief::Quality quality; ///< Quality belief
-            std::map<unsigned long, belief::ProfitStream> profit_stream; ///< Profit stream beliefs
-        } belief;
+        /// Fixed cost of keeping a book on the market
+        double cost_fixed;
+
+        /// Unit cost of creating a copy of a book
+        double cost_unit;
+
+        /// Per-period (external) income
+        double income;
+
+        // Beliefs, copied out at the time the ReaderState object is created
+        belief::Profit profit; ///< Profit beliefs
+        belief::Profit profit_extrap; ///< Profit beliefs using extrapolation for on-market books
+        belief::Demand demand; ///< Single-period demand belief
+        belief::Quality quality; ///< Quality belief
+        std::map<unsigned int, belief::ProfitStream> profit_stream; ///< Profit stream beliefs
 };
 
 }}

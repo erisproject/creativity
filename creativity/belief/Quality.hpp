@@ -35,9 +35,18 @@ class Quality : public Linear {
          */
         Quality() = default;
 
+        /** Constructs a Quality object with the given parameter information.
+         *
+         * \param args a parameter pack to forward to the base Linear constructor.
+         * 
+         * \sa Linear::Linear
+         */
         template <typename ...Args>
         Quality(Args &&...args) : Linear{std::forward<Args>(args)...}
         {}
+
+        /// This model has 7 parameters
+        virtual unsigned int fixedModelSize() const override;
 
         /** Given a book, this returns \f$\widehat q_b\f$, the expected quality of the book.
          *

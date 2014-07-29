@@ -3,29 +3,31 @@
 
 namespace creativity { namespace state {
 
+ReaderState::ReaderState(const unsigned int dimensions) :
+    position{eris::Position::zero(dimensions)}
+{}
+
 ReaderState::ReaderState(const Reader &r) :
     id{r.id()},
-    t{r.simulation()->t()},
     position{r.position()},
     u{r.u()},
-    uLifetime{r.uLifetime()},
-    belief{
-        .profit = r.profitBelief(),
-        .profit_extrap = r.profitExtrapBelief(),
-        .demand = r.demandBelief(),
-        .quality = r.qualityBelief(),
-        .profit_stream = r.profitStreamBeliefs()
-    }
-
+    u_lifetime{r.uLifetime()},
+    cost_fixed{r.cost_fixed},
+    cost_unit{r.cost_unit},
+    profit{r.profitBelief()},
+    profit_extrap{r.profitExtrapBelief()},
+    demand{r.demandBelief()},
+    quality{r.qualityBelief()},
+    profit_stream{r.profitStreamBeliefs()}
 {
     library.reserve(r.library().size());
     for (auto &bq : r.library()) {
         library.emplace(bq.first->id(), bq.second);
     }
 
-    newBooks.reserve(r.newBooks().size());
+    new_books.reserve(r.newBooks().size());
     for (auto &b : r.newBooks()) {
-        newBooks.emplace(b->id());
+        new_books.emplace(b->id());
     }
 
     wrote.reserve(r.wrote().size());

@@ -11,13 +11,8 @@ namespace state {
 
 /** Records the various variables associated with a book.  This is basically a container class
  * with a constructor that copies the current state of a given Book. */
-class BookState final : private eris::noncopyable {
+class BookState final {
     public:
-        /** Constructs a new BookState without setting any of its values (they will be default
-         * initialized).
-         */
-        BookState() = default;
-
         /// Constructs a new BookState, settings its values using the given Book.
         BookState(const Book &b);
 
@@ -27,11 +22,14 @@ class BookState final : private eris::noncopyable {
          */
         BookState(const Book &b, unsigned long num_copies);
 
+        /** Constructs a new blank BookState for a book with a position of the given number of
+         * dimensions.  All values will be default initialized.  (The number of dimensions is needed
+         * for Position initialization).
+         */
+        BookState(const unsigned int dimensions);
+
         /// Unique simulation ID of the book
         eris::eris_id_t id;
-
-        /// The simulation period this state represents.
-        unsigned long t;
 
         /// The author of this book
         eris::eris_id_t author;
@@ -52,17 +50,17 @@ class BookState final : private eris::noncopyable {
         double revenue;
 
         /// The cumulative lifetime revenue of this book, up to and including the current period.
-        double revenueLifetime;
+        double revenue_lifetime;
 
         /// The number of sales of copies of this book in the current period.
         unsigned long sales;
 
         /// The cumulative lifetime sales of copies of this book, up to and including the current period.
-        unsigned long salesLifetime;
+        unsigned long sales_lifetime;
 
         /** The number of copies of this book in the simulation.  This will always be at least
-         * `.sales + 1` (the `+ 1` because the author has a copy of his own book), and can higher if
-         * there are non-sale, i.e., piratic ways of obtaining a copy of a book.
+         * `.sales_lifetime + 1` (the `+ 1` because the author has a copy of his own book), and can
+         * higher if there are non-sale, i.e., piratic ways of obtaining a copy of a book.
          */
         unsigned long copies;
 

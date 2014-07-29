@@ -80,10 +80,11 @@ namespace creativity { namespace gui {
 #define PI "&#x3c0;"
 #define GTREQ "&#x2265;"
 
-InfoWindow::InfoWindow(const State &state, std::shared_ptr<Gtk::Window> main_window, unsigned long reader_id, std::function<void(eris::eris_id_t)> open_info_dialog)
+InfoWindow::InfoWindow(std::shared_ptr<const State> state, std::shared_ptr<Gtk::Window> main_window,
+        eris_id_t reader_id, std::function<void(eris::eris_id_t)> open_info_dialog)
     : reader{reader_id}, book{0}, open_info_dialog_{std::move(open_info_dialog)}
 {
-    if (state.readers.count(reader) == 0)
+    if (state->readers.count(reader) == 0)
         throw std::out_of_range("InfoWindow() called with invalid reader id");
 
     initWindow(*main_window);
@@ -176,7 +177,7 @@ InfoWindow::InfoWindow(const State &state, std::shared_ptr<Gtk::Window> main_win
     show_all();
 }
 
-InfoWindow::InfoWindow(const State &state, std::shared_ptr<Gtk::Window> main_window, unsigned long book_id)
+InfoWindow::InfoWindow(std::shared_ptr<const State> state, std::shared_ptr<Gtk::Window> main_window, unsigned long book_id)
     : reader{0}, book{book_id}
 {
     initWindow(*main_window);
@@ -217,29 +218,29 @@ void InfoWindow::initWindow(Gtk::Window &parent) {
     set_deletable(true);
 }
 
-void InfoWindow::refresh(const State &state) {
-    if (state.t == t_) return;
+void InfoWindow::refresh(std::shared_ptr<const State> state) {
+    if (state->t == t_) return;
 
     ERIS_DBG("refreshing");
 
     if (reader) {
-        auto &r = state.readers.at(reader);
+        auto &r = state->readers.at(reader);
         updateValue("id", r.id);
         updateValue("position", GUI::pos_to_string(r.position));
         updateValue("utility", r.u);
-        updateValue("uLife", r.uLifetime);
+        updateValue("uLife", r.u_lifetime);
         updateValue("books", r.library.size());
-        updateValue("booksNew", r.newBooks.size());
+        updateValue("booksNew", r.new_books.size());
         updateValue("booksWritten", r.wrote.size());
         updateValue("bookLast", r.wrote.empty()
                 ? "(never written)"
-                : std::to_string(state.books.at(r.wrote.back()).age));
+                : std::to_string(state->books.at(r.wrote.back()).age));
 
 #define UPDATE_LIN(PREFIX, VAR) \
         updateValue(PREFIX + std::string("n"), VAR.n()); \
         for (size_t i = 0; i < VAR.K(); i++) \
             updateValue(PREFIX + std::to_string(i), VAR.beta()[i]);
-#define UPDATE_LIN_RB(PREFIX, BELIEF) UPDATE_LIN(PREFIX, r.belief.BELIEF)
+#define UPDATE_LIN_RB(PREFIX, BELIEF) UPDATE_LIN(PREFIX, r.BELIEF)
 
         UPDATE_LIN_RB("q_", quality);
         UPDATE_LIN_RB("p_", profit);
@@ -249,8 +250,8 @@ void InfoWindow::refresh(const State &state) {
         for (unsigned long a : Reader::profit_stream_ages) {
             std::string code_prefix = "ps" + std::to_string(a) + "_";
 
-            if (r.belief.profit_stream.count(a)) {
-                auto &psi = r.belief.profit_stream.at(a);
+            if (r.profit_stream.count(a)) {
+                auto &psi = r.profit_stream.at(a);
                 UPDATE_LIN(code_prefix, psi);
             }
             else {
@@ -272,9 +273,9 @@ void InfoWindow::refresh(const State &state) {
         }
     }
     else {
-        if (state.books.count(book)) {
+        if (state->books.count(book)) {
             set_title("Book details (" + std::to_string(book) + ")");
-            auto &b = state.books.at(book);
+            auto &b = state->books.at(book);
             updateValue("id", b.id);
             updateValue("author", b.author);
             updateValue("position", GUI::pos_to_string(b.position));
@@ -282,9 +283,9 @@ void InfoWindow::refresh(const State &state) {
             updateValue("price", b.price);
             updateValue("quality", b.quality);
             updateValue("age", b.age);
-            updateValue("revenue", b.revenueLifetime);
+            updateValue("revenue", b.revenue_lifetime);
             updateValue("revenueLast", b.revenue);
-            updateValue("sales", b.salesLifetime);
+            updateValue("sales", b.sales_lifetime);
             updateValue("salesLast", b.sales);
             updateValue("copies", b.copies);
         }

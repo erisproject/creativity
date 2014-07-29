@@ -10,6 +10,7 @@
 #include "belief/ProfitStream.hpp"
 #include "belief/Demand.hpp"
 #include "belief/Quality.hpp"
+#include <random>
 
 namespace creativity {
 
@@ -145,7 +146,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         Reader(
                 const eris::Position &pos, const eris::Position &b1, const eris::Position &b2,
                 belief::Demand &&demand, belief::Profit &&profit, belief::Quality &&quality,
-                const double &cFixed, const double &cUnit, const double &income
+                double cFixed, double cUnit, double income
               );
 
         /** Takes a money value and a container of SharedMember<Book> objects and returns the
@@ -338,6 +339,17 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          */
         double writer_quality_sd{1.0};
 
+        /// The fixed cost of keeping a book on the market for a period.
+        double cost_fixed{0};
+
+        /** The unit cost of producing a copy of a book on the market.  Copies are produced
+         * instantly as required; no preallocated number of copies is performed.
+         */
+        double cost_unit{0};
+
+        /// The per-unit income the reader receives.
+        double income{0};
+
         /** The reader's creation coefficients.  This reader can exhert effort \f$\ell \geq 0\f$ to
          * create a book of quality \f$q(\ell) = \alpha_0 + \alpha_1 \ell^{\alpha_2}\f$, where
          * \f$\alpha\f$ is this vector.
@@ -374,20 +386,25 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          *
          * If there are no models at all, a highly noninformative one for `age=1` is created and
          * returned.
+         *
+         * Note that the returned model will have, at most, `age` parameters (that is, `model.K() <=
+         * age` will always be true).
          */
-        const belief::ProfitStream& profitStreamBelief(unsigned long age) const;
+        const belief::ProfitStream& profitStreamBelief(unsigned int age) const;
 
         /** Returns the map of all current profit stream beliefs.  The keys of the map are the
          * minimum age for which the belief applies and the value is the actual belief with `age`
          * (i.e. the key) parameters.
+         *
+         * Note that the model associated with key `x` will have exactly `x` parameters.
          */
-        const std::map<unsigned long, belief::ProfitStream>& profitStreamBeliefs() const;
+        const std::map<unsigned int, belief::ProfitStream>& profitStreamBeliefs() const;
 
         /** The different ages that will be considered for profit_stream_beliefs.  Note that these
          * aren't won't actually have associated beliefs until a book of the given market age is
          * observed: these are only the possible age model sizes that will be used.
          */
-        static const std::vector<unsigned long> profit_stream_ages;
+        static const std::vector<unsigned int> profit_stream_ages;
 
         /// Read-only access to this reader's demand belief
         const belief::Demand& demandBelief() const;
@@ -448,7 +465,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * `profit_stream_beliefs_[3]` is the model of future profits for books that stayed on the
          * market for at least 3 periods.
          */
-        std::map<unsigned long, belief::ProfitStream> profit_stream_beliefs_;
+        std::map<unsigned int, belief::ProfitStream> profit_stream_beliefs_;
 
         /** Updates all of the reader's beliefs, in the following order:
          * - book quality beliefs
@@ -517,12 +534,6 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
 
         // Track current and cumulative utility:
         double u_curr_ = 0, u_lifetime_ = 0;
-
-        // Costs for creating copies of a book
-        double c_fixed_ = 0, c_unit_ = 0;
-
-        // Per-period income
-        double income_ = 0;
 
         // Book prices for the upcoming period.  If a book currently on the market isn't in here,
         // or has a negative price, it'll be removed from the market

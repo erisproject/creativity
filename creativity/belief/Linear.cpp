@@ -1,9 +1,12 @@
 #include "creativity/belief/Linear.hpp"
+#include <eris/debug.hpp>
 #include <Eigen/QR>
 
 namespace creativity { namespace belief {
 
 using namespace Eigen;
+
+constexpr double Linear::NONINFORMATIVE_N, Linear::NONINFORMATIVE_S2;
 
 Linear::Linear(
         const Ref<const VectorXd> &beta,
@@ -16,12 +19,25 @@ Linear::Linear(
 {
     // Check that the given matrices conform
     auto k = K();
-    if (k < 1) throw std::runtime_error("Linear model requires at least one parameter");
-    if (V_.rows() != V_.cols()) throw std::runtime_error("Linear requires square V matrix");
-    if (k != V_.rows()) throw std::runtime_error("Linear requires beta and V of same number of rows");
+    if (k < 1) throw std::logic_error("Linear model requires at least one parameter");
+    if (V_.rows() != V_.cols()) throw std::logic_error("Linear requires square V matrix");
+    if (k != V_.rows()) throw std::logic_error("Linear requires beta and V of same number of rows");
     if (V_inv_ and (V_inv_->rows() != V_inv_->cols() or V_inv_->rows() != k))
-        throw std::runtime_error("Linear constructed with invalid V_inv");
+        throw std::logic_error("Linear constructed with invalid V_inv");
+    auto fixed = fixedModelSize();
+    if (fixed and k != fixed) throw std::logic_error("Linear model constructed with incorrect number of model parameters");
 }
+
+Linear::Linear(unsigned int K) :
+    beta_{VectorXd::Zero(K)}, s2_{NONINFORMATIVE_S2}, V_{MatrixXd::Identity(K, K)},
+    n_{NONINFORMATIVE_N}, noninformative_{true}, K_{K}
+{
+    if (K < 1) throw std::logic_error("Linear model requires at least one parameter");
+    auto fixed = fixedModelSize();
+    if (fixed and K != fixed) throw std::logic_error("Linear model constructed with incorrect number of model parameters");
+}
+
+unsigned int Linear::fixedModelSize() const { return 0; }
 
 #define NO_EMPTY_MODEL if (K_ == 0) { throw std::logic_error("Cannot use default constructed model object as a model"); }
 
@@ -35,6 +51,8 @@ const MatrixXd& Linear::Vinv() const {
         V_inv_ = std::make_shared<MatrixXd>(V_.colPivHouseholderQr().inverse());
     return *V_inv_;
 }
+
+const bool& Linear::noninformative() const { NO_EMPTY_MODEL; return noninformative_; }
 
 double Linear::predict(const Ref<const RowVectorXd> &Xi) const {
     NO_EMPTY_MODEL;
@@ -71,7 +89,9 @@ Linear Linear::update(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X
     MatrixXd V_post = V_post_inv->colPivHouseholderQr().inverse();
 
     VectorXd beta_post = V_post * (Vinv() * beta_ + Xt * y);
-    double n_post = n_ + X.rows();
+    double n_post = X.rows();
+    if (not noninformative()) n_post += n_;
+
     VectorXd residuals = y - X * beta_;
     double s2_post = (n_ * s2_ + residuals.transpose() * (X * V_ * Xt + MatrixXd::Identity(X.rows(), X.rows())) * residuals) / n_post;
 
