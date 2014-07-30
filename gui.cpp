@@ -2,7 +2,6 @@
 #include "creativity/gui/GUI.hpp"
 #include "creativity/Reader.hpp"
 #include "creativity/Book.hpp"
-#include "creativity/common.hpp"
 #include "creativity/belief/Demand.hpp"
 #include "creativity/belief/Profit.hpp"
 #include "creativity/belief/ProfitStream.hpp"
