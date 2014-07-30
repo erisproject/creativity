@@ -45,7 +45,10 @@ class Quality : public Linear {
         Quality(Args &&...args) : Linear{std::forward<Args>(args)...}
         {}
 
-        /// This model has 7 parameters
+        /// Returns the number of parameters of this model (7)
+        static unsigned int parameters() { return 7; }
+
+        /// Returns `parameters()`
         virtual unsigned int fixedModelSize() const override;
 
         /** Given a book, this returns \f$\widehat q_b\f$, the expected quality of the book.

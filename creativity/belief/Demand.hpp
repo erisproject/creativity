@@ -55,6 +55,9 @@ class Demand : public Linear {
         : Linear{std::forward<Args>(args)...}, D_{D}
         {}
 
+        /// Returns the number of parameters of this model
+        static unsigned int parameters() { return 8; }
+
         /// This model has 8 parameters
         virtual unsigned int fixedModelSize() const override;
 

@@ -8,7 +8,7 @@ namespace creativity { namespace belief {
 
 using namespace Eigen;
 
-unsigned int Quality::fixedModelSize() const { return 7; }
+unsigned int Quality::fixedModelSize() const { return parameters(); }
 
 double Quality::predict(const Book &book) const {
     double price = 0;

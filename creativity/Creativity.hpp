@@ -2,6 +2,7 @@
 #include <eris/Simulation.hpp>
 #include <eris/Good.hpp>
 #include <eris/Optimize.hpp>
+#include <Eigen/Core>
 #include "creativity/Book.hpp"
 #include "creativity/state/MemoryStorage.hpp"
 
@@ -93,6 +94,20 @@ class Creativity : private eris::noncopyable, public std::enable_shared_from_thi
              * reader income can be updated on a individual reader level.
              */
             double income = 1000.0;
+
+            Eigen::VectorXd demand_beta, ///< Initial belief::Demand belief beta values
+                profit_beta, ///< Initial belief::Profit beta values
+                quality_beta; ///< Initial belief::Quality beta values
+            double demand_s2 = 10, ///< Initial belief::Demand s2 value
+                   demand_n = 1, ///< Initial belief::Demand n value
+                   profit_s2 = 10, ///< Initial belief::Profit s2 value
+                   profit_n = 1, ///< Initial belief::Profit n value
+                   quality_s2 = 10, ///< Initial belief::Quality s2 value
+                   quality_n = 1; ///< Initial belief::Quality n value
+            Eigen::MatrixXd demand_V, ///< Initial V matrix for belief::Demand.  Must be PSD.
+                profit_V, /// Initial V matrix for belief::Profit.  Must be PSD.
+                quality_V; /// Initial V matrix for belief::Quality.  Must be PSD.
+
         } parameters;
 
         /** Returns the simulation boundary.  If simulation setup is complete, this returns the
@@ -161,7 +176,7 @@ class Creativity : private eris::noncopyable, public std::enable_shared_from_thi
 
     protected:
         /* Default constructor is protected; construct by calling create(). */
-        Creativity() = default;
+        Creativity();
 
     private:
         // True if this is a live simulation.  Exclusive of setup_read_.

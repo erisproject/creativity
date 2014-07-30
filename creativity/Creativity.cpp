@@ -1,5 +1,8 @@
 #include "creativity/Creativity.hpp"
 #include "creativity/state/FileStorage.hpp"
+#include "creativity/belief/Demand.hpp"
+#include "creativity/belief/Quality.hpp"
+#include "creativity/belief/Profit.hpp"
 #include <eris/Random.hpp>
 #include <eris/intraopt/Callback.hpp>
 #include <Eigen/Core>
@@ -10,6 +13,20 @@ namespace creativity {
 using namespace creativity::state;
 using namespace eris;
 using namespace Eigen;
+
+Creativity::Creativity() {
+    // Set up belief defaults
+    parameters.demand_beta.resize(belief::Demand::parameters());
+    parameters.demand_V = MatrixXd::Identity(belief::Demand::parameters(), belief::Demand::parameters());
+    parameters.profit_beta.resize(belief::Profit::parameters());
+    parameters.profit_V = MatrixXd::Identity(belief::Profit::parameters(), belief::Profit::parameters());
+    parameters.quality_beta.resize(belief::Quality::parameters());
+    parameters.quality_V = MatrixXd::Identity(belief::Quality::parameters(), belief::Quality::parameters());
+
+    parameters.demand_beta << 0, -2, 0.5, -0.1, 0, 0, 0, 0;
+    parameters.profit_beta << 0, 1, 0, 0, 0;
+    parameters.quality_beta << 5, -1, 1, 0, 0, 0, 0.1;
+}
 
 double Creativity::boundary() const {
     if (setup_sim_ or setup_read_) return boundary_;
@@ -58,24 +75,13 @@ void Creativity::setup() {
 
     auto &rng = eris::Random::rng();
     ERIS_DBG("Setting up readers");
-    ERIS_DBG("FIXME: need to move belief parameters into .parameters");
-
-    VectorXd demand_beta{8}; demand_beta << 0, -2, 0.5, -0.1, 0, 0, 0, 0;
-    MatrixXd demand_V = MatrixXd::Identity(8, 8);
-    double demand_s2 = 10, demand_n = 1;
-    VectorXd profit_beta{5}; profit_beta << 0, 1, 0, 0, 0;
-    MatrixXd profit_V = MatrixXd::Identity(5, 5);
-    double profit_s2 = 10, profit_n = 1;
-    VectorXd quality_beta{7}; quality_beta << 5, -1, 1, 0, 0, 0, 0.1;
-    MatrixXd quality_V = MatrixXd::Identity(7, 7);
-    double quality_s2 = 10, quality_n = 1;
 
     for (unsigned int i = 0; i < parameters.readers; i++) {
         auto r = sim->create<Reader>(shared_from_this(),
                 Position{unif_pmb(rng), unif_pmb(rng)},
-                belief::Demand{2, demand_beta, demand_s2, demand_V, demand_n},
-                belief::Profit{2, profit_beta, profit_s2, profit_V, profit_n},
-                belief::Quality{quality_beta, quality_s2, quality_V, quality_n},
+                belief::Demand{parameters.dimensions, parameters.demand_beta, parameters.demand_s2, parameters.demand_V, parameters.demand_n},
+                belief::Profit{parameters.dimensions, parameters.profit_beta, parameters.profit_s2, parameters.profit_V, parameters.profit_n},
+                belief::Quality{parameters.quality_beta, parameters.quality_s2, parameters.quality_V, parameters.quality_n},
                 parameters.cost_fixed, parameters.cost_unit, parameters.income
                 );
         r->writer_book_sd = parameters.book_quality_sd;

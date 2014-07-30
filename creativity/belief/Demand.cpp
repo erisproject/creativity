@@ -9,7 +9,7 @@ namespace creativity { namespace belief {
 
 using namespace Eigen;
 
-unsigned int Demand::fixedModelSize() const { return 8; }
+unsigned int Demand::fixedModelSize() const { return parameters(); }
 
 double Demand::predict(double P, double q, unsigned long S, unsigned long otherBooks, unsigned long marketBooks) const {
     ERIS_DBGVAR(P);

@@ -8,7 +8,7 @@ namespace creativity { namespace belief {
 
 using namespace Eigen;
 
-unsigned int Profit::fixedModelSize() const { return 5; }
+unsigned int Profit::fixedModelSize() const { return parameters(); }
 
 double Profit::predict(double q, unsigned long previousBooks, unsigned long marketBooks) const {
     RowVectorXd X(K());
