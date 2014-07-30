@@ -1,25 +1,27 @@
 #include "creativity/Book.hpp"
 #include "creativity/BookMarket.hpp"
 #include "creativity/Reader.hpp"
-#include "creativity/common.hpp"
+#include "creativity/Creativity.hpp"
 
 using namespace eris;
 
 namespace creativity {
 
 Book::Book(
+        std::shared_ptr<Creativity> creativity,
         const Position &p,
         SharedMember<Reader> author,
         unsigned long order,
         double initial_price,
         double quality,
-        const std::function<double(const Book&, const Reader&)> &qDraw)
+        std::function<double(const Book&, const Reader&)> qDraw)
     : WrappedPositional<Good::Discrete>(p, author->wrapLowerBound(), author->wrapUpperBound()),
-        author_{author},
+        creativity_{std::move(creativity)},
+        author_{std::move(author)},
         order_{order},
         init_price_{initial_price},
         quality_{quality},
-        quality_draw_{qDraw}
+        quality_draw_{std::move(qDraw)}
 {}
 
 void Book::added() {
@@ -32,8 +34,8 @@ void Book::added() {
     revenue_total_ = 0;
     revenue_.clear();
 
-    auto mkt = sim->create<BookMarket>(sharedSelf(), init_price_);
-    NEW_BOOKS.push_back(sharedSelf());
+    auto mkt = sim->create<BookMarket>(creativity_, sharedSelf(), init_price_);
+    creativity_->newBooks().first.push_back(sharedSelf());
     market_ = mkt;
     dependsWeaklyOn(mkt);
 }

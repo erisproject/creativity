@@ -1,7 +1,6 @@
 #pragma once
 #include <eris/Market.hpp>
 #include "creativity/Book.hpp"
-#include "creativity/common.hpp"
 
 namespace creativity {
 
@@ -11,9 +10,9 @@ namespace creativity {
 class BookMarket : public eris::Market, public virtual eris::intraopt::Finish {
     public:
         /** Constructs a BookMarket that sells copies of the given Book with an initial price of
-         * MONEY times p.  Books are created as needed at zero cost.
+         * p times the money good.  Books are created as needed at zero cost.
          */
-        BookMarket(eris::SharedMember<Book> b, double price);
+        BookMarket(std::shared_ptr<Creativity> creativity, eris::SharedMember<Book> b, double price);
 
         /** Returns price info.  Since price is constant, and there is no quantity limits,
          * this price into is simple: it's always feasible, and total is just quantity times price,
@@ -68,6 +67,7 @@ class BookMarket : public eris::Market, public virtual eris::intraopt::Finish {
         virtual void buy_(Reservation_ &res) override;
 
     private:
+        std::shared_ptr<Creativity> creativity_;
         eris::SharedMember<Book> book_;
         double price_;
         // The income of the book (these get transferred in the interApply phase)

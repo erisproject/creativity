@@ -23,14 +23,16 @@
 #include <boost/geometry/index/rtree.hpp>
 #include "creativity/gui/GraphArea.hpp"
 #include "creativity/gui/InfoWindow.hpp"
-#include "creativity/gui/ReaderStore.hpp"
-#include "creativity/gui/BookStore.hpp"
 #include "creativity/state/State.hpp"
 #include "creativity/state/Storage.hpp"
 
 namespace sigc { SIGC_FUNCTORS_DEDUCE_RESULT_TYPE_WITH_DECLTYPE }
 
 namespace creativity { namespace gui {
+
+// Forward declarations
+class ReaderStore;
+class BookStore;
 
 /** Class that runs a GUI in a thread, collecting its events into a queue to be processed
  * periodically (e.g. between iterations) via GUIShim.
@@ -43,13 +45,11 @@ class GUI : eris::noncopyable {
          * called.
          */
         GUI(
-                /** The simulation state storage object.  This is expected to be updated at the end
-                 * of each simulation period, and will be used in the GUI to display the simulation.
+                /** The Creativity object containing the simulation storage.  The object does not
+                 * need to be initialized (by calling setup()): in particular, if the GUI is
+                 * displaying a previously stored simulation run, it typically won't be.
                  */
-                const std::unique_ptr<state::Storage> &states,
-
-                /** Mutex guarding the provided `states` vector. */
-                std::mutex &state_mutex,
+                std::shared_ptr<Creativity> creativity,
 
                 /** A function to call with the GUI simulation parameters (in a series of
                  * GUI.Parameter structs) when the user configures the simulation via the GUI.  This
@@ -237,6 +237,9 @@ class GUI : eris::noncopyable {
         static std::string pos_to_string(const eris::Position &pos);
 
     private:
+        /// The Creativity object
+        std::shared_ptr<Creativity> creativity_;
+
         /// The thread the GUI is running in.  Set during construction.
         std::thread gui_thread_{};
 
@@ -268,9 +271,6 @@ class GUI : eris::noncopyable {
          * mutex also handles synchronization during thread startup and guards access to the queue
          * of events (setup, run, etc.) emitted by the GUI and status variable accessed by the
          * GUI.  It also guards dispatcher_, which the thread deletes when it quits.
-         *
-         * It does *not* guard access to the actual simulation state (readers/books): that is
-         * guarded by `state_mutex_`.
          */
         std::mutex mutex_;
 
@@ -363,15 +363,11 @@ class GUI : eris::noncopyable {
         /** The state currently be displayed. */
         unsigned long state_curr_ = (unsigned long) -1;
 
-        /** The current number of states known to the GUI.  `states_.size() >= state_num_` is
-         * guaranteeded to be true.  There may be more in the states_ variable if the GUI hasn't
-         * received or processed the notification.
+        /** The current number of states known to the GUI.  `creativity_.storage.size() >=
+         * state_num_` is guaranteeded to be true.  There may be more in the `creativity_.storage`
+         * variable if the GUI hasn't received and processed the notification yet.
          */
         unsigned long state_num_ = 0;
-
-        /** Obtains and returns a lock on the state mutex.
-         */
-        std::unique_lock<std::mutex> stateLock();
 
         /** Opens a dialog for the given member, which must be either a Reader or a Book.  If the
          * dialog is already open, it is presented again (which is window manager dependent, but
@@ -396,13 +392,6 @@ class GUI : eris::noncopyable {
 
         /** The custom graph area */
         std::unique_ptr<GraphArea> graph_;
-
-        /** Reference to the simulation state snapshots variable. The index is the simulation
-         * period. */
-        const std::unique_ptr<state::Storage> &states_;
-
-        /** Reference to mutex controlling access to `states_` */
-        std::mutex &state_mutex_;
 
         /** The various objects used for the Agents tab */
         Gtk::ScrolledWindow *rdr_win_;

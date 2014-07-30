@@ -353,6 +353,10 @@ std::pair<eris::eris_id_t, ReaderState> FileStorage::readReader() const {
     // Utility
     r.u = read_dbl();
     r.u_lifetime = read_dbl();
+    // Costs:
+    r.cost_fixed = read_dbl();
+    r.cost_unit = read_dbl();
+    r.income = read_dbl();
 
     // Beliefs
     belief_data belief = readBelief();
@@ -383,6 +387,7 @@ std::pair<eris::eris_id_t, ReaderState> FileStorage::readReader() const {
     for (uint32_t i = 0; i < pstream_locs; i++) {
         belief = readBelief();
         if (belief.K == 0) throwParseError("found illegal profitStream belief with K = 0 (i.e. default constructed model)");
+        else if (r.profit_stream.count(belief.K)) throwParseError("found duplicate K value in profit_stream beliefs");
         r.profit_stream.emplace(belief.beta.rows(), belief.noninformative
                 ? ProfitStream(belief.K)
                 : ProfitStream(belief.beta, belief.s2, belief.V, belief.n));
@@ -519,6 +524,10 @@ void FileStorage::writeReader(const ReaderState &r) {
     for (auto &w : r.wrote) write_u64(w);
     write_value(r.u);
     write_value(r.u_lifetime);
+
+    write_value(r.cost_fixed);
+    write_value(r.cost_unit);
+    write_value(r.income);
 
     writeBelief(r.profit);
     writeBelief(r.profit_extrap);

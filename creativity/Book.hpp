@@ -8,6 +8,7 @@ namespace creativity {
 // forward-declarations
 class Reader;
 class BookMarket;
+class Creativity;
 
 /** Class representing a particular book.
  *
@@ -20,11 +21,11 @@ class BookMarket;
  */
 class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
     public:
-        /** Constructs a new book at the given position created by the given author.  The book will
-         * have the same wrapping boundaries as the author.  When the book is added to the
-         * simulation, a BookMarket is constructed for selling the book which starts the price at
-         * `initial_price`.  
+        /** Constructs a new book at the given position created by the given author.  When the book
+         * is added to the simulation, a BookMarket is constructed for selling the book which starts
+         * the price at `initial_price`.  
          *
+         * \param creativity the Creativity object that owns the simulation this book belongs to
          * \param p the position of the book
          * \param author the author of the book
          * \param order the number of this book in the author's authored books list.  `order == 0`
@@ -40,8 +41,8 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
          * Note that a reference to the author is stored internally: even if the author is removed
          * from the simulation, it will still be kept from destruction by this class.
          */
-        Book(const eris::Position &p, eris::SharedMember<Reader> author, unsigned long order, double initial_price,
-                double quality, const std::function<double(const Book&, const Reader&)> &qDraw);
+        Book(std::shared_ptr<Creativity> creativity, const eris::Position &p, eris::SharedMember<Reader> author, unsigned long order,
+                double initial_price, double quality, std::function<double(const Book&, const Reader&)> qDraw);
 
         /// Returns the age of the book, in simulation periods.
         unsigned long age() const;
@@ -166,6 +167,7 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         double qualityDraw(const Reader &reader);
 
     private:
+        std::shared_ptr<Creativity> creativity_;
         unsigned long created_, out_of_print_, copies_sold_total_;
         double revenue_total_;
         std::map<unsigned long, unsigned long> copies_sold_;

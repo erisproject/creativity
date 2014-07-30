@@ -292,13 +292,15 @@ class FileStorage : public Storage, private eris::noncopyable {
          *     u64[]        new
          *     u64[]        wrote
          *     dbl          u
-         *     dbl          uLifetime
-         *     BELIEF       belief.profit
-         *     BELIEF       belief.profitExtrap
-         *     BELIEF       belief.demand
-         *     BELIEF       belief.quality
-         *     u32          S -- profitStream map size
-         *     BELIEF[S]    belief.profitStream (keys are belief.K())
+         *     dbl          u_lifetime
+         *     dbl          cost_fixed
+         *     dbl          cost_unit
+         *     dbl          income
+         *     BELIEF       profit belief
+         *     BELIEF       profit extrapolated belief
+         *     BELIEF       demand belief
+         *     BELIEF       quality belief
+         *     BELIEF[]     profit stream beliefs (for different K() values)
          *
          * where type[] indicates an array structured as:
          *     u32          length
@@ -310,8 +312,9 @@ class FileStorage : public Storage, private eris::noncopyable {
          * BELIEF is a i64 belief location (or special value) and possibly a set of belief data, as
          * handled by readBelief(int64_t).
          *
-         * profitStream beliefs may not be placeholder beliefs (i.e. default constructed objects);
-         * such objects should simply be omitted when writing the data.
+         * profit stream beliefs may not be placeholder beliefs (i.e. default constructed objects);
+         * such objects should simply be omitted when writing the data.  Each profit stream belief K
+         * value must also be unique.
          */
         std::pair<eris::eris_id_t, ReaderState> readReader() const;
 

@@ -1,14 +1,14 @@
 #include "creativity/BookMarket.hpp"
 #include "creativity/Reader.hpp"
-#include "creativity/Book.hpp"
+#include "creativity/Creativity.hpp"
 #include <random>
 
 using namespace eris;
 
 namespace creativity {
 
-BookMarket::BookMarket(SharedMember<Book> b, double price)
-    : Market{{{ b, 1 }}, {{ MONEY, 1 }}}, book_{b}, price_{price}
+BookMarket::BookMarket(std::shared_ptr<Creativity> creativity, SharedMember<Book> b, double price)
+    : Market{{{ b, 1 }}, {{ creativity->money, 1 }}}, creativity_{std::move(creativity)}, book_{b}, price_{price}
 {}
 
 SharedMember<Book> BookMarket::book() {
@@ -68,7 +68,7 @@ void BookMarket::buy_(Reservation_ &res) {
     Bundle &b = reservationBundle_(res);
 
     // Record the sale in the book status
-    book_->sale(res.quantity, b[MONEY]);
+    book_->sale(res.quantity, b[creativity_->money]);
 
     // Transfer the money into the "proceeds" jar (which will eventually go to the author)
     b.transferApprox(b, proceeds_);

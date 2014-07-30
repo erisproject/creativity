@@ -14,6 +14,7 @@ ReaderState::ReaderState(const Reader &r) :
     u_lifetime{r.uLifetime()},
     cost_fixed{r.cost_fixed},
     cost_unit{r.cost_unit},
+    income{r.income},
     profit{r.profitBelief()},
     profit_extrap{r.profitExtrapBelief()},
     demand{r.demandBelief()},

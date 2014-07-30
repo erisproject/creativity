@@ -1,3 +1,4 @@
+#include "creativity/Creativity.hpp"
 #include "creativity/Reader.hpp"
 #include "creativity/Book.hpp"
 #include "creativity/BookMarket.hpp"
@@ -16,12 +17,14 @@ const std::vector<double> Reader::default_penalty_polynomial{{0, 0, 0.25}};
 const std::vector<unsigned int> Reader::profit_stream_ages{{1,2,4,8}};
 
 Reader::Reader(
-        const Position &pos, const Position &b1, const Position &b2,
+        std::shared_ptr<Creativity> creativity,
+        const Position &pos,
         belief::Demand &&demand, belief::Profit &&profit, belief::Quality &&quality,
         double cFixed, double cUnit, double inc
         )
-    : WrappedPositional<agent::AssetAgent>(pos, b1, b2),
+    : WrappedPositional<agent::AssetAgent>(pos, {-creativity->boundary(), -creativity->boundary()}, {creativity->boundary(), creativity->boundary()}),
     cost_fixed{cFixed}, cost_unit{cUnit}, income{inc},
+    creativity_{std::move(creativity)},
     profit_belief_{std::move(profit)}, profit_belief_extrap_{profit_belief_},
     demand_belief_{std::move(demand)}, quality_belief_{std::move(quality)},
     profit_stream_beliefs_{{1, 1}}
@@ -120,7 +123,7 @@ void Reader::interOptimize() {
             it++;
     }
 
-    double income_available = assets()[MONEY] + income;
+    double income_available = assets()[creativity_->money] + income;
 
     auto sim = simulation();
     const double market_books = sim->countMarkets<BookMarket>();
@@ -174,7 +177,7 @@ void Reader::interOptimize() {
     if (income_available >= cost_fixed) {
         double l_max = profit_belief_extrap_.argmaxL(
                 [this] (const double &l) -> double { return creationQuality(l); },
-                previous_books, market_books, assets()[MONEY] + income - cost_fixed
+                previous_books, market_books, assets()[creativity_->money] + income - cost_fixed
                 );
         double quality = creationQuality(l_max);
 
@@ -198,12 +201,12 @@ void Reader::interApply() {
     // Give potential income (this has to be before authorship decision, since authorship requires
     // giving up some potential income: actual income will be this amount minus whatever is given up
     // to author)
-    assets() += {MONEY, income};
+    assets() += {creativity_->money, income};
 
     SharedMember<Book> newbook;
     if (create_) {
         // The cost (think of this as an opportunity cost) of creating:
-        assets() -= {MONEY, create_effort_ + cost_fixed};
+        assets() -= {creativity_->money, create_effort_ + cost_fixed};
 
         // The book is centered at the reader's position, plus some noise we add below
         Position bookPos{position()};
@@ -211,7 +214,7 @@ void Reader::interApply() {
         auto qdraw = [this] (const Book &book, const Reader &) -> double {
             return std::max(0.0, book.quality() + writer_quality_sd * stdnormal(Random::rng()));
         };
-        newbook = simulation()->create<Book>(bookPos, sharedSelf(), wrote_.size(), create_price_, create_quality_, qdraw);
+        newbook = simulation()->create<Book>(creativity_, bookPos, sharedSelf(), wrote_.size(), create_price_, create_quality_, qdraw);
 
         /// If enabled, add some noise in a random direction to the position
         if (writer_book_sd > 0) {
@@ -230,7 +233,7 @@ void Reader::interApply() {
         if (new_prices_.count(b) > 0) {
             // Set the new price
             b->market()->setPrice(new_prices_[b]);
-            assets() -= {MONEY, cost_fixed};
+            assets() -= {creativity_->money, cost_fixed};
         }
         else if (not create_ or b != newbook) {
             // No new price, which means we remove the book from the market
@@ -273,7 +276,7 @@ double Reader::penalty(unsigned long n) const {
 const std::unordered_map<SharedMember<Book>, double>& Reader::library() const { return library_; }
 
 void Reader::receiveProfits(SharedMember<Book> book, const Bundle &revenue) {
-    assets() += revenue - Bundle{MONEY, book->currSales() * cost_unit};
+    assets() += revenue - Bundle{creativity_->money, book->currSales() * cost_unit};
 }
 
 const belief::Profit& Reader::profitBelief() const { return profit_belief_; }
@@ -449,7 +452,8 @@ void Reader::updateProfitBelief() {
 }
 
 void Reader::intraInitialize() {
-    for (auto &bm : NEW_BOOKS) {
+    auto nb = creativity_->newBooks();
+    for (auto &bm : nb.first) {
         book_cache_.insert(bm);
     }
 }
@@ -493,7 +497,7 @@ void Reader::intraOptimize() {
     for (auto &del : cache_del) book_cache_.erase(del);
 
     std::set<SharedMember<Book>> buy;
-    double money = assets()[MONEY];
+    double money = assets()[creativity_->money];
     double u_curr = u(money, buy); // the "no-books" utility
     // Keep looking at books as long as the net utility from buying the next best book exceeds the
     // penalty that will be incurred.
@@ -547,7 +551,7 @@ void Reader::intraApply() {
     std::swap(library_new_, reserved_books_); // Clear away into new_books_
 
     // "Eat" any money leftover
-    double money = assets().remove(MONEY);
+    double money = assets().remove(creativity_->money);
     // Finalize utility
     u_curr_ = u(money, library_new_);
     u_lifetime_ += u_curr_;

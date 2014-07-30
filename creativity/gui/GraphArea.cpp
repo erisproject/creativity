@@ -1,5 +1,6 @@
 #include "creativity/gui/GraphArea.hpp"
 #include "creativity/gui/GUI.hpp"
+#include "creativity/Creativity.hpp"
 #include "creativity/Reader.hpp"
 #include "creativity/Book.hpp"
 #include <cmath>
@@ -18,14 +19,16 @@ Cairo::Matrix GraphArea::graph_to_canvas() const {
     const int width = allocation.get_width();
     const int height = allocation.get_height();
 
+    const double boundary = gui_.creativity_->boundary();
+
     // The second of these is negative, which is correct because "up" in the graph translates to a
     // lower coordinate on the screen (since positive y coordinates are down the screen).
-    const double gwidth = 2*BOUNDARY, gheight = -2*BOUNDARY;
+    const double gwidth = 2*boundary, gheight = -2*boundary;
 
     // Build a transformation that converts from positions to canvas coordinates
     auto trans = Cairo::identity_matrix();
     trans.scale(width / gwidth, height / gheight);
-    trans.translate(BOUNDARY, -BOUNDARY);
+    trans.translate(boundary, -boundary);
 
     return trans;
 }
@@ -34,6 +37,7 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
     Gtk::Allocation allocation = get_allocation();
     const int width = allocation.get_width();
     const int height = allocation.get_height();
+    const double boundary = gui_.creativity_->boundary();
 
     if (gui_.state_num_ == 0) {
         // No states at all: just draw a blank screen
@@ -59,12 +63,11 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
         std::shared_ptr<const State> state;
 
         {
-            // Lock the state vector while we grab the state
-            auto lock = gui_.stateLock();
-            if (gui_.states_->empty())
+            auto st = gui_.creativity_->storage();
+            if (st.first->empty())
                 state = std::make_shared<State>();
             else
-                state = (*gui_.states_)[gui_.state_curr_];
+                state = (*st.first)[gui_.state_curr_];
         }
 
         cr->save();
@@ -155,7 +158,7 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
         // Tick marks
         cr->set_line_width(1.0);
         int tick_num = 0;
-        for (double gx = tick_space; gx <= BOUNDARY; gx += tick_space) {
+        for (double gx = tick_space; gx <= boundary; gx += tick_space) {
             const double curr_tick_size = (++tick_num % tick_big) ? tick_size : 3*tick_size;
             double x = gx, y = 0;
             trans.transform_point(x, y);
@@ -169,7 +172,7 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
             cr->rel_line_to(0, curr_tick_size);
         }
         tick_num = 0;
-        for (double gy = tick_space; gy <= BOUNDARY; gy += tick_space) {
+        for (double gy = tick_space; gy <= boundary; gy += tick_space) {
             const double curr_tick_size = (++tick_num % tick_big) ? tick_size : 3*tick_size;
             double x = 0, y = gy;
             trans.transform_point(x, y);
@@ -196,10 +199,11 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
 void GraphArea::drawWrappingLine(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans, const Position &from, const Position &to) {
     cr->save();
     cr->transform(trans);
-    const double x_span = 2*BOUNDARY;
-    const double y_span = 2*BOUNDARY;
+    const double boundary = gui_.creativity_->boundary();
+    const double x_span = 2*boundary;
+    const double y_span = 2*boundary;
     if (not wpb_.wrapped(0)) {
-        wpb_ = WrappedPositionalBase({0.0,0.0}, {-BOUNDARY, -BOUNDARY}, {BOUNDARY, BOUNDARY});
+        wpb_ = WrappedPositionalBase({0.0,0.0}, {-boundary, -boundary}, {boundary, boundary});
     }
     wpb_.moveTo(from);
     auto v = wpb_.vectorTo(to);
@@ -221,16 +225,17 @@ void GraphArea::drawPoint(
 
     // The radius of the point
     const double pt_radius = point_size * scale;
+    const double boundary = gui_.creativity_->boundary();
 
     // Before we transform x and y, consider whether there are wrapped versions of the point we need
     // to worry about; if so, draw them first.
     if (not virt) {
-        double dim_x = 2*BOUNDARY,
-               dim_y = 2*BOUNDARY;
-        bool wrap_right = x + pt_radius > BOUNDARY,
-             wrap_left  = x - pt_radius < -BOUNDARY,
-             wrap_up    = y + pt_radius > BOUNDARY,
-             wrap_down  = y - pt_radius < -BOUNDARY;
+        double dim_x = 2*boundary,
+               dim_y = 2*boundary;
+        bool wrap_right = x + pt_radius > boundary,
+             wrap_left  = x - pt_radius < -boundary,
+             wrap_up    = y + pt_radius > boundary,
+             wrap_down  = y - pt_radius < -boundary;
 
         // There are 8 wrapping possibilities to consider; the first 4 are corners, the last 4 are
         // single-dimension edge wraps.  Corners are just like double-edged wraps, but *also* have

@@ -1,4 +1,7 @@
 #include "creativity/gui/GUI.hpp"
+#include "creativity/gui/ReaderStore.hpp"
+#include "creativity/gui/BookStore.hpp"
+#include "creativity/Creativity.hpp"
 #include "creativity/config.hpp"
 #include "creativity/Reader.hpp"
 #include "creativity/Book.hpp"
@@ -14,8 +17,7 @@ using namespace std::placeholders;
 
 namespace creativity { namespace gui {
 
-GUI::GUI(const std::unique_ptr<Storage> &states,
-        std::mutex &state_mutex,
+GUI::GUI(std::shared_ptr<Creativity> creativity,
         std::function<void(Parameter)> setup,
         std::function<void(unsigned int count)> run,
         std::function<void()> stop,
@@ -23,8 +25,7 @@ GUI::GUI(const std::unique_ptr<Storage> &states,
         std::function<void()> step,
         std::function<void()> quit)
     :
-        states_{states},
-        state_mutex_{state_mutex},
+        creativity_{creativity},
         on_setup_{std::move(setup)},
         on_run_{std::move(run)},
         on_stop_{std::move(stop)},
@@ -293,15 +294,19 @@ void GUI::thr_set_state(unsigned long t) {
 
     std::shared_ptr<const State> state;
     {
-        auto lock = stateLock();
-        state = (*states_)[t]; // Will throw if `t` is invalid
+        size_t storage_size;
+        {
+            auto st = creativity_->storage();
+            state = (*st.first)[t]; // Will throw if `t` is invalid
+            storage_size = st.first->size();
+        }
 
         // Enlarge if necessary
-        if (rdr_models_.size() < states_->size()) rdr_models_.resize(states_->size());
-        if (rdr_trees_.size() < states_->size()) rdr_trees_.resize(states_->size());
-        if (bk_models_.size() < states_->size()) bk_models_.resize(states_->size());
-        if (bk_trees_.size() < states_->size()) bk_trees_.resize(states_->size());
-        if (rtrees_.size() < states_->size()) rtrees_.resize(states_->size());
+        if (rdr_models_.size() < storage_size) rdr_models_.resize(storage_size);
+        if (rdr_trees_.size() < storage_size) rdr_trees_.resize(storage_size);
+        if (bk_models_.size() < storage_size) bk_models_.resize(storage_size);
+        if (bk_trees_.size() < storage_size) bk_trees_.resize(storage_size);
+        if (rtrees_.size() < storage_size) rtrees_.resize(storage_size);
     }
 
     // Values may be null pointers--if so, create new model stores
@@ -462,10 +467,6 @@ decltype(Gtk::FileFilter::create()) GUI::fileFilter() const {
     return ff_;
 }
 
-std::unique_lock<std::mutex> GUI::stateLock() {
-    return std::unique_lock<std::mutex>(state_mutex_);
-}
-
 void GUI::thr_info_dialog(eris_id_t member_id) {
     auto already_open = info_windows_.find(member_id);
     if (already_open != info_windows_.end()) {
@@ -475,8 +476,7 @@ void GUI::thr_info_dialog(eris_id_t member_id) {
     else {
         std::shared_ptr<const State> state;
         {
-            auto l = stateLock();
-            state = (*states_)[state_curr_];
+            state = (*creativity_->storage().first)[state_curr_];
         }
 
         if (state->readers.count(member_id)) {
@@ -591,11 +591,7 @@ void GUI::thr_signal() {
 
     if (last_new_states.type == Signal::Type::new_states) {
         auto old_state_num = state_num_;
-
-        {
-            auto lock = stateLock();
-            state_num_ = states_->size();
-        }
+        state_num_ = creativity_->storage().first->size();
 
         if (state_num_ > old_state_num) {
             // - 1 here because we don't really count 0 as a stage

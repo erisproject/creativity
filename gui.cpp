@@ -1,3 +1,4 @@
+#include "creativity/Creativity.hpp"
 #include "creativity/gui/GUI.hpp"
 #include "creativity/Reader.hpp"
 #include "creativity/Book.hpp"
@@ -25,26 +26,20 @@ using namespace Eigen;
 
 int main(int argc, char *argv[1]) {
     Eigen::initParallel();
-    auto sim = Simulation::spawn();
-    MONEY = sim->create<Good::Continuous>();
-    sim->create<NEW_BOOKS_Cleaner>();
+    auto creativity = Creativity::create();
 
     std::cerr << std::setprecision(16);
     std::cout << std::setprecision(16);
 
     bool setup = false, stopped = true, step = false, quit = false;
-    unsigned long num_readers = 1000, dimensions = 2;
-    double density = 1.0;
-    double book_sd = 0.5, quality_draw_sd = 1.0;
-    double cost_fixed = 20, cost_unit = 1, income = 1000;
     unsigned long run_start = 0, run_end = 0;
     double speed_limit = 0;
     std::chrono::milliseconds sync_speed{50};
     bool save_to_file = false, load_from_file = false;
-    std::unique_ptr<Storage> storage(new MemoryStorage());
+    unsigned int max_threads = 0;
 
-#define NONNEG_DOUBLE(VAR, DESC) \
-    case GUI::ParamType::VAR: \
+#define NONNEG_DOUBLE(TYPE, VAR, DESC) \
+    case GUI::ParamType::TYPE: \
         if (setup) throw std::runtime_error("Cannot change " DESC " after initial setup"); \
         if (p.dbl < 0) \
             throw std::domain_error{DESC " `" + std::to_string(p.dbl) + "' is invalid"}; \
@@ -70,13 +65,13 @@ int main(int argc, char *argv[1]) {
                 if (setup) throw std::runtime_error("Cannot change readers after initial setup");
                 if (p.ul < 1)
                     throw std::domain_error{"Must have at least one reader"};
-                num_readers = p.ul;
+                creativity->parameters.readers = p.ul;
                 break;
             case GUI::ParamType::density:
                 if (setup) throw std::runtime_error("Cannot change density after initial setup");
                 if (p.dbl <= 0)
                     throw std::domain_error{"Density must be positive"};
-                density = p.dbl;
+                creativity->parameters.density = p.dbl;
                 break;
             case GUI::ParamType::seed:
                 if (setup) throw std::runtime_error("Cannot change seed after initial setup");
@@ -85,14 +80,13 @@ int main(int argc, char *argv[1]) {
             case GUI::ParamType::load:
                 if (setup) throw std::runtime_error("Cannot load after initial setup");
                 if (save_to_file) throw std::runtime_error("Error: setup specified both load and save file");
-                storage = std::unique_ptr<Storage>(new FileStorage(*reinterpret_cast<std::string*>(p.ptr), FileStorage::MODE::READONLY));
-                if (storage->size() == 0)
+                creativity->fileRead(*reinterpret_cast<std::string*>(p.ptr));
+                if (creativity->storage().first->size() == 0)
                     throw std::runtime_error("Unable to load file: file has no states");
-                if (storage->dimensions() != 2)
+                if (creativity->storage().first->dimensions() != 2)
                     throw std::runtime_error("Unable to load file: dimensions != 2");
-                if (storage->boundary() <= 0)
+                if (creativity->storage().first->boundary() <= 0)
                     throw std::runtime_error("Unable to load file: file has invalid non-positive boundary value");
-                BOUNDARY = storage->boundary();
                 load_from_file = true;
                 break;
             case GUI::ParamType::save_as:
@@ -100,18 +94,18 @@ int main(int argc, char *argv[1]) {
                 // to copy the current Storage object into the new FileStorage.
                 if (setup) throw std::runtime_error("Cannot change file after initial setup");
                 if (load_from_file) throw std::runtime_error("Error: setup specified both load and save file");
-                storage = std::unique_ptr<Storage>(new FileStorage(*reinterpret_cast<std::string*>(p.ptr), FileStorage::MODE::OVERWRITE));
+                creativity->fileWrite(*reinterpret_cast<std::string*>(p.ptr));
                 save_to_file = true;
                 break;
-            NONNEG_DOUBLE(book_sd, "Book standard deviation");
-            NONNEG_DOUBLE(quality_draw_sd, "Quality standard deviation");
-            NONNEG_DOUBLE(cost_fixed, "Fixed cost");
-            NONNEG_DOUBLE(cost_unit, "Unit cost");
+            NONNEG_DOUBLE(book_sd, creativity->parameters.book_distance_sd, "Book standard deviation");
+            NONNEG_DOUBLE(quality_draw_sd, creativity->parameters.book_quality_sd, "Quality standard deviation");
+            NONNEG_DOUBLE(cost_fixed, creativity->parameters.cost_fixed, "Fixed cost");
+            NONNEG_DOUBLE(cost_unit, creativity->parameters.cost_unit, "Unit cost");
             case GUI::ParamType::threads:
                 // This is the only setting that *can* be changed after the initial setup.  This
                 // will throw if currently running, but that's okay: the GUI isn't allowed to send
                 // it if the simulation is currently running.
-                sim->maxThreads(p.ul);
+                max_threads = p.ul;
                 break;
         }
     };
@@ -122,7 +116,7 @@ int main(int argc, char *argv[1]) {
             throw std::logic_error("Event error: RUN before successful SETUP");
         if (load_from_file)
             throw std::logic_error("Error: simulation state is readonly");
-        run_start = sim->t();
+        run_start = creativity->sim->t();
         run_end = run_start + periods;
         stopped = false;
     };
@@ -133,7 +127,7 @@ int main(int argc, char *argv[1]) {
 
     std::mutex storage_mutex;
 
-    GUI gui(storage, storage_mutex, on_setup, on_run, on_stop, on_resume, on_step, on_quit);
+    GUI gui(creativity, on_setup, on_run, on_stop, on_resume, on_step, on_quit);
 
     try {
         gui.start(argc, argv);
@@ -143,13 +137,10 @@ int main(int argc, char *argv[1]) {
         throw;
     }
 
-    auto &rng = eris::Random::rng();
-
     while (!setup) {
         gui.waitEvents();
         if (quit) return 0;
     }
-
     if (load_from_file) {
         // We're in read-only mode, which means we do nothing but wait for the GUI to quit.
         gui.initialized();
@@ -160,45 +151,11 @@ int main(int argc, char *argv[1]) {
         return 0;
     }
 
-    // Calculate the boundaries from the density.  Total hypervolume is (2*BOUNDARY)^(dimensions),
-    // so to achieve `density` we need BOUNDARY set as the solution to:
-    //     density = readers / ((2*BOUNDARY)^(dimensions))
-    // thus:
-    BOUNDARY = 0.5 *
-        (dimensions == 1 ? num_readers/density :
-         dimensions == 2 ? std::sqrt(num_readers/density) :
-         dimensions == 3 ? std::cbrt(num_readers/density) :
-         std::pow(num_readers/density, 1.0/dimensions));
+    creativity->setup();
+    auto sim = creativity->sim;
 
-    std::uniform_real_distribution<double> unif_pmb{-BOUNDARY, BOUNDARY};
-
-    ERIS_DBG("Setting up readers");
-    VectorXd demand_beta{8}; demand_beta << 0, -2, 0.5, -0.1, 0, 0, 0, 0;
-    MatrixXd demand_V = MatrixXd::Identity(8, 8);
-    double demand_s2 = 10, demand_n = 1;
-    VectorXd profit_beta{5}; profit_beta << 0, 1, 0, 0, 0;
-    MatrixXd profit_V = MatrixXd::Identity(5, 5);
-    double profit_s2 = 10, profit_n = 1;
-    VectorXd quality_beta{7}; quality_beta << 5, -1, 1, 0, 0, 0, 0.1;
-    MatrixXd quality_V = MatrixXd::Identity(7, 7);
-    double quality_s2 = 10, quality_n = 1;
-    for (auto i = 0UL; i < num_readers; i++) {
-        auto r = sim->create<Reader>(Position{unif_pmb(rng), unif_pmb(rng)},
-                Position{-BOUNDARY,-BOUNDARY}, Position{BOUNDARY, BOUNDARY},
-                belief::Demand{2, demand_beta, demand_s2, demand_V, demand_n},
-                belief::Profit{2, profit_beta, profit_s2, profit_V, profit_n},
-                belief::Quality{quality_beta, quality_s2, quality_V, quality_n},
-                cost_fixed, cost_unit, income
-                );
-        r->writer_book_sd = book_sd;
-    }
-    ERIS_DBG("Done with readers");
-
-
-    {
-        std::unique_lock<std::mutex> lock(storage_mutex);
-        storage->emplace_back(sim);
-    }
+    // Copy the initial state into the storage object
+    creativity->storage().first->emplace_back(sim);
 
     // Tell the GUI we're done with initialization
     gui.initialized();
@@ -232,7 +189,7 @@ int main(int argc, char *argv[1]) {
             {
                 std::unique_lock<std::mutex> lock(storage_mutex);
                 ERIS_DBG("Adding simulation state to storage...");
-                storage->emplace_back(sim);
+                creativity->storage().first->emplace_back(sim);
                 ERIS_DBG("done");
             }
 

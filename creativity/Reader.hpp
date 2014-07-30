@@ -16,6 +16,7 @@ namespace creativity {
 
 class Book; // forward declaration
 class BookMarket;
+class Creativity;
 
 /** A Reader is an agent that both consumes previously unread books and potentially writes new books
  * and sells copies of those books.  The Reader's utility is determined by books read and an outside
@@ -127,15 +128,12 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
     public:
         Reader() = delete; ///< Not default constructible
 
-        /** Constructor takes the reader position and the (wrapping) positional boundaries, new
-         * belief objects for demand, profit, and quality, and the fixed and per-unit costs of
-         * copies.
+        /** Constructor takes the reader position and various reader properties.
          *
          * ProfitStream beliefs start off with a highly non-informative prior for age=1.
          *
+         * \param creativity the Creativity object owning the simulation this reader is created in
          * \param pos the initial position of the reader
-         * \param b1 a vertex of the wrapping boundary box for the reader
-         * \param b2 the vertex opposite `b1` of the wrapping boundary box for the reader
          * \param demand a per-period demand belief object
          * \param profit a lifetime profit belief object
          * \param quality a quality belief object
@@ -144,7 +142,8 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * \param income the per-period income of the agent
          */
         Reader(
-                const eris::Position &pos, const eris::Position &b1, const eris::Position &b2,
+                std::shared_ptr<Creativity> creativity,
+                const eris::Position &pos,
                 belief::Demand &&demand, belief::Profit &&profit, belief::Quality &&quality,
                 double cFixed, double cUnit, double income
               );
@@ -457,6 +456,8 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         void intraReset() override;
 
     protected:
+        /// The Creativity object that owns the simulation this reader belongs to
+        std::shared_ptr<Creativity> creativity_;
         belief::Profit profit_belief_, ///< Belief about lifetime book profits
             profit_belief_extrap_; ///< Beliefs about lifetime book profits using profit stream expectations
         belief::Demand demand_belief_; ///< Belief about per-period demand
