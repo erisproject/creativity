@@ -1,17 +1,7 @@
 #include "creativity/Creativity.hpp"
 #include "creativity/gui/GUI.hpp"
-#include "creativity/Reader.hpp"
-#include "creativity/Book.hpp"
-#include "creativity/belief/Demand.hpp"
-#include "creativity/belief/Profit.hpp"
-#include "creativity/belief/ProfitStream.hpp"
-#include "creativity/belief/Quality.hpp"
-#include "creativity/state/State.hpp"
-#include "creativity/state/MemoryStorage.hpp"
-#include "creativity/state/FileStorage.hpp"
 #include <eris/Simulation.hpp>
 #include <eris/Random.hpp>
-#include <eris/intraopt/FixedIncome.hpp>
 #include <functional>
 #include <iostream>
 #include <iomanip>
