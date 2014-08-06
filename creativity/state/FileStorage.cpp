@@ -39,7 +39,7 @@ void FileStorage::throwParseError(const std::string& message) const {
     decltype(f_.tellg()) pos;
     try { pos = f_.tellg(); }
     catch (std::ios_base::failure &f) { pos = -1; } // -1 is also be returned by .tellg() for pre-existing failures
-    throwParseError("Parsing file failed [pos=" + (pos == -1 ? std::string{"(error)"} : std::to_string(pos)) + "]: " + message);
+    throw ParseError("Parsing file failed [pos=" + (pos == -1 ? std::string{"(error)"} : std::to_string(pos)) + "]: " + message);
 }
 
 inline bool file_exists(const std::string &name) {
