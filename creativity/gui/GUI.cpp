@@ -47,7 +47,7 @@ void GUI::start(int argc, char *argv[]) {
     if (gui_thread_.joinable())
         throw std::runtime_error("GUI thread can only be started once!");
 
-    app_ = Gtk::Application::create(argc, argv, "ca.imaginary.test.cairo-drawing",
+    app_ = Gtk::Application::create(argc, argv, "ca.imaginary.eris.creativity",
             Gio::APPLICATION_NON_UNIQUE);
     builder_ = Gtk::Builder::create();
 
