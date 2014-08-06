@@ -111,8 +111,6 @@ void FileStorage::push_back(std::shared_ptr<const State> state) {
 
     addStateLocation(location);
 
-    state_pos_.push_back(location);
-
     if (states_.size() < state_pos_.size()) states_.resize(state_pos_.size());
     states_[state_pos_.size()-1] = state;
 
@@ -164,9 +162,6 @@ void FileStorage::writeEmptyHeader() {
     char zeros[8 * (HEADER::states + 1)] = {0};
     f_.write(zeros, sizeof zeros);
 
-    // DEBUG:
-    f_.flush();
-
     if (f_.tellp() != HEADER::size) {
         // If this exception occurs, something in the above sequence is wrong.
         throw std::runtime_error("Header writing failed: header size != " + std::to_string(HEADER::size) + " bytes");
@@ -192,7 +187,7 @@ void FileStorage::addStateLocation(std::streampos location) {
 
     f_.seekp(HEADER::pos::states);
     write_u32((curr_states + 1));
-    curr_states++;
+    state_pos_.push_back(location);
 }
 
 void FileStorage::createContinuationBlock() {
@@ -200,6 +195,10 @@ void FileStorage::createContinuationBlock() {
     std::streampos location = f_.tellp();
     char blank[CBLOCK::size] = {0};
     f_.write(blank, CBLOCK::size);
+    // Write the new block location either in the header (if this is the first cblock) or in the
+    // previous cblock
+    f_.seekp(cont_pos_.empty() ? HEADER::pos::continuation : (int64_t) cont_pos_.back() + CBLOCK::next_cblock);
+    write_i64(location);
     cont_pos_.push_back(location);
 }
 
@@ -275,7 +274,7 @@ void FileStorage::parseMetadata() {
         f_.read(cblock, sizeof cblock);
 
         uint32_t block_locations = std::min(remaining, CBLOCK::states);
-        parseStateLocations(block[0], block_locations, file_size);
+        parseStateLocations(cblock[0], block_locations, file_size);
 
         remaining -= block_locations;
     }
@@ -293,7 +292,7 @@ void FileStorage::parseStateLocations(const char &from, const size_t count, cons
     for (size_t i = 0; i < to; i += 8) {
         auto loc = parse_value<std::streamoff>(data[i]);
         if (loc < HEADER::size or (size_t) loc >= end)
-            throwParseError("found invalid state data location in header");
+            throwParseError("found invalid state data location in header: " + std::to_string(loc));
         state_pos_.push_back(loc);
     }
 }

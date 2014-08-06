@@ -253,7 +253,7 @@ class FileStorage : public Storage, private eris::noncopyable {
          * Creates a new continuation block (updating the previous one) if necessary.
          *
          * After updating (or creating) the continuation block(s), this also updates the header with
-         * the new number of states.
+         * the new number of states, and adds the location to state_pos_.
          */
         void addStateLocation(std::streampos location);
 
@@ -263,6 +263,9 @@ class FileStorage : public Storage, private eris::noncopyable {
          *
          * This method should only be called when the current last continuation block (or the states
          * in the header) is full.
+         *
+         * The file output position is not guaranteed to be at any particular position after this
+         * call.
          */
         void createContinuationBlock();
 
