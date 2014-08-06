@@ -61,6 +61,12 @@ class Storage {
         template<class... Args>
         void emplace_back(Args&&... args);
 
+        /** Flushes changes, if the underlying storage object has such a concept.  The default
+         * implementation does nothing.  If this is not called at the end of a program, written data
+         * may not actually be saved to the underlying storage system.
+         */
+        virtual void flush();
+
         /// Default destructor
         virtual ~Storage() = default;
 

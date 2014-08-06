@@ -229,5 +229,8 @@ int main(int argc, char *argv[1]) {
         // user waits would be included in the calculation).
         last_progress = std::chrono::high_resolution_clock::now();
     }
+
+    creativity->storage().first->flush();
+
     std::cerr << "running off the bottom of main\n";
 }

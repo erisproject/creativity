@@ -85,7 +85,7 @@ class FileStorage : public Storage, private eris::noncopyable {
          *
          * \sa std::basic_ostream::flush
          */
-        void flush();
+        virtual void flush() override;
 
     protected:
         /** The file buffer object. Mutable because we need to read from it in const methods. */
