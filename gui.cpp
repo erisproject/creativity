@@ -114,8 +114,6 @@ int main(int argc, char *argv[1]) {
     auto on_resume = [&]() { stopped = false; };
     auto on_quit = [&]() { quit = true; };
 
-    std::mutex storage_mutex;
-
     GUI gui(creativity, on_setup, on_run, on_stop, on_resume, on_step, on_quit);
 
     try {
@@ -176,7 +174,6 @@ int main(int argc, char *argv[1]) {
             ERIS_DBG("done running");
 
             {
-                std::unique_lock<std::mutex> lock(storage_mutex);
                 ERIS_DBG("Adding simulation state to storage...");
                 creativity->storage().first->emplace_back(sim);
                 ERIS_DBG("done");
