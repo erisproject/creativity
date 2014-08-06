@@ -246,12 +246,12 @@ class GUI : eris::noncopyable {
         /** The GTK::Application.  Created in start(); should only be touched after startup by the
          * GUI thread.
          */
-        decltype(Gtk::Application::create()) app_;
+        Glib::RefPtr<Gtk::Application> app_;
 
         /** The Gtk::Builder that creates the GUI from the glade file.  Should only be touched after
          * startup by the GUI thread.
          */
-        decltype(Gtk::Builder::create()) builder_;
+        Glib::RefPtr<Gtk::Builder> builder_;
 
         /** The main window. */
         std::shared_ptr<Gtk::Window> main_window_;
