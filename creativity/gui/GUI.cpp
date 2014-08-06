@@ -48,7 +48,7 @@ void GUI::start(int argc, char *argv[]) {
         throw std::runtime_error("GUI thread can only be started once!");
 
     app_ = Gtk::Application::create(argc, argv, "ca.imaginary.eris.creativity",
-            Gio::APPLICATION_NON_UNIQUE);
+            Gio::APPLICATION_NON_UNIQUE | Gio::APPLICATION_HANDLES_OPEN);
     builder_ = Gtk::Builder::create();
 
     std::list<std::string> datadirs;
@@ -134,6 +134,14 @@ void GUI::thr_run() {
             load_ = "";
         }
     });
+
+    // Set up a signal handler that is invoked if the application is started up with a filename
+    app_->signal_open().connect_notify([this](const std::vector<Glib::RefPtr<Gio::File>> &files, const Glib::ustring&) -> void {
+        if (files.size() != 1) throw std::runtime_error("Unable to open multiple files!");
+        load_ = files[0]->get_path();
+        app_->add_window(*main_window_);
+        main_window_->show_all();
+    }, true);
 
     // Clicking the save file chooser likewise fires the save radio, then also starts up the file
     // chooser dialog.
@@ -280,7 +288,8 @@ void GUI::thr_run() {
             thread_running_ = true;
             lock.unlock();
             cv_.notify_all();
-            });
+            if (not load_.empty()) loadSim();
+    });
 
     app_->run(*main_window_);
 
