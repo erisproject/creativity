@@ -39,6 +39,7 @@ int main(int argc, char *argv[1]) {
     auto on_setup = [&](GUI::Parameter p) { // Setup
         switch (p.param) {
             case GUI::ParamType::finished:
+                creativity->setup();
                 setup = true;
                 break;
             case GUI::ParamType::begin:
@@ -138,7 +139,6 @@ int main(int argc, char *argv[1]) {
         return 0;
     }
 
-    creativity->setup();
     auto sim = creativity->sim;
 
     // Copy the initial state into the storage object
