@@ -123,6 +123,8 @@ InfoWindow::InfoWindow(std::shared_ptr<const State> state, std::shared_ptr<Gtk::
     std::vector<std::string> p_vars{{"constant", "quality<sup>D</sup>", "I(firstBook)", "previousBooks", "marketBooks"}};
     for (size_t i = 0; i < p_vars.size(); i++)
         DATA_ROW(grid_profit, "p_" + std::to_string(i), BETA "[" + p_vars[i] + "]");
+    DATA_ROW(grid_profit, "_p_draws", "# successful draws");
+    DATA_ROW(grid_profit, "_p_discards", "# discarded draws");
 
     NEW_TAB_GRID(grid_demand, beliefs, "Demand");
     COMMENT_ROW(grid_demand, "Note: this regression is for single-period demand");
@@ -131,6 +133,8 @@ InfoWindow::InfoWindow(std::shared_ptr<const State> state, std::shared_ptr<Gtk::
     std::vector<std::string> d_vars{{"constant", "price<sup>D</sup>", "quality<sup>D</sup>", "prevSales", "age", "I(onlyBook)", "otherBooks", "marketBooks"}};
     for (size_t i = 0; i < d_vars.size(); i++)
         DATA_ROW(grid_demand, "d_" + std::to_string(i), BETA "[" + d_vars[i] + "]");
+    DATA_ROW(grid_demand, "_d_draws", "# successful draws");
+    DATA_ROW(grid_demand, "_d_discards", "# discarded draws");
 
     NEW_TAB_GRID(grid_pstream, beliefs, "Profit Stream");
 
@@ -246,6 +250,11 @@ void InfoWindow::refresh(std::shared_ptr<const State> state) {
         UPDATE_LIN_RB("p_", profit);
         UPDATE_LIN_RB("d_", demand);
         UPDATE_LIN_RB("pe_", profit_extrap);
+
+        updateValue("_p_draws", r.profit.draw_success_cumulative);
+        updateValue("_p_discards", r.profit.draw_discards_cumulative);
+        updateValue("_d_draws", r.demand.draw_success_cumulative);
+        updateValue("_d_discards", r.demand.draw_discards_cumulative);
 
         for (unsigned long a : Reader::profit_stream_ages) {
             std::string code_prefix = "ps" + std::to_string(a) + "_";
