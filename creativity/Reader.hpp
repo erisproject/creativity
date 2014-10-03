@@ -213,7 +213,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * the calculated overall value is less than 0, 0 is returned.
          *
          * If the book is already in the reader's library, this returns the realized utility.
-         * Otherwise, this method returns an estimate.  See quality() for details.
+         * Otherwise, this method returns an estimate by calling quality().
          *
          * Note that this method isn't enough to evaluate the utility of adding an additional book:
          * calling code must also ensure that the book being added is not already contained in the
@@ -229,8 +229,8 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         /** Returns the quality of a given book.  If the given book is already in the user's
          * library, this returns the realized quality value determined when the book was added;
          * otherwise it returns a predicted quality value based on the reader's quality prior.  This
-         * quantity must be non-stochastic (i.e.  calling it multiple times with the same library
-         * and prior should return the same value).
+         * quantity may be stochastic for the initial call, but subsequent calls will return the same
+         * predicted value until the quality belief is updated.
          */
         virtual double quality(eris::SharedMember<Book> b) const;
 
@@ -518,6 +518,9 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         std::vector<double> pen_poly_ = Reader::default_penalty_polynomial;
         /// Map of books owned to realized quality of those books:
         std::unordered_map<eris::SharedMember<Book>, double> library_;
+        /** Map of books to quality predictions (which are cached until the library/quality belief
+         * changes). */
+        mutable std::unordered_map<eris::SharedMember<Book>, double> quality_predictions_;
         /// Books purchased in the just-finished period
         std::unordered_set<eris::SharedMember<Book>> library_new_;
         /// Set of books that are still on the market

@@ -265,8 +265,16 @@ double Reader::quality(SharedMember<Book> b) const {
     if (found != library_.end())
         return found->second;
 
+    found = quality_predictions_.find(b);
+    if (found != quality_predictions_.end())
+        return found->second;
+
     // Otherwise we need to use the quality belief to predict the quality
-    return quality_belief_.predict(b);
+    auto &q_b = const_cast<belief::Quality&>(quality_belief_);
+    double q_hat = q_b.predict(b);
+    quality_predictions_.emplace(b, q_hat);
+
+    return q_hat;
 }
 
 double Reader::penalty(unsigned long n) const {
