@@ -52,6 +52,13 @@ file(GLOB_RECURSE cr_headers creativity/*.hpp)
 
 # Set up compilation flags; put everything before CMAKE_CXX_FLAGS so that these can be overridden
 set(CMAKE_CXX_FLAGS "-std=c++11 -march=native -O3 -Wall -Wextra ${CMAKE_CXX_FLAGS}")
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    # Increasing the inline threshold to 1000 makes a big difference for mt19937 RNG generation
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mllvm -inline-threshold=10000")
+endif()
+
+message("CMAKE_CXX_FLAGS = ${CMAKE_CXX_FLAGS}")
+
 # Force on ERIS_DEBUG and -O0 for a Debug build
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -DERIS_DEBUG")
 
