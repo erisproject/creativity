@@ -43,6 +43,9 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
             SQUARE //!< A small square
         };
 
+        /// Typedef of Colour to the appropriate ref-pointed Cairo class
+        using Colour = Cairo::RefPtr<Cairo::SolidPattern>;
+
         /** Draws a point.  Drawn points have a fixed size that does not depend on the drawing area
          * size.
          * \param cr the Cairo::Context used for drawing
@@ -50,15 +53,12 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
          * \param x the point x coordinate, in graph space
          * \param y the point y coordinate, in graph space
          * \param type the type of point to draw
-         * \param red the red component (0-1) of the colour
-         * \param green the green component (0-1) of the colour
-         * \param blue the blue component (0-1) of the colour
-         * \param alpha the alpha component (0-1) of the colour: 0 is transparent, 1 is opaque.
+         * \param colour the colour (and alpha channel) of the point
          * \param scale the scale of the point.  1 (the default) means default size.
          * \param virt whether this is a virtual (i.e. wrapping) point. Internal use only.
          */
         void drawPoint(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans, double x, double y,
-                const PointType &type, double red, double green, double blue, double alpha, double scale = 1.0, bool virt = false);
+                const PointType &type, const Colour &colour, double scale = 1.0, bool virt = false);
 
         /** Draws a circle.  Circles, however, are in graph space, not drawing area space, so
          * this is actually going to end up drawing ovals (unless the drawing area happens
@@ -68,14 +68,10 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
          * \param cx the center x coordinate, in graph space
          * \param cy the center y coordinate, in graph space
          * \param r the radius of the circle, in graph space
-         * \param red the red component (0-1) of the colour
-         * \param green the green component (0-1) of the colour
-         * \param blue the blue component (0-1) of the colour
-         * \param alpha the alpha component (0-1) of the colour: 0 is transparent, 1 is opaque.
+         * \param colour the colour (and possibly alpha value) of the circle.
          */
         void drawCircle(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans,
-                double cx, double cy, double r,
-                double red, double green, double blue, double alpha);
+                double cx, double cy, double r, const Colour &colour);
 
         /// Spacing of axes tick marks.  2.0 means ticks at 2, 4, 6, etc.
         double tick_space = 1.0;
@@ -83,6 +79,35 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
         double tick_size = 6.0;
         /// Every `tick_big`th tick will be triple-sized
         int tick_big = 5;
+
+        /** The opacity of "dead" (i.e. off-market) books.  A value of 0 doesn't draw dead books at
+         * all, a value of 1 draws them entirely; values in-between draws them semi-transparently.
+         */
+
+        /** Struct containing the colours for various graph components.  To hide any particular
+         * element, replace its colour with one with an alpha value of 0.
+         */
+        struct {
+            Colour
+                /// The colour of on-market books
+                book_live = Cairo::SolidPattern::create_rgb(0, .4, 1),
+                /// The colour of off-market books
+                book_dead = Cairo::SolidPattern::create_rgb(0.5, 0.5, 0.5),
+                /// Authorship lines from author to book for on-market books
+                author_live = Cairo::SolidPattern::create_rgba(0.5, 0.2, 0.5, 0.5),
+                /// Authorship lines from author to book for off-market books
+                author_dead = Cairo::SolidPattern::create_rgba(0.75, 0.5, 0.75, 0.25),
+                /// The colour of lines from readers to newly purchased books
+                reading = Cairo::SolidPattern::create_rgba(1, 0.55, 0, 0.5),
+                /// The colour of agents (readers/authors)
+                reader = Cairo::SolidPattern::create_rgb(1, 0, 0),
+                /// The colour of the utility circle (for readers with utility > 1000)
+                utility = Cairo::SolidPattern::create_rgba(.133, .545, .133, 0.5),
+                /// The colour of the graph axes and tick marks
+                axes = Cairo::SolidPattern::create_rgb(0, 0, 0),
+                /// The colour of the background
+                background = Cairo::SolidPattern::create_rgb(1, 1, 1);
+        } colours;
 
         /** The radius of markers representing points, in pixels.  For example, a value of 5 means
          * that CROSS points will have horizontal and vertical lines extending a distance of 5,
@@ -104,6 +129,14 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
         // Sets up one or more (wrapping) lines between two points, but does not actually draw it
         // with stroke().
         void drawWrappingLine(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans, const eris::Position &from, const eris::Position &to);
+
+        bool invisible(const Colour &colour) const;
 };
+
+inline bool GraphArea::invisible(const Colour &colour) const {
+    double ignore, alpha;
+    colour->get_rgba(ignore, ignore, ignore, alpha);
+    return alpha == 0;
+}
 
 } }
