@@ -50,7 +50,7 @@ inline bool file_exists(const std::string &name) {
 FileStorage::FileStorage(const std::string &filename, MODE mode) {
     f_.exceptions(f_.failbit | f_.badbit);
 
-    bool parse;
+    bool parse = true;
     switch (mode) {
         case MODE::READONLY:
             f_.open(filename, open_readonly);
@@ -399,12 +399,16 @@ FileStorage::belief_data FileStorage::readBelief() const {
     auto location = read_i64();
     auto return_loc = f_.tellg();
     bool seek_back = false;
+    belief_data belief;
     /// Handle magic values:
     if (location == 0) {
-        return { .K = 0 };
+        belief.K = 0;
+        return belief;
     }
     else if (location < 0 and location >= -100) {
-        return { .K = (uint32_t) -location, .noninformative = true };
+        belief.K = (uint32_t) -location;
+        belief.noninformative = true;
+        return belief;
     }
     else if (location == -512) {
         // Magic value for "immediately follows".  We need a special value because
@@ -464,35 +468,34 @@ FileStorage::belief_data FileStorage::readBelief() const {
 
     // The cache record is set, now extract the values from the record block.
 
-    belief_data b{
-        .K = k,
-        .beta = VectorXd(k),
-        .s2 = 0.0,
-        .n = 0.0,
-        .V = MatrixXd(k, k)
-    };
+    belief.K = k;
+    belief.noninformative = false;
+    belief.beta = VectorXd(k);
+    belief.s2 = 0.0;
+    belief.n = 0.0;
+    belief.V = MatrixXd(k, k);
 
     // First K elements are beta values
     uint32_t offset = 0;
     for (; offset < k; ++offset)
-        b.beta[offset] = parse_value<double>(record[offset]);
+        belief.beta[offset] = parse_value<double>(record[offset]);
 
     // Then s2 and n:
-    b.s2 = parse_value<double>(record[offset++]);
-    b.n = parse_value<double>(record[offset++]);
+    belief.s2 = parse_value<double>(record[offset++]);
+    belief.n = parse_value<double>(record[offset++]);
 
     // The last K*(K+1)/2 are the V values
     for (unsigned int r = 0; r < k; r++) {
         for (unsigned int c = r; c < k; c++) {
             double cov = parse_value<double>(record[offset++]);
-            b.V(r,c) = cov;
-            b.V(c,r) = cov;
+            belief.V(r,c) = cov;
+            belief.V(c,r) = cov;
         }
     }
 
     if (seek_back) f_.seekg(return_loc);
 
-    return b;
+    return belief;
 }
 
 void FileStorage::writeState(const State &state) {
