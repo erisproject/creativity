@@ -25,7 +25,7 @@ GUI::GUI(std::shared_ptr<Creativity> creativity,
         std::function<void()> step,
         std::function<void()> quit)
     :
-        creativity_{creativity},
+        creativity_{std::move(creativity)},
         on_setup_{std::move(setup)},
         on_run_{std::move(run)},
         on_stop_{std::move(stop)},
