@@ -51,11 +51,13 @@ class Quality : public Linear {
         /// Returns `parameters()`
         virtual unsigned int fixedModelSize() const override;
 
-        /** Given a book, this returns \f$\widehat q_b\f$, the expected quality of the book.
+        /** Given a book, this returns \f$\widehat q_b\f$, the predicted quality of the book.
          *
          * \param book the book being considered.
          */
-        double predict(const Book &book) const;
+        double predict(const Book &book);
+
+        using Linear::predict;
 
         /** Uses the current object's priors to generate a new object whose parameters are the
          * posteriors of this object after incorporating new data.
@@ -86,7 +88,7 @@ class Quality : public Linear {
         }
     private:
         // Initialize a Quality from a Linear<7>
-        Quality(Linear &&base) : Linear{base} {}
+        Quality(Linear &&base) : Linear(std::move(base)) {}
 };
 
 }}

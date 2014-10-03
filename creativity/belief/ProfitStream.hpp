@@ -25,8 +25,7 @@ namespace creativity { namespace belief {
  * point, a book of age \f$j\f$ contributes one data point to each model with \f$K \leq j\f$: one
  * data point for each period of its life.
  *
- * This restriction with a natural conjugate prior is used for the purposes of updating the beliefs
- * via Bayesian econometrics.
+ * \f$\beta\f$ values are not restricted.
  */
 class ProfitStream : public Linear {
     public:
@@ -64,7 +63,9 @@ class ProfitStream : public Linear {
          * \param book the book, which should have an age of at least K (otherwise the prediction
          * will be wrong as 0 will be used for revenue in \f$(age, K]\f$).
          */
-        double predict(eris::SharedMember<Book> book) const;
+        double predict(eris::SharedMember<Book> book);
+
+        using Linear::predict;
 
         /** Uses the current object's priors to generate a new object whose parameters are the
          * posteriors of this object after incorporating new data.

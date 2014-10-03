@@ -1,7 +1,9 @@
 #pragma once
-#include "creativity/belief/Linear.hpp"
+#include "creativity/belief/LinearRestricted.hpp"
 #include <eris/algorithms.hpp>
 #include <eris/SharedMember.hpp>
+
+#include <eris/debug.hpp>
 
 namespace creativity {
 class Book;
@@ -36,7 +38,7 @@ namespace belief {
  * These constraints are combined with a natural conjugate prior for the purposes of updating the
  * beliefs via Bayesian econometrics.
  */
-class Demand : public Linear {
+class Demand : public LinearRestricted {
     public:
         /** Default constructor: note that default constructed objects are not valid models.
          * \sa belief::Linear::Linear()
@@ -52,13 +54,21 @@ class Demand : public Linear {
          */
         template <typename ...Args>
         Demand(unsigned int D, Args &&...args)
-        : Linear{std::forward<Args>(args)...}, D_{D}
-        {}
+        : LinearRestricted(std::forward<Args>(args)...), D_{D}
+        {
+            ERIS_DBG("wtf!");
+            ERIS_DBGVAR(K_);
+            // Add restrictions:
+            upperBounds()[1] = 0; // beta_price <= 0 (higher price <-> lower quantity)
+            upperBounds()[6] = 0; // more competition <-> lower demand
+            lowerBounds()[2] = 0; // higher quality <-> more demand
+            ERIS_DBG("wtf?");
+        }
 
         /// Returns the number of parameters of this model
         static unsigned int parameters() { return 8; }
 
-        /// This model has 8 parameters
+        /// This model always has exactly 8 parameters
         virtual unsigned int fixedModelSize() const override;
 
         /** Given a set of model parameters, this returns an expected value \f$Q_b\f$, the number of sales.
@@ -72,7 +82,9 @@ class Demand : public Linear {
          *
          * \throws std::domain_error if `P < 0` or `q < 0`.
          */
-        double predict(double P, double q, unsigned long S, unsigned long otherBooks, unsigned long marketBooks) const;
+        double predict(double P, double q, unsigned long S, unsigned long otherBooks, unsigned long marketBooks);
+
+        using LinearRestricted::predict;
 
         /** Given a set of model parameters (other than \f$P_b\f$) and an optional per-unit cost
          * (defaulting to 0), this returns the \f$P_b\f$ value that maximizes total profits:
@@ -124,7 +136,7 @@ class Demand : public Linear {
          * (i.e. when `c > 0`).
          * \sa eris::single_peak_search for the numerical algorithm used.
          */
-        std::pair<double, double> argmaxP(double q, unsigned long S, unsigned long otherBooks, unsigned long marketBooks, double c = 0.0) const;
+        std::pair<double, double> argmaxP(double q, unsigned long S, unsigned long otherBooks, unsigned long marketBooks, double c = 0.0);
 
         /** The maximum P that will be considered for argmaxP() when called with `c > 0`.  Only
          * needs to be adjusted if the optimal value of P could potential exceed the default of 10,000.
@@ -149,7 +161,7 @@ class Demand : public Linear {
         unsigned int D_;
 
         // Initialize a Demand from a Linear object of the correct size
-        Demand(unsigned int D, Linear &&base) : Linear{base}, D_{D} {}
+        Demand(unsigned int D, Linear &&base) : LinearRestricted(std::move(base)), D_{D} {}
 };
 
 }}

@@ -1,5 +1,5 @@
 #pragma once
-#include "creativity/belief/Linear.hpp"
+#include "creativity/belief/LinearRestricted.hpp"
 #include "creativity/Book.hpp"
 
 namespace creativity { namespace belief {
@@ -28,7 +28,7 @@ namespace creativity { namespace belief {
  * These constraints are combined with a natural conjugate prior for the purposes of updating the
  * beliefs via Bayesian econometrics.
  */
-class Profit : public Linear {
+class Profit : public LinearRestricted {
     public:
         /** Default constructor: note that default constructed objects are not valid models.
          * \sa belief::Linear::Linear()
@@ -44,7 +44,7 @@ class Profit : public Linear {
          */
         template <typename ...Args>
         Profit(unsigned int D, Args &&...args)
-        : Linear{std::forward<Args>(args)...}, D_{D}
+        : LinearRestricted{std::forward<Args>(args)...}, D_{D}
         {}
 
         /// Returns the number of parameters of this model (5)
@@ -61,7 +61,9 @@ class Profit : public Linear {
          * parameter also determines the `firstBook` dummy (`= 1` iff `previousBooks == 0`).
          * \param marketBooks the number of books on the market last period
          */
-        double predict(double q, unsigned long previousBooks, unsigned long marketBooks) const;
+        double predict(double q, unsigned long previousBooks, unsigned long marketBooks);
+
+        using LinearRestricted::predict;
 
         /** Given `previousBooks` and `marketBooks` parameters, a function \f$q(\ell)\f$ that returns
          * expected quality for a given value \f$\ell\f$, and \f$\ell_{max}\f$, this numerically
@@ -92,7 +94,7 @@ class Profit : public Linear {
                 const std::function<double(const double &)> q,
                 unsigned long previousBooks, unsigned long marketBooks,
                 double l_max
-                ) const;
+                );
 
         /** Uses the current object's priors to generate a new object whose parameters are the
          * posteriors of this object after incorporating new data.
@@ -111,7 +113,7 @@ class Profit : public Linear {
     private:
         // Initialize a Profit from a Linear<>
         Profit(unsigned int D, Linear &&base)
-            : Linear{base}, D_{D} {}
+            : LinearRestricted(std::move(base)), D_{D} {}
 
         unsigned int D_;
 

@@ -1,5 +1,6 @@
 #include "creativity/belief/Linear.hpp"
 #include <eris/debug.hpp>
+#include <eris/Random.hpp>
 #include <Eigen/QR>
 
 namespace creativity { namespace belief {
@@ -13,9 +14,10 @@ Linear::Linear(
         double s2,
         const Ref<const MatrixXd> &V,
         double n,
-        std::shared_ptr<MatrixXd> V_inv
+        std::shared_ptr<MatrixXd> V_inv,
+        std::shared_ptr<MatrixXd> V_chol_L
         )
-    : beta_{beta}, s2_{s2}, V_{V}, V_inv_{std::move(V_inv)}, n_{n}, K_(beta_.rows())
+    : beta_{beta}, s2_{s2}, V_{V}, V_inv_{std::move(V_inv)}, V_chol_L_{std::move(V_chol_L)}, n_{n}, K_(beta_.rows())
 {
     // Check that the given matrices conform
     auto k = K();
@@ -24,6 +26,8 @@ Linear::Linear(
     if (k != V_.rows()) throw std::logic_error("Linear requires beta and V of same number of rows");
     if (V_inv_ and (V_inv_->rows() != V_inv_->cols() or V_inv_->rows() != k))
         throw std::logic_error("Linear constructed with invalid V_inv");
+    if (V_chol_L_ and (V_chol_L_->rows() != V_chol_L_->cols() or V_chol_L_->rows() != k))
+        throw std::logic_error("Linear constructed with invalid V_chol_L");
     auto fixed = fixedModelSize();
     if (fixed and k != fixed) throw std::logic_error("Linear model constructed with incorrect number of model parameters");
 }
@@ -51,13 +55,62 @@ const MatrixXd& Linear::Vinv() const {
         V_inv_ = std::make_shared<MatrixXd>(V_.colPivHouseholderQr().inverse());
     return *V_inv_;
 }
+const MatrixXd& Linear::VcholL() const {
+    NO_EMPTY_MODEL;
+    if (not V_chol_L_)
+        V_chol_L_ = std::make_shared<MatrixXd>(V_.llt().matrixL());
+    return *V_chol_L_;
+}
 
 const bool& Linear::noninformative() const { NO_EMPTY_MODEL; return noninformative_; }
 
-double Linear::predict(const Ref<const RowVectorXd> &Xi) const {
+double Linear::predict(const Ref<const RowVectorXd> &Xi) {
     NO_EMPTY_MODEL;
-    // FIXME: this is wrong; prediction should be using some sort of sampling
     return Xi * beta_;
+}
+
+const VectorXd& Linear::draw() {
+    NO_EMPTY_MODEL;
+
+    if (last_draw_.size() != K_ + 1) last_draw_.resize(K_ + 1);
+    auto &rng = eris::Random::rng();
+
+    // beta is distributed as t(beta, s^2*V, n)
+    
+    // That can be generated as beta + y*sqrt(n/q) where y ~ N(0, s^2*V), and q ~ chisq(n)
+
+    // To generate y ~ N(0, SIGMA), generate N(0,1) and multiple by L from the cholesky
+    // decomposition of SIGMA, or in other words, s*L where LL'=V (so SIGMA=s^2*V)
+    VectorXd y(K());
+    std::normal_distribution<double> stdnorm;
+    for (unsigned int i = 0; i < K_; i++) y[i] = stdnorm(rng);
+
+    std::chi_squared_distribution<double> rchisqn(n_);
+
+    y = sqrt(s2_) * sqrt(n_ / rchisqn(rng)) * VcholL() * y;
+
+    for (unsigned int i = 0; i < K_; i++) last_draw_[i] = y[i];
+
+    // h has distribution Gamma(n/2, 2/(n*s^2)), and s^2 is the inverse of h:
+    last_draw_[K_] = 1.0 / (std::gamma_distribution<double>(n_/2, 2/(s2_*n_))(rng));
+
+    return last_draw_;
+}
+
+const VectorXd& Linear::lastDraw() const {
+    return last_draw_;
+}
+
+void Linear::discard(unsigned int) {
+    NO_EMPTY_MODEL;
+    // Default implementation is a no-op since the default draw() distributions are already
+    // independent.
+}
+
+void Linear::discardForce(unsigned int burn) {
+    NO_EMPTY_MODEL;
+    for (unsigned int i = 0; i < burn; i++)
+        draw();
 }
 
 std::ostream& operator<<(std::ostream &os, const Linear &b) {

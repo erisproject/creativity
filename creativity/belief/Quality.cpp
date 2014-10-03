@@ -10,7 +10,7 @@ using namespace Eigen;
 
 unsigned int Quality::fixedModelSize() const { return parameters(); }
 
-double Quality::predict(const Book &book) const {
+double Quality::predict(const Book &book) {
     double price = 0;
     if (book.hasMarket())
         price = book.market()->price();

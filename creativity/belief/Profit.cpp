@@ -10,17 +10,17 @@ using namespace Eigen;
 
 unsigned int Profit::fixedModelSize() const { return parameters(); }
 
-double Profit::predict(double q, unsigned long previousBooks, unsigned long marketBooks) const {
+double Profit::predict(double q, unsigned long previousBooks, unsigned long marketBooks) {
     RowVectorXd X(K());
     X << 1, std::copysign(std::pow(q, D_), q), previousBooks == 0 ? 1 : 0, previousBooks, marketBooks;
-    return Linear::predict(X);
+    return predict(X);
 }
 
 double Profit::argmaxL(
         const std::function<double(const double &)> q,
         unsigned long previousBooks, unsigned long marketBooks,
         double l_max
-) const {
+) {
 
     // Get the prediction without the quality term:
     const double Xb_base = predict(0, previousBooks, marketBooks);

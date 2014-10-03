@@ -22,7 +22,7 @@ ProfitStream::ProfitStream(
     : Linear(beta, s2, V, n)
 {}
 
-double ProfitStream::predict(SharedMember<Book> book) const {
+double ProfitStream::predict(SharedMember<Book> book) {
     RowVectorXd X(K());
     for (size_t i = 0; i < K(); i++) {
         X[i] = book->revenue(book->created() + i);
