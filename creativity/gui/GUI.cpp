@@ -246,13 +246,20 @@ void GUI::thr_run() {
     hand_ = Gdk::Cursor::create(main_window_->get_display(), Gdk::HAND1);
 
     motion_handler_ = [this](GdkEventMotion *event) -> bool {
-        rt_point clicked(event->x, event->y);
+        double x = event->x, y = event->y;
+        auto c2g = graph_->canvas_to_graph();
+        c2g.transform_point(x, y);
+        rt_point clicked(x, y);
+
+        double thresh_x = 5.0, thresh_y = -5.0;
+        c2g.transform_distance(thresh_x, thresh_y);
 
         // When the mouse moves over the image, change the cursor to a hand any time the cursor
-        // is within 5 pixels of a graph item (book, reader, etc.)
+        // is within 5 pixels (on both dimensions) of a graph item (book, reader, etc.).
         auto nearest = thr_nearest(clicked);
 
-        if (not nearest.empty() and boost::geometry::distance(nearest[0].first, clicked) <= 5)
+        if (not nearest.empty() and std::fabs(nearest[0].first.get<0>() - x) <= thresh_x
+                and std::fabs(nearest[0].first.get<1>() - y) <= thresh_y)
             main_window_->get_window()->set_cursor(hand_);
         else
             main_window_->get_window()->set_cursor();
@@ -263,12 +270,21 @@ void GUI::thr_run() {
     motion_handler_conn_ = graph_->signal_motion_notify_event().connect(motion_handler_);
 
     graph_->signal_button_press_event().connect([this](GdkEventButton *event) -> bool {
-        rt_point clicked(event->x, event->y);
+        double x = event->x, y = event->y;
+        auto c2g = graph_->canvas_to_graph();
+        c2g.transform_point(x, y);
+        rt_point clicked(x, y);
 
         // Figure out the closest Reader and Book on the canvas relative to where the click happened
         auto nearest = thr_nearest(clicked);
 
-        if (nearest.empty() or boost::geometry::distance(nearest[0].first, clicked) > 5)
+        // If the nearest point isn't within 5 screen pixels (in each dimension) of the click,
+        // ignore the click.
+        double thresh_x = 5.0, thresh_y = -5.0;
+        c2g.transform_distance(thresh_x, thresh_y);
+
+        if (nearest.empty() or std::fabs(nearest[0].first.get<0>() - x) > thresh_x
+                or std::fabs(nearest[0].first.get<1>() - y) > thresh_y)
             return false;
 
         thr_info_dialog(nearest[0].second);
@@ -417,18 +433,16 @@ void GUI::thr_set_state(unsigned long t) {
     if (rtrees_[t].empty()) {
         // Stick all points into an rtree so that we can quickly find the nearest one (needed, in
         // particular, for fast mouseovers).
+        //
+        // Note that we store graph positions, not canvas positions: canvas positions change when
+        // the graph size changes (i.e. the user resizes the window).  Rather than invalidating and
+        // needing to rebuild the rtrees when that happens, we store graph positions and translate
+        // to graph positions as needed in the mouseover/click handlers.
         auto &rt = rtrees_[t];
-        auto g2c = graph_->graph_to_canvas();
-        for (auto &r : state->readers) {
-            double x = r.second.position[0], y = r.second.position[1];
-            g2c.transform_point(x, y);
-            rt.insert(std::make_pair(rt_point{x, y}, r.second.id));
-        }
-        for (auto &b : state->books) {
-            double x = b.second.position[0], y = b.second.position[1];
-            g2c.transform_point(x, y);
-            rt.insert(std::make_pair(rt_point{x, y}, b.second.id));
-        }
+        for (auto &r : state->readers)
+            rt.insert(std::make_pair(rt_point{r.second.position[0], r.second.position[1]}, r.second.id));
+        for (auto &b : state->books)
+            rt.insert(std::make_pair(rt_point{b.second.position[0], b.second.position[1]}, b.second.id));
     }
 
     // Now go through any open reader/book info dialog windows: delete any that have been closed,

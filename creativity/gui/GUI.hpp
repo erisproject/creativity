@@ -444,7 +444,7 @@ class GUI : eris::noncopyable {
         /** Returns the `n` nearest points/eris_id_t pairs to the given rt_point.  May returns fewer
          * than `n` (including 0) if there are not `n` points within `radius` pixels.
          *
-         * \param point the point around which to search
+         * \param point the graph point (not canvas point) around which to search
          * \param n the maximum number of rt_vals to return; the first element is the closest point.
          * Defaults to 1.
          */
