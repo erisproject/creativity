@@ -4,15 +4,7 @@
 #include <condition_variable>
 #include <memory>
 #include <glibmm/dispatcher.h>
-#ifdef __clang__
-// Loading gtkmm.h gives a overloaded virtual warning: ignore it.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Woverloaded-virtual"
-#endif
 #include <gtkmm.h>
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
 #include <eris/noncopyable.hpp>
 #include <unordered_map>
 #include <array>
