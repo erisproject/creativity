@@ -16,21 +16,26 @@ GraphArea::GraphArea(GUI &gui) :
 
 Cairo::Matrix GraphArea::graph_to_canvas() const {
     Gtk::Allocation allocation = get_allocation();
-    const int width = allocation.get_width();
-    const int height = allocation.get_height();
 
+    const double half_width = 0.5 * allocation.get_width(), half_height = 0.5 * allocation.get_height();
     const double boundary = gui_.creativity_->boundary();
+    // The second of these is negative because higher y canvas values are down the screen, which are
+    // *lower* graph values.
+    return Cairo::Matrix(half_width / boundary, 0, 0, -half_height / boundary, half_width, half_height);
+}
 
-    // The second of these is negative, which is correct because "up" in the graph translates to a
-    // lower coordinate on the screen (since positive y coordinates are down the screen).
-    const double gwidth = 2*boundary, gheight = -2*boundary;
+Cairo::Matrix GraphArea::canvas_to_graph() const {
+    Gtk::Allocation allocation = get_allocation();
 
-    // Build a transformation that converts from positions to canvas coordinates
-    auto trans = Cairo::identity_matrix();
-    trans.scale(width / gwidth, height / gheight);
-    trans.translate(boundary, -boundary);
-
-    return trans;
+    const double half_width = 0.5 * allocation.get_width(), half_height = 0.5 * allocation.get_height();
+    const double boundary = gui_.creativity_->boundary();
+    // The second value below is negative because higher y canvas values are down the screen, which
+    // are *lower* graph values.
+    //
+    // After scaling, the (x+, y+) screen location will be scaled into ([0,2*b], [0,-2*b])
+    // coordinates, which we need to shift into ([-b,b], [-b,b]) by subtracting b from x and adding
+    // b to y.
+    return Cairo::Matrix(boundary / half_width, 0, 0, -boundary / half_height, -boundary, boundary);
 }
 
 bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {

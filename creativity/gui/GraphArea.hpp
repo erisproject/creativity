@@ -27,10 +27,17 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
          */
         GraphArea(GUI &gui);
 
-        /** Returns a Cairo::Matrix that translates graph coordinates into screen coordinates.  To
-         * go the other way, invert this matrix.
+        /** Returns a Cairo::Matrix that translates graph coordinates into canvas (i.e. on-screen
+         * pixel) coordinates.  To go the other way, call canvas_to_graph(), or .invert() the
+         * returned matrix.
          */
         Cairo::Matrix graph_to_canvas() const;
+
+        /** Returns a Cairo::Matrix that tranlates canvas coordinates into graph coordinates.  To go
+         * the other way, call graph_to_canvas(), or .invert() the returned matrix.
+         */
+        Cairo::Matrix canvas_to_graph() const;
+
 
         /** Draws the current set of points/circles, and updates the data in any reader/book
          * dialogs. */
