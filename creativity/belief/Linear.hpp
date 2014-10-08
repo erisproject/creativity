@@ -47,8 +47,13 @@ class Linear {
 
         // NB: if changing these constants, also change the above constructor documentation
         static constexpr double
-            /// The value of `n` for a noninformative model constructed using `Linear(unsigned int)`
-            NONINFORMATIVE_N = 1e-6,
+            /** The value of `n` for a noninformative model constructed using `Linear(unsigned
+             * int)`.  Although ideally a value close to 0 is preferred, using a value of even 0.01 tends
+             * to throw up 0 values.  Thus we err on the side of safety by picking 0.5 coupled with
+             * a large s^2 value.
+             */
+            //
+            NONINFORMATIVE_N = 0.5,
             /// The value of `s2` for a noninformative model constructed using `Linear(unsigned int)`
             NONINFORMATIVE_S2 = 1e+6;
 
