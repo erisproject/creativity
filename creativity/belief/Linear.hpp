@@ -32,7 +32,7 @@ class Linear {
          * s2, V, n) with highly noninformative priors; specifically this model will initialize
          * parameters with:
          *     beta = 0 vector
-         *     s2 = `NONINFORMATIVE_S2` (currently 1e-6)
+         *     s2 = `NONINFORMATIVE_S2` (currently 1e+6)
          *     V = identity matrix
          *     n = `NONINFORMATIVE_N` (currently 1e-6)
          *
@@ -50,7 +50,7 @@ class Linear {
             /// The value of `n` for a noninformative model constructed using `Linear(unsigned int)`
             NONINFORMATIVE_N = 1e-6,
             /// The value of `s2` for a noninformative model constructed using `Linear(unsigned int)`
-            NONINFORMATIVE_S2 = 1e-6;
+            NONINFORMATIVE_S2 = 1e+6;
 
         /** Constructs a Linear model with the given parameters.  These parameters will be those
          * used for the prior when updating.
