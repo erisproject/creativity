@@ -180,20 +180,6 @@ class Linear {
          */
         friend std::ostream& operator << (std::ostream &os, const Linear &b);
 
-    protected:
-        /** Called during construction to verify that the given parameters are valid.  Subclasses
-         * should override to throw an exception if there are problems.  The default implementation
-         * in this class does nothing.
-         */
-        virtual void verifyParameters() const;
-
-        /** This method calls draw() the given number of times, discarding the results.  Unlike
-         * discard(), this always calls draw(), while discard() is meant to only call draw() when
-         * needed (i.e. when draws are not independent).  This method should generally not be called
-         * directly, but instead invoked by subclasses in overridden discard() methods.
-         */
-        virtual void discardForce(unsigned int burn);
-
         /** Combines the stored prior parameters with the provided data to create a new Linear
          * object.
          *
@@ -208,6 +194,20 @@ class Linear {
          * small portions will yield the same posterior as updating once with the full data set.
          */
         Linear update(const Eigen::Ref<const Eigen::VectorXd> &y, const Eigen::Ref<const Eigen::MatrixXd> &X) const __attribute__((warn_unused_result));
+
+    protected:
+        /** Called during construction to verify that the given parameters are valid.  Subclasses
+         * should override to throw an exception if there are problems.  The default implementation
+         * in this class does nothing.
+         */
+        virtual void verifyParameters() const;
+
+        /** This method calls draw() the given number of times, discarding the results.  Unlike
+         * discard(), this always calls draw(), while discard() is meant to only call draw() when
+         * needed (i.e. when draws are not independent).  This method should generally not be called
+         * directly, but instead invoked by subclasses in overridden discard() methods.
+         */
+        virtual void discardForce(unsigned int burn);
 
         /// The column vector prior of coefficient means
         Eigen::VectorXd beta_;
