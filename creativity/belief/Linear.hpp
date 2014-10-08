@@ -207,7 +207,7 @@ class Linear {
          * less than the number of parameters.  Updating iteratively with a data set broken into
          * small portions will yield the same posterior as updating once with the full data set.
          */
-        Linear update(const Eigen::Ref<const Eigen::VectorXd> &y, const Eigen::Ref<const Eigen::MatrixXd> &X) const;
+        Linear update(const Eigen::Ref<const Eigen::VectorXd> &y, const Eigen::Ref<const Eigen::MatrixXd> &X) const __attribute__((warn_unused_result));
 
         /// The column vector prior of coefficient means
         Eigen::VectorXd beta_;
