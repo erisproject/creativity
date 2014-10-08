@@ -73,6 +73,7 @@ const VectorXd& Linear::draw() {
     NO_EMPTY_MODEL;
 
     if (last_draw_.size() != K_ + 1) last_draw_.resize(K_ + 1);
+
     auto &rng = eris::Random::rng();
 
     // beta is distributed as t(beta, s^2*V, n)
@@ -81,15 +82,14 @@ const VectorXd& Linear::draw() {
 
     // To generate y ~ N(0, SIGMA), generate N(0,1) and multiple by L from the cholesky
     // decomposition of SIGMA, or in other words, s*L where LL'=V (so SIGMA=s^2*V)
-    VectorXd y(K());
-    std::normal_distribution<double> stdnorm;
+    VectorXd y(K_);
+    std::normal_distribution<double> stdnorm(0, 1);
     for (unsigned int i = 0; i < K_; i++) y[i] = stdnorm(rng);
 
     std::chi_squared_distribution<double> rchisqn(n_);
 
-    y = sqrt(s2_) * sqrt(n_ / rchisqn(rng)) * VcholL() * y;
+    last_draw_.head(K_) = beta_ + sqrt(s2_ * n_ / rchisqn(rng)) * VcholL() * y;
 
-    for (unsigned int i = 0; i < K_; i++) last_draw_[i] = y[i];
 
     // h has distribution Gamma(n/2, 2/(n*s^2)), and s^2 is the inverse of h:
     last_draw_[K_] = 1.0 / (std::gamma_distribution<double>(n_/2, 2/(s2_*n_))(rng));
@@ -133,10 +133,11 @@ Linear Linear::update(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X
     MatrixXd Xt = X.transpose();
     MatrixXd XtX = Xt * X;
 
-    // Store (V^{-1} + X^\top X) in a shared pointer so that we can pass it along as V^{-1}
-    // to the new Linear object so that if *it* needs an inverse, it can just use this
-    // instead of having to reinvert to get back to this value.  This saves some
-    // computational time and, more importantly, gives more accurate numerical results.
+    // We need the inverse of (V^{-1} + X^\top X) for V_post, but store the value in a shared
+    // pointer before inverting because there's a good chance that the next object will need the
+    // inverse of the inverse, i.e. by calling its own Vinv()--so, by storing the intermediate value
+    // before the inverse, we may be able to avoid inverting an inverse later: so in such a case we
+    // save time *and* avoid the numerical precision loss from taking an extra inverse.
     auto V_post_inv = std::make_shared<MatrixXd>(Vinv() + XtX);
 
     MatrixXd V_post = V_post_inv->colPivHouseholderQr().inverse();
@@ -145,8 +146,9 @@ Linear Linear::update(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X
     double n_post = X.rows();
     if (not noninformative()) n_post += n_;
 
-    VectorXd residuals = y - X * beta_;
-    double s2_post = (n_ * s2_ + residuals.transpose() * (X * V_ * Xt + MatrixXd::Identity(X.rows(), X.rows())) * residuals) / n_post;
+    VectorXd residualspost = y - X * beta_post;
+    VectorXd beta_diff = beta_post - beta_;
+    double s2_post = (n_ * s2_ + residualspost.transpose() * residualspost + beta_diff.transpose() * Vinv() * beta_diff) / n_post;
 
     return Linear(beta_post, s2_post, V_post, n_post, V_post_inv);
 }
