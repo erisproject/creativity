@@ -14,20 +14,6 @@ using namespace creativity::state;
 using namespace eris;
 using namespace Eigen;
 
-Creativity::Creativity() {
-    // Set up belief defaults
-    parameters.demand_beta.resize(belief::Demand::parameters());
-    parameters.demand_V = MatrixXd::Identity(belief::Demand::parameters(), belief::Demand::parameters());
-    parameters.profit_beta.resize(belief::Profit::parameters());
-    parameters.profit_V = MatrixXd::Identity(belief::Profit::parameters(), belief::Profit::parameters());
-    parameters.quality_beta.resize(belief::Quality::parameters());
-    parameters.quality_V = MatrixXd::Identity(belief::Quality::parameters(), belief::Quality::parameters());
-
-    parameters.demand_beta << 0, -2, 0.5, -0.1, 0, 0, 0, 0;
-    parameters.profit_beta << 0, 1, 0, 0, 0;
-    parameters.quality_beta << 5, -1, 1, 0, 0, 0, 0.1;
-}
-
 double Creativity::boundary() const {
     if (setup_sim_ or setup_read_) return boundary_;
 
@@ -79,9 +65,10 @@ void Creativity::setup() {
     for (unsigned int i = 0; i < parameters.readers; i++) {
         auto r = sim->create<Reader>(shared_from_this(),
                 Position{unif_pmb(rng), unif_pmb(rng)},
-                belief::Demand{parameters.dimensions, parameters.demand_beta, parameters.demand_s2, parameters.demand_V, parameters.demand_n},
-                belief::Profit{parameters.dimensions, parameters.profit_beta, parameters.profit_s2, parameters.profit_V, parameters.profit_n},
-                belief::Quality{parameters.quality_beta, parameters.quality_s2, parameters.quality_V, parameters.quality_n},
+                // (Nearly) non-informative priors for the rest:
+                belief::Demand(parameters.dimensions, belief::Demand::parameters()),
+                belief::Profit(parameters.dimensions, belief::Profit::parameters()),
+                belief::Quality(belief::Quality::parameters()),
                 parameters.cost_fixed, parameters.cost_unit, parameters.income
                 );
         r->writer_book_sd = parameters.book_quality_sd;

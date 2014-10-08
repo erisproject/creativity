@@ -151,21 +151,6 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         ArrayConstraint opt_##PARAM##_constr(cr.parameters.PARAM.rows() * (cr.parameters.PARAM.rows() + 1) / 2); \
         TCLAP::ValueArg<std::string> opt_##PARAM##_arg(SHORT, LONG, DESC, false, lowerTriangleString(cr.parameters.PARAM), &opt_##PARAM##_constr, cmd);
 
-        OPTION_VECTOR(demand_beta, "", "demand-beta", "Initial demand belief beta parameters");
-        OPTION_LBOUND(demand_n, "", "demand-n", "Initial demand belief n parameter", 0);
-        OPTION_LBOUND(demand_s2, "", "demand-s2", "Initial demand belief s^2 parameter", 0);
-        OPTION_LOWERTRI(demand_V, "", "demand-V", "Initial demand belief V values (lower triangle only, in row-major order)");
-
-        OPTION_VECTOR(profit_beta, "", "profit-beta", "Initial profit belief beta parameters");
-        OPTION_LBOUND(profit_n, "", "profit-n", "Initial profit belief n parameter", 0);
-        OPTION_LBOUND(profit_s2, "", "profit-s2", "Initial profit belief s^2 parameter", 0);
-        OPTION_LOWERTRI(profit_V, "", "profit-V", "Initial profit belief V values (lower triangle only, in row-major order)");
-
-        OPTION_VECTOR(quality_beta, "", "quality-beta", "Initial quality belief beta parameters");
-        OPTION_LBOUND(quality_n, "", "quality-n", "Initial quality belief n parameter", 0);
-        OPTION_LBOUND(quality_s2, "", "quality-s2", "Initial quality belief s^2 parameter", 0);
-        OPTION_LOWERTRI(quality_V, "", "quality-V", "Initial quality belief V values (lower triangle only, in row-major order)");
-
         RangeConstraint<unsigned int> periods_constr(1);
         TCLAP::ValueArg<unsigned int> periods_arg("p", "periods", "Number of simulation periods to run", false, 100, &periods_constr, cmd);
 
@@ -191,14 +176,6 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         COPY_PARAM_SETTING(cost_fixed);
         COPY_PARAM_SETTING(cost_unit);
         COPY_PARAM_SETTING(income);
-        COPY_PARAM_SETTING(demand_n);
-        COPY_PARAM_SETTING(demand_s2);
-        COPY_PARAM_SETTING(profit_n);
-        COPY_PARAM_SETTING(profit_s2);
-        COPY_PARAM_SETTING(quality_n);
-        COPY_PARAM_SETTING(quality_s2);
-
-        std::cerr << "FIXME: need to copy beta/V values for demand,profit,quality\n";
 
         cmd_args ret;
         ret.periods = periods_arg.getValue();
