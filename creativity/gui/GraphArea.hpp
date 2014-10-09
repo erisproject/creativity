@@ -3,8 +3,6 @@
 #include <eris/Position.hpp>
 #include <eris/WrappedPositional.hpp>
 #include <gtkmm/drawingarea.h>
-#include <mutex>
-#include <memory>
 
 namespace creativity {
 
@@ -21,9 +19,7 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
     public:
         GraphArea() = delete;
 
-        /** Creates a graph area that draws in the rectangle bounded by [`bottom', `top'] on the
-         * vertical plane and [`left', `right'] on the horizontal plane.  Specifying a value of
-         * bottom or left larger than top or bottom will flip the respective axis.
+        /** Creates a graph area that draws according to the boundary of the given GUI object.
          */
         GraphArea(GUI &gui);
 

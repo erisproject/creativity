@@ -52,6 +52,7 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
     }
 
     if (drawing_cache_width_ != width || drawing_cache_height_ != height) {
+        // If the width or height has changed from the cached image, clear the cache.
         drawing_cache_.clear();
         drawing_cache_width_ = width;
         drawing_cache_height_ = height;
