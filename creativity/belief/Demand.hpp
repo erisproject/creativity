@@ -56,13 +56,10 @@ class Demand : public LinearRestricted {
         Demand(unsigned int D, Args &&...args)
         : LinearRestricted(std::forward<Args>(args)...), D_{D}
         {
-            ERIS_DBG("wtf!");
-            ERIS_DBGVAR(K_);
             // Add restrictions:
             upperBounds()[1] = 0; // beta_price <= 0 (higher price <-> lower quantity)
             upperBounds()[6] = 0; // more competition <-> lower demand
             lowerBounds()[2] = 0; // higher quality <-> more demand
-            ERIS_DBG("wtf?");
         }
 
         /// Returns the number of parameters of this model
