@@ -519,6 +519,7 @@
                                             <property name="can_focus">False</property>
                                             <property name="xalign">0</property>
                                             <property name="label" translatable="yes">Currently unimplemented</property>
+                                            <property name="wrap">True</property>
                                             <attributes>
                                               <attribute name="style" value="italic"/>
                                             </attributes>
@@ -534,6 +535,7 @@
                                             <property name="can_focus">False</property>
                                             <property name="xalign">0</property>
                                             <property name="label" translatable="yes">Number of readers to create</property>
+                                            <property name="wrap">True</property>
                                             <attributes>
                                               <attribute name="style" value="italic"/>
                                             </attributes>
@@ -579,6 +581,7 @@
                                             <property name="can_focus">False</property>
                                             <property name="xalign">0</property>
                                             <property name="label" translatable="yes">The per-unit cost of creating copies of a book.</property>
+                                            <property name="wrap">True</property>
                                             <attributes>
                                               <attribute name="style" value="italic"/>
                                             </attributes>
@@ -624,6 +627,7 @@
                                             <property name="can_focus">False</property>
                                             <property name="xalign">0</property>
                                             <property name="label" translatable="yes">The fixed per-period cost of keeping a book on the market.</property>
+                                            <property name="wrap">True</property>
                                             <attributes>
                                               <attribute name="style" value="italic"/>
                                             </attributes>
@@ -651,6 +655,7 @@
                                             <property name="can_focus">False</property>
                                             <property name="xalign">0</property>
                                             <property name="label" translatable="yes">Book quality is assessed as true quality plus noise with this st.dev.</property>
+                                            <property name="wrap">True</property>
                                             <attributes>
                                               <attribute name="style" value="italic"/>
                                             </attributes>
@@ -714,6 +719,7 @@
                                             <property name="can_focus">False</property>
                                             <property name="xalign">0</property>
                                             <property name="label" translatable="yes">New books are created at the reader's location plus noise with this st.dev.</property>
+                                            <property name="wrap">True</property>
                                             <attributes>
                                               <attribute name="style" value="italic"/>
                                             </attributes>
@@ -741,6 +747,7 @@
                                             <property name="can_focus">False</property>
                                             <property name="xalign">0</property>
                                             <property name="label" translatable="yes">Average readers per square unit; this determines the simulation boundaries.</property>
+                                            <property name="wrap">True</property>
                                             <attributes>
                                               <attribute name="style" value="italic"/>
                                             </attributes>
@@ -961,6 +968,7 @@
                                             <property name="can_focus">False</property>
                                             <property name="xalign">0</property>
                                             <property name="label" translatable="yes">The number of periods to run the simulation before stopping.</property>
+                                            <property name="wrap">True</property>
                                             <attributes>
                                               <attribute name="style" value="italic"/>
                                             </attributes>
@@ -1018,6 +1026,7 @@
                                             <property name="can_focus">False</property>
                                             <property name="xalign">0</property>
                                             <property name="label" translatable="yes">The random seed.  For reproducible results, you must also turn disable CPU Threads.</property>
+                                            <property name="wrap">True</property>
                                             <attributes>
                                               <attribute name="style" value="italic"/>
                                             </attributes>
@@ -1253,7 +1262,6 @@
     <property name="skip_pager_hint">True</property>
     <property name="urgency_hint">True</property>
     <property name="transient_for">window1</property>
-    <property name="has_resize_grip">False</property>
     <property name="message_type">error</property>
     <property name="buttons">close</property>
     <property name="text" translatable="yes">An error has occurred!</property>
