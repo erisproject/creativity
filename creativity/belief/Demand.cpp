@@ -13,8 +13,9 @@ unsigned int Demand::fixedModelSize() const { return parameters(); }
 
 double Demand::predict(double P, double q, unsigned long S, unsigned long otherBooks, unsigned long marketBooks) {
     if (P < 0) throw std::domain_error("Demand::predict: P cannot be < 0");
+    if (q < 0) throw std::domain_error("Demand::predict: q cannot be < 0");
     RowVectorXd X(K());
-    X << 1, std::pow(P, D_), std::copysign(std::pow(q, D_), q), S, 0, otherBooks == 0 ? 1 : 0, otherBooks, marketBooks;
+    X << 1.0, P, P*P, q, q*q, S, 0, otherBooks == 0 ? 1 : 0, otherBooks, marketBooks;
 
     return predict(X);
 }
@@ -30,27 +31,20 @@ std::pair<double, double> Demand::argmaxP(double q, unsigned long S, unsigned lo
         // just going to make that more negative, so just give back c
         return {c, Xg};
 
-    if (c == 0) {
-        // With c = 0 the solution is analytical:
-        double P_d = Xg / (-beta_[1] * (1 + D_));
-        return {std::pow(P_d, 1.0/D_), Xg + beta_[1] * P_d};
-    }
-
     // Otherwise optimize numerically
     double p_opt = eris::single_peak_search([&c,&Xg,this] (double P) -> double {
-            return (P - c) * (Xg + beta_[1] * std::pow(P, D_));
+            return (P - c) * (Xg + beta_[1] * P + beta_[2] * P * P);
             }, c, argmaxP_MAX);
-    return {p_opt, Xg + beta_[1] * std::pow(p_opt, D_)};
+    return {p_opt, Xg + beta_[1] * p_opt + beta_[2] * p_opt * p_opt};
 }
 
 
 RowVectorXd Demand::bookRow(eris::SharedMember<Book> book, double quality) const {
-    RowVectorXd row(K());
+    RowVectorXd row(K_);
 
     auto t = book->simulation()->t() - 1;
-    row << 1.0,
-        (book->hasMarket() ? std::pow(book->market()->price(), D_) : 0.0), // Price^D
-        std::pow(quality, D_), // quality^D
+    double p = book->hasMarket() ? book->market()->price() : 0.0;
+    row << 1.0, p, p*p, quality, quality*quality,
         book->lifeSales() - book->sales(t), // sales before time t
         book->age() - 1.0, // age (-1 because we're called agter t() has been incremented)
         book->author()->wrote().size() == 1 ? 1.0 : 0.0, // onlyBook

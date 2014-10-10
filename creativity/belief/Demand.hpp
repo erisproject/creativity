@@ -12,16 +12,13 @@ namespace belief {
 /** This class represents an author's belief about the per-period demand for books.  The model is of
  * the form:
  *
- * \f$Q_b = \beta_0 + \beta_1 P_b^D + \beta_2 q_b^D + \beta_3 S_{b-} + \beta_4 age + \beta_5
- * onlyBook + \beta_6 otherBooks + \beta_7 marketBooks + u\f$
+ * \f$Q_b = \beta_0 + \beta_1 P_b + \beta_2 P_b^2 + \beta_3 q_b + \beta_4 q_b^2 + \beta_5 S_{b-} +
+ * \beta_6 age + \beta_7 onlyBook + \beta_8 otherBooks + \beta_9 marketBooks + u\f$
  * where:
  * - \f$Q_b\f$ is the quantity (i.e. copies) sold
  * - \f$P_b\f$ is the price of a copy (which must be non-negative)
  * - \f$q_b\f$ is the quality of the work, determined when the work is created, which must be
  *   non-negative.
- * - \f$D\f$ is the fixed dimensionality of the model (e.g. 2 for a two-dimensional world).  Both
- *   \f$q_b\f$ and \f$P_b\f$ are raised to the dimensionality because changes in either affect
- *   the radius of potential customers, with total customers being proportional to \f$r^D\f$.
  * - \f$S_{b-}\f$ is the number of copies sold in previous periods
  * - \f$age\f$ is the age of the book, in simulation periods, starting from 0.
  * - \f$onlyBook\f$ is a dummy: 1 if this is the creator's only work, 0 if the creator has other
@@ -31,9 +28,10 @@ namespace belief {
  * - \f$marketBooks\f$ is the number of books on the market in the previous period
  *
  * The following restrictions are imposed on beliefs:
- * - \f$\beta_1 \leq 0\f$ (higher price means fewer sales)
- * - \f$\beta_2 \geq 0\f$ (higher quality means more sales)
- * - \f$\beta_6 \leq 0\f$ (more competition means fewer sales)
+ * - \f$\beta_1 \leq 0\f$ (demand curve is downward sloping (at least for sufficiently small p))
+ * - \f$\beta_3 \geq 0\f$ (higher quality means more sales (at least for low quality))
+ * - \f$\beta_4 \leq 0\f$ (quality increase effect is concave)
+ * - \f$\beta_9 \leq 0\f$ (more competition means lower (individual) demand)
  *
  * These constraints are combined with a natural conjugate prior for the purposes of updating the
  * beliefs via Bayesian econometrics.
@@ -57,13 +55,14 @@ class Demand : public LinearRestricted {
         : LinearRestricted(std::forward<Args>(args)...), D_{D}
         {
             // Add restrictions:
-            upperBounds()[1] = 0; // beta_price <= 0 (higher price <-> lower quantity)
-            upperBounds()[6] = 0; // more competition <-> lower demand
-            lowerBounds()[2] = 0; // higher quality <-> more demand
+            upperBounds()[1] = 0.0; // beta_price <= 0 (higher price <-> lower quantity)
+            lowerBounds()[3] = 0.0; // beta_q >= 0
+            upperBounds()[4] = 0.0; // beta_{q^2} <= 0
+            upperBounds()[9] = 0.0; // more competition <-> lower demand
         }
 
         /// Returns the number of parameters of this model
-        static unsigned int parameters() { return 8; }
+        static unsigned int parameters() { return 10; }
 
         /// This model always has exactly 8 parameters
         virtual unsigned int fixedModelSize() const override;
