@@ -120,7 +120,7 @@ InfoWindow::InfoWindow(std::shared_ptr<const State> state, std::shared_ptr<Gtk::
     NEW_TAB_GRID(grid_profit, beliefs, "Profit");
     LABELS_ROW(grid_profit, "Dependent variable", "<i>lifetimeProfit</i>");
     DATA_ROW(grid_profit, "p_n", "n");
-    std::vector<std::string> p_vars{{"constant", "quality<sup>D</sup>", "I(firstBook)", "previousBooks", "marketBooks"}};
+    std::vector<std::string> p_vars{{"constant", "quality", "quality<sup>2</sup>", "I(firstBook)", "previousBooks", "marketBooks"}};
     for (size_t i = 0; i < p_vars.size(); i++)
         DATA_ROW(grid_profit, "p_" + std::to_string(i), BETA "[" + p_vars[i] + "]");
     DATA_ROW(grid_profit, "_p_draws", "# successful draws");
@@ -130,7 +130,7 @@ InfoWindow::InfoWindow(std::shared_ptr<const State> state, std::shared_ptr<Gtk::
     COMMENT_ROW(grid_demand, "Note: this regression is for single-period demand");
     LABELS_ROW(grid_demand, "Dependent variable", "<i>quantityDemanded</i>");
     DATA_ROW(grid_demand, "d_n", "n");
-    std::vector<std::string> d_vars{{"constant", "price<sup>D</sup>", "quality<sup>D</sup>", "prevSales", "age", "I(onlyBook)", "otherBooks", "marketBooks"}};
+    std::vector<std::string> d_vars{{"constant", "price", "price<sup>2</sup>", "quality", "quality<sup>2</sup>", "prevSales", "age", "I(onlyBook)", "otherBooks", "marketBooks"}};
     for (size_t i = 0; i < d_vars.size(); i++)
         DATA_ROW(grid_demand, "d_" + std::to_string(i), BETA "[" + d_vars[i] + "]");
     DATA_ROW(grid_demand, "_d_draws", "# successful draws");
