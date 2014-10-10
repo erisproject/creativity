@@ -157,7 +157,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          */
         template <typename Container>
         typename std::enable_if<std::is_base_of<Book, typename Container::value_type::member_type>::value, double>::type
-        u(const double &money, const Container &books) const {
+        u(double money, const Container &books) const {
             double u = money - penalty(books.size());
             for (auto &book : books) {
                 u += uBook(book);
@@ -170,7 +170,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          */
         template <typename Container>
         typename std::enable_if<std::is_same<eris::eris_id_t, typename Container::value_type>::value, double>::type
-        u(const double &money, const Container &books) const {
+        u(double money, const Container &books) const {
             double u = money - penalty(books.size());
             for (auto &book_id : books) {
                 u += uBook(simGood<Book>(book_id));
@@ -282,7 +282,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * \param polynomial the coefficients at which to evaluate the polynomial.
          * `coefficients[0]` is the constant term, `coefficients[i]` applies to the \f$x^i\f$ term.
          */
-        static double evalPolynomial(const double &x, const std::vector<double> &polynomial);
+        static double evalPolynomial(double x, const std::vector<double> &polynomial);
 
         /** The default polynomial coefficients.  The default is the straight line \f$4-d\f$ (that
          * is, the vector {4.0, -1.0}).

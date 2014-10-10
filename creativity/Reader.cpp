@@ -79,7 +79,7 @@ const std::vector<double>& Reader::uPolynomial() const {
     return u_poly_;
 }
 
-double Reader::evalPolynomial(const double &x, const std::vector<double> &polynomial) {
+double Reader::evalPolynomial(double x, const std::vector<double> &polynomial) {
     double p = 0.0;
     double xi = 1.0;
     for (auto &c : polynomial) {
@@ -190,7 +190,7 @@ void Reader::interOptimize() {
     // decided to spend above to keep books on the market.
     if (income_available >= cost_fixed) {
         double l_max = profit_belief_extrap_.argmaxL(
-                [this] (const double &l) -> double { return creationQuality(l); },
+                [this] (double l) -> double { return creationQuality(l); },
                 previous_books, market_books, assets()[creativity_->money] + income - cost_fixed
                 );
         double quality = creationQuality(l_max);
@@ -267,9 +267,7 @@ void Reader::interApply() {
 
 double Reader::uBook(SharedMember<Book> b) const {
     double u = evalPolynomial(distance(b), u_poly_);
-    double q_DEBUG = quality(b);
-    //std::cerr << "Evaluating book " << b << ": quality=" << q_DEBUG << ", totalu=" << q_DEBUG + u << "\n";
-    u += q_DEBUG;//quality(b);
+    u += quality(b);
     if (u < 0) u = 0.0;
     return u;
 }
