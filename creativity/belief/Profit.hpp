@@ -43,7 +43,12 @@ class Profit : public LinearRestricted {
         template <typename ...Args>
         Profit(unsigned int D, Args &&...args)
         : LinearRestricted{std::forward<Args>(args)...}, D_{D}
-        {}
+        {
+            // Add restrictions:
+            lowerBounds()[1] = 0.0; // beta_q >= 0 (higher quality <-> higher profits, at least for low quality)
+            upperBounds()[2] = 0.0; // beta_{q^2} >= 0 (quality effect is concave)
+            upperBounds()[5] = 0.0; // beta_{marketbooks} <= 0 (more competition <-> lower profit)
+        }
 
         /// Returns the number of parameters of this model (6)
         static unsigned int parameters() { return 6; }
