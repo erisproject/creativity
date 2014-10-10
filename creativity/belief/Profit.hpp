@@ -7,13 +7,10 @@ namespace creativity { namespace belief {
 /** This class represents an author's belief about the lifetime profitability of a work.  The model
  * is of the form:
  *
- * \f$\Pi_b = \beta_0 + \beta_1 q_b^D + \beta_2 firstBook + \beta_3 previousBooks + \beta_4 marketBooks + u\f$
+ * \f$\Pi_b = \beta_0 + \beta_1 q_b + \beta_2 q_b^2 + \beta_3 firstBook + \beta_4 previousBooks + \beta_5 marketBooks + u\f$
  * where:
  * - \f$Pi_b\f$ is the lifetime profits of the book
- * - \f$q_b\f$ is the quality of the book.  Note that the exponentiation on this term is
- *   sign-preserving even when \f$D\f$ is even: thus for \f$q_b = -0.5, D=2\f$ the relevant quantity
- *   is \f$-0.25\f$.
- * - \f$D\f$ is the dimensionality of the modelled world (e.g. 2 for a two-dimensional world).
+ * - \f$q_b\f$ is the (non-negative) quality of the book.
  *   \f$q_b\f$ is raised to the dimensionality because changes in it affect the radius of potential
  *   customers, with total customers being proportional to the radius raised to \f$D\f$.
  * - \f$firstBook\f$ is a dummy: 1 if this is the creator's first work, 0 if the creator has other
@@ -22,7 +19,8 @@ namespace creativity { namespace belief {
  * - \f$marketBooks\f$ is the number of books on the market in the previous period.
  *
  * The following restrictions are imposed on beliefs:
- * - \f$\beta_2 \geq 0\f$ (profit increases with quality)
+ * - \f$\beta_1 \geq 0\f$ (profit increases with quality, at least for low quality values)
+ * - \f$\beta_2 \leq 0\f$ (the effect of profit is concave)
  * - \f$\beta_5 \leq 0\f$ (more competition means lower profit)
  *
  * These constraints are combined with a natural conjugate prior for the purposes of updating the
@@ -47,8 +45,8 @@ class Profit : public LinearRestricted {
         : LinearRestricted{std::forward<Args>(args)...}, D_{D}
         {}
 
-        /// Returns the number of parameters of this model (5)
-        static unsigned int parameters() { return 5; }
+        /// Returns the number of parameters of this model (6)
+        static unsigned int parameters() { return 6; }
 
         /// Returns `parameters()`
         virtual unsigned int fixedModelSize() const override;
