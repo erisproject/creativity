@@ -2,15 +2,14 @@
 #include <eris/WrappedPositional.hpp>
 #include <eris/agent/AssetAgent.hpp>
 #include <eris/Market.hpp>
-#include <string>
-#include <vector>
-#include <unordered_set>
 #include <Eigen/Core>
 #include "belief/Profit.hpp"
 #include "belief/ProfitStream.hpp"
 #include "belief/Demand.hpp"
 #include "belief/Quality.hpp"
-#include <random>
+#include <string>
+#include <vector>
+#include <unordered_set>
 
 namespace creativity {
 
@@ -349,21 +348,39 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         /// The per-unit income the reader receives.
         double income{0};
 
-        /** The reader's creation coefficients.  This reader can exhert effort \f$\ell \geq 0\f$ to
-         * create a book of quality \f$q(\ell) = \alpha_0 + \alpha_1 \ell^{\alpha_2}\f$, where
-         * \f$\alpha\f$ is this vector.
+        /** The reader's creation function shape coefficient.  This reader can exhert effort \f$\ell
+         * \geq 0\f$ to create a book of quality \f$q(\ell) = \beta \frac{(\ell+1)^{1-\alpha} -
+         * 1}{1 - \alpha}\f$, where \f$\alpha\f$ is this value.
          *
-         * The default value is \f$\alpha = (-2.0, 4.0, 0.25)\f$, which is appropriate for a
-         * 2-dimensional world and probably a poor choice for any other dimensionality.
+         * Note that \f$\alpha = 1\f$ is handled specially as \f$q(\ell) = \beta ln(\ell+1)\f$ which
+         * holds mathematically (by L'Hôpital's Rule); without this special handling, evaluating the
+         * above numerically would result in a NaN value.
+         *
+         * The default value is \f$\alpha = 1\f$, yield a logarithmic quality/effort relationship.
+         *
+         * The value of this parameter should be strictly greater than 0 to maintain the concavity
+         * of the function.
          */
-        Eigen::Vector3d creation_coefs{-2.0, 4.0, 0.25};
+        double creation_shape = 1.0;
+
+        /** The reader's creation function scale coefficient.  This reader can exhert effort \f$\ell
+         * \geq 0\f$ to create a book of quality \f$q(\ell) = \beta \frac{(\ell+1)^{1-\alpha} -
+         * 1}{1 - \alpha}\f$, where \f$\beta\f$ is this value.
+         *
+         * The default value is \f$beta = 1\f$.  Changing this value across readers of a simulation
+         * allows readers to differ in ability while maintaining the same functional form.
+         *
+         * The specified value must be non-negative, for obvious reasons.  Specifying 0 works as
+         * expected (the reader always produces quality 0 works, regardless of effort).
+         */
+        double creation_scale = 1.0;
 
         /** Returns the resulting quality of this reader exerting effort level `effort` to create a
          * book.
          *
          * \sa creation_coefs
          */
-        double creationQuality(const double &effort) const;
+        double creationQuality(double effort) const;
 
         /** Called at the end of a period (from BookMarket::intraFinish) to transfer book revenue
          * earned during a period back to the author.  The author subtracts variable cost (if any)

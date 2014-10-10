@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <map>
 #include <random>
+#include <cmath>
 
 using namespace eris;
 using namespace Eigen;
@@ -106,8 +107,21 @@ const std::vector<double>& Reader::penaltyPolynomial() const {
     return pen_poly_;
 }
 
-double Reader::creationQuality(const double &effort) const {
-    return creation_coefs[0] + creation_coefs[1] * std::pow(effort, creation_coefs[2]);
+double Reader::creationQuality(double effort) const {
+    if (effort < 0)
+        throw std::domain_error("Reader::creationQuality() error: effort cannot be negative");
+    if (creation_shape < 0)
+        throw std::logic_error("Reader::creationQuality() error: creation_shape cannot be negative");
+    if (creation_scale < 0)
+        throw std::logic_error("Reader::creationQuality() error: creation_scale cannot be negative");
+    if (creation_scale == 0) return 0.0;
+
+    return creation_scale * (
+            creation_shape == 1.0 ? std::log(effort + 1.0) : // Special case for log
+            creation_shape == 0.5 ? 2.0 * (std::sqrt(effort + 1.0) - 1.0) : // Slightly more efficient sqrt calculation
+            creation_shape == 0.0 ? effort : // Simple linear
+            (std::pow(effort + 1.0, 1.0 - creation_shape) - 1.0) / (1 - creation_shape) // Otherwise use the full formula
+    );
 }
 
 void Reader::interOptimize() {
@@ -347,12 +361,25 @@ void Reader::updateProfitStreamBelief() {
     std::map<unsigned int, std::vector<SharedMember<Book>>> just_left;
     for (auto &book : library_market_) {
         if (not book->hasMarket()) {
-            const unsigned long periods = book->marketPeriods();
+            unsigned long periods = book->marketPeriods();
             // We only look for the predefined age values, and only include books with
             // marketPeriods() strictly greater than the predefined age values (because a book on
             // the market for x periods can only contribute to models with (x-1) past profit
             // variables.
             //
+            // However, it's possible that the book was kept on the market far too long (i.e. it had
+            // no sales on the last 2+ periods), so reduce `periods` until either the last or
+            // second-last referenced period had positive sales.  (The last having zero sales is
+            // fine, because it will be the dependent variable for the model including the
+            // second-last).
+            const unsigned long &created = book->created();
+            while (periods > 1 and book->sales(created + periods - 1) == 0 and book->sales(created + periods - 2) == 0)
+                periods--;
+
+            // If there weren't at least 2 meaningful sales periods, we can't use this book to infer
+            // anything.
+            if (periods <= 1) continue;
+
             // TODO: this could potentially change to create new profit stream age models as we
             // encounter books of longer ages.  One tricky thing to consider: if we have a book of
             // age 6, should we really use, say, a n=1, age=6 model when we have, say, n=10, age=5
@@ -374,13 +401,14 @@ void Reader::updateProfitStreamBelief() {
         size_t row = 0;
         for (auto &book : jl.second) {
             double cumul_rev = 0;
-            unsigned long created = book->created();
+            const unsigned long &created = book->created();
             for (unsigned int i = 0; i < age; i++) {
                 double r_i = book->revenue(created + i);
                 X(row, i) = r_i;
                 cumul_rev += r_i;
             }
             y[row] = book->lifeRevenue() - cumul_rev;
+            row++;
         }
 
         // Create a new belief of the given size if none exists yet
