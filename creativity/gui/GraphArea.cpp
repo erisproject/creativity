@@ -46,7 +46,7 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
 
     if (gui_.state_num_ == 0) {
         // No states at all: just draw a blank screen
-        cr_grapharea->set_source(colours.background);
+        cr_grapharea->set_source(design.colour.background);
         cr_grapharea->paint();
         return true;
     }
@@ -79,7 +79,7 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
         cr->save();
 
         // Paint the background white
-        cr->set_source(colours.background);
+        cr->set_source(design.colour.background);
         cr->paint();
 
         auto trans = graph_to_canvas();
@@ -88,9 +88,13 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
         // on top of earlier things).  This means we have to loop over the same vector a few times,
         // unfortunately.
 
-        // Draw lines from readers to newly purchased books.
-        if (not invisible(colours.reading)) {
-            cr->set_source(colours.reading);
+        // Draw lines from readers to newly purchased books (unless we're not showing newly
+        // purchased books)
+        if (design.enabled.reading) {
+            cr->save();
+            cr->set_source(design.colour.reading);
+            cr->set_dash(design.dash.reading, 0);
+            cr->set_line_width(design.stroke_width.reading);
             for (auto &rpair : state->readers) {
                 auto &r = rpair.second;
 
@@ -100,55 +104,115 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
                 }
             }
             cr->stroke();
+            cr->restore();
         }
+
+        // Draw friendship/sharing links
+        if (design.enabled.friendship) {
+            cr->save();
+            cr->set_source(design.colour.friendship);
+            cr->set_dash(design.dash.friendship, 0);
+            cr->set_line_width(design.stroke_width.friendship);
+            for (auto &rpair : state->readers) {
+                auto &r = rpair.second;
+                for (auto &fid : r.friends) {
+                    if (r.id < fid) { // lines are symmetric: only draw each link once
+                        auto f = state->readers.find(fid);
+                        if (f != state->readers.end())
+                            drawWrappingLine(cr, trans, r.position, f->second.position);
+                    }
+                }
+            }
+            cr->stroke();
+            cr->restore();
+        }
+
 
         // Draw books.  On-market and off-market books have different colours, and newer books are
         // larger than older books.
-        if (not invisible(colours.book_live) or not invisible(colours.book_dead)) {
+        if (design.enabled.book_live or design.enabled.book_dead) {
             for (auto &bpair : state->books) {
                 auto &b = bpair.second;
-                // Give new books a larger cross: a brand new book gets a point 3 times as large; this
-                // scaling decreases linearly to the regular size at a 10-period old book.
-                const double scale = std::max(1.0, 3.0 - 0.3*b.age);
+                // Give new books a larger cross: a brand new book gets a point scaled larges; this
+                // scaling decreases linearly until reading the regular size.
 
-                // Draw book:
-                drawPoint(cr, trans, b.position[0], b.position[1], PointType::CROSS,
-                        b.market ? colours.book_live : colours.book_dead, scale);
-            }
-        }
-
-        // Readers have utility circles, indicating how much about the base 1000 utility the reader
-        // was in the period.
-        if (not invisible(colours.utility)) {
-            for (auto &rpair : state->readers) {
-                auto &r = rpair.second;
-                double rx = r.position[0], ry = r.position[1];
-                const double radius1 = 0.05 * (r.u - 1000);
-                if (radius1 > 0) { // Utility > 1000 means some utility gain from books
-                    drawCircle(cr, trans, rx, ry, radius1, colours.utility);
+                if (b.market) {
+                    if (design.enabled.book_live) {
+                        const double scale = std::max(1.0, design.size.book_live_scale_a - design.size.book_live_scale_b*b.age);
+                        drawPoint(cr, trans, b.position[0], b.position[1], design.style.book_live,
+                                design.colour.book_live, design.size.book_live*scale, design.stroke_width.book_live);
+                    }
+                }
+                else {
+                    if (design.enabled.book_dead) {
+                        const double scale = std::max(1.0, design.size.book_dead_scale_a - design.size.book_dead_scale_b*b.age);
+                        drawPoint(cr, trans, b.position[0], b.position[1], design.style.book_dead,
+                                design.colour.book_dead, design.size.book_dead*scale, design.stroke_width.book_dead);
+                    }
                 }
             }
         }
 
+        // Readers have utility circles, indicating how much about the base 1000 utility the reader
+        // was in the period.  (Don't draw anything in the initialization period, though, since
+        // everyone just has 0 utility then).
+        if ((design.enabled.utility_gain or design.enabled.utility_loss) and state->t > 0) {
+            cr->save();
+            cr->set_dash(design.dash.utility, 0);
+            cr->set_line_width(design.stroke_width.utility);
+            for (auto &rpair : state->readers) {
+                auto &r = rpair.second;
+                double rx = r.position[0], ry = r.position[1];
+                double radius = 0.0;
+                Colour colour = design.colour.utility_gain;
+                if (r.u > 1000) { /// 1000 is the starting utility
+                    radius = design.size.utility_gain_scale * std::log(r.u - 999);
+                }
+                else if (r.u < 1000) {
+                    radius = design.size.utility_loss_scale * std::log(1001 - r.u);
+                    colour = design.colour.utility_loss;
+                }
+                ERIS_DBGVAR(radius);
+
+                if (radius > 0.0)
+                    drawCanvasCircle(cr, trans, rx, ry, radius, colour, design.stroke_width.utility, design.stroke_width.utility_radial);
+            }
+            cr->restore();
+        }
+
         // Lines from each book to its author
-        if (not invisible(colours.author_live) or not invisible(colours.author_dead)) {
+        if (design.enabled.author_live or design.enabled.author_dead) {
+            cr->save();
             for (auto &bpair : state->books) {
                 auto &b = bpair.second;
-                cr->set_source(b.market ? colours.author_live : colours.author_dead);
-                drawWrappingLine(cr, trans, state->readers.at(b.author).position, b.position);
+                if (b.market) {
+                    if (not design.enabled.author_live) continue;
+
+                    cr->set_source(design.colour.author_live);
+                    cr->set_dash(design.dash.author_live, 0);
+                    cr->set_line_width(design.stroke_width.author_live);
+                }
+                else {
+                    if (not design.enabled.author_dead) continue;
+
+                    cr->set_source(design.colour.author_dead);
+                    cr->set_dash(design.dash.author_dead, 0);
+                    cr->set_line_width(design.stroke_width.author_dead);
+                }
+                drawWrappingLine(cr, trans, b.position, state->readers.at(b.author).position);
                 cr->stroke();
             }
+            cr->restore();
         }
 
         // Draw readers
-        if (not invisible(colours.reader)) {
+        if (design.enabled.reader) {
             for (auto &rpair : state->readers) {
                 auto &r = rpair.second;
                 double rx = r.position[0], ry = r.position[1];
                 // Draw the reader
-                drawPoint(cr, trans, rx, ry, PointType::X, colours.reader);
-
-                // NB: rx, ry may be translated now
+                drawPoint(cr, trans, rx, ry,
+                        design.style.reader, design.colour.reader, design.size.reader, design.stroke_width.reader);
             }
         }
 
@@ -161,8 +225,8 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
         zero_x = std::round(zero_x);
         zero_y = std::round(zero_y);
 
-        cr->set_line_width(2.0);
-        cr->set_source(colours.axes);
+        cr->set_line_width(design.stroke_width.axes);
+        cr->set_source(design.colour.axes);
         cr->move_to(zero_x, 0);
         cr->line_to(zero_x, height);
         cr->stroke();
@@ -171,36 +235,31 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
         cr->stroke();
 
         // Tick marks
-        cr->set_line_width(1.0);
         int tick_num = 0;
-        for (double gx = tick_space; gx <= boundary; gx += tick_space) {
-            const double curr_tick_size = (++tick_num % tick_big) ? tick_size : 3*tick_size;
-            double x = gx, y = 0;
-            trans.transform_point(x, y);
-            x = std::round(x + 0.5) - 0.5; // Round to nearest 0.5 for crisper lines
-            cr->move_to(x, y - curr_tick_size/2.0);
-            cr->rel_line_to(0, curr_tick_size);
-            x = -gx; y = 0;
-            trans.transform_point(x, y);
-            x = std::round(x + 0.5) - 0.5; // Round for crisper lines
-            cr->move_to(x, y - curr_tick_size/2.0);
-            cr->rel_line_to(0, curr_tick_size);
+        for (double tickpos = design.style.tick_every; tickpos <= boundary; tickpos += design.style.tick_every) {
+            const bool big_tick = ++tick_num % design.style.tick_big == 0;
+            const double curr_tick_size = big_tick ? design.size.tick_big : design.size.tick;
+            cr->set_line_width(big_tick ? design.stroke_width.axes_ticks_big : design.stroke_width.axes_ticks);
+
+            // x-axis ticks:
+            for (double x : {tickpos,-tickpos}) {
+                double y = 0;
+                trans.transform_point(x, y);
+                x = std::round(x + 0.5) - 0.5; // Round to nearest 0.5 for crisper lines
+                cr->move_to(x, y - 0.5*curr_tick_size);
+                cr->rel_line_to(0, curr_tick_size);
+            }
+            // y-axis ticks:
+            for (double y : {tickpos,-tickpos}) {
+                double x = 0;
+                trans.transform_point(x, y);
+                y = std::round(y + 0.5) - 0.5; // Round to nearest 0.5 for crisper lines
+                cr->move_to(x - 0.5*curr_tick_size, y);
+                cr->rel_line_to(curr_tick_size, 0);
+            }
+
+            cr->stroke();
         }
-        tick_num = 0;
-        for (double gy = tick_space; gy <= boundary; gy += tick_space) {
-            const double curr_tick_size = (++tick_num % tick_big) ? tick_size : 3*tick_size;
-            double x = 0, y = gy;
-            trans.transform_point(x, y);
-            y = std::round(y + 0.5) - 0.5; // Round for crisper lines
-            cr->move_to(x - curr_tick_size/2.0, y);
-            cr->rel_line_to(curr_tick_size, 0);
-            x = 0; y = -gy;
-            trans.transform_point(x, y);
-            y = std::round(y + 0.5) - 0.5; // Round for crisper lines
-            cr->move_to(x - curr_tick_size/2.0, y);
-            cr->rel_line_to(curr_tick_size, 0);
-        }
-        cr->stroke();
 
         cr->restore();
     }
@@ -233,13 +292,10 @@ void GraphArea::drawWrappingLine(const Cairo::RefPtr<Cairo::Context> &cr, const 
     cr->restore(); // Undo transformation
 }
 
-#define RGBA red, green, blue, alpha
 void GraphArea::drawPoint(
         const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans, double x, double y,
-        const PointType &type, const Colour &colour, double scale, bool virt) {
+        const PointType &type, const Colour &colour, const double radius, const double width, bool virt) {
 
-    // The radius of the point
-    const double pt_radius = point_size * scale;
     const double boundary = gui_.creativity_->boundary();
 
     // Before we transform x and y, consider whether there are wrapped versions of the point we need
@@ -247,48 +303,51 @@ void GraphArea::drawPoint(
     if (not virt) {
         double dim_x = 2*boundary,
                dim_y = 2*boundary;
-        bool wrap_right = x + pt_radius > boundary,
-             wrap_left  = x - pt_radius < -boundary,
-             wrap_up    = y + pt_radius > boundary,
-             wrap_down  = y - pt_radius < -boundary;
+        bool wrap_right = x + radius > boundary,
+             wrap_left  = x - radius < -boundary,
+             wrap_up    = y + radius > boundary,
+             wrap_down  = y - radius < -boundary;
 
         // There are 8 wrapping possibilities to consider; the first 4 are corners, the last 4 are
-        // single-dimension edge wraps.  Corners are just like double-edged wraps, but *also* have
-        // to wrap to the opposite corner.
+        // single-dimension edge wraps.  Corners are just like a wrap in each wrapped edge, but
+        // *also* have to wrap to the opposite corner.
+        //
+        // Note also that this doesn't properly handle cases where radius > 2*boundary: such would
+        // require wrapping multiple times, or on opposite sides at once (i.e. right *and* left
+        // wraps).  Since that shouldn't happen in practice, this isn't a big limitation.
         if (wrap_left and wrap_up) // Upper left
-            drawPoint(cr, trans, x+dim_x, y-dim_y, type, colour, scale, true); // Lower right
+            drawPoint(cr, trans, x+dim_x, y-dim_y, type, colour, radius, width, true); // Lower right
         else if (wrap_left and wrap_down) // Lower left
-            drawPoint(cr, trans, x+dim_x, y+dim_y, type, colour, scale, true); // Upper right
+            drawPoint(cr, trans, x+dim_x, y+dim_y, type, colour, radius, width, true); // Upper right
         else if (wrap_right and wrap_up) // Upper right
-            drawPoint(cr, trans, x-dim_x, y-dim_y, type, colour, scale, true); // Lower left
+            drawPoint(cr, trans, x-dim_x, y-dim_y, type, colour, radius, width, true); // Lower left
         else if (wrap_right and wrap_down) // Lower right
-            drawPoint(cr, trans, x-dim_x, y+dim_y, type, colour, scale, true); // Upper left
+            drawPoint(cr, trans, x-dim_x, y+dim_y, type, colour, radius, width, true); // Upper left
 
         // Now the edge mirroring
         if (wrap_left)
-            drawPoint(cr, trans, x+dim_x, y, type, colour, scale, true);
+            drawPoint(cr, trans, x+dim_x, y, type, colour, radius, width, true);
         else if (wrap_right)
-            drawPoint(cr, trans, x-dim_x, y, type, colour, scale, true);
-        
+            drawPoint(cr, trans, x-dim_x, y, type, colour, radius, width, true);
+
         if (wrap_up)
-            drawPoint(cr, trans, x, y-dim_y, type, colour, scale, true);
+            drawPoint(cr, trans, x, y-dim_y, type, colour, radius, width, true);
         else if (wrap_down)
-            drawPoint(cr, trans, x, y+dim_y, type, colour, scale, true);
+            drawPoint(cr, trans, x, y+dim_y, type, colour, radius, width, true);
     }
 
     // Get the user-space coordinates of the point
     trans.transform_point(x, y);
 
     cr->save();
-    cr->set_line_width(2.0);
+    cr->set_line_width(width);
+    cr->set_source(colour);
 
     switch (type) {
         case PointType::X:
             {
                 // We're drawing 45-degree lines, so get the linear distance on each dimension:
-                double edge = pt_radius * sqrt(2.0);
-
-                cr->set_source(colour);
+                double edge = radius * sqrt(2.0);
 
                 cr->move_to(x-0.5*edge, y-0.5*edge); // Upper left
                 cr->rel_line_to(edge, edge); // ... line to bottom right
@@ -300,22 +359,19 @@ void GraphArea::drawPoint(
         case PointType::SQUARE:
             {
                 // The SQUARE vertices are the the same as the X type, above
-                double edge = pt_radius * sqrt(2.0);
-
-                cr->set_source(colour);
+                double edge = radius * sqrt(2.0);
                 cr->rectangle(x-0.5*edge, y-0.5*edge, edge, edge);
                 break;
             }
         case PointType::CROSS:
             {
-                cr->set_source(colour);
+                // Easier than the above: the lines are simply of length 2*radius
                 // Horizontal line:
-                cr->move_to(x - pt_radius, y);
-                cr->rel_line_to(2*pt_radius, 0);
-
+                cr->move_to(x - radius, y);
+                cr->rel_line_to(2*radius, 0);
                 // Verical line:
-                cr->move_to(x, y - pt_radius);
-                cr->rel_line_to(0, 2*pt_radius);
+                cr->move_to(x, y - radius);
+                cr->rel_line_to(0, 2*radius);
                 break;
             }
     }
@@ -324,8 +380,8 @@ void GraphArea::drawPoint(
     cr->restore();
 }
 
-void GraphArea::drawCircle(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans,
-        double cx, double cy, double r, const Colour &colour) {
+void GraphArea::drawGraphCircle(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans,
+        double cx, double cy, double r, const Colour &colour, double stroke_width, double radial_stroke_width) {
     // Apply the full transformation: then we can just draw the circle in *graph* space which,
     // post-transformation, will be exactly the desired oval.
     cr->save();
@@ -336,21 +392,65 @@ void GraphArea::drawCircle(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo:
     // more compressed axis).
     cr->arc(cx, cy, r, 0.0, 2*M_PI);
 
-    // Draw a radial line at a quasi-random angle (based on the position and radius values) to the
-    // center of the circle.  The quasi-random calculation means the same circle gets the same angle
-    // when redrawn.
-    double angle = std::fmod(1000000 * cx * cy * r, 2*M_PI);
-    cr->move_to(cx, cy);
-    cr->rel_line_to(r*std::sin(angle), r*std::cos(angle));
-
     // Undo the transformation, then change the color and line width and actually draw the circle
     cr->restore();
     cr->save();
-    cr->set_line_width(2.0);
+    cr->set_line_width(stroke_width);
     cr->set_source(colour);
 
     cr->stroke();
     cr->restore();
+
+    if (radial_stroke_width > 0) {
+        cr->save();
+        cr->transform(trans);
+        // Draw a radial line at a quasi-random angle (based on the position and radius values) to the
+        // center of the circle.  The quasi-random calculation means the same circle gets the same angle
+        // when redrawn.
+        double angle = std::fmod(1000000 * cx * cy * r, 2*M_PI);
+        cr->move_to(cx, cy);
+        cr->rel_line_to(r*std::sin(angle), r*std::cos(angle));
+        cr->restore();
+        cr->save();
+        cr->set_line_width(radial_stroke_width);
+        cr->set_source(colour);
+        cr->stroke();
+        cr->restore();
+    }
+}
+
+void GraphArea::drawCanvasCircle(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans,
+        double cx, double cy, double r, const Colour &colour, double stroke_width, double radial_stroke_width) {
+
+    // Draw a radial line at a quasi-random angle (based on the position and radius values) to the
+    // center of the circle.  The quasi-random calculation means the same circle gets the same angle
+    // when redrawn.  Calculate this *before* transforming the point so that the angle remains the
+    // same across canvas resizing.
+    const double radial_angle = std::fmod(1000000 * cx * cy * r, 2*M_PI);
+
+    trans.transform_point(cx, cy);
+
+    cr->save();
+    cr->arc(cx, cy, r, 0.0, 2*M_PI);
+    cr->set_line_width(stroke_width);
+    cr->set_source(colour);
+    cr->stroke();
+
+    // Now draw the radial line (if non-zero):
+    if (radial_stroke_width > 0) {
+        cr->set_line_width(radial_stroke_width);
+
+        cr->move_to(cx, cy);
+        cr->rel_line_to(r*std::sin(radial_angle), r*std::cos(radial_angle));
+        cr->set_line_width(radial_stroke_width);
+        cr->stroke();
+    }
+
+    cr->restore();
+}
+
+void GraphArea::resetCache() {
+    drawing_cache_width_ = -1;
 }
 
 } }
