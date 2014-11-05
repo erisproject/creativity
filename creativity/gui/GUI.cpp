@@ -241,7 +241,6 @@ void GUI::thr_run() {
     std::unique_lock<std::mutex> lock{mutex_};
 
     graph_ = std::unique_ptr<GraphArea>(new GraphArea(*this));
-    graph_->add_events(Gdk::EventMask::BUTTON_PRESS_MASK);
 
     hand_ = Gdk::Cursor::create(main_window_->get_display(), Gdk::HAND1);
 
@@ -269,6 +268,7 @@ void GUI::thr_run() {
     graph_->add_events(Gdk::POINTER_MOTION_MASK);
     motion_handler_conn_ = graph_->signal_motion_notify_event().connect(motion_handler_);
 
+    graph_->add_events(Gdk::EventMask::BUTTON_PRESS_MASK);
     graph_->signal_button_press_event().connect([this](GdkEventButton *event) -> bool {
         double x = event->x, y = event->y;
         auto c2g = graph_->canvas_to_graph();
@@ -290,6 +290,20 @@ void GUI::thr_run() {
         thr_info_dialog(nearest[0].second);
         return true;
     });
+
+    graph_->add_events(Gdk::EventMask::SCROLL_MASK);
+    graph_->signal_scroll_event().connect([this](GdkEventScroll *event) -> bool {
+        if (event->direction == GdkScrollDirection::GDK_SCROLL_UP) {
+            if (state_curr_ > 0) thr_set_state(state_curr_ - 1);
+            return true;
+        }
+        if (event->direction == GdkScrollDirection::GDK_SCROLL_DOWN) {
+            if (state_curr_ + 1 < state_num_) thr_set_state(state_curr_ + 1);
+            return true;
+        }
+        return false;
+    });
+
 
     rdr_win_ = widget<Gtk::ScrolledWindow>("win_rdr");
     bk_win_ = widget<Gtk::ScrolledWindow>("win_bk");
