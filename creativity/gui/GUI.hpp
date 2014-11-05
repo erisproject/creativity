@@ -438,8 +438,9 @@ class GUI : eris::noncopyable {
 
         typedef boost::geometry::model::point<double, 2, boost::geometry::cs::cartesian> rt_point;
         typedef std::pair<rt_point, eris::eris_id_t> rt_val;
+        using RTree = boost::geometry::index::rtree<rt_val, boost::geometry::index::rstar<16>>;
         /** rtrees of reader/book points for each state. */
-        std::vector<boost::geometry::index::rtree<rt_val, boost::geometry::index::rstar<16>>> rtrees_;
+        std::vector<std::unique_ptr<RTree>> rtrees_;
 
         /** Returns the `n` nearest points/eris_id_t pairs to the given rt_point.  May returns fewer
          * than `n` (including 0) if there are not `n` points within `radius` pixels.
@@ -449,6 +450,16 @@ class GUI : eris::noncopyable {
          * Defaults to 1.
          */
         std::vector<rt_val> thr_nearest(const rt_point &point, int n = 1);
+
+        /** Called when the visibility of readers, live books, or dead books have changed to throw
+         * out all cached rtrees and rebuild the current state's rtree.
+         */
+        void thr_reset_rtrees();
+
+        /** Given a newly-constructed, empty rtree and a state, this populates the rtree with the
+         * visible books and readers of the state.
+         */
+        void thr_init_rtree(RTree &rt, const std::shared_ptr<const state::State> &state) const;
 
         std::function<bool(GdkEventMotion* event)> motion_handler_;
         sigc::connection motion_handler_conn_;

@@ -305,6 +305,52 @@ void GUI::thr_run() {
     });
 
 
+    // Set up handlers and defaults for the visualization settings
+#define GUI_SETUP_VIS_COLOUR(FIELD) {\
+        auto colour_button = widget<Gtk::ColorButton>("colour_" #FIELD); \
+        double r, g, b, a; Gdk::RGBA rgba; \
+        graph_->design.colour.FIELD->get_rgba(r, g, b, a); \
+        rgba.set_red(r); rgba.set_green(g); rgba.set_blue(b); rgba.set_alpha(a); \
+        colour_button->set_rgba(rgba); \
+        colour_button->signal_color_set().connect([this,colour_button] { \
+            auto colour = colour_button->get_rgba(); \
+            graph_->design.colour.FIELD = Cairo::SolidPattern::create_rgba(colour.get_red(), colour.get_green(), colour.get_blue(), colour.get_alpha()); \
+            graph_->resetCache(); \
+            graph_->queue_draw(); \
+        }); \
+    }
+#define GUI_SETUP_VIS_SETTING_(FIELD, AFFECTS_RTREE) {\
+        auto enable_button = widget<Gtk::CheckButton>("enable_" #FIELD); \
+        enable_button->set_active(graph_->design.enabled.FIELD); \
+        enable_button->signal_toggled().connect([this,enable_button] { \
+            bool was = graph_->design.enabled.FIELD; \
+            bool now = enable_button->get_active(); \
+            if (was != now) { \
+                graph_->design.enabled.FIELD = now; \
+                graph_->resetCache(); \
+                graph_->queue_draw(); \
+                if (AFFECTS_RTREE) thr_reset_rtrees(); \
+            } \
+        }); \
+    } \
+    GUI_SETUP_VIS_COLOUR(FIELD)
+#define GUI_SETUP_VIS_SETTING(FIELD) GUI_SETUP_VIS_SETTING_(FIELD, false)
+#define GUI_SETUP_VIS_SETTING_AFFECTS_RTREE(FIELD) GUI_SETUP_VIS_SETTING_(FIELD, true)
+
+    GUI_SETUP_VIS_SETTING_AFFECTS_RTREE(reader)
+    GUI_SETUP_VIS_SETTING_AFFECTS_RTREE(book_live)
+    GUI_SETUP_VIS_SETTING_AFFECTS_RTREE(book_dead)
+    GUI_SETUP_VIS_SETTING(friendship)
+    GUI_SETUP_VIS_SETTING(author_live)
+    GUI_SETUP_VIS_SETTING(author_dead)
+    GUI_SETUP_VIS_SETTING(reading)
+    GUI_SETUP_VIS_SETTING(utility_gain)
+    GUI_SETUP_VIS_SETTING(utility_loss)
+    GUI_SETUP_VIS_SETTING(axes)
+    GUI_SETUP_VIS_COLOUR(background)
+#undef GUI_SETUP_VIS_SETTING
+#undef GUI_SETUP_VIS_COLOUR
+
     rdr_win_ = widget<Gtk::ScrolledWindow>("win_rdr");
     bk_win_ = widget<Gtk::ScrolledWindow>("win_bk");
 
@@ -444,7 +490,7 @@ void GUI::thr_set_state(unsigned long t) {
     bk_win_->remove();
     bk_win_->add(*bk_trees_[t]);
 
-    if (rtrees_[t].empty()) {
+    if (not rtrees_[t]) {
         // Stick all points into an rtree so that we can quickly find the nearest one (needed, in
         // particular, for fast mouseovers).
         //
@@ -452,11 +498,11 @@ void GUI::thr_set_state(unsigned long t) {
         // the graph size changes (i.e. the user resizes the window).  Rather than invalidating and
         // needing to rebuild the rtrees when that happens, we store graph positions and translate
         // to graph positions as needed in the mouseover/click handlers.
-        auto &rt = rtrees_[t];
-        for (auto &r : state->readers)
-            rt.insert(std::make_pair(rt_point{r.second.position[0], r.second.position[1]}, r.second.id));
-        for (auto &b : state->books)
-            rt.insert(std::make_pair(rt_point{b.second.position[0], b.second.position[1]}, b.second.id));
+        //
+        // Also note that only *visible* points get added here (according to
+        // graph_->design.enabled.*)
+        rtrees_[t] = std::unique_ptr<RTree>(new RTree);
+        thr_init_rtree(*rtrees_[t], state);
     }
 
     // Now go through any open reader/book info dialog windows: delete any that have been closed,
@@ -488,10 +534,34 @@ void GUI::thr_set_state(unsigned long t) {
     if (graph_->get_is_drawable()) graph_->queue_draw();
 }
 
+void GUI::thr_reset_rtrees() {
+    rtrees_.clear();
+    if (state_num_ == 0) return; // No states to worry about!
+    auto st = creativity_->storage();
+    rtrees_.resize(st.first->size());
+    auto state = (*st.first)[state_curr_];
+
+    rtrees_[state_curr_] = std::unique_ptr<RTree>(new RTree);
+    thr_init_rtree(*rtrees_[state_curr_], state);
+}
+
+void GUI::thr_init_rtree(RTree &rt, const std::shared_ptr<const State> &state) const {
+    if (graph_->design.enabled.reader) {
+        for (auto &r : state->readers)
+            rt.insert(std::make_pair(rt_point{r.second.position[0], r.second.position[1]}, r.second.id));
+    }
+    if (graph_->design.enabled.book_live or graph_->design.enabled.book_dead) {
+        for (auto &b : state->books) {
+            if (b.second.market ? graph_->design.enabled.book_live : graph_->design.enabled.book_dead)
+                rt.insert(std::make_pair(rt_point{b.second.position[0], b.second.position[1]}, b.second.id));
+        }
+    }
+}
+
 std::vector<GUI::rt_val> GUI::thr_nearest(const rt_point &point, int n) {
     std::vector<rt_val> nearest;
     if (state_num_ > 0)
-        rtrees_[state_curr_].query(boost::geometry::index::nearest(point, n), std::back_inserter(nearest));
+        rtrees_[state_curr_]->query(boost::geometry::index::nearest(point, n), std::back_inserter(nearest));
     return nearest;
 }
 
