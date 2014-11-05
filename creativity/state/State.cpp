@@ -9,6 +9,7 @@ namespace creativity { namespace state {
 State::State(const std::shared_ptr<Simulation> &sim) {
     auto lock = sim->runLock();
 
+    t = sim->t();
     // We can get the number of copies of books a bit more efficiently than calling book->copies()
     // for every book (the latter requires a loop through all readers for all books, thus requiring
     // R*B iterations (where R=# readers, B=# books); this way requires R*b iterations, where b is
