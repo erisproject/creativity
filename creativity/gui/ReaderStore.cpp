@@ -59,12 +59,13 @@ void ReaderStore::get_value_vfunc(const iterator &iter, int column, Glib::ValueB
         value.init(v.gobj());
     }
     else if (column == columns.books_owned.index() or column == columns.books_new.index() or column == columns.books_written.index()
-            or column == columns.last_book_age.index()) {
+            or column == columns.last_book_age.index() or column == columns.num_friends.index()) {
         Glib::Value<size_t> v;
         v.init(v.value_type());
         v.set(  column == columns.books_owned.index() ? r.library.size() :
                 column == columns.books_new.index() ? r.new_books.size() :
                 column == columns.books_written.index() ? r.wrote.size() :
+                column == columns.num_friends.index() ? r.friends.size() :
                 r.wrote.empty() ? state_->t : state_->books.at(r.wrote.back()).age
              );
         value.init(v.gobj());
@@ -86,6 +87,7 @@ void ReaderStore::set_sort_column_id_vfunc(int sort_column_id, Gtk::SortType ord
     ELSE_IF_COL(pos_str);
     ELSE_IF_COL(u);
     ELSE_IF_COL(u_lifetime);
+    ELSE_IF_COL(num_friends);
     ELSE_IF_COL(books_owned);
     ELSE_IF_COL(books_new);
     ELSE_IF_COL(books_written);
@@ -107,6 +109,7 @@ LESS_GREATER_A(pos_x, position[0])
 LESS_GREATER_A(pos_y, position[1])
 LESS_GREATER(u)
 LESS_GREATER(u_lifetime)
+LESS_GREATER_A(num_friends, friends.size())
 LESS_GREATER_A(books_owned, library.size())
 LESS_GREATER_A(books_new, new_books.size())
 LESS_GREATER_A(books_written, wrote.size())
@@ -136,6 +139,7 @@ void ReaderStore::appendColumnsTo(Gtk::TreeView &v) const {
     appendCol(v, "Position", columns.pos_str, 110);
     appendCol(v, "Utility", columns.u, 90);
     appendCol(v, "Life Util.", columns.u_lifetime, 90);
+    appendCol(v, "# Friends", columns.num_friends, 80);
     appendCol(v, "Books", columns.books_owned, 80);
     appendCol(v, "# New", columns.books_new, 80);
     appendCol(v, "# Written", columns.books_written, 100);

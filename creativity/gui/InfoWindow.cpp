@@ -105,6 +105,7 @@ InfoWindow::InfoWindow(std::shared_ptr<const State> state, std::shared_ptr<Gtk::
     DATA_ROW(grid_status, "booksNew", "New books");
     DATA_ROW(grid_status, "booksWritten", "Books written");
     DATA_ROW(grid_status, "bookLast", "Latest book age");
+    DATA_ROW(grid_status, "numFriends", "# Friends");
 
     nbs_.emplace_back();
     Gtk::Notebook &beliefs = nbs_.back();
@@ -239,6 +240,7 @@ void InfoWindow::refresh(std::shared_ptr<const State> state) {
         updateValue("bookLast", r.wrote.empty()
                 ? "(never written)"
                 : std::to_string(state->books.at(r.wrote.back()).age));
+        updateValue("numFriends", r.friends.size());
 
 #define UPDATE_LIN(PREFIX, VAR) \
         updateValue(PREFIX + std::string("n"), VAR.n()); \

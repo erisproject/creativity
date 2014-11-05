@@ -43,12 +43,13 @@ class ReaderStore : public MemberStore<state::ReaderState>, private Glib::Object
                 Gtk::TreeModelColumn<size_t> books_owned, ///< Number of books possessed by this reader
                     books_new, ///< Number of books acquired in the current period
                     books_written, ///< Number of books authored by this reader
-                    last_book_age; ///< Age of the most recently written book, or simulation age if `booksWritten == 0`
+                    last_book_age, ///< Age of the most recently written book, or simulation age if `booksWritten == 0`
+                    num_friends; ///< Number of friends of this reader
 
             private:
                 ColRec() {
                     add(id); add(pos_x); add(pos_y); add(pos_str); add(u); add(u_lifetime);
-                    add(cost_fixed); add(cost_unit); add(income);
+                    add(cost_fixed); add(cost_unit); add(income); add(num_friends);
                     add(books_owned); add(books_new); add(books_written); add(last_book_age);
                 }
                 friend class ReaderStore;
@@ -118,6 +119,7 @@ class ReaderStore : public MemberStore<state::ReaderState>, private Glib::Object
         LESS_GREATER_METHODS(books_owned)
         LESS_GREATER_METHODS(books_new)
         LESS_GREATER_METHODS(books_written)
+        LESS_GREATER_METHODS(num_friends)
 #undef LESS_GREATER_METHODS
         bool less_last_book_age(const state::ReaderState &a, const state::ReaderState &b) const;
         bool greater_last_book_age(const state::ReaderState &a, const state::ReaderState &b) const;
