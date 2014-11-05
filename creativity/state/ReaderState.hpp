@@ -29,6 +29,9 @@ class ReaderState final {
         /// Position of the reader
         eris::Position position;
 
+        /// Friends of the reader
+        std::unordered_set<eris::eris_id_t> friends;
+
         /** The reader's library: the keys are the book IDs of owned books, the values are the book
          * quality values realized by this reader.
          */

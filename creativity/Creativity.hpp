@@ -95,6 +95,20 @@ class Creativity : private eris::noncopyable, public std::enable_shared_from_thi
              */
             double income = 1000.0;
 
+            /** The number of sharing/friendship links as a proportion of the maxinum number of
+             * sharing links possible (which is \f$\frac{R(R-1)}{2}\f$, where \f$R\f$ is the number
+             * of readers).
+             *
+             * Links as assigned randomly between agents when the simulation is initially set up,
+             * with an equal probably of each possible link being selected.
+             *
+             * The default is 10% coverage of maximum potential links (rounded to the nearest
+             * integer).  In the default 100-reader simulation, this is 495 links.
+             *
+             * The value must be in \f$[0, 1]\f$.
+             */
+            double sharing_link_proportion = 0.1;
+
         } parameters;
 
         /** Returns the simulation boundary.  If simulation setup is complete, this returns the

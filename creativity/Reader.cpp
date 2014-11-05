@@ -124,6 +124,25 @@ double Reader::creationQuality(double effort) const {
     );
 }
 
+const std::unordered_set<SharedMember<Reader>>& Reader::friends() const {
+    return friends_;
+}
+
+bool Reader::addFriend(SharedMember<Reader> new_pal, bool recurse) {
+    auto inserted = friends_.insert(std::move(new_pal));
+    if (inserted.second and recurse) (*inserted.first)->addFriend(sharedSelf(), false);
+    return inserted.second;
+}
+
+bool Reader::removeFriend(const SharedMember<Reader> &old_pal, bool recurse) {
+    auto found = friends_.find(old_pal);
+    if (found == friends_.end()) return false; // Not found
+
+    if (recurse) (*found)->removeFriend(sharedSelf(), false);
+    friends_.erase(found);
+    return true;
+}
+
 void Reader::interOptimize() {
     // Update the various profit, demand, and quality beliefs
     updateBeliefs();

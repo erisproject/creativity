@@ -331,6 +331,13 @@ std::pair<eris::eris_id_t, ReaderState> FileStorage::readReader() const {
     for (uint32_t d = 0; d < dimensions_; d++) {
         r.position[d] = read_dbl();
     }
+    // Friends
+    auto num_friends = read_u32();
+    r.friends.reserve(num_friends);
+    for (uint32_t i = 0; i < num_friends; i++) {
+        r.friends.insert(read_u64());
+    }
+
     // Library
     auto libsize = read_u32();
     r.library.reserve(libsize);
@@ -341,13 +348,13 @@ std::pair<eris::eris_id_t, ReaderState> FileStorage::readReader() const {
     auto newsize = read_u32();
     r.new_books.reserve(newsize);
     for (uint32_t i = 0; i < newsize; i++) {
-        r.new_books.emplace(read_u64());
+        r.new_books.insert(read_u64());
     }
     // Authored books
     auto wrotesize = read_u32();
     r.wrote.reserve(wrotesize);
     for (uint32_t i = 0; i < wrotesize; i++) {
-        r.wrote.emplace_back(read_u64());
+        r.wrote.push_back(read_u64());
     }
     // Utility
     r.u = read_dbl();

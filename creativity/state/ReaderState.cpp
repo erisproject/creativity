@@ -21,6 +21,11 @@ ReaderState::ReaderState(const Reader &r) :
     quality{r.qualityBelief()},
     profit_stream{r.profitStreamBeliefs()}
 {
+    friends.reserve(r.friends().size());
+    for (auto &f : r.friends()) {
+        friends.insert(f->id());
+    }
+
     library.reserve(r.library().size());
     for (auto &bq : r.library()) {
         library.emplace(bq.first->id(), bq.second);

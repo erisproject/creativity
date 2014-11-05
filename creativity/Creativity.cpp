@@ -7,6 +7,7 @@
 #include <eris/intraopt/Callback.hpp>
 #include <Eigen/Core>
 #include <cmath>
+#include <algorithm>
 
 namespace creativity {
 
@@ -62,6 +63,20 @@ void Creativity::setup() {
     auto &rng = eris::Random::rng();
     ERIS_DBG("Setting up readers");
 
+    if (parameters.sharing_link_proportion < 0 or parameters.sharing_link_proportion > 1)
+        throw std::logic_error("Creativity sharing_link_proportion parameter is invalid (not in [0,1])");
+
+    unsigned long max_links = parameters.readers * (parameters.readers - 1) / 2;
+    unsigned long num_links = std::lround(parameters.sharing_link_proportion * max_links);
+
+    // Track ids of created readers, to build to set of all possible edges as we go
+    std::vector<eris_id_t> created;
+    std::vector<std::pair<eris_id_t, eris_id_t>> potential_edges;
+    if (num_links > 0) {
+        created.reserve(parameters.readers);
+        potential_edges.reserve(max_links);
+    }
+
     for (unsigned int i = 0; i < parameters.readers; i++) {
         auto r = sim->create<Reader>(shared_from_this(),
                 Position{unif_pmb(rng), unif_pmb(rng)},
@@ -72,7 +87,26 @@ void Creativity::setup() {
                 parameters.cost_fixed, parameters.cost_unit, parameters.income
                 );
         r->writer_book_sd = parameters.book_quality_sd;
+
+        if (num_links > 0) {
+            for (auto &other : created) {
+                potential_edges.emplace_back(r->id(), other);
+            }
+            created.push_back(r->id());
+        }
     }
+
+    if (num_links > 0 and num_links < max_links) {
+        // We aren't a full graph, so shuffle then throw away the ones we don't need
+        auto &rng = Random::rng();
+        std::shuffle(potential_edges.begin(), potential_edges.end(), rng);
+        potential_edges.resize(num_links);
+    }
+
+    for (auto &e : potential_edges) {
+        sim->agent<Reader>(e.first)->addFriend(sim->agent<Reader>(e.second));
+    }
+
     ERIS_DBG("Done with readers");
 
     sim->create<intraopt::FinishCallback>([this] { new_books_.clear(); });

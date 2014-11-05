@@ -427,6 +427,33 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         /// Read-only access to this reader's quality belief
         const belief::Quality& qualityBelief() const;
 
+        /** Read-only access to the set of friends of this reader. */
+        const std::unordered_set<eris::SharedMember<Reader>>& friends() const;
+
+        /** Adds a friend to this reader, and adds this reader as a friend of the other reader.
+         *
+         * If the friendship is already established, this method does nothing.
+         *
+         * \param new_pal the new friend
+         * \param recurse true (the default) if the reciprocal friendship should be added.  Internal
+         * use only; external callers should not specify this value.
+         *
+         * \returns true if the call established a new friendship, false if the friendship already
+         * existed.
+         */
+        bool addFriend(eris::SharedMember<Reader> new_pal, bool recurse = true);
+
+        /** Removes a friend from this reader, and removes this reader from the given reader's set
+         * of friends.
+         *
+         * \param old_pal the friend to remove
+         * \param recurse true (the default) if the reciprocal friendship should also be removed.
+         * Internal use only; external callers should not specify this value.
+         *
+         * \returns true if the friendship was removed, false if the friendship did not exist.
+         */
+        bool removeFriend(const eris::SharedMember<Reader> &old_pal, bool recurse = true);
+
         /** In-between periods, the reader optimizes by:
          * - updates his beliefs based on characteristics of newly obtained books
          * - chooses whether or not to create a new book and, if so, the effort to expend on it
@@ -484,6 +511,9 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * market for at least 3 periods.
          */
         std::map<unsigned int, belief::ProfitStream> profit_stream_beliefs_;
+
+        /** The set of friends of this reader. */
+        std::unordered_set<eris::SharedMember<Reader>> friends_;
 
         /** Updates all of the reader's beliefs, in the following order:
          * - book quality beliefs

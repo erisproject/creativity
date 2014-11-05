@@ -287,10 +287,11 @@ class FileStorage : public Storage, private eris::noncopyable {
         void writeState(const State &state);
 
         /** Reads a ReaderState record from the current file position and returns it in an
-         * {eris_id_t, ReaderState} pair, where `.first` is the id.  Such a structure is:
+         * {eris_id_t, ReaderState} pair, where `.first` is the id.  Such a record consists of:
          *
          *     u64          id
          *     dbl*DIM      position (DIM = dimensions)
+         *     u64[]        friend ids
          *     (u64,dbl)[]  library
          *     u64[]        new
          *     u64[]        wrote
