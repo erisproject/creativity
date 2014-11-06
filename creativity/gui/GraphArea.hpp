@@ -112,6 +112,23 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
         void drawCanvasCircle(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans,
                 double cx, double cy, double r, const Colour &colour, double stroke_width, double radial_stroke_width = 0.0);
 
+        /** Draws the shortest line between two points, allowing the line to wrap across simulation
+         * boundaries.  Note that when a line wraps this actually involves drawing several line
+         * segments.
+         *
+         * \param cr the Cairo::Context on which to draw
+         * \param trans the transformation matrix that converts graph points to canvas points
+         * \param from the start position of the line, in graph space
+         * \param to the end position of the line, in graph space
+         * \param min_length the minimum length line to draw; if the on-screen line length is less
+         * than this, it will not be drawn.  If omitted, defaults to 0 (no minimum).
+         * \param start_colour the start colour of the line (if not specified, the stroke colour is
+         * not changed), for creating a line with a gradient.
+         * \param end_colour the ending colour of the line, for creating a line with a gradient.
+         */
+        void drawWrappingLine(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans, const eris::Position &from, const eris::Position &to,
+                double min_length = 0.0, Colour start_colour = Colour(), Colour end_colour = Colour());
+
         /** Struct containing various graph properties such as colours, line widths, and dash
          * styles.
          */
@@ -120,11 +137,12 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
             struct {
                 bool
                     reader = true, ///< Whether to draw agents
+                    friendship = true, ///< Whether to draw friendship links
+                    movement = true, ///< Whether to draw a reader movement trail
                     book_live = true, ///< Whether to draw on-market books
                     book_dead = true, ///< Whether to draw off-market books
                     author_live = true, ///< Whether to draw on-market authorship lines
                     author_dead = true, ///< Whether to draw off-market authorship lines
-                    friendship = true, ///< Whether to draw friendship links
                     reading = true, ///< Whether to draw lines for newly obtained books
                     utility_gain = true, ///< Whether to draw utility gain circles
                     utility_loss = true, ///< Whether to draw utility loss circles
@@ -148,6 +166,10 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
                     reader = Cairo::SolidPattern::create_rgb(1, 0, 0),
                     /// The colour of friendship links between readers
                     friendship = Cairo::SolidPattern::create_rgba(0.75, 0, 0, 0.5),
+                    /** The colour of the movement trail; the actual trail will be a gradient from
+                     * fully transparent to this colour.
+                     */
+                    movement = Cairo::SolidPattern::create_rgba(1, 0, 0, 0.75),
                     /// The colour of the utility circle (for readers with utility > 1000)
                     utility_gain = Cairo::SolidPattern::create_rgba(.133, .545, .133, 0.5),
                     /// The colour of the utility loss circle (for readers with utility < 1000)
@@ -172,6 +194,8 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
                     reading,
                     /// The dash pattern of friendship links between readers
                     friendship{{12.0, 3.0}},
+                    /// The dash pattern of reader movement trails
+                    movement,
                     /// The dash pattern of the utility circle (for readers with utility > 1000)
                     utility;
             } dash;
@@ -186,6 +210,7 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
                     reading = 2.0, ///< Width of lines from readers to newly-obtained books
                     reader = 2.0, ///< Stroke width of agent icons
                     friendship = 1.0, ///< Stroke width of reader-to-reader friendship links
+                    movement = 3.0, ///< Stroke width of movement path
                     utility = 2.0, ///< Stroke width of utility circles
                     utility_radial = 1.0, ///< Stroke width of the radial line of utility circles
                     axes = 2.0, ///< Stroke width of the graph axes
@@ -252,7 +277,9 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
 
                 double
                     /// Spacing of axes tick marks.  2.0 means ticks at 2, 4, 6, etc.
-                    tick_every = 1.0;
+                    tick_every = 1.0,
+                    /// Alpha multiplier for the starting colour of the movement line gradient.
+                    movement_alpha_multiplier = 0.1;
 
                 unsigned int
                     /// Every `style.tick_big`th tick will be `size.tick_big`-sized
@@ -277,9 +304,6 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
         std::vector<Cairo::RefPtr<Cairo::ImageSurface>> drawing_cache_;
         int drawing_cache_width_ = -1, drawing_cache_height_ = -1;
 
-        // Sets up one or more (wrapping) lines between two points, but does not actually draw it
-        // with stroke().
-        void drawWrappingLine(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans, const eris::Position &from, const eris::Position &to);
 };
 
 } }

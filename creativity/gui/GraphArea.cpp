@@ -66,14 +66,16 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
                 drawing_cache_[gui_.state_curr_] = Cairo::ImageSurface::create(Cairo::FORMAT_RGB24, width, height)
         );
 
-        std::shared_ptr<const State> state;
+        std::shared_ptr<const State> state, prev_state;
 
         {
             auto st = gui_.creativity_->storage();
             if (st.first->empty())
                 state = std::make_shared<State>();
-            else
+            else {
                 state = (*st.first)[gui_.state_curr_];
+                if (gui_.state_curr_ > 0) prev_state = (*st.first)[gui_.state_curr_ - 1];
+            }
         }
 
         cr->save();
@@ -87,6 +89,25 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
         // Things get draw here in order from least to most important (since later things are drawn
         // on top of earlier things).  This means we have to loop over the same vector a few times,
         // unfortunately.
+
+        // Draw reader movement lines (if the reader existed in the previous period).
+        if (design.enabled.movement and prev_state) {
+            cr->save();
+            cr->set_dash(design.dash.movement, 0);
+            cr->set_line_width(design.stroke_width.movement);
+            double r, g, b, a;
+            design.colour.movement->get_rgba(r,g,b,a);
+            a = std::max(0.0, std::min(1.0, a * design.style.movement_alpha_multiplier));
+            auto start_colour = Cairo::SolidPattern::create_rgba(r, g, b, a);
+
+            for (auto &rpair : state->readers) {
+                if (prev_state->readers.count(rpair.first) > 0) {
+                    auto &was_at = prev_state->readers.at(rpair.first).position;
+                    drawWrappingLine(cr, trans, was_at, rpair.second.position, 5.0, start_colour, design.colour.movement);
+                }
+            }
+            cr->restore();
+        }
 
         // Draw lines from readers to newly purchased books (unless we're not showing newly
         // purchased books)
@@ -270,9 +291,9 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
     return true;
 }
 
-void GraphArea::drawWrappingLine(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans, const Position &from, const Position &to) {
-    cr->save();
-    cr->transform(trans);
+void GraphArea::drawWrappingLine(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans, const Position &from, const Position &to,
+        double min_length, Colour start_colour, Colour end_colour) {
+
     const double boundary = gui_.creativity_->boundary();
     const double x_span = 2*boundary;
     const double y_span = 2*boundary;
@@ -280,16 +301,83 @@ void GraphArea::drawWrappingLine(const Cairo::RefPtr<Cairo::Context> &cr, const 
         wpb_ = WrappedPositionalBase({0.0,0.0}, {-boundary, -boundary}, {boundary, boundary});
     }
     wpb_.moveTo(from);
+    // Get the shortest-path vector to the target, first in graph vectors, then translated to canvas
+    // vectors:
     auto v = wpb_.vectorTo(to);
-    // There are nine virtual points the author can take; draw a line from each of them (at most
-    // three of these lines will actually show up)
-    for (double r_x : {from[0], from[0] - x_span, from[0] + x_span}) {
-        for (double r_y : {from[1], from[1] - y_span, from[1] + y_span}) {
-            cr->move_to(r_x, r_y);
-            cr->rel_line_to(v[0], v[1]);
+    double v_canvas[2] = {v[0], v[1]};
+
+    trans.transform_distance(v_canvas[0], v_canvas[1]);
+
+    if (std::hypot(v_canvas[0], v_canvas[1]) < min_length)
+        return;
+
+
+
+    // Build a list of all the "from" points we actually need to draw from.  Obviously we need a
+    // vector from the original one, but we may also need to draw a vector from 1 or 3 virtual
+    // source locations (i.e. locations in wrapped dimensions).
+    std::vector<std::pair<double,double>> source_locations;
+    source_locations.emplace_back(from[0], from[1]);
+    // Figure out if we're crossing any boundaries:
+    bool wrap_right = (v[0] > 0 and to[0] < from[0]),
+         wrap_left = (v[0] < 0 and to[0] > from[0]),
+         wrap_top = (v[1] > 0 and to[1] < from[1]),
+         wrap_bottom = (v[1] < 0 and to[1] > from[1]);
+
+    if (wrap_right) {
+        source_locations.emplace_back(from[0] - x_span, from[1]); // Left virtual
+        // Check for corner virtuals:
+        if (wrap_top)
+            source_locations.emplace_back(from[0] - x_span, from[1] - y_span); // Bottom-left virtual
+        else if (wrap_bottom)
+            source_locations.emplace_back(from[0] - x_span, from[1] + y_span); // Top-left virtual
+    }
+    else if (wrap_left) {
+        source_locations.emplace_back(from[0] + x_span, from[1]); // Right virtual
+        // Check for corner virtuals:
+        if (wrap_top)
+            source_locations.emplace_back(from[0] + x_span, from[1] - y_span); // Bottom-right virtual
+        else if (wrap_bottom)
+            source_locations.emplace_back(from[0] + x_span, from[1] + y_span); // Top-right virtual
+    }
+    if (wrap_top)
+        source_locations.emplace_back(from[0], from[1] - y_span); // Bottom virtual
+    else if (wrap_bottom)
+        source_locations.emplace_back(from[0], from[1] + y_span); // Top virtual
+
+
+    // Now figure out the gradient/colour stuff, if requested
+    cr->save();
+    struct rgba { double r, g, b, a; };
+    struct { bool active = false; rgba start; rgba end; } gradient;
+    if (start_colour) {
+        if (end_colour) {
+            gradient.active = true;
+            start_colour->get_rgba(gradient.start.r, gradient.start.g, gradient.start.b, gradient.start.a);
+            end_colour->get_rgba(gradient.end.r, gradient.end.g, gradient.end.b, gradient.end.a);
+        }
+        else {
+            cr->set_source(start_colour);
         }
     }
-    cr->restore(); // Undo transformation
+
+    // else start_colour is unset, so don't touch the colour
+    // source_locations now holds all the virtual line segment starting points (in graph notation),
+    // from which we need to draw the directional vector `v_canvas` (in canvas notation).
+    for (auto &s : source_locations) {
+        trans.transform_point(s.first, s.second); // Convert to canvas coordinate
+        if (gradient.active) {
+            auto grad = Cairo::LinearGradient::create(s.first, s.second, s.first + v_canvas[0], s.second + v_canvas[1]);
+            grad->add_color_stop_rgba(0.0, gradient.start.r, gradient.start.g, gradient.start.b, gradient.start.a);
+            grad->add_color_stop_rgba(1.0, gradient.end.r, gradient.end.g, gradient.end.b, gradient.end.a);
+            cr->set_source(grad);
+        }
+        cr->move_to(s.first, s.second);
+        cr->rel_line_to(v_canvas[0], v_canvas[1]);
+        cr->stroke();
+    }
+
+    cr->restore(); // Undo any colour changes
 }
 
 void GraphArea::drawPoint(

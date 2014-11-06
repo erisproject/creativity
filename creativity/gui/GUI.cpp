@@ -341,6 +341,7 @@ void GUI::thr_run() {
     GUI_SETUP_VIS_SETTING_AFFECTS_RTREE(book_live)
     GUI_SETUP_VIS_SETTING_AFFECTS_RTREE(book_dead)
     GUI_SETUP_VIS_SETTING(friendship)
+    GUI_SETUP_VIS_SETTING(movement)
     GUI_SETUP_VIS_SETTING(author_live)
     GUI_SETUP_VIS_SETTING(author_dead)
     GUI_SETUP_VIS_SETTING(reading)
