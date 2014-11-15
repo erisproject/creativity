@@ -27,8 +27,8 @@ class Creativity : private eris::noncopyable, public std::enable_shared_from_thi
         /// The money good.  Will be empty until setup() is called.
         eris::SharedMember<eris::Good::Continuous> money;
 
-        /** Simulation parameters that should be updated appropriately before calling setup().  This
-         * parameters may be read but should not be changed after setup() has been called.
+        /** Simulation parameters that should be updated appropriately before calling setup().
+         * These parameters may be read but should not be changed after setup() has been called.
          */
         struct {
             /// The number of readers in the simulation
@@ -95,6 +95,10 @@ class Creativity : private eris::noncopyable, public std::enable_shared_from_thi
              */
             double income = 1000.0;
 
+            /** The period in which the sharing network is introduced.
+             */
+            unsigned long sharing_begins = 100;
+
             /** The number of sharing/friendship links as a proportion of the maxinum number of
              * sharing links possible (which is \f$\frac{R(R-1)}{2}\f$, where \f$R\f$ is the number
              * of readers).
@@ -157,6 +161,18 @@ class Creativity : private eris::noncopyable, public std::enable_shared_from_thi
          */
         void updateAllCosts(double cost_fixed, double cost_unit = -1.0);
 
+        /** Returns true if file sharing exists.  Attempt to call this on a Creativity object that
+         * is not a live simulation, or is a live simulation but has not been set up yet, will raise
+         * an exception.
+         */
+        bool sharing() const;
+
+        /** Returns the period in which sharing becomes available in the current simulation.
+         * Raises an exception if the Creativity object corresponds neither to a simulation state
+         * nor live, setup simulation.
+         */
+        unsigned long sharingBegins() const;
+
         /** Establishes a lock on the new books storage and returns a pair consisting of the new
          * books reference and a unique lock on the books.  For optimal performance, store the
          * returned value in the smallest scope practical.
@@ -205,6 +221,9 @@ class Creativity : private eris::noncopyable, public std::enable_shared_from_thi
 
         // During setup() this is set to the wrapping boundary coordinates used by the simulation.
         double boundary_;
+
+        // The period in which sharing first becomes available
+        unsigned long sharing_begins_;
 
 };
 

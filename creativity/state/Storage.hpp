@@ -41,6 +41,16 @@ class Storage {
          */
         double boundary() const;
 
+        /** Returns the simulation period when sharing first becomes available.
+         */
+        unsigned long sharingBegins() const;
+
+        /** Sets the period in which sharing first becomes available.  This should generally be
+         * called only once.  Attempting to change the sharingBegins() period using a second call to
+         * sharingBegins(t) will raise an exception.
+         */
+        void sharingBegins(uint64_t t);
+
         /// Returns the number of states currently stored.
         virtual size_t size() const = 0;
 
@@ -80,6 +90,12 @@ class Storage {
          * the number of dimensions can be determined (i.e. as soon as a non-empty State is added).
          */
         unsigned int dimensions_ = 0;
+
+        /** The period in which sharing first becomes available.  Initialized to the maximum value
+         * of an unsigned long, but subclasses should update to the appropriate value as soon as
+         * possible.
+         */
+        uint64_t sharing_begins_ = std::numeric_limits<uint64_t>::max();
 };
 
 template <class... Args>

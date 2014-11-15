@@ -645,7 +645,7 @@ void GUI::thr_signal() {
         widget<Gtk::Notebook>("nb_tabs")->set_current_page(1);
 
         // Disable spin buttons:
-        for (auto &widg : {"set_dimensions", "set_readers", "set_density", "set_book_sd", "set_quality_draw_sd", "set_cost_fixed", "set_cost_unit"})
+        for (auto &widg : {"set_dimensions", "set_readers", "set_density", "set_book_sd", "set_quality_draw_sd", "set_cost_fixed", "set_cost_unit", "set_sharing_begins"})
             widget<Gtk::SpinButton>(widg)->set_sensitive(false);
 
         widget<Gtk::Button>("btn_init")->set_sensitive(false);
@@ -767,6 +767,7 @@ void GUI::setupSim() {
     p.param = ParamType::quality_draw_sd; p.dbl = sb("set_quality_draw_sd"); params.push_back(p);
     p.param = ParamType::cost_fixed; p.dbl = sb("set_cost_fixed"); params.push_back(p);
     p.param = ParamType::cost_unit; p.dbl = sb("set_cost_unit"); params.push_back(p);
+    p.param = ParamType::sharing_begins; p.ul = sb("set_sharing_begins"); params.push_back(p);
     p.param = ParamType::seed; p.ul = std::stoul(widget<Gtk::Entry>("set_seed")->get_text()); params.push_back(p);
     int threads = widget<Gtk::ComboBoxText>("combo_threads")->get_active_row_number();
     if (threads < 0) threads = 0; // -1 means no item selected (shouldn't be possible, but just in case)

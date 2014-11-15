@@ -144,6 +144,7 @@ class GUI : eris::noncopyable {
             quality_draw_sd, ///< Sets the perceived quality standard deviation in `.dbl`
             cost_fixed, ///< Sets the fixed cost of keeping a book on the market in `.dbl`
             cost_unit, ///< Sets the per-unit cost of copies of a book in `.dbl`
+            sharing_begins, ///< The period in which sharing becomes available
             save_as, ///< The file to save simulation data to (will be overwritten)
             load, ///< The file to load existing simulation data from
             seed, ///< Sets the seed value for eris::Random::seed in `.ul`

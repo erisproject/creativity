@@ -202,7 +202,8 @@ class FileStorage : public Storage, private eris::noncopyable {
                     states = 16, ///< location of the number of states stored in this file (u32)
                     dimensions = 20, ///< number of dimensions of the simulation these states belong to (u32)
                     boundary = 24, ///< Location of the simulation boundary (positive double)
-                    state_first = 32, ///< Location of the first state location
+                    sharing_begins = 32, ///< Location of the sharing start period (u64)
+                    state_first = 40, ///< Location of the first state location
                     state_last = 496, ///< Location of the last state location
                     continuation = 504; ///< Location of the header continuation block location
             };
@@ -417,6 +418,9 @@ class FileStorage : public Storage, private eris::noncopyable {
          *     u64          lifetime
          */
         std::pair<eris::eris_id_t, BookState> readBook() const;
+
+        /// Whether the file contains a (non-default) state_begins_ value
+        bool wrote_sharing_begins_ = false;
 
         /** Writes a book at the current file position.  See readBook() for data layout. */
         void writeBook(const BookState &book);

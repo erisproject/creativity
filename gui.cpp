@@ -63,6 +63,10 @@ int main(int argc, char *argv[1]) {
                     throw std::domain_error{"Density must be positive"};
                 creativity->parameters.density = p.dbl;
                 break;
+            case GUI::ParamType::sharing_begins:
+                if (setup) throw std::runtime_error("Cannot change sharing t after initial setup");
+                creativity->parameters.sharing_begins = p.ul;
+                break;
             case GUI::ParamType::seed:
                 if (setup) throw std::runtime_error("Cannot change seed after initial setup");
                 eris::Random::seed(p.ul);

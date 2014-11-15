@@ -35,7 +35,7 @@ double Creativity::boundary() const {
 
 void Creativity::fileWrite(const std::string &filename) {
     if (setup_sim_) throw std::logic_error("Cannot call Creativity::fileWrite() after setup()");
-    else if (setup_read_) throw std::logic_error("Cannot call Creativity::fileWriter() after fileRead()");
+    else if (setup_read_) throw std::logic_error("Cannot call Creativity::fileWrite() after fileRead()");
     storage().first = std::make_shared<FileStorage>(filename, FileStorage::MODE::OVERWRITE);
 }
 
@@ -44,8 +44,8 @@ void Creativity::fileRead(const std::string &filename) {
     auto st = storage();
     st.first = std::make_shared<FileStorage>(filename, FileStorage::MODE::READONLY);
     boundary_ = st.first->boundary();
+    sharing_begins_ = st.first->sharingBegins();
     setup_read_ = true;
-    
 }
 
 void Creativity::setup() {
@@ -53,6 +53,9 @@ void Creativity::setup() {
     else if (setup_sim_) throw std::logic_error("Creativity::setup() cannot be called twice");
 
     boundary_ = boundary();
+
+    sharing_begins_ = parameters.sharing_begins;
+    storage().first->sharingBegins(sharing_begins_);
 
     std::uniform_real_distribution<double> unif_pmb{-boundary_, boundary_};
 
@@ -69,7 +72,7 @@ void Creativity::setup() {
     unsigned long max_links = parameters.readers * (parameters.readers - 1) / 2;
     unsigned long num_links = std::lround(parameters.sharing_link_proportion * max_links);
 
-    // Track ids of created readers, to build to set of all possible edges as we go
+    // Track ids of created readers, to build the set of all possible edges as we go
     std::vector<eris_id_t> created;
     std::vector<std::pair<eris_id_t, eris_id_t>> potential_edges;
     if (num_links > 0) {
@@ -134,6 +137,16 @@ void Creativity::updateAllCosts(double cost_fixed, double cost_unit) {
         if (cost_unit >= 0)
             r->cost_unit = cost_unit;
     }
+}
+
+bool Creativity::sharing() const {
+    if (!setup_sim_) throw std::logic_error("Cannot call sharing() on a non-live or unconfigured simulation");
+    return sim->t() >= sharing_begins_;
+}
+
+unsigned long Creativity::sharingBegins() const {
+    if (not setup_sim_ and not setup_read_) throw std::logic_error("Cannot call sharingBegins() on an unconfigured Creativity object");
+    return sharing_begins_;
 }
 
 std::pair<std::vector<SharedMember<Book>>&, std::unique_lock<std::mutex>> Creativity::newBooks() {

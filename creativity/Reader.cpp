@@ -70,6 +70,12 @@ const double& Reader::uLifetime() const {
 const std::unordered_set<SharedMember<Book>>& Reader::newBooks() const {
     return library_new_;
 }
+const std::unordered_set<SharedMember<Book>>& Reader::newPurchased() const {
+    return library_new_;
+}
+const std::unordered_set<SharedMember<Book>>& Reader::newShared() const {
+    return library_new_shared_;
+}
 
 const std::vector<SharedMember<Book>>& Reader::wrote() const {
     return wrote_;
@@ -122,6 +128,10 @@ double Reader::creationQuality(double effort) const {
             creation_shape == 0.0 ? effort : // Simple linear
             (std::pow(effort + 1.0, 1.0 - creation_shape) - 1.0) / (1 - creation_shape) // Otherwise use the full formula
     );
+}
+
+double Reader::piracyCost() const {
+    return creativity_->parameters.cost_unit;
 }
 
 const std::unordered_set<SharedMember<Reader>>& Reader::friends() const {
@@ -234,12 +244,12 @@ void Reader::interApply() {
     // Give potential income (this has to be before authorship decision, since authorship requires
     // giving up some potential income: actual income will be this amount minus whatever is given up
     // to author)
-    assets() += {creativity_->money, income};
+    assets()[creativity_->money] += income;
 
     SharedMember<Book> newbook;
     if (create_) {
         // The cost (think of this as an opportunity cost) of creating:
-        assets() -= {creativity_->money, create_effort_ + cost_fixed};
+        assets()[creativity_->money] -= create_effort_ + cost_fixed;
 
         // The book is centered at the reader's position, plus some noise we add below
         Position bookPos{position()};
@@ -266,7 +276,7 @@ void Reader::interApply() {
         if (new_prices_.count(b) > 0) {
             // Set the new price
             b->market()->setPrice(new_prices_[b]);
-            assets() -= {creativity_->money, cost_fixed};
+            assets()[creativity_->money] -= cost_fixed;
         }
         else if (not create_ or b != newbook) {
             // No new price, which means we remove the book from the market
@@ -315,7 +325,8 @@ double Reader::penalty(unsigned long n) const {
 const std::unordered_map<SharedMember<Book>, double>& Reader::library() const { return library_; }
 
 void Reader::receiveProfits(SharedMember<Book> book, const Bundle &revenue) {
-    assets() += revenue - Bundle{creativity_->money, book->currSales() * cost_unit};
+    assets() += revenue;
+    assets()[creativity_->money] -= book->currSales() * cost_unit;
 }
 
 const belief::Profit& Reader::profitBelief() const { return profit_belief_; }
@@ -515,27 +526,49 @@ void Reader::intraOptimize() {
     auto lock = readLock();
 
     std::vector<SharedMember<Book>> cache_del;
-    // Map utility-minus-price values to sets of market ids so that we can pick the book(s) where
-    // net utility (i.e. u-p) is highest.  NB: this is sorted by utility in highest-to-lowest order
-    // for the purposes of iteration.
-    std::map<double, std::vector<SharedMember<Book>>, std::greater<double>> book_net_u;
+    // Map utility-minus-price values to `<buy, book>` pairs, where `buy` is true if the book is to
+    // be purchased and false if the book is to be pirated from a friend (we don't store *which*
+    // friend, but it'll only be true if there is at least one friend with a copy).
+    // 
+    // This is sorted by net utility in highest-to-lowest order for the purposes of iterating from
+    // best to worse options.
+    std::map<double, std::vector<std::pair<bool, SharedMember<Book>>>, std::greater<double>> book_net_u;
+    double piracy_cost = piracyCost();
     for (auto &book : book_cache_) {
-        if (not book->hasMarket()) { // Market removed: remove from cache and continue
-            cache_del.push_back(book);
-            continue;
-        }
         if (library_.count(book) > 0) {
             // Already have the book: remove from cache and continue
             cache_del.push_back(book);
             continue;
         }
         double u = uBook(book);
-        double p = book->market()->price();
-        if (u >= p) {
-            // Good: the book is available and its utility (before any penalty) exceeds the purchase price
-            // Store the net utility of this book:
-            book_net_u[u - p].push_back(book);
+        // Two ways to obtain the book:
+        // - If it's on the market, can buy at its current price
+        // - If piracy has been invented and one of my friends has it, I can get a copy from the friend
+
+        bool for_sale = book->hasMarket();
+        bool shared = false;
+        if (creativity_->sharing()) {
+            for (auto &f : friends()) {
+                if (f->library().count(book) > 0) {
+                    // My friend owns the book
+                    if (book->author() != f) {
+                        // ... and isn't the author (who presumably wouldn't share it)
+                        shared = true;
+                        break;
+                    }
+                }
+            }
         }
+
+        double p = for_sale ? book->market()->price() : 0.0;
+
+        if (for_sale and shared and p > piracy_cost)
+            for_sale = false; // It's for sale, but the pirated version is cheaper.
+
+        if (for_sale and u >= p) // We're buying, and the book is worth buying
+            book_net_u[u - p].emplace_back(true, book);
+        else if (shared and u >= piracy_cost) // We're pirating, and the book is worth the cost of pirating
+            book_net_u[u - piracy_cost].emplace_back(false, book);
     }
 
     // Shuffle the order of any books with the same net utilities so that we'll be choosing randomly
@@ -549,44 +582,72 @@ void Reader::intraOptimize() {
 
     for (auto &del : cache_del) book_cache_.erase(del);
 
-    std::set<SharedMember<Book>> buy;
+    std::set<SharedMember<Book>> new_books;
     double money = assets()[creativity_->money];
-    double u_curr = u(money, buy); // the "no-books" utility
+    double u_curr = u(money, new_books); // the "no-books" utility
     // Keep looking at books as long as the net utility from buying the next best book exceeds the
     // penalty that will be incurred.
     while (not book_net_u.empty() and money > 0) {
         // Pull off the best remaining book:
         auto &s = book_net_u.begin()->second;
-        auto book = std::move(s.back());
+        auto buy_book = std::move(s.back());
+        bool buying = buy_book.first;
+        auto &book = buy_book.second;
         s.pop_back();
         // If we just pulled off the last book at the current net utility level, delete the level.
         if (s.empty()) book_net_u.erase(book_net_u.begin());
 
-        auto bm = book->market();
-        lock.add(bm);
-        // Perform some safety checks:
-        // - if we've already added the book to the set of books to buy, don't add it again. (This
-        //   should only be possible if there are multiple BookMarkets selling the same book).
-        // - if the BookMarket says the book is no longer feasible, ignore it. (This shouldn't
-        //   happen, but just in case).
-        // - if we can't afford it, skip it.
-        auto pinfo = bm->price(1);
-        if (buy.count(book) == 0 and pinfo.feasible and pinfo.total <= money) {
-            buy.insert(book);
-            double u_with_book = u(money - pinfo.total, buy);
-            if (u_with_book < u_curr) {
-                // The best book lowered utility, so we're done.
-                buy.erase(book);
-                lock.remove(bm);
-                break;
+        if (buying) {
+            auto bm = book->market();
+            lock.add(bm);
+            // Perform some safety checks:
+            // - if we've already added the book to the set of books to buy, don't add it again. (This
+            //   shouldn't be possible)
+            if (new_books.count(book) > 0) throw std::logic_error("Internal Reader error: attempt to buy book that is already obtained!");
+            // - if the BookMarket says the book is no longer feasible, ignore it. (This shouldn't
+            //   happen, but just in case).
+            auto pinfo = bm->price(1);
+            if (not pinfo.feasible) throw std::logic_error("Internal Reader error: book market says book not available!");
+            if (pinfo.total <= money) { // Only buy if we can actually afford it
+                new_books.insert(book);
+                double u_with_book = u(money - pinfo.total, new_books);
+                if (u_with_book < u_curr) {
+                    // The best book *lowered* utility (because of the multiple books penalty), so
+                    // we're done (because all other new books have utility no higher than this
+                    // one), and will incur the same utility penalty.
+                    new_books.erase(book);
+                    lock.remove(bm);
+                    break;
+                }
+                // Otherwise the purchase is a good one, so make a reservation.
+                reservations_.push_front(bm->reserve(sharedSelf(), 1, pinfo.total));
+                reserved_books_.insert(book);
+                u_curr = u_with_book;
+                money -= pinfo.total;
             }
-            // Otherwise the purchase is a good one, so make a reservation.
-            reservations_.push_front(bm->reserve(sharedSelf(), 1, pinfo.total));
-            reserved_books_.insert(book);
-            u_curr = u_with_book;
-            money -= pinfo.total;
+            lock.remove(bm);
         }
-        lock.remove(bm);
+        else {
+            // Pirating.
+            if (new_books.count(book) != 0) throw std::logic_error("Internal Reader error: attempt to pirate book that is already obtained!");
+
+            if (piracy_cost <= money) { // Only pirate if we can actually afford piracy
+                new_books.insert(book);
+
+                double u_with_book = u(money - piracy_cost, new_books);
+                if (u_with_book < u_curr) {
+                    // The best book *lowered* utility (because of the multiple books penalty), so
+                    // we're done (because all other new books have utility no higher than this
+                    // one), and will incur the same utility penalty.
+                    new_books.erase(book);
+                    break;
+                }
+                reserved_books_.insert(book);
+                reserved_piracy_cost_ += piracy_cost;
+                u_curr = u_with_book;
+                money -= piracy_cost;
+            }
+        }
     }
 }
 void Reader::intraApply() {
@@ -594,6 +655,8 @@ void Reader::intraApply() {
     for (auto &res : reservations_) {
         res->buy();
     }
+    assets()[creativity_->money] -= reserved_piracy_cost_;
+    reserved_piracy_cost_ = 0.0;
     for (auto &book : reserved_books_) {
         double q = book->qualityDraw(*this);
         library_.emplace(book, q);
@@ -613,6 +676,7 @@ void Reader::intraReset() {
     auto lock = writeLock();
     reservations_.clear();
     reserved_books_.clear();
+    reserved_piracy_cost_ = 0;
 }
 
 }

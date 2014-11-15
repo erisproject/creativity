@@ -124,6 +124,11 @@ void FileStorage::push_back(std::shared_ptr<const State> state) {
         write_value(state->boundary);
         boundary_ = state->boundary;
     }
+    if (not wrote_sharing_begins_ and sharing_begins_ != std::numeric_limits<uint64_t>::max()) {
+        f_.seekp(HEADER::pos::sharing_begins);
+        write_value(sharing_begins_);
+        wrote_sharing_begins_ = true;
+    }
 }
 
 
@@ -157,6 +162,8 @@ void FileStorage::writeEmptyHeader() {
     write_u32(0); // Number of states (will be updated once known)
     write_u32(0); // Number of dimensions (updated once known)
     write_dbl(0.0); // Boundary (updated once known)
+    write_u64(sharing_begins_); // Sharing start period (updated once known)
+    wrote_sharing_begins_ = sharing_begins_ != std::numeric_limits<uint64_t>::max();
 
     // State addresses and continuation location:
     char zeros[8 * (HEADER::states + 1)] = {0};
@@ -247,15 +254,20 @@ void FileStorage::parseMetadata() {
     CHECK_TEST(i64, int64_t);
     CHECK_TEST(dbl, double);
 
-    // Now the number of states and number of dimensions:
+    // number of states and number of dimensions:
     auto num_states = parse_value<uint32_t>(block[HEADER::pos::states]);
     dimensions_ = parse_value<uint32_t>(block[HEADER::pos::dimensions]);
     if (dimensions_ == 0 and num_states != 0)
         throwParseError("found invalid dimensions == 0 when num_states > 0");
 
+    // Boundary location
     boundary_ = parse_value<double>(block[HEADER::pos::boundary]);
     if (boundary_ < 0 or (boundary_ == 0 and num_states != 0))
         throwParseError("found invalid boundary position");
+
+    // Sharing start period
+    sharing_begins_ = parse_value<uint64_t>(block[HEADER::pos::sharing_begins]);
+    wrote_sharing_begins_ = sharing_begins_ != std::numeric_limits<uint64_t>::max();
 
     state_pos_.reserve(num_states);
 
