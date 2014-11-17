@@ -193,7 +193,6 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
                     radius = design.size.utility_loss_scale * std::log(1001 - r.u);
                     colour = design.colour.utility_loss;
                 }
-                ERIS_DBGVAR(radius);
 
                 if (radius > 0.0)
                     drawCanvasCircle(cr, trans, rx, ry, radius, colour, design.stroke_width.utility, design.stroke_width.utility_radial);
