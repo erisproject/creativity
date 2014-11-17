@@ -64,7 +64,6 @@ void Creativity::setup() {
     money = sim->create<Good::Continuous>();
 
     auto &rng = eris::Random::rng();
-    ERIS_DBG("Setting up readers");
 
     if (parameters.sharing_link_proportion < 0 or parameters.sharing_link_proportion > 1)
         throw std::logic_error("Creativity sharing_link_proportion parameter is invalid (not in [0,1])");
@@ -109,8 +108,6 @@ void Creativity::setup() {
     for (auto &e : potential_edges) {
         sim->agent<Reader>(e.first)->addFriend(sim->agent<Reader>(e.second));
     }
-
-    ERIS_DBG("Done with readers");
 
     sim->create<intraopt::FinishCallback>([this] { new_books_.clear(); });
 
