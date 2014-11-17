@@ -121,6 +121,9 @@ class FileStorage : public Storage, private eris::noncopyable {
         /** Alias for `read_value<uint32_t>()` */
         uint32_t read_u32() const { return read_value<uint32_t>(); }
 
+        /** Alias for `read_value<uint8_t>()` */
+        uint8_t read_u8() const { return read_value<uint8_t>(); }
+
         /** Alias for `read_value<int64_t>()` */
         int64_t read_i64() const { return read_value<int64_t>(); }
 
@@ -139,6 +142,9 @@ class FileStorage : public Storage, private eris::noncopyable {
 
         /** Alias for `write_value((uint32_t) value)` */
         void write_u32(uint32_t value) { write_value(value); }
+
+        /** Alias for `write_value((uint8_t) value)` */
+        void write_u8(uint8_t value) { write_value(value); }
 
         /** Alias for `write_value((int64_t) value)` */
         void write_i64(int64_t value) { write_value(value); }
@@ -203,9 +209,9 @@ class FileStorage : public Storage, private eris::noncopyable {
                     dimensions = 20, ///< number of dimensions of the simulation these states belong to (u32)
                     boundary = 24, ///< Location of the simulation boundary (positive double)
                     sharing_begins = 32, ///< Location of the sharing start period (u64)
-                    state_first = 40, ///< Location of the first state location
-                    state_last = 496, ///< Location of the last state location
-                    continuation = 504; ///< Location of the header continuation block location
+                    state_first = 40, ///< Location of the first state record
+                    state_last = 496, ///< Location of the last state record
+                    continuation = 504; ///< Location of the header continuation block
             };
             /** The number of states that can be stored in the header.  Storing additional states
              * requires using continuation blocks.
@@ -290,22 +296,20 @@ class FileStorage : public Storage, private eris::noncopyable {
         /** Reads a ReaderState record from the current file position and returns it in an
          * {eris_id_t, ReaderState} pair, where `.first` is the id.  Such a record consists of:
          *
-         *     u64          id
-         *     dbl*DIM      position (DIM = dimensions)
-         *     u64[]        friend ids
-         *     (u64,dbl)[]  library
-         *     u64[]        new
-         *     u64[]        wrote
-         *     dbl          u
-         *     dbl          u_lifetime
-         *     dbl          cost_fixed
-         *     dbl          cost_unit
-         *     dbl          income
-         *     BELIEF       profit belief
-         *     BELIEF       profit extrapolated belief
-         *     BELIEF       demand belief
-         *     BELIEF       quality belief
-         *     BELIEF[]     profit stream beliefs (for different K() values)
+         *     u64              id
+         *     dbl*DIM          position (DIM = dimensions)
+         *     u64[]            friend ids
+         *     (u8,u64,dbl)[]   library; see below for the u8 values.
+         *     dbl              u
+         *     dbl              u_lifetime
+         *     dbl              cost_fixed
+         *     dbl              cost_unit
+         *     dbl              income
+         *     BELIEF           profit belief
+         *     BELIEF           profit extrapolated belief
+         *     BELIEF           demand belief
+         *     BELIEF           quality belief
+         *     BELIEF[]         profit stream beliefs (for different K() values)
          *
          * where type[] indicates an array structured as:
          *     u32          length
@@ -313,6 +317,13 @@ class FileStorage : public Storage, private eris::noncopyable {
          *
          * and (type1,type2) indicates a single type1 value followed immediately by a single type2
          * value.
+         *
+         * The u8 in the library indicates the property of the book made up of the following bits:
+         *     1 - set if this reader wrote the book
+         *     2 - set if the reader pirated the book (instead of purchasing)
+         *     4 - set if the book is new (i.e. added to library this period)
+         *     >4 - reserved
+         * 1 is exclusive of the other bits (they may not be set when 1 is set).
          *
          * BELIEF is a i64 belief location (or special value) and possibly a set of belief data, as
          * handled by readBelief(int64_t).
@@ -413,8 +424,11 @@ class FileStorage : public Storage, private eris::noncopyable {
          *     dbl          revenueLifetime
          *     u64          sales
          *     u64          salesLifetime
+         *     u64          pirated
+         *     u64          piratedLifetime
          *     u64          copies
          *     u64          age
+         *     u64          created
          *     u64          lifetime
          */
         std::pair<eris::eris_id_t, BookState> readBook() const;

@@ -21,25 +21,18 @@ ReaderState::ReaderState(const Reader &r) :
     quality{r.qualityBelief()},
     profit_stream{r.profitStreamBeliefs()}
 {
-    friends.reserve(r.friends().size());
-    for (auto &f : r.friends()) {
-        friends.insert(f->id());
-    }
-
     library.reserve(r.library().size());
-    for (auto &bq : r.library()) {
+    for (const auto &bq : r.library())
         library.emplace(bq.first->id(), bq.second);
-    }
 
-    new_books.reserve(r.newBooks().size());
-    for (auto &b : r.newBooks()) {
-        new_books.emplace(b->id());
-    }
+    copyIDs(r.friends(), friends);
+    copyIDs(r.libraryPurchased(), library_purchased);
+    copyIDs(r.libraryPirated(), library_pirated);
+    copyIDs(r.newBooks(), new_books);
+    copyIDs(r.newPurchased(), new_purchased);
+    copyIDs(r.newPirated(), new_pirated);
 
-    wrote.reserve(r.wrote().size());
-    for (auto &b : r.wrote()) {
-        wrote.emplace_back(b->id());
-    }
+    for (const auto &b : r.wrote()) wrote.emplace_hint(wrote.end(), b->id());
 }
 
 }}

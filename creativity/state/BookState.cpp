@@ -21,8 +21,11 @@ BookState::BookState(const Book &b, unsigned long num_copies) :
     revenue_lifetime{b.lifeRevenue()},
     sales{b.currSales()},
     sales_lifetime{b.lifeSales()},
+    pirated{b.currPirated()},
+    pirated_lifetime{b.lifePirated()},
     copies{num_copies},
     age{b.age()},
+    created{b.created()},
     lifetime{b.marketPeriods()}
 {}
 

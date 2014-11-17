@@ -59,14 +59,20 @@ void ReaderStore::get_value_vfunc(const iterator &iter, int column, Glib::ValueB
         value.init(v.gobj());
     }
     else if (column == columns.books_owned.index() or column == columns.books_new.index() or column == columns.books_written.index()
-            or column == columns.last_book_age.index() or column == columns.num_friends.index()) {
+            or column == columns.last_book_age.index() or column == columns.num_friends.index()
+            or column == columns.books_pirated.index() or column == columns.books_purchased.index()
+            or column == columns.books_new_pirated.index() or column == columns.books_new_purchased.index()) {
         Glib::Value<size_t> v;
         v.init(v.value_type());
         v.set(  column == columns.books_owned.index() ? r.library.size() :
+                column == columns.books_purchased.index() ? r.library_purchased.size() :
+                column == columns.books_pirated.index() ? r.library_pirated.size() :
                 column == columns.books_new.index() ? r.new_books.size() :
+                column == columns.books_new_purchased.index() ? r.new_purchased.size() :
+                column == columns.books_new_pirated.index() ? r.new_pirated.size() :
                 column == columns.books_written.index() ? r.wrote.size() :
                 column == columns.num_friends.index() ? r.friends.size() :
-                r.wrote.empty() ? state_->t : state_->books.at(r.wrote.back()).age
+                r.wrote.empty() ? state_->t : state_->books.at(*r.wrote.crbegin()).age
              );
         value.init(v.gobj());
     }
@@ -89,7 +95,11 @@ void ReaderStore::set_sort_column_id_vfunc(int sort_column_id, Gtk::SortType ord
     ELSE_IF_COL(u_lifetime);
     ELSE_IF_COL(num_friends);
     ELSE_IF_COL(books_owned);
+    ELSE_IF_COL(books_purchased);
+    ELSE_IF_COL(books_pirated);
     ELSE_IF_COL(books_new);
+    ELSE_IF_COL(books_new_purchased);
+    ELSE_IF_COL(books_new_pirated);
     ELSE_IF_COL(books_written);
 #undef ELSE_IF_COL
     else if (sort_column_id == columns.last_book_age.index())
@@ -111,7 +121,11 @@ LESS_GREATER(u)
 LESS_GREATER(u_lifetime)
 LESS_GREATER_A(num_friends, friends.size())
 LESS_GREATER_A(books_owned, library.size())
+LESS_GREATER_A(books_purchased, library_purchased.size())
+LESS_GREATER_A(books_pirated, library_pirated.size())
 LESS_GREATER_A(books_new, new_books.size())
+LESS_GREATER_A(books_new_purchased, new_purchased.size())
+LESS_GREATER_A(books_new_pirated, new_pirated.size())
 LESS_GREATER_A(books_written, wrote.size())
 #undef LESS_GREATER
 #undef LESS_GREATER_A
@@ -126,12 +140,12 @@ bool ReaderStore::greater_pos_str(const ReaderState &a, const ReaderState &b) {
     return ax == bx ? a.position[1] > b.position[1] : ax > bx;
 }
 bool ReaderStore::less_last_book_age(const ReaderState &a, const ReaderState &b) const {
-    return (a.wrote.empty() ? std::numeric_limits<unsigned long>::max() : state_->books.at(a.wrote.back()).age)
-         < (b.wrote.empty() ? std::numeric_limits<unsigned long>::max() : state_->books.at(b.wrote.back()).age);
+    return (a.wrote.empty() ? std::numeric_limits<unsigned long>::max() : state_->books.at(*a.wrote.crbegin()).age)
+         < (b.wrote.empty() ? std::numeric_limits<unsigned long>::max() : state_->books.at(*b.wrote.crbegin()).age);
 }
 bool ReaderStore::greater_last_book_age(const ReaderState &a, const ReaderState &b) const {
-    return (a.wrote.empty() ? std::numeric_limits<unsigned long>::max() : state_->books.at(a.wrote.back()).age)
-         > (b.wrote.empty() ? std::numeric_limits<unsigned long>::max() : state_->books.at(b.wrote.back()).age);
+    return (a.wrote.empty() ? std::numeric_limits<unsigned long>::max() : state_->books.at(*a.wrote.crbegin()).age)
+         > (b.wrote.empty() ? std::numeric_limits<unsigned long>::max() : state_->books.at(*b.wrote.crbegin()).age);
 }
 
 void ReaderStore::appendColumnsTo(Gtk::TreeView &v) const {
@@ -142,6 +156,8 @@ void ReaderStore::appendColumnsTo(Gtk::TreeView &v) const {
     appendCol(v, "# Friends", columns.num_friends, 80);
     appendCol(v, "Books", columns.books_owned, 80);
     appendCol(v, "# New", columns.books_new, 80);
+    appendCol(v, "# Bought", columns.books_purchased, 100);
+    appendCol(v, "# Pirated", columns.books_pirated, 100);
     appendCol(v, "# Written", columns.books_written, 100);
     appendCol(v, "Last wrote", columns.last_book_age, 100);
 }

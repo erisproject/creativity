@@ -19,7 +19,11 @@ class ReaderStore : public MemberStore<state::ReaderState>, private Glib::Object
          * - current utility
          * - lifetime utility
          * - books owned
+         * - books purchased
+         * - books pirated
          * - new books
+         * - new books (purchased)
+         * - new books (pirated)
          * - books written
          * - age of most recently written book (simulation age if no books written)
          */
@@ -41,7 +45,11 @@ class ReaderStore : public MemberStore<state::ReaderState>, private Glib::Object
                     income; ///< The reader's external income
                 Gtk::TreeModelColumn<std::string> pos_str; ///< position of the book as a string such as `(-7.16,0.440)`
                 Gtk::TreeModelColumn<size_t> books_owned, ///< Number of books possessed by this reader
+                    books_purchased, ///< Number of books purchased by this reader
+                    books_pirated, ///< Number of books obtained via piracy by this reader
                     books_new, ///< Number of books acquired in the current period
+                    books_new_purchased, ///< Number of books acquired by purchasing in the current period
+                    books_new_pirated, ///< Number of books acquired by piracy in the current period
                     books_written, ///< Number of books authored by this reader
                     last_book_age, ///< Age of the most recently written book, or simulation age if `booksWritten == 0`
                     num_friends; ///< Number of friends of this reader
@@ -50,7 +58,9 @@ class ReaderStore : public MemberStore<state::ReaderState>, private Glib::Object
                 ColRec() {
                     add(id); add(pos_x); add(pos_y); add(pos_str); add(u); add(u_lifetime);
                     add(cost_fixed); add(cost_unit); add(income); add(num_friends);
-                    add(books_owned); add(books_new); add(books_written); add(last_book_age);
+                    add(books_owned); add(books_purchased); add(books_pirated);
+                    add(books_new); add(books_new_purchased); add(books_new_pirated);
+                    add(books_written); add(last_book_age);
                 }
                 friend class ReaderStore;
         };
@@ -117,7 +127,11 @@ class ReaderStore : public MemberStore<state::ReaderState>, private Glib::Object
         LESS_GREATER_METHODS(cost_unit)
         LESS_GREATER_METHODS(income)
         LESS_GREATER_METHODS(books_owned)
+        LESS_GREATER_METHODS(books_purchased)
+        LESS_GREATER_METHODS(books_pirated)
         LESS_GREATER_METHODS(books_new)
+        LESS_GREATER_METHODS(books_new_purchased)
+        LESS_GREATER_METHODS(books_new_pirated)
         LESS_GREATER_METHODS(books_written)
         LESS_GREATER_METHODS(num_friends)
 #undef LESS_GREATER_METHODS

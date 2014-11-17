@@ -126,6 +126,15 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         /// Returns the number of sales in simulation period `t`
         unsigned long sales(unsigned long t) const;
 
+        /// Returns the lifelong number of pirated copies of this book
+        unsigned long lifePirated() const;
+
+        /// Returns the number of pirated copies of this book so far in the current period
+        unsigned long currPirated() const;
+
+        /// Returns the number of pirated copies in simulation period `t`
+        unsigned long pirated(unsigned long t) const;
+
         /// Returns the lifelong revenue of this book
         double lifeRevenue() const;
 
@@ -137,11 +146,11 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
 
         /** Queries the simulation for the number of copies of this book in existence.  This will
          * always be at least one greater than `lifeSales()` because the author gets a (non-sale)
-         * copy upon creating the book, and may be much greater if there are non-market ways of
-         * obtaining copies of books.
+         * copy upon creating the book, and may be much greater if the book has been pirated.
          *
          * This method call is expensive: it requires iterating the querying the library of every
-         * reader in the simulation.
+         * reader in the simulation.  It is generally preferred to use `lifeSales() + lifePiracy() +
+         * 1`, which should always add up to this value.
          */
         unsigned long copies() const;
 
@@ -149,7 +158,13 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
          * called multiple times per period.  Both the current sales/revenue values and global
          * revenue values will be increased by the call.
          */
-        void sale(unsigned long new_sales, double new_revenue);
+        void recordSale(unsigned long new_sales, double new_revenue);
+
+        /** Increase the number of pirated copies of this book for the current period.  This can
+         * safely be called multiple times per period.  Both the current piracy count and global
+         * piracy count will be increased by the call.
+         */
+        void recordPiracy(unsigned long new_copies);
 
         /** Returns the actual, fixed quality value of the book.  This is meant to be used by the
          * author and the `qDraw` callable object given during construction; readers of the book
@@ -168,9 +183,9 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
 
     private:
         std::shared_ptr<Creativity> creativity_;
-        unsigned long created_, out_of_print_, copies_sold_total_;
+        unsigned long created_, out_of_print_, copies_sold_total_, copies_pirated_total_;
         double revenue_total_;
-        std::map<unsigned long, unsigned long> copies_sold_;
+        std::map<unsigned long, unsigned long> copies_sold_, copies_pirated_;
         std::map<unsigned long, double> revenue_;
         eris::SharedMember<Reader> author_;
         const unsigned long order_;

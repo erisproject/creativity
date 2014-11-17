@@ -102,7 +102,11 @@ InfoWindow::InfoWindow(std::shared_ptr<const State> state, std::shared_ptr<Gtk::
     DATA_ROW(grid_status, "utility", "Utility");
     DATA_ROW(grid_status, "uLife", "Lifetime utility");
     DATA_ROW(grid_status, "books", "Books owned");
+    DATA_ROW(grid_status, "booksPurchased", "Books purchased");
+    DATA_ROW(grid_status, "booksPirated", "Books pirated");
     DATA_ROW(grid_status, "booksNew", "New books");
+    DATA_ROW(grid_status, "booksNewPurchased", "New books (purchased)");
+    DATA_ROW(grid_status, "booksNewPirated", "New books (pirated)");
     DATA_ROW(grid_status, "booksWritten", "Books written");
     DATA_ROW(grid_status, "bookLast", "Latest book age");
     DATA_ROW(grid_status, "numFriends", "# Friends");
@@ -198,11 +202,14 @@ InfoWindow::InfoWindow(std::shared_ptr<const State> state, std::shared_ptr<Gtk::
     DATA_ROW(grid_status, "market", "Market");
     DATA_ROW(grid_status, "price", "Price");
     DATA_ROW(grid_status, "quality", "Quality");
+    DATA_ROW(grid_status, "created", "Period written");
     DATA_ROW(grid_status, "age", "Age");
     DATA_ROW(grid_status, "revenue", "Revenue (lifetime)");
     DATA_ROW(grid_status, "revenueLast", "Revenue (current)");
     DATA_ROW(grid_status, "sales", "Copies sold (lifetime)");
     DATA_ROW(grid_status, "salesLast", "Copies sold (current)");
+    DATA_ROW(grid_status, "pirated", "Copies pirated (lifetime)");
+    DATA_ROW(grid_status, "piratedLast", "Copies pirated (current)");
     DATA_ROW(grid_status, "copies", "Copies in world");
     DATA_ROW(grid_status, "author", "Author ID");
     override_background_color(Gdk::RGBA{"white"});
@@ -235,11 +242,15 @@ void InfoWindow::refresh(std::shared_ptr<const State> state) {
         updateValue("utility", r.u);
         updateValue("uLife", r.u_lifetime);
         updateValue("books", r.library.size());
+        updateValue("booksPurchased", r.library_purchased.size());
+        updateValue("booksPirated", r.library_pirated.size());
         updateValue("booksNew", r.new_books.size());
+        updateValue("booksNewPurchased", r.new_purchased.size());
+        updateValue("booksNewPirated", r.new_pirated.size());
         updateValue("booksWritten", r.wrote.size());
         updateValue("bookLast", r.wrote.empty()
                 ? "(never written)"
-                : std::to_string(state->books.at(r.wrote.back()).age));
+                : std::to_string(state->books.at(*r.wrote.crbegin()).age));
         updateValue("numFriends", r.friends.size());
 
 #define UPDATE_LIN(PREFIX, VAR) \
@@ -293,18 +304,22 @@ void InfoWindow::refresh(std::shared_ptr<const State> state) {
             updateValue("market", b.market ? "yes" : "no");
             updateValue("price", b.price);
             updateValue("quality", b.quality);
+            updateValue("created", b.created);
             updateValue("age", b.age);
             updateValue("revenue", b.revenue_lifetime);
             updateValue("revenueLast", b.revenue);
             updateValue("sales", b.sales_lifetime);
             updateValue("salesLast", b.sales);
+            updateValue("pirated", b.pirated_lifetime);
+            updateValue("piratedLast", b.pirated);
             updateValue("copies", b.copies);
         }
         else {
             // If the user navigates back in time to a period where the book doesn't exist, set
             // everything to N/A and change the title.
             set_title("Book details (" + std::to_string(book) + "): not yet created!");
-            for (auto &key : {"id", "author", "position", "market", "price", "quality", "age", "revenue", "revenueLast", "sales", "salesLast", "copies"}) {
+            for (auto &key : {"id", "author", "position", "market", "price", "quality", "age", "created",
+                    "revenue", "revenueLast", "sales", "salesLast", "pirated", "piratedLast", "copies"}) {
                 updateValue(key, "N/A");
             }
         }

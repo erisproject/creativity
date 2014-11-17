@@ -68,7 +68,7 @@ void BookMarket::buy_(Reservation_ &res) {
     Bundle &b = reservationBundle_(res);
 
     // Record the sale in the book status
-    book_->sale(res.quantity, b[creativity_->money]);
+    book_->recordSale(res.quantity, b[creativity_->money]);
 
     // Transfer the money into the "proceeds" jar (which will eventually go to the author)
     b.transferApprox(b, proceeds_);

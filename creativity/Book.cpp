@@ -31,6 +31,8 @@ void Book::added() {
     // These shouldn't be doing anything, but clear everything just in case a Book is removed and reintroduced:
     copies_sold_total_ = 0;
     copies_sold_.clear();
+    copies_pirated_total_ = 0;
+    copies_pirated_.clear();
     revenue_total_ = 0;
     revenue_.clear();
 
@@ -86,13 +88,34 @@ unsigned long Book::sales(unsigned long t) const {
     return it->second;
 }
 
-void Book::sale(unsigned long count, double revenue) {
+unsigned long Book::lifePirated() const {
+    auto lock = readLock();
+    return copies_pirated_total_;
+}
+unsigned long Book::currPirated() const {
+    return pirated(simulation()->t());
+}
+unsigned long Book::pirated(unsigned long t) const {
+    if (t < created_) return 0;
+    auto lock = readLock();
+    auto it = copies_pirated_.find(t);
+    if (it == copies_pirated_.end()) return 0;
+    return it->second;
+}
+
+void Book::recordSale(unsigned long count, double revenue) {
     auto lock = writeLock();
     copies_sold_total_ += count;
     revenue_total_ += revenue;
     auto t = simulation()->t();
     copies_sold_[t] += count;
     revenue_[t] += revenue;
+}
+
+void Book::recordPiracy(unsigned long new_copies) {
+    auto lock = writeLock();
+    copies_pirated_total_ += new_copies;
+    copies_pirated_[simulation()->t()] += new_copies;
 }
 
 double Book::lifeRevenue() const {
@@ -114,7 +137,7 @@ double Book::revenue(unsigned long t) const {
 
 unsigned long Book::copies() const {
     unsigned long copies = 0;
-    SharedMember<Book> me{sharedSelf()};
+    SharedMember<Book> me(sharedSelf());
     for (auto &r : simulation()->agents<Reader>()) {
         if (r->library().count(me))
             copies++;

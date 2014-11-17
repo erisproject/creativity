@@ -354,19 +354,25 @@ std::pair<eris::eris_id_t, ReaderState> FileStorage::readReader() const {
     auto libsize = read_u32();
     r.library.reserve(libsize);
     for (uint32_t i = 0; i < libsize; i++) {
-        r.library.emplace(read_u64(), read_dbl());
-    }
-    // New books
-    auto newsize = read_u32();
-    r.new_books.reserve(newsize);
-    for (uint32_t i = 0; i < newsize; i++) {
-        r.new_books.insert(read_u64());
-    }
-    // Authored books
-    auto wrotesize = read_u32();
-    r.wrote.reserve(wrotesize);
-    for (uint32_t i = 0; i < wrotesize; i++) {
-        r.wrote.push_back(read_u64());
+        auto status = read_u8();
+        auto id = read_u64();
+        r.library.emplace(id, read_dbl());
+        bool pirated = status & 1<<1, new_book = status & 1<<2;
+        if (status == 1) // Wrote it (other bits not allowed)
+            r.wrote.insert(r.wrote.end(), id);
+        else if (status & ~(1<<1 | 1<<2))
+            throwParseError("found illegal book status (invalid status bits set)");
+        else {
+            if (new_book) r.new_books.insert(id);
+            if (pirated) {
+                r.library_pirated.insert(id);
+                if (new_book) r.new_pirated.insert(id);
+            }
+            else {
+                r.library_purchased.insert(id);
+                if (new_book) r.new_purchased.insert(id);
+            }
+        }
     }
     // Utility
     r.u = read_dbl();
@@ -536,13 +542,16 @@ void FileStorage::writeReader(const ReaderState &r) {
 
     write_u32(r.library.size());
     for (auto &l : r.library) {
+        uint8_t status = 0;
+        if (r.wrote.count(l.first)) status = 1;
+        else {
+            if (r.library_pirated.count(l.first)) status |= 1<<1;
+            if (r.new_books.count(l.first)) status |= 1<<2;
+        }
+        write_u8(status);
         write_u64(l.first);
         write_dbl(l.second);
     }
-    write_u32(r.new_books.size());
-    for (auto &n : r.new_books) write_u64(n);
-    write_u32(r.wrote.size());
-    for (auto &w : r.wrote) write_u64(w);
     write_value(r.u);
     write_value(r.u_lifetime);
 
@@ -684,8 +693,11 @@ std::pair<eris_id_t, BookState> FileStorage::readBook() const {
     b.revenue_lifetime = read_dbl();
     b.sales = read_u64();
     b.sales_lifetime = read_u64();
+    b.pirated = read_u64();
+    b.pirated_lifetime = read_u64();
     b.copies = read_u64();
     b.age = read_u64();
+    b.created = read_u64();
     b.lifetime = read_u64();
 
     return pair;
@@ -704,8 +716,11 @@ void FileStorage::writeBook(const BookState &b) {
     write_dbl(b.revenue_lifetime);
     write_u64(b.sales);
     write_u64(b.sales_lifetime);
+    write_u64(b.pirated);
+    write_u64(b.pirated_lifetime);
     write_u64(b.copies);
     write_u64(b.age);
+    write_u64(b.created);
     write_u64(b.lifetime);
 }
 

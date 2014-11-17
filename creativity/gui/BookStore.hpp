@@ -24,9 +24,12 @@ class BookStore : public MemberStore<state::BookState>, Glib::Object {
          * - revenue
          * - revenueLifetime
          * - market (true if on market, false otherwise)
-         * - age
-         * - sales
-         * - salesLifetime
+         * - age (in simulation periods)
+         * - creation date (i.e. simulation period)
+         * - current sales
+         * - lifetime sales
+         * - current pirated copies
+         * - lifetime pirated copies
          * - copies
          * - lifetime (# periods on market)
          *
@@ -41,31 +44,41 @@ class BookStore : public MemberStore<state::BookState>, Glib::Object {
          */
         class ColRec : public Gtk::TreeModel::ColumnRecord {
             public:
-                Gtk::TreeModelColumn<eris::eris_id_t> id; ///< Book ID
-                Gtk::TreeModelColumn<eris::eris_id_t> author; ///< Author ID
-                Gtk::TreeModelColumn<double> pos_x; ///< x coordinate of the book
-                Gtk::TreeModelColumn<double> pos_y; ///< y coordinate of the book
+                Gtk::TreeModelColumn<eris::eris_id_t>
+                    id, ///< Book ID
+                    author; ///< Author ID
+
+                Gtk::TreeModelColumn<double>
+                    pos_x, ///< x coordinate of the book
+                    pos_y, ///< y coordinate of the book
+                    quality, ///< quality parameter of the book (the mean of realized quality draws)
+                    price, ///< price of the book, or NaN if the book is not on the market
+                    revenue, ///< revenue of the book in the current period
+                    revenue_lifetime; ///< Cumulative revenue of the book since its creation
+
                 Gtk::TreeModelColumn<std::string> pos_str; ///< position of the book as a string such as `(-7.16,0.440)`
-                Gtk::TreeModelColumn<double> quality; ///< quality parameter of the book (the mean of realized quality draws)
                 Gtk::TreeModelColumn<bool> market; ///< True if the book is currently on the market
-                Gtk::TreeModelColumn<double> price; ///< price of the book, or NaN if the book is not on the market
-                Gtk::TreeModelColumn<double> revenue; ///< revenue of the book in the current period
-                Gtk::TreeModelColumn<double> revenue_lifetime; ///< Cumulative revenue of the book since its creation
-                Gtk::TreeModelColumn<size_t> age; ///< Age of the book in simulation periods since it was written
-                Gtk::TreeModelColumn<size_t> sales; ///< Copies sold in the current period
-                Gtk::TreeModelColumn<size_t> sales_lifetime; ///< Lifetime copies sold
-                /** Copies that exist in the simulation.  This is at least one larger than the
-                 * number of lifetime sales because the author has a copy (which wasn't a sale); if
-                 * there is non-sale piracy, this value could be much greater than lifetime sales.
-                 */
-                Gtk::TreeModelColumn<size_t> copies;
-                Gtk::TreeModelColumn<size_t> lifetime; ///< Number of periods the book has been or was on the market
+                Gtk::TreeModelColumn<unsigned long>
+                    age, ///< Age of the book in simulation periods since it was written
+                    created, ///< Age of the book in simulation periods since it was written
+                    sales, ///< Copies sold in the current period
+                    sales_lifetime, ///< Lifetime copies sold
+                    pirated, ///< Copies sold in the current period
+                    pirated_lifetime, ///< Lifetime copies sold
+                    /** Copies that exist in the simulation.  This is at least one larger than the
+                     * number of lifetime sales because the author has a copy (which wasn't a sale),
+                     * if there is non-sale piracy, this value could be much greater than lifetime
+                     * sales. */
+                    copies,
+                    lifetime; ///< Number of periods the book has been or was on the market
 
             private:
                 ColRec() {
                     add(id); add(author); add(market); add(pos_x); add(pos_y); add(pos_str);
                     add(quality); add(price); add(revenue); add(revenue_lifetime);
-                    add(age); add(sales); add(sales_lifetime); add(copies); add(lifetime);
+                    add(age); add(created);
+                    add(sales); add(sales_lifetime); add(pirated); add(pirated_lifetime);
+                    add(copies); add(lifetime);
                 }
                 friend class BookStore;
         };
@@ -136,8 +149,11 @@ class BookStore : public MemberStore<state::BookState>, Glib::Object {
         LESS_GREATER_METHODS(revenue)
         LESS_GREATER_METHODS(revenue_lifetime)
         LESS_GREATER_METHODS(age)
+        LESS_GREATER_METHODS(created)
         LESS_GREATER_METHODS(sales)
         LESS_GREATER_METHODS(sales_lifetime)
+        LESS_GREATER_METHODS(pirated)
+        LESS_GREATER_METHODS(pirated_lifetime)
         LESS_GREATER_METHODS(lifetime)
         LESS_GREATER_METHODS(copies)
 #undef LESS_GREATER_METHODS

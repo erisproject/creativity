@@ -76,13 +76,18 @@ void BookStore::get_value_vfunc(const iterator &iter, int column, Glib::ValueBas
         v.set(GUI::pos_to_string(b.position));
         value.init(v.gobj());
     }
-    else if (column == columns.age.index() or column == columns.sales.index() or column == columns.sales_lifetime.index()
+    else if (column == columns.age.index() or column == columns.created.index()
+            or column == columns.sales.index() or column == columns.sales_lifetime.index()
+            or column == columns.pirated.index() or column == columns.pirated_lifetime.index()
             or column == columns.lifetime.index() or column == columns.copies.index()) {
-        Glib::Value<size_t> v;
+        Glib::Value<unsigned long> v;
         v.init(v.value_type());
         v.set(  column == columns.age.index() ? b.age :
+                column == columns.created.index() ? b.created :
                 column == columns.sales.index() ? b.sales :
                 column == columns.sales_lifetime.index() ? b.sales_lifetime :
+                column == columns.pirated.index() ? b.pirated :
+                column == columns.pirated_lifetime.index() ? b.pirated_lifetime :
                 column == columns.lifetime.index() ? b.lifetime :
                 b.copies
              );
@@ -110,8 +115,11 @@ void BookStore::set_sort_column_id_vfunc(int sort_column_id, Gtk::SortType order
     ELSE_IF_COL(revenue);
     ELSE_IF_COL(revenue_lifetime);
     ELSE_IF_COL(age);
+    ELSE_IF_COL(created);
     ELSE_IF_COL(sales);
     ELSE_IF_COL(sales_lifetime);
+    ELSE_IF_COL(pirated);
+    ELSE_IF_COL(pirated_lifetime);
     ELSE_IF_COL(lifetime);
     ELSE_IF_COL(copies);
 #undef ELSE_IF_COL
@@ -131,8 +139,11 @@ LESS_GREATER(quality)
 LESS_GREATER(revenue)
 LESS_GREATER(revenue_lifetime)
 LESS_GREATER(age)
+LESS_GREATER(created)
 LESS_GREATER(sales)
 LESS_GREATER(sales_lifetime)
+LESS_GREATER(pirated)
+LESS_GREATER(pirated_lifetime)
 LESS_GREATER(lifetime)
 LESS_GREATER(market)
 LESS_GREATER(copies)
@@ -162,12 +173,13 @@ void BookStore::appendColumnsTo(Gtk::TreeView &v) const {
     appendCol(v, "ID", columns.id, 50);
     appendCol(v, "Position", columns.pos_str, 110);
     if (not author_) appendCol(v, "Author", columns.author, 80);
-    appendCol(v, "Age", columns.age, 65);
+    appendCol(v, "Created", columns.created, 85);
     appendCol(v, "Quality", columns.quality, 85);
     appendCol(v, "Mkt?", columns.market, 65);
     appendCol(v, "Price", columns.price, 75);
     appendCol(v, "Rev.", columns.revenue_lifetime, 75);
     appendCol(v, "Sales", columns.sales_lifetime, 75);
+    appendCol(v, "Pirated", columns.pirated_lifetime, 85);
     appendCol(v, "Copies", columns.copies, 80);
     appendCol(v, "Life", columns.lifetime, 65);
 }
