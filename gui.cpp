@@ -84,7 +84,7 @@ int main(int argc, char *argv[1]) {
                 load_from_file = true;
                 break;
             case GUI::ParamType::save_as:
-                // FIXME: this could actually be handled when already setup: it should be possible
+                // TODO: this could actually be handled when already setup: it should be possible
                 // to copy the current Storage object into the new FileStorage.
                 if (setup) throw std::runtime_error("Cannot change file after initial setup");
                 if (load_from_file) throw std::runtime_error("Error: setup specified both load and save file");
