@@ -177,7 +177,7 @@ void Reader::interOptimize() {
     for (auto &book : wrote_market_) {
         auto book_mkt = book->market();
 
-        auto max = demand_belief_.argmaxP(book->quality(), book->lifeSales(), previous_books-1, market_books, cost_unit);
+        auto max = demand_belief_.argmaxP(book->quality(), book->lifeSales(), previous_books, market_books, cost_unit);
         const double &p = max.first;
         const double &q = max.second;
         const double profit = (p - cost_unit) * q - cost_fixed;
@@ -231,7 +231,7 @@ void Reader::interOptimize() {
             // We're going to create, so calculate the optimal first-period price.  It's possible that
             // we get back cost_unit (and so predicted profit is non-positive); write the book anyway:
             // perhaps profits are expected to come in later periods?
-            auto max = demand_belief_.argmaxP(quality, 0, wrote_.size()-1, market_books, cost_unit);
+            auto max = demand_belief_.argmaxP(quality, 0, previous_books, market_books, cost_unit);
             create_price_ = max.first;
             create_quality_ = quality;
             create_effort_ = l_max;
