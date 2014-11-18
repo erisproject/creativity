@@ -691,10 +691,10 @@ void GUI::thr_signal() {
 
     std::string errstr = errors.str();
     if (not errstr.empty()) {
-        auto dlg_error = widget<Gtk::MessageDialog>("dlg_error");
-        dlg_error->set_secondary_text(errors.str());
-        dlg_error->run();
-        dlg_error->hide();
+        Gtk::MessageDialog dlg_error(*main_window_, "An error has occured!", false, Gtk::MESSAGE_ERROR, Gtk::BUTTONS_CLOSE, true);
+        dlg_error.set_secondary_text(errors.str());
+        dlg_error.run();
+        dlg_error.hide();
     }
 
     if (last_new_states.type == Signal::Type::new_states) {
@@ -886,7 +886,7 @@ void GUI::handleEvent(const Event &event) {
                 break;
         }
     } catch (std::exception &e) {
-        queueSignal({ Signal::Type::error, e.what() });
+        queueSignal({ Signal::Type::error, std::string{"An exception has occured: "} + e.what() });
     }
 
     for (auto &e : setup_errors) {
