@@ -46,16 +46,12 @@ add_definitions("-DERIS_DEBUG")
 find_package(Eigen3 REQUIRED)
 include_directories(${EIGEN3_INCLUDE_DIR})
 
-#find_package(Boost REQUIRED)
-#include_directories(${Boost_INCLUDE_DIRS})
-
 # Find library source/headers
 file(GLOB_RECURSE cr_libsrc creativity/*.cpp)
 file(GLOB_RECURSE cr_gui_libsrc creativity/gui/*.cpp)
 list(REMOVE_ITEM cr_libsrc ${cr_gui_libsrc})
-#file(GLOB_RECURSE cr_headers creativity/*.hpp)
-#file(GLOB_RECURSE cr_gui_headers creativity/gui/*.hpp)
-#list(REMOVE_ITEM cr_headers ${cr_gui_headers})
+# doc/CMakeLists.txt needs the list of headers:
+file(GLOB_RECURSE cr_headers creativity/*.hpp)
 
 # Set up compilation flags; put everything before CMAKE_CXX_FLAGS so that these can be overridden
 set(CMAKE_CXX_FLAGS "-std=c++11 -march=native -O3 -Wall -Wextra ${CMAKE_CXX_FLAGS}")
