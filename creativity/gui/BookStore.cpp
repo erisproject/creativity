@@ -174,14 +174,14 @@ void BookStore::appendColumnsTo(Gtk::TreeView &v) const {
     appendCol(v, "Position", columns.pos_str, 110);
     if (not author_) appendCol(v, "Author", columns.author, 80);
     appendCol(v, "Created", columns.created, 85);
-    appendCol(v, "Quality", columns.quality, 85);
+    appendCol(v, "Life", columns.lifetime, 65);
     appendCol(v, "Mkt?", columns.market, 65);
+    appendCol(v, "Quality", columns.quality, 85);
     appendCol(v, "Price", columns.price, 75);
     appendCol(v, "Rev.", columns.revenue_lifetime, 75);
     appendCol(v, "Sales", columns.sales_lifetime, 75);
     appendCol(v, "Pirated", columns.pirated_lifetime, 85);
     appendCol(v, "Copies", columns.copies, 80);
-    appendCol(v, "Life", columns.lifetime, 65);
 }
 
 }}
