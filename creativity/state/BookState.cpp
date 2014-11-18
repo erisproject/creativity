@@ -8,9 +8,9 @@ BookState::BookState(const unsigned int dimensions) :
     position{eris::Position::zero(dimensions)}
 {}
 
-BookState::BookState(const Book &b) : BookState(b, b.copies()) {}
+BookState::BookState(const eris::SharedMember<Book> &b) : BookState((Book&) b) {}
 
-BookState::BookState(const Book &b, unsigned long num_copies) :
+BookState::BookState(const Book &b) :
     id{b.id()},
     author{b.author()->id()},
     position{b.position()},
@@ -23,7 +23,7 @@ BookState::BookState(const Book &b, unsigned long num_copies) :
     sales_lifetime{b.lifeSales()},
     pirated{b.currPirated()},
     pirated_lifetime{b.lifePirated()},
-    copies{num_copies},
+    copies{b.copies()},
     age{b.age()},
     created{b.created()},
     lifetime{b.marketPeriods()}

@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <eris/types.hpp>
 #include <eris/Position.hpp>
+#include <eris/SharedMember.hpp>
 #include <eris/noncopyable.hpp>
 
 namespace creativity {
@@ -13,14 +14,11 @@ namespace state {
  * with a constructor that copies the current state of a given Book. */
 class BookState final {
     public:
-        /// Constructs a new BookState, settings its values using the given Book.
-        BookState(const Book &b);
+        /// Constructs a new BookState, setting its values using the given Book member.
+        BookState(const eris::SharedMember<Book> &b);
 
-        /** Constructs a new BookState, additionally specifying the number of copies of this book in
-         * the simulation.  This saves a call to the `b.copies()` method, which is expensive, and is
-         * thus useful where the copies of a book can be obtained more efficiently.
-         */
-        BookState(const Book &b, unsigned long num_copies);
+        /// Constructs a new BookState, setting its value using the given Book reference.
+        BookState(const Book &b);
 
         /** Constructs a new blank BookState for a book with a position of the given number of
          * dimensions.  All values will be default initialized.  (The number of dimensions is needed
