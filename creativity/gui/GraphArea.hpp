@@ -57,7 +57,8 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
          * \param y the point y coordinate, in graph space
          * \param type the type of point to draw
          * \param colour the colour (and alpha channel) of the point
-         * \param scale the scale of the point.  1 (the default) means default size.
+         * \param radius the radius of the point.  1 (the default) means default size.
+         * \param line_width the line width to use to draw the point indicator
          * \param virt whether this is a virtual (i.e. wrapping) point. Internal use only.
          */
         void drawPoint(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans, double x, double y,
