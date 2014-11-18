@@ -144,15 +144,21 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         /// Returns the revenue earned by this book in simulation period `t`
         double revenue(unsigned long t) const;
 
-        /** Queries the simulation for the number of copies of this book in existence.  This will
-         * always be at least one greater than `lifeSales()` because the author gets a (non-sale)
-         * copy upon creating the book, and may be much greater if the book has been pirated.
-         *
-         * This method call is expensive: it requires iterating the querying the library of every
-         * reader in the simulation.  It is generally preferred to use `lifeSales() + lifePiracy() +
-         * 1`, which should always add up to this value.
+        /** Returns `lifeSales() + lifePirated()` (but atomically), reflecting the number of copies
+         * of the book that have been made.  This should always be one less than the total in the
+         * simulation, as the author also has a copy of the book in his library which is neither a
+         * sale nor a pirated copy.
          */
         unsigned long copies() const;
+
+        /** Queries the simulation for the number of copies of this book in existence.  So long as
+         * no readers are removed from the simulation, this should always be exactly one larger than
+         * the value as returned by copies(), because this counts the author's original copy, while
+         * copies() does not.  This method is considerably more expensive than copies() as it has to
+         * examine the library of every reader in the simulation.  Calling copies() is generally
+         * preferable.
+         */
+        unsigned long queryCopies() const;
 
         /** Increase the sales and revenue of this book for the current period.  This can safely be
          * called multiple times per period.  Both the current sales/revenue values and global

@@ -136,6 +136,11 @@ double Book::revenue(unsigned long t) const {
 }
 
 unsigned long Book::copies() const {
+    auto lock = readLock();
+    return lifeSales() + lifePirated();
+}
+
+unsigned long Book::queryCopies() const {
     unsigned long copies = 0;
     SharedMember<Book> me(sharedSelf());
     for (auto &r : simulation()->agents<Reader>()) {
