@@ -314,16 +314,15 @@ std::shared_ptr<const State> FileStorage::readState() const {
     State &state = const_cast<State&>(*shst);
 
     state.t = read_u64();
+
     auto num_readers = read_u32();
-    auto num_books = read_u32();
-
     state.readers.reserve(num_readers);
-    state.books.reserve(num_books);
-
     for (uint32_t i = 0; i < num_readers; i++) {
         state.readers.insert(readReader());
     }
 
+    auto num_books = read_u32();
+    state.books.reserve(num_books);
     for (uint32_t i = 0; i < num_books; i++) {
         state.books.insert(readBook());
     }
@@ -526,10 +525,10 @@ FileStorage::belief_data FileStorage::readBelief() const {
 void FileStorage::writeState(const State &state) {
     write_u64(state.t);
     write_u32(state.readers.size());
-    write_u32(state.books.size());
     for (auto &r : state.readers) {
         writeReader(r.second);
     }
+    write_u32(state.books.size());
     for (auto &b : state.books) {
         writeBook(b.second);
     }

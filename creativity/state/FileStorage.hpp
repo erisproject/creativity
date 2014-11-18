@@ -280,10 +280,12 @@ class FileStorage : public Storage, private eris::noncopyable {
          * follows:
          *
          *     u64      t (simulation time period)
-         *     u32      numReaders
-         *     u32      numBooks
-         *     READER*numReaders    reader data
-         *     BOOK*numBooks        book data
+         *     READER[] readers array
+         *     BOOK[]   books
+         *
+         * where type[] indicates an array structured as:
+         *     u32          length
+         *     type*length  sequential type records
          *
          * \see readReader() for the structure of READER
          * \see readBook() for the structure of BOOK
@@ -313,7 +315,7 @@ class FileStorage : public Storage, private eris::noncopyable {
          *
          * where type[] indicates an array structured as:
          *     u32          length
-         *     type*length  type
+         *     type*length  sequential type records
          *
          * and (type1,type2) indicates a single type1 value followed immediately by a single type2
          * value.
