@@ -339,15 +339,14 @@ std::pair<eris::eris_id_t, ReaderState> FileStorage::readReader() const {
     r.id = pair.first;
 
     // Position
-    for (uint32_t d = 0; d < dimensions_; d++) {
+    for (uint32_t d = 0; d < dimensions_; d++)
         r.position[d] = read_dbl();
-    }
+
     // Friends
     auto num_friends = read_u32();
     r.friends.reserve(num_friends);
-    for (uint32_t i = 0; i < num_friends; i++) {
+    for (uint32_t i = 0; i < num_friends; i++)
         r.friends.insert(read_u64());
-    }
 
     // Library
     auto libsize = read_u32();
@@ -355,7 +354,8 @@ std::pair<eris::eris_id_t, ReaderState> FileStorage::readReader() const {
     for (uint32_t i = 0; i < libsize; i++) {
         auto status = read_u8();
         auto id = read_u64();
-        r.library.emplace(id, read_dbl());
+        auto quality = read_dbl();
+        r.library.emplace(id, quality);
         bool pirated = status & 1<<1, new_book = status & 1<<2;
         if (status == 1) // Wrote it (other bits not allowed)
             r.wrote.insert(r.wrote.end(), id);
@@ -376,7 +376,7 @@ std::pair<eris::eris_id_t, ReaderState> FileStorage::readReader() const {
     // Utility
     r.u = read_dbl();
     r.u_lifetime = read_dbl();
-    // Costs:
+    // Costs
     r.cost_fixed = read_dbl();
     r.cost_unit = read_dbl();
     r.income = read_dbl();
@@ -536,9 +536,17 @@ void FileStorage::writeState(const State &state) {
 
 void FileStorage::writeReader(const ReaderState &r) {
     write_u64(r.id);
+
+    // Position
     for (size_t i = 0; i < r.position.dimensions; i++)
         write_dbl(r.position[i]);
 
+    // Friends
+    write_u32(r.friends.size());
+    for (auto &f : r.friends)
+        write_u64(f);
+
+    // Library
     write_u32(r.library.size());
     for (auto &l : r.library) {
         uint8_t status = 0;
@@ -550,14 +558,16 @@ void FileStorage::writeReader(const ReaderState &r) {
         write_u8(status);
         write_u64(l.first);
         write_dbl(l.second);
-    }
+    } 
+    // Utility
     write_value(r.u);
     write_value(r.u_lifetime);
-
+    // Costs
     write_value(r.cost_fixed);
     write_value(r.cost_unit);
     write_value(r.income);
 
+    // Beliefs
     writeBelief(r.profit);
     writeBelief(r.profit_extrap);
     writeBelief(r.demand);
