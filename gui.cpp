@@ -39,7 +39,8 @@ int main(int argc, char *argv[1]) {
     auto on_setup = [&](GUI::Parameter p) { // Setup
         switch (p.param) {
             case GUI::ParamType::finished:
-                creativity->setup();
+                if (not load_from_file)
+                    creativity->setup();
                 setup = true;
                 break;
             case GUI::ParamType::begin:
