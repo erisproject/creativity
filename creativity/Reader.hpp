@@ -416,20 +416,30 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * \geq 0\f$ to create a book of quality \f$q(\ell) = \beta \frac{(\ell+1)^{1-\alpha} -
          * 1}{1 - \alpha}\f$, where \f$\beta\f$ is this value.
          *
-         * The default value is \f$beta = 1\f$.  Changing this value across readers of a simulation
+         * The default value is \f$beta = 10\f$.  Changing this value across readers of a simulation
          * allows readers to differ in ability while maintaining the same functional form.
          *
          * The specified value must be non-negative, for obvious reasons.  Specifying 0 works as
          * expected (the reader always produces quality 0 works, regardless of effort).
          */
-        double creation_scale = 1.0;
+        double creation_scale = 10.0;
 
         /** Returns the resulting quality of this reader exerting effort level `effort` to create a
          * book.
          *
-         * \sa creation_coefs
+         * \sa creation_shape
+         * \sa creation_scale
+         * \sa creationEffort
          */
         double creationQuality(double effort) const;
+
+        /** Returns the effort required of the reader to create a book of the given quality.
+         *
+         * \sa creation_shape
+         * \sa creation_scale
+         * \sa creationQuality
+         */
+        double creationEffort(double quality) const;
 
         /** Called at the end of a period (from BookMarket::intraFinish) to transfer book revenue
          * earned during a period back to the author.  The author subtracts variable cost (if any)

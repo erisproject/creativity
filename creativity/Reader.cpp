@@ -135,6 +135,21 @@ double Reader::creationQuality(double effort) const {
     );
 }
 
+double Reader::creationEffort(double quality) const {
+    if (quality < 0)
+        throw std::domain_error("Reader::creationEffort() error: quality cannot be negative");
+    if (creation_shape < 0)
+        throw std::logic_error("Reader::creationEffort() error: creation_shape cannot be negative");
+    if (creation_scale < 0)
+        throw std::logic_error("Reader::creationEffort() error: creation_scale cannot be negative");
+    if (creation_scale == 0) return 0.0;
+
+    return
+        creation_shape == 1.0 ? std::exp(quality / creation_scale) - 1 : // The special log case
+        creation_shape == 0.0 ? quality / creation_scale : // Simple linear case
+        std::pow(1.0 + quality * (1.0-creation_shape) / creation_scale, 1.0/(1.0 - creation_shape)) - 1;
+}
+
 double Reader::piracyCost() const {
     return creativity_->parameters.cost_unit;
 }
