@@ -77,8 +77,11 @@ class InfoWindow : public Gtk::Window {
         void updateValue(const std::string &code, long val);
         /// Updates a single value Gtk::Label text with the given double
         void updateValue(const std::string &code, double val);
-        /// Updates a matrix set up with matrix_at with the values of the given matrix.
-        void updateMatrix(const std::string &code, const Ref<const MatrixXd> &m);
+        /** Updates a matrix set up with matrix_at with the values of the given matrix.  If the
+         * optional lower_triangle parameter is given as true, only the lower diagonal of the matrix
+         * is displayed; the upper-triangle values are set to blanks.
+         */
+        void updateMatrix(const std::string &code, const Ref<const MatrixXd> &m, bool lower_triangle = false);
 
     private:
         std::unordered_map<std::string, std::pair<Gtk::Label, Gtk::Label>> fields_;

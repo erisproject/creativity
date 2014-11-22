@@ -157,7 +157,7 @@ InfoWindow::InfoWindow(std::shared_ptr<const State> state, std::shared_ptr<Gtk::
         data_append(grid_demand, "d_" + std::to_string(i), BETA "[" + d_vars[i] + "]");
     data_append(grid_demand, "_d_draws", "# successful draws");
     data_append(grid_demand, "_d_discards", "# discarded draws");
-    matrix_at(grid_demand, "d_V", "<b>V</b>", 2, 2, p_vars.size(), p_vars.size());
+    matrix_at(grid_demand, "d_V", "<b>V</b>", 2, 2, d_vars.size(), d_vars.size());
     comment_append(grid_demand, "<i>NB: This regression is for single-period demand.</i>", p_vars.size() + 3);
 
     nbs_.emplace_back();
@@ -277,7 +277,7 @@ void InfoWindow::refresh(std::shared_ptr<const State> state) {
 #define UPDATE_LIN(PREFIX, VAR) \
         updateValue(PREFIX + std::string("n"), VAR.n()); \
         updateValue(PREFIX + std::string("s2"), VAR.s2()); \
-        updateMatrix(PREFIX + std::string("V"), VAR.V()); \
+        updateMatrix(PREFIX + std::string("V"), VAR.V(), true); \
         for (size_t i = 0; i < VAR.K(); i++) \
             updateValue(PREFIX + std::to_string(i), VAR.beta()[i]);
 #define UPDATE_LIN_RB(PREFIX, BELIEF) UPDATE_LIN(PREFIX, r.BELIEF)
@@ -364,12 +364,12 @@ void InfoWindow::updateValue(const std::string &code, double val) {
     updateValue(code, std::to_string(val));
 }
 
-void InfoWindow::updateMatrix(const std::string &code, const Ref<const MatrixXd> &m) {
+void InfoWindow::updateMatrix(const std::string &code, const Ref<const MatrixXd> &m, bool lower_triangle) {
     size_t pos = 0;
     auto &labels = matrix_[code];
     for (int i = 0; i < m.rows(); i++) { for (int j = 0; j < m.cols(); j++) {
         if (pos >= labels.size()) return;
-        labels[pos]->set_markup(std::to_string(m(i,j)));
+        labels[pos]->set_markup((lower_triangle and j > i) ? "" : std::to_string(m(i,j)));
         pos++;
     }}
 }
