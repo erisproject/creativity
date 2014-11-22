@@ -80,9 +80,9 @@ void Creativity::setup() {
 
     std::uniform_real_distribution<double> unif_pmb{-parameters.boundary, parameters.boundary};
 
-    sim = Simulation::spawn();
+    sim = Simulation::create();
 
-    money = sim->create<Good::Continuous>();
+    money = sim->spawn<Good::Continuous>();
 
     auto &rng = eris::Random::rng();
 
@@ -101,7 +101,7 @@ void Creativity::setup() {
     }
 
     for (unsigned int i = 0; i < parameters.readers; i++) {
-        auto r = sim->create<Reader>(shared_from_this(),
+        auto r = sim->spawn<Reader>(shared_from_this(),
                 Position{unif_pmb(rng), unif_pmb(rng)},
                 // (Nearly) non-informative priors for the rest:
                 belief::Demand(parameters.dimensions, belief::Demand::parameters()),
@@ -131,7 +131,7 @@ void Creativity::setup() {
         sim->agent<Reader>(e.first)->addFriend(sim->agent<Reader>(e.second));
     }
 
-    sim->create<intraopt::FinishCallback>([this] { new_books_.clear(); });
+    sim->spawn<intraopt::FinishCallback>([this] { new_books_.clear(); });
 
     setup_sim_ = true;
 }

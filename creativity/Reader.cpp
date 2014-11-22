@@ -309,7 +309,7 @@ void Reader::interApply() {
         auto qdraw = [this] (const Book &book, const Reader &) -> double {
             return std::max(0.0, book.quality() + writer_quality_sd * stdnormal(Random::rng()));
         };
-        newbook = simulation()->create<Book>(creativity_, bookPos, sharedSelf(), wrote_.size(), create_price_, create_quality_, qdraw);
+        newbook = simulation()->spawn<Book>(creativity_, bookPos, sharedSelf(), wrote_.size(), create_price_, create_quality_, qdraw);
 
         /// If enabled, add some noise in a random direction to the position
         if (writer_book_sd > 0) {

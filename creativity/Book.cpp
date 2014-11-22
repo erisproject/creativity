@@ -36,7 +36,7 @@ void Book::added() {
     revenue_total_ = 0;
     revenue_.clear();
 
-    auto mkt = sim->create<BookMarket>(creativity_, sharedSelf(), init_price_);
+    auto mkt = sim->spawn<BookMarket>(creativity_, sharedSelf(), init_price_);
     creativity_->newBooks().first.push_back(sharedSelf());
     market_ = mkt;
     dependsWeaklyOn(mkt);
