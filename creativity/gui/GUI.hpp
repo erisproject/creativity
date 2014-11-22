@@ -137,14 +137,6 @@ class GUI : eris::noncopyable {
 
         /// Parameter types for a Parameter.
         enum class ParamType {
-            dimensions, ///< Sets the number of dimensions in `.ul`
-            readers, ///< Sets the number of readers in `.ul`
-            density, ///< Sets the density of readers per unit^dimensions
-            book_sd, ///< Sets the book location standard deviation in `.dbl`
-            quality_draw_sd, ///< Sets the perceived quality standard deviation in `.dbl`
-            cost_fixed, ///< Sets the fixed cost of keeping a book on the market in `.dbl`
-            cost_unit, ///< Sets the per-unit cost of copies of a book in `.dbl`
-            sharing_begins, ///< The period in which sharing becomes available
             save_as, ///< The file to save simulation data to (will be overwritten)
             load, ///< The file to load existing simulation data from
             seed, ///< Sets the seed value for eris::Random::seed in `.ul`
@@ -349,6 +341,11 @@ class GUI : eris::noncopyable {
          */
         void thr_run();
 
+        /** When called, this updates the simulation parameters displayed in the GUI to match the
+         * current creativity_->parameters values.
+         */
+        void thr_update_parameters();
+
         /** Called to update the GUI tabs to display the state at the given time.
          */
         void thr_set_state(unsigned long t);
@@ -370,7 +367,7 @@ class GUI : eris::noncopyable {
          */
         void thr_info_dialog(eris::eris_id_t member_id);
 
-        /** Loads an existing simulation output and settings from the currently selected file.
+        /** Loads a previously-run simulation from the currently selected file.
          */
         void loadSim();
 

@@ -66,6 +66,8 @@ const bool& Linear::noninformative() const { NO_EMPTY_MODEL; return noninformati
 
 double Linear::predict(const Ref<const RowVectorXd> &Xi) {
     NO_EMPTY_MODEL;
+    if (noninformative_)
+        throw std::logic_error("Cannot call predict() on noninformative model");
     return Xi * beta_;
 }
 

@@ -18,7 +18,7 @@ Cairo::Matrix GraphArea::graph_to_canvas() const {
     Gtk::Allocation allocation = get_allocation();
 
     const double half_width = 0.5 * allocation.get_width(), half_height = 0.5 * allocation.get_height();
-    const double boundary = gui_.creativity_->boundary();
+    const double boundary = gui_.creativity_->parameters.boundary;
     // The second of these is negative because higher y canvas values are down the screen, which are
     // *lower* graph values.
     return Cairo::Matrix(half_width / boundary, 0, 0, -half_height / boundary, half_width, half_height);
@@ -28,7 +28,7 @@ Cairo::Matrix GraphArea::canvas_to_graph() const {
     Gtk::Allocation allocation = get_allocation();
 
     const double half_width = 0.5 * allocation.get_width(), half_height = 0.5 * allocation.get_height();
-    const double boundary = gui_.creativity_->boundary();
+    const double boundary = gui_.creativity_->parameters.boundary;
     // The second value below is negative because higher y canvas values are down the screen, which
     // are *lower* graph values.
     //
@@ -42,7 +42,7 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
     Gtk::Allocation allocation = get_allocation();
     const int width = allocation.get_width();
     const int height = allocation.get_height();
-    const double boundary = gui_.creativity_->boundary();
+    const double boundary = gui_.creativity_->parameters.boundary;
 
     if (gui_.state_num_ == 0) {
         // No states at all: just draw a blank screen
@@ -293,7 +293,7 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
 void GraphArea::drawWrappingLine(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans, const Position &from, const Position &to,
         double min_length, Colour start_colour, Colour end_colour) {
 
-    const double boundary = gui_.creativity_->boundary();
+    const double boundary = gui_.creativity_->parameters.boundary;
     const double x_span = 2*boundary;
     const double y_span = 2*boundary;
     if (not wpb_.wrapped(0)) {
@@ -383,7 +383,7 @@ void GraphArea::drawPoint(
         const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans, double x, double y,
         const PointType &type, const Colour &colour, const double radius, const double width, bool virt) {
 
-    const double boundary = gui_.creativity_->boundary();
+    const double boundary = gui_.creativity_->parameters.boundary;
 
     // Before we transform x and y, consider whether there are wrapped versions of the point we need
     // to worry about; if so, draw them first.

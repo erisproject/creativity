@@ -1,6 +1,7 @@
 #pragma once
 #include <iterator>
 #include "creativity/state/State.hpp"
+#include "creativity/CreativitySettings.hpp"
 
 namespace creativity { namespace state {
 
@@ -27,29 +28,9 @@ class Storage {
          */
         virtual std::shared_ptr<const State> operator[](size_t i) const = 0;
 
-        /** Returns the number of simulation dimensions.  Subclasses must update the `dimensions_`
-         * variable as soon as the number of dimensions becomes known.  A Storage class must always
-         * know the dimensions as soon as a single state containing at least one reader or book is
-         * stored.
+        /** Accesses the simulation settings associated with this storage object.
          */
-        virtual unsigned int dimensions() const;
-
-        /** Returns the +/- simulation boundaries (which wrap).  Will always return a strictly
-         * positive value as long as the storage has at least one state with at least one reader.
-         *
-         * Subclasses must update the `boundary_` variable as soon as the boundary is available.
-         */
-        double boundary() const;
-
-        /** Returns the simulation period when sharing first becomes available.
-         */
-        unsigned long sharingBegins() const;
-
-        /** Sets the period in which sharing first becomes available.  This should generally be
-         * called only once.  Attempting to change the sharingBegins() period using a second call to
-         * sharingBegins(t) will raise an exception.
-         */
-        void sharingBegins(uint64_t t);
+        const CreativitySettings &settings = settings_;
 
         /// Returns the number of states currently stored.
         virtual size_t size() const = 0;
@@ -81,21 +62,10 @@ class Storage {
         virtual ~Storage() = default;
 
     protected:
-        /** The simulation boundary.  Initialized to 0, but subclasses must reset to a positive
-         * value as soon as the boundary can be determined.
+        /** The simulation settings, with default initialization of fields to 0.  These settings
+         * should be updated as soon as possible.
          */
-        double boundary_ = 0.0;
-
-        /** The number of dimensions.  Subclasses must update this to a non-zero value as soon as
-         * the number of dimensions can be determined (i.e. as soon as a non-empty State is added).
-         */
-        unsigned int dimensions_ = 0;
-
-        /** The period in which sharing first becomes available.  Initialized to the maximum value
-         * of an unsigned long, but subclasses should update to the appropriate value as soon as
-         * possible.
-         */
-        uint64_t sharing_begins_ = std::numeric_limits<uint64_t>::max();
+        CreativitySettings settings_ = {};
 };
 
 template <class... Args>

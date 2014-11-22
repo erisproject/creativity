@@ -241,9 +241,9 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          */
         const std::unordered_set<eris::SharedMember<Book>>& newPirated() const;
 
-        /** Returns the set of Books that this reader wrote, sorted by creation date of the book.
-         * These books are included in the reader's library but aren't available for sharing with
-         * friends.
+        /** Returns the set of Books that this reader wrote, sorted by id (which is also sorted by
+         * creation date of the book, from oldest to newest).  These books are included in the
+         * reader's library but aren't available for sharing with friends.
          *
          * The reader's library() contains the books returned by libraryPurchased(),
          * libraryPirated(), and wrote().
@@ -405,7 +405,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * holds mathematically (by L'Hôpital's Rule); without this special handling, evaluating the
          * above numerically would result in a NaN value.
          *
-         * The default value is \f$\alpha = 1\f$, yield a logarithmic quality/effort relationship.
+         * The default value is \f$\alpha = 1\f$, yielding a logarithmic quality/effort relationship.
          *
          * The value of this parameter should be strictly greater than 0 to maintain the concavity
          * of the function.
@@ -634,8 +634,9 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         std::vector<double> pen_poly_ = Reader::default_penalty_polynomial;
         /// Map of books owned to realized quality of those books:
         std::unordered_map<eris::SharedMember<Book>, double> library_;
-        /** Map of books to quality predictions (which are cached until the library/quality belief
-         * changes). */
+        /** Cache of quality predictions used so that quality(book) returns the same value if called
+         * multiple times.  The cache is reset whenever the library or quality belief changes.
+         */
         mutable std::unordered_map<eris::SharedMember<Book>, double> quality_predictions_;
         std::unordered_set<eris::SharedMember<Book>>
             /// Books in `library_` that were purchased by this reader

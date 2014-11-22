@@ -147,6 +147,10 @@ class LinearRestricted : public Linear {
          * As a consequence, `double y1 = predict(X, 1000); double y2 = predict(X, 1000)` will
          * return the same predictions, but `double y1 = predict(X, 1000); predict(X, 2000); double
          * y2 = predict(X, 1000)` could produce different values of `y1` and `y2`.
+         *
+         * \throws std::logic_error if attempting to call predict() on an empty or noninformative
+         * model.  (Because of the large s2 and small n values, draws would be highly random and in
+         * no way useful for prediction).
          */
         virtual double predict(const Eigen::Ref<const Eigen::RowVectorXd> &Xi, long min_draws);
 

@@ -20,17 +20,17 @@ class State final {
         State() = default;
 
         /// The simulation period represented by this state
-        unsigned long t{0};
+        uint64_t t = 0;
 
         /** The simulation boundary.  This is inferred from the first reader found in the
          * simulation, the first book if there are no readers, and otherwise 0.
          */
-        double boundary{0.0};
+        double boundary{std::numeric_limits<double>::quiet_NaN()};
 
         /** The simulation dimensions.  This is inferred from the first reader found in the
          * simulation, the first book if there are no readers, and otherwise 0.
          */
-        unsigned int dimensions{0};
+        uint32_t dimensions = 0;
 
         /// The readers at the given state
         std::unordered_map<eris::eris_id_t, ReaderState> readers;

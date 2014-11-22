@@ -1,4 +1,5 @@
 #include "creativity/state/FileStorage.hpp"
+#include "creativity/Creativity.hpp"
 #include <cmath>
 #include <sys/stat.h>
 
@@ -22,7 +23,23 @@ constexpr int64_t
         FileStorage::HEADER::pos::test_value,
         FileStorage::HEADER::pos::states,
         FileStorage::HEADER::pos::dimensions,
+        FileStorage::HEADER::pos::readers,
         FileStorage::HEADER::pos::boundary,
+        FileStorage::HEADER::pos::book_distance_sd,
+        FileStorage::HEADER::pos::book_quality_sd,
+        FileStorage::HEADER::pos::cost_fixed,
+        FileStorage::HEADER::pos::cost_unit,
+        FileStorage::HEADER::pos::cost_piracy,
+        FileStorage::HEADER::pos::income,
+        FileStorage::HEADER::pos::sharing_begins,
+        FileStorage::HEADER::pos::sharing_link_proportion,
+        FileStorage::HEADER::pos::init_prob_write,
+        FileStorage::HEADER::pos::init_q_min,
+        FileStorage::HEADER::pos::init_q_max,
+        FileStorage::HEADER::pos::init_p_min,
+        FileStorage::HEADER::pos::init_p_max,
+        FileStorage::HEADER::pos::init_prob_keep,
+        FileStorage::HEADER::pos::init_keep_scale,
         FileStorage::HEADER::pos::state_first,
         FileStorage::HEADER::pos::state_last,
         FileStorage::HEADER::pos::continuation,
@@ -47,7 +64,7 @@ inline bool file_exists(const std::string &name) {
     return stat(name.c_str(), &buffer) == 0;
 }
 
-FileStorage::FileStorage(const std::string &filename, MODE mode) {
+FileStorage::FileStorage(const std::string &filename, MODE mode, CreativitySettings &settings_in) {
     f_.exceptions(f_.failbit | f_.badbit);
 
     bool parse = true;
@@ -79,10 +96,14 @@ FileStorage::FileStorage(const std::string &filename, MODE mode) {
             break;
     }
 
-    if (parse)
+    if (parse) {
         parseMetadata();
-    else
+        settings_in = settings;
+    }
+    else {
+        settings_ = settings_in;
         writeEmptyHeader();
+    }
 }
 
 size_t FileStorage::size() const {
@@ -91,10 +112,12 @@ size_t FileStorage::size() const {
 
 void FileStorage::push_back(std::shared_ptr<const State> state) {
     // Make sure the state agrees with the states we already have
-    if (dimensions_ != 0 and state->dimensions != dimensions_)
+    if (settings.dimensions != 0 and state->dimensions != settings.dimensions)
         throw std::runtime_error("Cannot add state: state dimensions differ from storage dimensions");
-    if (boundary_ != 0 and state->boundary != boundary_)
+    if (settings.boundary != 0 and state->boundary != settings.boundary)
         throw std::runtime_error("Cannot add state: state boundary differs from storage boundary");
+    if (settings.readers != 0 and settings.readers != state->readers.size())
+        throw std::runtime_error("Cannot add state: state #readers differs from storage #readers");
 
     f_.seekp(0, f_.end);
     auto location = f_.tellp();
@@ -114,20 +137,16 @@ void FileStorage::push_back(std::shared_ptr<const State> state) {
     if (states_.size() < state_pos_.size()) states_.resize(state_pos_.size());
     states_[state_pos_.size()-1] = state;
 
-    if (dimensions_ == 0 and state->dimensions != 0) {
+    if (settings.dimensions == 0 and state->dimensions != 0) {
         f_.seekp(HEADER::pos::dimensions);
         write_u32(state->dimensions);
-        dimensions_ = state->dimensions;
+        settings_.dimensions = state->dimensions;
     }
-    if (boundary_ == 0 and state->boundary != 0) {
+    if (settings.boundary == 0 and state->boundary != 0) {
         f_.seekp(HEADER::pos::boundary);
         write_value(state->boundary);
-        boundary_ = state->boundary;
-    }
-    if (not wrote_sharing_begins_ and sharing_begins_ != std::numeric_limits<uint64_t>::max()) {
-        f_.seekp(HEADER::pos::sharing_begins);
-        write_value(sharing_begins_);
-        wrote_sharing_begins_ = true;
+        settings_.boundary = state->boundary;
+        settings_.density = densityFromBoundary(settings.readers, settings.dimensions, settings.boundary);
     }
 }
 
@@ -159,13 +178,33 @@ void FileStorage::writeEmptyHeader() {
     f_.write(HEADER::fileid, sizeof HEADER::fileid); // 'CrSt' file signature
     write_u32(1); // file version
     f_.write(HEADER::test_value, sizeof HEADER::test_value); // All test values squished into one
-    write_u32(0); // Number of states (will be updated once known)
-    write_u32(0); // Number of dimensions (updated once known)
-    write_dbl(0.0); // Boundary (updated once known)
-    write_u64(sharing_begins_); // Sharing start period (updated once known)
-    wrote_sharing_begins_ = sharing_begins_ != std::numeric_limits<uint64_t>::max();
 
-    // State addresses and continuation location:
+    write_u32(0); // Number of states
+    write_value(settings.dimensions);
+    write_value(settings.readers);
+    if (settings.use_density) settings_.boundary = boundaryFromDensity(settings.readers, settings.dimensions, settings.density);
+    else                      settings_.density = densityFromBoundary(settings.readers, settings.dimensions, settings.boundary);
+
+    write_value(settings.boundary);
+    write_value(settings.book_distance_sd);
+    write_value(settings.book_quality_sd);
+    write_value(settings.cost_fixed);
+    write_value(settings.cost_unit);
+    write_value(settings.cost_piracy);
+    write_value(settings.income);
+    write_value(settings.sharing_begins);
+    write_value(settings.sharing_link_proportion);
+    write_value(settings.initial.prob_write);
+    write_value(settings.initial.q_min);
+    write_value(settings.initial.q_max);
+    write_value(settings.initial.p_min);
+    write_value(settings.initial.p_max);
+    write_value(settings.initial.prob_keep);
+    write_value(settings.initial.keep_price);
+
+    write_u32(0); // Unused padding value
+
+    // State addresses and continuation location (all 0):
     char zeros[8 * (HEADER::states + 1)] = {0};
     f_.write(zeros, sizeof zeros);
 
@@ -254,20 +293,33 @@ void FileStorage::parseMetadata() {
     CHECK_TEST(i64, int64_t);
     CHECK_TEST(dbl, double);
 
-    // number of states and number of dimensions:
+    // number of states:
     auto num_states = parse_value<uint32_t>(block[HEADER::pos::states]);
-    dimensions_ = parse_value<uint32_t>(block[HEADER::pos::dimensions]);
-    if (dimensions_ == 0 and num_states != 0)
-        throwParseError("found invalid dimensions == 0 when num_states > 0");
 
-    // Boundary location
-    boundary_ = parse_value<double>(block[HEADER::pos::boundary]);
-    if (boundary_ < 0 or (boundary_ == 0 and num_states != 0))
-        throwParseError("found invalid boundary position");
+    parse_value(block[HEADER::pos::dimensions], settings_.dimensions);
+    parse_value(block[HEADER::pos::readers], settings_.readers);
+    parse_value(block[HEADER::pos::boundary], settings_.boundary);
+    parse_value(block[HEADER::pos::book_distance_sd], settings_.book_distance_sd);
+    parse_value(block[HEADER::pos::book_quality_sd], settings_.book_quality_sd);
+    parse_value(block[HEADER::pos::cost_fixed], settings_.cost_fixed);
+    parse_value(block[HEADER::pos::cost_unit], settings_.cost_unit);
+    parse_value(block[HEADER::pos::cost_piracy], settings_.cost_piracy);
+    parse_value(block[HEADER::pos::income], settings_.income);
+    parse_value(block[HEADER::pos::sharing_begins], settings_.sharing_begins);
+    parse_value(block[HEADER::pos::sharing_link_proportion], settings_.sharing_link_proportion);
+    parse_value(block[HEADER::pos::init_prob_write], settings_.initial.prob_write);
+    parse_value(block[HEADER::pos::init_q_min], settings_.initial.q_min);
+    parse_value(block[HEADER::pos::init_q_max], settings_.initial.q_max);
+    parse_value(block[HEADER::pos::init_p_min], settings_.initial.p_min);
+    parse_value(block[HEADER::pos::init_p_max], settings_.initial.p_max);
+    parse_value(block[HEADER::pos::init_prob_keep], settings_.initial.prob_keep);
+    parse_value(block[HEADER::pos::init_keep_scale], settings_.initial.keep_price);
 
-    // Sharing start period
-    sharing_begins_ = parse_value<uint64_t>(block[HEADER::pos::sharing_begins]);
-    wrote_sharing_begins_ = sharing_begins_ != std::numeric_limits<uint64_t>::max();
+    if (settings.dimensions == 0) throwParseError("found invalid dimensions == 0");
+    if (settings.readers == 0) throwParseError("found invalid readers == 0");
+    if (settings.boundary <= 0) throwParseError("found invalid (non-positive) boundary position");
+    if (settings.book_distance_sd < 0) throwParseError("found invalid (negative) book_distance_sd");
+    if (settings.book_quality_sd < 0) throwParseError("found invalid (negative) book_quality_sd");
 
     state_pos_.reserve(num_states);
 
@@ -333,13 +385,13 @@ std::shared_ptr<const State> FileStorage::readState() const {
 std::pair<eris::eris_id_t, ReaderState> FileStorage::readReader() const {
     auto pair = std::make_pair<eris_id_t, ReaderState>(
             read_u64(),
-            ReaderState(dimensions_));
+            ReaderState(settings.dimensions));
 
     ReaderState &r = pair.second;
     r.id = pair.first;
 
     // Position
-    for (uint32_t d = 0; d < dimensions_; d++)
+    for (uint32_t d = 0; d < settings.dimensions; d++)
         r.position[d] = read_dbl();
 
     // Friends
@@ -385,20 +437,20 @@ std::pair<eris::eris_id_t, ReaderState> FileStorage::readReader() const {
     belief_data belief = readBelief();
     if (belief.K > 0)
         r.profit = belief.noninformative
-            ? Profit(dimensions_, belief.K)
-            : Profit(dimensions_, belief.beta, belief.s2, belief.V, belief.n);
+            ? Profit(settings.dimensions, belief.K)
+            : Profit(settings.dimensions, belief.beta, belief.s2, belief.V, belief.n);
 
     belief = readBelief();
     if (belief.K > 0)
         r.profit_extrap = belief.noninformative
-            ? Profit(dimensions_, belief.K)
-            : Profit(dimensions_, belief.beta, belief.s2, belief.V, belief.n);
+            ? Profit(settings.dimensions, belief.K)
+            : Profit(settings.dimensions, belief.beta, belief.s2, belief.V, belief.n);
 
     belief = readBelief();
     if (belief.K > 0)
         r.demand = belief.noninformative
-            ? Demand(dimensions_, belief.K)
-            : Demand(dimensions_, belief.beta, belief.s2, belief.V, belief.n);
+            ? Demand(settings.dimensions, belief.K)
+            : Demand(settings.dimensions, belief.beta, belief.s2, belief.V, belief.n);
 
     belief = readBelief();
     if (belief.K > 0)
@@ -685,13 +737,13 @@ void FileStorage::writeBelief(const Linear &m) {
 
 std::pair<eris_id_t, BookState> FileStorage::readBook() const {
     auto pair = std::make_pair<eris_id_t, BookState>(
-            read_u64(), BookState(dimensions_));
+            read_u64(), BookState(settings.dimensions));
 
     BookState &b = pair.second;
     b.id = pair.first;
 
     b.author = read_u64();
-    for (uint32_t d = 0; d < dimensions_; d++) {
+    for (uint32_t d = 0; d < settings.dimensions; d++) {
         b.position[d] = read_dbl();
     }
 

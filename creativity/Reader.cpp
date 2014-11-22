@@ -23,7 +23,7 @@ Reader::Reader(
         belief::Demand &&demand, belief::Profit &&profit, belief::Quality &&quality,
         double cFixed, double cUnit, double inc
         )
-    : WrappedPositional<agent::AssetAgent>(pos, {-creativity->boundary(), -creativity->boundary()}, {creativity->boundary(), creativity->boundary()}),
+    : WrappedPositional<agent::AssetAgent>(pos, {-creativity->parameters.boundary, -creativity->parameters.boundary}, {creativity->parameters.boundary, creativity->parameters.boundary}),
     cost_fixed{cFixed}, cost_unit{cUnit}, income{inc},
     creativity_{std::move(creativity)},
     profit_belief_{std::move(profit)}, profit_belief_extrap_{profit_belief_},
@@ -183,70 +183,111 @@ void Reader::interOptimize() {
     const double market_books = sim->countMarkets<BookMarket>();
     const double previous_books = wrote().size();
 
-    // Figure out the expected profitability of each book; positive ones will be kept on the market
-    std::map<double, std::vector<std::pair<SharedMember<Book>, double>>, std::greater<double>> profitability;
-    for (auto &book : wrote_market_) {
-        auto book_mkt = book->market();
-
-        auto max = demand_belief_.argmaxP(book->quality(), book->lifeSales(), previous_books, market_books, cost_unit);
-        const double &p = max.first;
-        const double &q = max.second;
-        const double profit = (p - cost_unit) * q - cost_fixed;
-
-        if (profit > 0) {
-            // Profitable to keep this book on the market, so do so
-            profitability[profit].push_back(std::make_pair(book, p));
-        }
-    }
-
-    // Store the decided prices for each book staying on the market in decreasing order of
-    // profitability UNLESS we can't afford the fixed cost of keeping the book on the market.
-    // Anything with a negative expected profit or costs that can't be covered will be removed from
-    // the market.  Note that the costs calculated here aren't actually incurred until interApply().
-    new_prices_.clear();
-    while (income_available >= cost_fixed and not profitability.empty()) {
-        auto &books = profitability.begin()->second;
-        if (income_available < cost_fixed * books.size())
-            // We don't have enough to do all the books at this profitability level, so shuffle them
-            // so that we choose randomly
-            std::shuffle(books.begin(), books.end(), Random::rng());
-
-        for (auto &b : books) {
-            if (income_available < cost_fixed) break;
-            income_available -= cost_fixed;
-            new_prices_.emplace(b.first, b.second);
-        }
-    }
     // Any books not in new_prices_ but that were on the market last period will be removed from the
     // market
+    new_prices_.clear();
 
+    auto &rng = Random::rng();
+
+    // Bypass market predictions if our market demand belief is noninformative:
+    if (demand_belief_.noninformative()) {
+        if (creativity_->parameters.initial.prob_keep > 0) {
+            std::bernoulli_distribution keep(creativity_->parameters.initial.prob_keep);
+            for (auto on_market = wrote_market_.cbegin(); income_available >= cost_fixed and on_market != wrote_market_.cend(); on_market++) {
+                auto &book = *on_market;
+                if (keep(rng)) {
+                    income_available -= cost_fixed;
+                    double new_price = (book->price() - cost_unit) * creativity_->parameters.initial.keep_price + cost_unit;
+                    new_prices_.emplace(book, new_price);
+                }
+            }
+        }
+    }
+    else {
+        // Figure out the expected profitability of each book; positive ones will be kept on the market
+        std::map<double, std::vector<std::pair<SharedMember<Book>, double>>, std::greater<double>> profitability;
+        for (auto &book : wrote_market_) {
+            auto book_mkt = book->market();
+
+            auto max = demand_belief_.argmaxP(book->quality(), book->lifeSales(), previous_books, market_books, cost_unit);
+            const double &p = max.first;
+            const double &q = max.second;
+            const double profit = (p - cost_unit) * q - cost_fixed;
+
+            if (profit > 0) {
+                // Profitable to keep this book on the market, so do so
+                profitability[profit].push_back(std::make_pair(book, p));
+            }
+        }
+
+        // Store the decided prices for each book staying on the market in decreasing order of
+        // profitability UNLESS we can't afford the fixed cost of keeping the book on the market.
+        // Anything with a negative expected profit or costs that can't be covered will be removed from
+        // the market.  Note that the costs calculated here aren't actually incurred until interApply().
+        while (income_available >= cost_fixed and not profitability.empty()) {
+            auto &books = profitability.begin()->second;
+            if (income_available < cost_fixed * books.size())
+                // We don't have enough to do all the books at this profitability level, so shuffle them
+                // so that we choose randomly
+                std::shuffle(books.begin(), books.end(), rng);
+
+            for (auto &b : books) {
+                if (income_available < cost_fixed) break;
+                income_available -= cost_fixed;
+                new_prices_.emplace(b.first, b.second);
+            }
+        }
+    }
 
     //// NEW BOOK CREATION:
-    // Create a book if E(profit) > effort required
     create_ = false;
-
-    // Find the l that maximizes creation profit given current wealth (which would have come from
-    // past sales, if non-zero) plus the fixed income we're about to receive, minus whatever we
-    // decided to spend above to keep books on the market.
     if (income_available >= cost_fixed) {
-        double l_max = profit_belief_extrap_.argmaxL(
-                [this] (double l) -> double { return creationQuality(l); },
-                previous_books, market_books, assets()[creativity_->money] + income - cost_fixed
-                );
-        double quality = creationQuality(l_max);
+        if (profit_belief_.noninformative()) {
+            // If we have no useful profit belief yet, just use the initial values:
+            if (creativity_->parameters.initial.prob_write > 0 and std::bernoulli_distribution(creativity_->parameters.initial.prob_write)(rng)) {
+                double q = std::uniform_real_distribution<double>(creativity_->parameters.initial.q_min, creativity_->parameters.initial.q_max)(rng);
+                double effort = creationEffort(q);
+                // Make sure the required effort doesn't exceed the available funds
+                if (income_available >= cost_fixed + effort) {
+                    create_ = true;
+                    create_price_ = std::uniform_real_distribution<double>(creativity_->parameters.initial.p_min, creativity_->parameters.initial.p_max)(rng);
+                    create_quality_ = q;
+                    create_effort_ = effort;
+                    ERIS_DBG(id() << " creating (via initial parameters) at q=" << q << ", l=" << effort <<", p=" << create_price_);
+                }
+            }
+        }
+        else {
+            // Otherwise, create a book if E(profit) > effort required
 
-        double exp_profit = profit_belief_.predict(quality, previous_books, market_books);
+            // Find the l that maximizes creation profit given current wealth (which would have come from
+            // past sales, if non-zero) plus the fixed income we're about to receive, minus whatever we
+            // decided to spend above to keep books on the market.
+            double l_max = profit_belief_extrap_.argmaxL(
+                    [this] (double l) -> double { return creationQuality(l); },
+                    previous_books, market_books, assets()[creativity_->money] + income - cost_fixed
+                    );
+            ERIS_DBGVAR(id());
+            ERIS_DBGVAR(l_max);
+            double quality = creationQuality(l_max);
+            ERIS_DBGVAR(quality);
 
-        // If the optimal effort level gives a book with positive expected profits, do it:
-        if (l_max < exp_profit) {
-            // We're going to create, so calculate the optimal first-period price.  It's possible that
-            // we get back cost_unit (and so predicted profit is non-positive); write the book anyway:
-            // perhaps profits are expected to come in later periods?
-            auto max = demand_belief_.argmaxP(quality, 0, previous_books, market_books, cost_unit);
-            create_price_ = max.first;
-            create_quality_ = quality;
-            create_effort_ = l_max;
-            create_ = true;
+            double exp_profit = profit_belief_.predict(quality, previous_books, market_books);
+            ERIS_DBGVAR(exp_profit);
+
+            // If the optimal effort level gives a book with positive expected profits, do it:
+            if (l_max < exp_profit) {
+                ERIS_DBG("CREATING! =)");
+                // We're going to create, so calculate the optimal first-period price.  It's possible that
+                // we get back cost_unit (and so predicted profit is non-positive); write the book anyway:
+                // perhaps profits are expected to come in later periods?
+                auto max = demand_belief_.argmaxP(quality, 0, previous_books, market_books, cost_unit);
+                create_price_ = max.first;
+                create_quality_ = quality;
+                create_effort_ = l_max;
+                create_ = true;
+            }
+            else ERIS_DBG("not creating. :(");
         }
     }
 }
@@ -321,9 +362,16 @@ double Reader::quality(SharedMember<Book> b) const {
     if (found != quality_predictions_.end())
         return found->second;
 
-    // Otherwise we need to use the quality belief to predict the quality
-    auto &q_b = const_cast<belief::Quality&>(quality_belief_);
-    double q_hat = q_b.predict(b);
+    double q_hat;
+    if (quality_belief_.noninformative()) {
+        // No informative beliefs above quality, so just use initial parameter midpoint
+        q_hat = (creativity_->parameters.initial.q_max + creativity_->parameters.initial.q_min) / 2.0;
+    }
+    else {
+        // Otherwise we need to use the quality belief to predict the quality
+        auto &q_b = const_cast<belief::Quality&>(quality_belief_);
+        q_hat = q_b.predict(b);
+    }
     quality_predictions_.emplace(b, q_hat);
 
     return q_hat;

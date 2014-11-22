@@ -4,7 +4,11 @@
 #include <fstream>
 #include <boost/predef/other/endian.h>
 
-namespace creativity { namespace state {
+namespace creativity {
+
+class Creativity;
+
+namespace state {
 
 /** Class for file-based storage.  Note that most of the methods of this class will throw errors
  * when the underlying file stream encounters an error.  You should not attempt to use the
@@ -46,14 +50,18 @@ class FileStorage : public Storage, private eris::noncopyable {
          *
          * \param filename the filename to open
          * \param mode the open mode to use
+         * \param settings is a reference to CreativitySettings.  If the file is being created (i.e.
+         * MODE is OVERWRITE, or is APPEND and the file does not exist), the settings stored in
+         * `settings` are written to the file; if an existing file is being read, the settings
+         * contained in the file are copied into `settings`.
          *
          * Throws various exceptions if the file does not exist, cannot be read, is empty, or
          * contains invalid data.
          */
-        FileStorage(const std::string &filename, MODE mode);
+        FileStorage(const std::string &filename, MODE mode, CreativitySettings &settings);
 
         /** Throws a ParseError exception.  The given message is prefixed with `Parsing file failed
-         * [pos=123]: `, where `123` is the current f_ position.
+         * [pos=123]: `, where `123` is the current file position.
          */
         void throwParseError(const std::string& message) const;
 
@@ -115,6 +123,12 @@ class FileStorage : public Storage, private eris::noncopyable {
         template <typename T>
         T read_value() const;
 
+        /** Reads a value from the file at its current location into the given variable, advancing
+         * the file's current location by the size of the given type.
+         */
+        template <typename T>
+        void read_value(T &val) const { val = read_value<T>(); }
+
         /** Alias for `read_value<uint64_t>()` */
         uint64_t read_u64() const { return read_value<uint64_t>(); }
 
@@ -166,11 +180,15 @@ class FileStorage : public Storage, private eris::noncopyable {
         template <typename T, typename F>
         static T parse_value(const F &from);
 
+        /// Like parse_value(from), but copies into the given variable instead of returning it.
+        template <typename T, typename F>
+        static void parse_value(const F &from, T &to) { to = parse_value<T>(from); }
+
         /** Copies the appropriate number of bytes from memory from the location of `from` into the
          * location of `to`, reordered (if necessary) to be in the file's little-endian order.
          *
          * The number of bytes copied is `sizeof(F)`; `to` may be a smaller type (such as a `char`)
-         * as long as `sizeof(T)` bytes of valid space exists at its location.
+         * as long as `sizeof(F)` bytes of valid space exists at its location.
          */
         template <typename F, typename T>
         static void store_value(const F &from, T &to);
@@ -194,7 +212,7 @@ class FileStorage : public Storage, private eris::noncopyable {
 
         /// Constants for header attributes
         struct HEADER {
-            static constexpr unsigned int size = 512; ///< Size of the header, in bytes
+            static constexpr unsigned int size = 4096; ///< Size of the header, in bytes
             /// The magic value 'CrSt' that identifies the file as created by this class
             static constexpr char fileid[4] = {'C', 'r', 'S', 't'};
             /// The test value bytes, which should be interpreted as the various test values below
@@ -204,14 +222,30 @@ class FileStorage : public Storage, private eris::noncopyable {
                 static constexpr int64_t
                     fileid = 0, ///< First 4 bytes are File ID such as "CrSt" ("Cr"eative "St"ate file)
                     filever = 4, ///< Second 4 bytes are u32 file format version
-                    test_value = 8, ///< location of the 8-byte test value (which is interpreted as various types)
-                    states = 16, ///< location of the number of states stored in this file (u32)
-                    dimensions = 20, ///< number of dimensions of the simulation these states belong to (u32)
-                    boundary = 24, ///< Location of the simulation boundary (positive double)
-                    sharing_begins = 32, ///< Location of the sharing start period (u64)
-                    state_first = 40, ///< Location of the first state record
-                    state_last = 496, ///< Location of the last state record
-                    continuation = 504; ///< Location of the header continuation block
+                    test_value = 8, ///< the 8-byte test value (which is interpreted as various types)
+                    states = 16, ///< the number of states stored in this file (u32)
+                    dimensions = 20, ///< the number of dimensions of the simulation these states belong to (u32)
+                    readers = 24, ///< the number of readers in the simulation
+                    boundary = 28, ///< the simulation boundary (positive double)
+                    book_distance_sd = 36, ///< standard deviation of distance of new books from authors (positive double)
+                    book_quality_sd = 44, ///< standard deviation of perceived book quality draw (draw is normal, with mean = true quality) (dbl)
+                    cost_fixed = 52, ///< Fixed cost of keeping a book on the market (dbl)
+                    cost_unit = 60, ///< Unit cost of an author creating a copy of a book (dbl)
+                    cost_piracy = 68, ///< Unit cost of getting a copy of a book via piracy (dbl)
+                    income = 76, ///< Per-period reader external income (before incurring authorship costs or receiving book profits) (dbl)
+                    sharing_begins = 84, ///< the sharing start period (u64)
+                    sharing_link_proportion = 92, ///< The proportion of potential friendship links that exist
+                    init_prob_write = 100, ///< The probability of writing (while beliefs noninformative)
+                    init_q_min = 108, ///< `a` in U[a,b], the noninformative belief authorship quality level
+                    init_q_max = 116, ///< `b` in U[a,b], the noninformative belief authorship quality level
+                    init_p_min = 124, ///< `a` in U[a,b], the noninformative belief book price
+                    init_p_max = 132, ///< `b` in U[a,b], the noninformative belief book price
+                    init_prob_keep = 140, ///< The probability of keeping a book on the market (uninformed beliefs)
+                    init_keep_scale = 148, ///< If keeping a book on the market, the new price is (p-c)*s+c, where this is s
+                    // NB: this next one MUST be an integer multiple of 8!
+                    state_first = 160, ///< the first state record
+                    state_last = size - 16, ///< the last state record
+                    continuation = size - 8; ///< the header continuation block pointer (used once header state blocks fill up)
             };
             /** The number of states that can be stored in the header.  Storing additional states
              * requires using continuation blocks.
@@ -434,9 +468,6 @@ class FileStorage : public Storage, private eris::noncopyable {
          *     u64          lifetime
          */
         std::pair<eris::eris_id_t, BookState> readBook() const;
-
-        /// Whether the file contains a (non-default) state_begins_ value
-        bool wrote_sharing_begins_ = false;
 
         /** Writes a book at the current file position.  See readBook() for data layout. */
         void writeBook(const BookState &book);

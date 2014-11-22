@@ -9,12 +9,14 @@ namespace creativity { namespace state {
  */
 class MemoryStorage : public Storage {
     public:
-        /// Creates an empty MemoryStorage object.
-        MemoryStorage() = default;
+        MemoryStorage() = delete;
 
-        /** Creates a MemoryStorage object by coping the States of the given Storage object into new
-         * in-memory states.  Note that this copies std::shared_ptr<State> from the given object; no
-         * deep copying is performed.
+        /// Creates an empty MemoryStorage object, copying the given creativity settings into it.
+        MemoryStorage(const CreativitySettings &set);
+
+        /** Creates a MemoryStorage object by coping the States and settings of the given Storage
+         * object into new in-memory states.  Note that this copies std::shared_ptr<State> from the
+         * given object; no deep copying is performed.
          */
         MemoryStorage(const Storage &copy);
 

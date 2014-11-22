@@ -22,51 +22,23 @@ int main(int argc, char *argv[1]) {
 
     bool setup = false, stopped = true, step = false, quit = false;
     unsigned long run_start = 0, run_end = 0;
-    double speed_limit = 0;
     std::chrono::milliseconds sync_speed{50};
     bool save_to_file = false, load_from_file = false;
     unsigned int max_threads = 0;
-
-#define NONNEG_DOUBLE(TYPE, VAR, DESC) \
-    case GUI::ParamType::TYPE: \
-        if (setup) throw std::runtime_error("Cannot change " DESC " after initial setup"); \
-        if (p.dbl < 0) \
-            throw std::domain_error{DESC " `" + std::to_string(p.dbl) + "' is invalid"}; \
-        VAR = p.dbl; \
-        break;
 
     // Set up handlers for user actions in the GUI
     auto on_setup = [&](GUI::Parameter p) { // Setup
         switch (p.param) {
             case GUI::ParamType::finished:
-                if (not load_from_file)
+                if (not load_from_file) {
+                    if (creativity->parameters.dimensions != 2) throw std::domain_error("Cannot yet handle dimensions ≠ 2");
+                    // setup() will check the other parameters for validity
                     creativity->setup();
+                }
                 setup = true;
                 break;
             case GUI::ParamType::begin:
             case GUI::ParamType::erred:
-                break;
-            case GUI::ParamType::dimensions:
-                if (setup) throw std::runtime_error("Cannot change dimensions after initial setup");
-                if (p.ul != 2)
-                    throw std::domain_error{"Cannot yet handle dimensions ≠ 2"};
-                // FIXME
-                break;
-            case GUI::ParamType::readers:
-                if (setup) throw std::runtime_error("Cannot change readers after initial setup");
-                if (p.ul < 1)
-                    throw std::domain_error{"Must have at least one reader"};
-                creativity->parameters.readers = p.ul;
-                break;
-            case GUI::ParamType::density:
-                if (setup) throw std::runtime_error("Cannot change density after initial setup");
-                if (p.dbl <= 0)
-                    throw std::domain_error{"Density must be positive"};
-                creativity->parameters.density = p.dbl;
-                break;
-            case GUI::ParamType::sharing_begins:
-                if (setup) throw std::runtime_error("Cannot change sharing t after initial setup");
-                creativity->parameters.sharing_begins = p.ul;
                 break;
             case GUI::ParamType::seed:
                 if (setup) throw std::runtime_error("Cannot change seed after initial setup");
@@ -78,9 +50,9 @@ int main(int argc, char *argv[1]) {
                 creativity->fileRead(*reinterpret_cast<std::string*>(p.ptr));
                 if (creativity->storage().first->size() == 0)
                     throw std::runtime_error("Unable to load file: file has no states");
-                if (creativity->storage().first->dimensions() != 2)
+                if (creativity->parameters.dimensions != 2)
                     throw std::runtime_error("Unable to load file: dimensions != 2");
-                if (creativity->storage().first->boundary() <= 0)
+                if (creativity->parameters.boundary <= 0)
                     throw std::runtime_error("Unable to load file: file has invalid non-positive boundary value");
                 load_from_file = true;
                 break;
@@ -92,10 +64,6 @@ int main(int argc, char *argv[1]) {
                 creativity->fileWrite(*reinterpret_cast<std::string*>(p.ptr));
                 save_to_file = true;
                 break;
-            NONNEG_DOUBLE(book_sd, creativity->parameters.book_distance_sd, "Book standard deviation");
-            NONNEG_DOUBLE(quality_draw_sd, creativity->parameters.book_quality_sd, "Quality standard deviation");
-            NONNEG_DOUBLE(cost_fixed, creativity->parameters.cost_fixed, "Fixed cost");
-            NONNEG_DOUBLE(cost_unit, creativity->parameters.cost_unit, "Unit cost");
             case GUI::ParamType::threads:
                 // This is the only setting that *can* be changed after the initial setup.  This
                 // will throw if currently running, but that's okay: the GUI isn't allowed to send
@@ -104,7 +72,6 @@ int main(int argc, char *argv[1]) {
                 break;
         }
     };
-#undef NONNEG_DOUBLE
 
     auto on_run = [&](unsigned long periods) { // Run
         if (not setup)
@@ -137,6 +104,8 @@ int main(int argc, char *argv[1]) {
     if (load_from_file) {
         // We're in read-only mode, which means we do nothing but wait for the GUI to quit.
         gui.initialized();
+        size_t num_states = creativity->storage().first->size() - 1; // -1 because we don't count the initial, t=0 setup state
+        gui.progress(num_states, num_states, 0);
         gui.newStates(0);
         while (not quit) {
             gui.waitEvents();
@@ -149,15 +118,13 @@ int main(int argc, char *argv[1]) {
     // Copy the initial state into the storage object
     creativity->storage().first->emplace_back(sim);
 
-    // Tell the GUI we're done with initialization
+    // Tell the GUI we're done with initialization so that it can disable the various setup elements
     gui.initialized();
-    ERIS_DBG("here we go...!");
 
     gui.progress(0, run_end, 0);
     auto last_progress = std::chrono::high_resolution_clock::now();
     auto last_progress_t = sim->t();
 
-    constexpr auto zero_ms = std::chrono::milliseconds::zero();
     constexpr auto progress_freq = std::chrono::milliseconds{50};
 
     std::chrono::time_point<std::chrono::high_resolution_clock> start, end,
@@ -174,15 +141,9 @@ int main(int argc, char *argv[1]) {
         while (not quit and (step or (not stopped and sim->t() < run_end))) {
             start = std::chrono::high_resolution_clock::now();
 
-            ERIS_DBG("running");
             sim->run();
-            ERIS_DBG("done running");
 
-            {
-                ERIS_DBG("Adding simulation state to storage...");
-                creativity->storage().first->emplace_back(sim);
-                ERIS_DBG("done");
-            }
+            creativity->storage().first->emplace_back(sim);
 
             if (step) step = false;
 
@@ -192,7 +153,7 @@ int main(int argc, char *argv[1]) {
             if (finished or end >= next_progress) {
                 auto now_t = sim->t();
                 double speed = (double) (now_t - last_progress_t) / std::chrono::duration<double>{end - last_progress}.count();
-                gui.progress(now_t, run_end, speed);
+                gui.progress(now_t, std::max(now_t, run_end), speed);
                 last_progress = end;
                 last_progress_t = now_t;
                 gui.checkEvents();
@@ -208,14 +169,6 @@ int main(int argc, char *argv[1]) {
             if (finished or end >= next_sync) {
                 gui.newStates();
                 next_sync = end + sync_speed;
-            }
-
-            if (not finished and speed_limit > 0) {
-
-                auto sleep = std::chrono::duration<double>{1.0/speed_limit} - (end - start);
-                if (sleep > zero_ms)
-                    std::this_thread::sleep_for(sleep);
-                // Else we're already slower than the speed limit
             }
         }
 

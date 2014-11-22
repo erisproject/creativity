@@ -167,7 +167,7 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
 
         cmd.parse(argc, argv);
 
-#define COPY_PARAM_SETTING(PARAM) cr.parameters.PARAM = opt_##PARAM##_arg.getValue()
+#define COPY_PARAM_SETTING(PARAM) cr.set().PARAM = opt_##PARAM##_arg.getValue()
         COPY_PARAM_SETTING(dimensions);
         COPY_PARAM_SETTING(readers);
         COPY_PARAM_SETTING(density);

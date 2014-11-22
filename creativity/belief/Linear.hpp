@@ -34,7 +34,7 @@ class Linear {
          *     beta = 0 vector
          *     s2 = `NONINFORMATIVE_S2` (currently 1e+6)
          *     V = identity matrix
-         *     n = `NONINFORMATIVE_N` (currently 1e-6)
+         *     n = `NONINFORMATIVE_N` (currently 1e-3)
          *
          * Unlike calling the full parameter constructor with the above values, this also keeps
          * track of the fact that the model is non-informative, which has two effects:
@@ -47,13 +47,11 @@ class Linear {
 
         // NB: if changing these constants, also change the above constructor documentation
         static constexpr double
-            /** The value of `n` for a noninformative model constructed using `Linear(unsigned
-             * int)`.  Although ideally a value close to 0 is preferred, using a value of even 0.01 tends
-             * to throw up 0 values.  Thus we err on the side of safety by picking 0.5 coupled with
-             * a large s^2 value.
+            /** The value of `n` for a default noninformative model constructed using
+             * `Linear(unsigned int)`.
              */
             //
-            NONINFORMATIVE_N = 0.5,
+            NONINFORMATIVE_N = 1e-3,
             /// The value of `s2` for a noninformative model constructed using `Linear(unsigned int)`
             NONINFORMATIVE_S2 = 1e+6;
 
@@ -142,6 +140,10 @@ class Linear {
          * natural conjugate prior); subclasses may override, particularly for models with
          * restrictions or other model parameter distribution assumptions where the parameter means
          * may be quite different than the distributional mean parameters due to the restrictions.
+         *
+         * \throws std::logic_error if attempting to call predict() on an empty or noninformative
+         * model.  (The default implementation would always simply return 0 for noninformative
+         * models, which is not a useful prediction).
          */
         virtual double predict(const Eigen::Ref<const Eigen::RowVectorXd> &Xi);
 

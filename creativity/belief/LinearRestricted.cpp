@@ -84,6 +84,9 @@ double LinearRestricted::predict(const Eigen::Ref<const Eigen::RowVectorXd> &Xi)
 }
 
 double LinearRestricted::predict(const Eigen::Ref<const Eigen::RowVectorXd> &Xi, long min_draws) {
+    if (noninformative_)
+        throw std::logic_error("Cannot call predict() on noninformative model");
+
     if (min_draws > mean_beta_draws_) {
         // First sum up new draws to make up the difference:
         VectorXd new_beta = VectorXd::Zero(K_);

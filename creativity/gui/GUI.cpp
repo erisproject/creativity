@@ -97,17 +97,14 @@ GUI::~GUI() {
 void GUI::thr_run() {
     main_window_ = std::shared_ptr<Gtk::Window>(widget<Gtk::Window>("window1"));
 
+    auto disable_on_load = {"fr_agents", "fr_save", "fr_run", "fr_sim"};
     // When the "load" radio button is activated, disable all the new simulation parameter fields
-    widget<Gtk::RadioButton>("radio_load")->signal_clicked().connect([this] {
-        widget<Gtk::Frame>("fr_agents")->set_sensitive(false);
-        widget<Gtk::Frame>("fr_data")->set_sensitive(false);
-        widget<Gtk::Frame>("fr_run")->set_sensitive(false);
+    widget<Gtk::RadioButton>("radio_load")->signal_clicked().connect([this,disable_on_load] {
+        for (const auto &fr : disable_on_load) widget<Gtk::Frame>(fr)->set_sensitive(false);
     });
     // Undo the above when "New simulation" is activated
-    widget<Gtk::RadioButton>("radio_new")->signal_clicked().connect([this] {
-        widget<Gtk::Frame>("fr_agents")->set_sensitive(true);
-        widget<Gtk::Frame>("fr_data")->set_sensitive(true);
-        widget<Gtk::Frame>("fr_run")->set_sensitive(true);
+    widget<Gtk::RadioButton>("radio_new")->signal_clicked().connect([this,disable_on_load] {
+            for (const auto &fr : disable_on_load) widget<Gtk::Frame>(fr)->set_sensitive(true);
     });
     // Clicking the load file chooser button directly first fires the load radio, triggering the above
     widget<Gtk::Button>("btn_load")->signal_clicked().connect([this] {
@@ -198,12 +195,28 @@ void GUI::thr_run() {
     });
 
     auto thrbox = widget<Gtk::ComboBoxText>("combo_threads");
-    int default_threads = 0;
-    for (unsigned int i = 2; i <= std::thread::hardware_concurrency(); i++) {
-        thrbox->append(std::to_string(i) + " threads");
-        default_threads = i;
+    auto active = thrbox->get_active_row_number();
+    // The gui setup has two entries: no threads, and 1 thread.  The latter is pointless (except for
+    // eris debugging), so remove it, but first check to see if it was selected; if it was, we'll
+    // update the default selection to the maximum number of threads; otherwise we'll leave it on no
+    // threads.
+    thrbox->remove_text(1);
+    unsigned int last = 1;
+    for (unsigned int i = 2, incr = 1; i <= std::thread::hardware_concurrency(); i += incr) {
+        thrbox->append(std::to_string(i), std::to_string(i) + " threads");
+        if (i >= 4*incr) incr *= 2;
+        last = i;
     }
-    thrbox->set_active(default_threads);
+    if (last < std::thread::hardware_concurrency()) {
+        // In case the processor has some weird number of max concurrency (such as 5,
+        // 7, 9-11, 13-15, 17-23, etc.) that doesn't get added above, add it.
+        std::string num = std::to_string(std::thread::hardware_concurrency());
+        thrbox->append(num, num + " threads");
+    }
+    // If the GUI's default was the 1 thread option, update it to max threads
+    if (active > 0 and std::thread::hardware_concurrency() > 1)
+        thrbox->set_active_id(std::to_string(std::thread::hardware_concurrency()));
+
     thrbox->signal_changed().connect([this] {
         int threads = widget<Gtk::ComboBoxText>("combo_threads")->get_active_row_number();
 
@@ -219,18 +232,9 @@ void GUI::thr_run() {
             widget<Gtk::Entry>("set_seed")->set_text(std::to_string(std::random_device{}()));
     });
 
-    widget<Gtk::ComboBox>("combo_state")->signal_changed().connect([this] {
-        thr_set_state(widget<Gtk::ComboBox>("combo_state")->get_active_row_number());
-    });
-
-    widget<Gtk::Button>("btn_prev")->signal_clicked().connect([this] {
-        if (state_curr_ > 0) thr_set_state(state_curr_ - 1);
-    });
-    widget<Gtk::Button>("btn_next")->signal_clicked().connect([this] {
-        if (state_curr_ + 1 < state_num_) thr_set_state(state_curr_ + 1);
-    });
-    widget<Gtk::Button>("btn_last")->signal_clicked().connect([this] {
-        thr_set_state(state_num_ - 1);
+    widget<Gtk::Scale>("scale_state")->signal_value_changed().connect([this] {
+        unsigned long t = std::lround(widget<Gtk::Scale>("scale_state")->get_value());
+        thr_set_state(t);
     });
 
     Gtk::Viewport *vis;
@@ -351,6 +355,30 @@ void GUI::thr_run() {
     GUI_SETUP_VIS_COLOUR(background)
 #undef GUI_SETUP_VIS_SETTING
 #undef GUI_SETUP_VIS_COLOUR
+
+    // Copy parameters (which will be the defaults) into the Agent Attributes settings
+    thr_update_parameters();
+
+    // Update the attributes tooltips: only the SpinButtons in the glade file have tooltips, so copy
+    // those tooltips into the associated Label as well (which is just left of the spinbutton in the
+    // grid)
+    auto attribs_grid = widget<Gtk::Grid>("grid_sim_attribs");
+    bool done_copying_tooltips = false;
+    for (int c = 1; not done_copying_tooltips; c += 2) {
+        for (int r = 1; ; r++) {
+            auto *widget = attribs_grid->get_child_at(c, r), *left = attribs_grid->get_child_at(c-1, r);
+            if (not widget or not left) {
+                if (r == 1) done_copying_tooltips = 1;
+                break;
+            }
+            // Don't copy the tooltip left if there is no tooltip, or the left element already has a
+            // tooltip
+            auto tooltip = widget->get_tooltip_markup();
+            if (not tooltip.empty() and left->get_tooltip_markup().empty())
+                left->set_tooltip_markup(tooltip);
+        }
+    }
+
 
     rdr_win_ = widget<Gtk::ScrolledWindow>("win_rdr");
     bk_win_ = widget<Gtk::ScrolledWindow>("win_bk");
@@ -524,13 +552,10 @@ void GUI::thr_set_state(unsigned long t) {
 
     state_curr_ = t;
     // This must be *after* state_curr_ gets updated, otherwise it'll trigger a recursive call
-    widget<Gtk::ComboBox>("combo_state")->set_active(t);
+    widget<Gtk::Scale>("scale_state")->set_value(t);
+
     widget<Gtk::Label>("lbl_tab_agents")->set_text("Agents (" + std::to_string(state->readers.size()) + ")");
     widget<Gtk::Label>("lbl_tab_books")->set_text("Books (" + std::to_string(state->books.size()) + ")");
-
-    widget<Gtk::Button>("btn_prev")->set_sensitive(state_curr_ > 0);
-    widget<Gtk::Button>("btn_next")->set_sensitive(state_curr_ + 1 < state_num_);
-    widget<Gtk::Button>("btn_last")->set_sensitive(state_curr_ + 1 < state_num_);
 
     if (graph_->get_is_drawable()) graph_->queue_draw();
 }
@@ -605,6 +630,30 @@ void GUI::thr_info_dialog(eris_id_t member_id) {
     }
 }
 
+void GUI::thr_update_parameters() {
+#define SET_SB(PARAMETER) widget<Gtk::SpinButton>("set_" #PARAMETER)->set_value(creativity_->parameters.PARAMETER)
+    SET_SB(readers);
+    SET_SB(density);
+    SET_SB(sharing_link_proportion);
+    SET_SB(book_distance_sd);
+    SET_SB(book_quality_sd);
+    SET_SB(sharing_begins);
+    SET_SB(income);
+    SET_SB(cost_fixed);
+    SET_SB(cost_unit);
+    SET_SB(cost_piracy);
+#define SET_INIT_SB(PARAMETER) widget<Gtk::SpinButton>("set_init_" #PARAMETER)->set_value(creativity_->parameters.initial.PARAMETER)
+    SET_INIT_SB(prob_write);
+    SET_INIT_SB(q_min);
+    SET_INIT_SB(q_max);
+    SET_INIT_SB(p_min);
+    SET_INIT_SB(p_max);
+    SET_INIT_SB(prob_keep);
+    SET_INIT_SB(keep_price);
+#undef SET_SB
+#undef SET_INIT_SB
+}
+
 void GUI::thr_signal() {
     std::unique_lock<std::mutex> lock(mutex_);
     // Keep track of the *last* state change we see, and whether or not we see a new_states signal
@@ -644,9 +693,22 @@ void GUI::thr_signal() {
     if (init) {
         widget<Gtk::Notebook>("nb_tabs")->set_current_page(1);
 
+        // FIXME: This really doesn't look good, and doesn't work properly until the scale has a
+        // range of at least sharing_begins (until then it appears at the beginning).  For now,
+        // leave it off, but it might be worthwhile adding in later.
+        //widget<Gtk::Scale>("scale_state")->add_mark(creativity_->parameters.sharing_begins, Gtk::POS_BOTTOM, "Piracy");
+
         // Disable spin buttons:
-        for (auto &widg : {"set_dimensions", "set_readers", "set_density", "set_book_sd", "set_quality_draw_sd", "set_cost_fixed", "set_cost_unit", "set_sharing_begins"})
+        for (auto &widg : {"set_readers", "set_density", "set_sharing_link_proportion",
+                "set_book_distance_sd", "set_book_quality_sd", "set_sharing_begins", "set_income",
+                "set_cost_fixed", "set_cost_unit", "set_cost_piracy", "set_init_prob_write",
+                "set_init_q_min", "set_init_q_max", "set_init_p_min", "set_init_p_max",
+                "set_init_prob_keep", "set_init_keep_price"})
             widget<Gtk::SpinButton>(widg)->set_sensitive(false);
+
+        // Update the agent attributes settings with the settings from the creativity object.
+        // These may be different from the defaults, particularly when opening a file.
+        thr_update_parameters();
 
         widget<Gtk::Button>("btn_init")->set_sensitive(false);
         widget<Gtk::Button>("btn_start")->set_sensitive(false);
@@ -680,9 +742,14 @@ void GUI::thr_signal() {
         // Progress bar update
         // .uls contains: t, end
         // .doubles has: speed
-        auto progress = widget<Gtk::ProgressBar>("progress_stage");
+        auto scale = widget<Gtk::Scale>("scale_state");
+        scale->set_range(0, last_progress.uls[1]);
+        widget<Gtk::Label>("lbl_total")->set_text(std::to_string(last_progress.uls[1]));
+        scale->set_fill_level(last_progress.uls[0]);
+        scale->set_value(state_curr_);
+/*        auto progress = widget<Gtk::ProgressBar>("progress_stage");
         progress->set_text(std::to_string(last_progress.uls[0]) + " / " + std::to_string(last_progress.uls[1]));
-        progress->set_fraction((double) last_progress.uls[0] / (double) last_progress.uls[1]);
+        progress->set_fraction((double) last_progress.uls[0] / (double) last_progress.uls[1]);*/
         std::ostringstream speed;
         speed << std::setw(7) << std::showpoint << last_progress.doubles[0];
 
@@ -705,14 +772,7 @@ void GUI::thr_signal() {
             // - 1 here because we don't really count 0 as a stage
             widget<Gtk::Label>("lbl_total")->set_text(std::to_string(state_num_-1));
 
-            // In case the next/last buttons are disable, reactivate them
-            widget<Gtk::Button>("btn_next")->set_sensitive(true);
-            widget<Gtk::Button>("btn_last")->set_sensitive(true);
-
-            auto periods = widget<Gtk::ComboBoxText>("combo_state");
-            for (unsigned long t = old_state_num; t < state_num_; t++) {
-                periods->append(std::to_string(t));
-            }
+            widget<Gtk::Scale>("scale_state")->set_fill_level(state_num_-1);
 
             // If the new_state signal doesn't carry a state instruction, and the user was already
             // on the last state, switch to the new last state:
@@ -739,35 +799,74 @@ void GUI::queueSignal(Signal &&s) {
     }
 }
 
+// Load a simulation from a saved file:
 void GUI::loadSim() {
     std::vector<Parameter> params;
-    Parameter p;
-    int threads = widget<Gtk::ComboBoxText>("combo_threads")->get_active_row_number();
-    if (threads < 0) threads = 0; // -1 means no item selected (shouldn't be possible, but just in case)
-    p.param = ParamType::threads; p.ul = (unsigned long)threads; params.push_back(p);
 
     if (load_ == "") throw std::runtime_error("loadSim() called without load_ set to file to load");
 
-    p.param = ParamType::load; p.ptr = &load_; params.push_back(p);
+    Parameter load;
+    load.param = ParamType::load;
+    load.ptr = &load_;
+    params.push_back(load);
 
     queueEvent(Event::Type::setup, std::move(params));
 
-    // Disable all the simulation controls, since loading is read-only
-    widget<Gtk::Box>("box_settings")->set_sensitive(false);
-    widget<Gtk::Box>("box_controls")->set_sensitive(false);
+    widget<Gtk::Label>("lbl_load")->set_text(load_);
+
+    // Disable and hide the simulation controls (at the top of the window), since loading is read-only
+    auto controls = widget<Gtk::Box>("box_controls");
+    controls->set_sensitive(false);
+    controls->set_visible(false);
+
+    // Hide the speed indicator
+    for (const auto &l : {"lbl_speed", "status_speed", "lbl_speed_units"})
+        widget<Gtk::Label>(l)->set_visible(false);
+
+    // Disable all the settings items that aren't modifiable anymore (basically everything except
+    // the visualization settings):
+    for (const auto &disable : {"fr_new", "fr_agents", "fr_sim", "fr_save", "fr_run"})
+        widget<Gtk::Frame>(disable)->set_sensitive(false);
+
+    // Completely disable and hide the expanders for settings that are totally irrelevant
+    for (const auto &kill : {"ex_sim", "ex_save", "ex_run"}) {
+        auto ex = widget<Gtk::Expander>(kill);
+        ex->set_expanded(false);
+        ex->set_sensitive(false);
+        ex->set_visible(false);
+    }
+    // Open the visualization settings (it's the only thing that's actually useful on the page)
+    widget<Gtk::Expander>("ex_vis")->set_expanded(true);
 }
 
+// Start a new simulation:
 void GUI::setupSim() {
+    // Set the parameters directly
+    auto &set = creativity_->set();
+    set.readers = lround(sb("set_readers"));
+    set.use_density = false;
+    set.sharing_begins = lround(sb("set_sharing_begins"));
+#define COPY_SB_D(PARAMETER) set.PARAMETER = sb("set_"#PARAMETER)
+    COPY_SB_D(density);
+    COPY_SB_D(sharing_link_proportion);
+    COPY_SB_D(book_distance_sd);
+    COPY_SB_D(book_quality_sd);
+    COPY_SB_D(income);
+    COPY_SB_D(cost_fixed);
+    COPY_SB_D(cost_unit);
+    COPY_SB_D(cost_piracy);
+#define COPY_SB_INIT_D(PARAMETER) set.initial.PARAMETER = sb("set_init_"#PARAMETER)
+    COPY_SB_INIT_D(prob_write);
+    COPY_SB_INIT_D(q_min);
+    COPY_SB_INIT_D(q_max);
+    COPY_SB_INIT_D(p_min);
+    COPY_SB_INIT_D(p_max);
+    COPY_SB_INIT_D(prob_keep);
+    COPY_SB_INIT_D(keep_price);
+#undef COPY_SB_D
+#undef SET_INIT_SB
     std::vector<Parameter> params;
     Parameter p;
-    p.param = ParamType::readers; p.ul = sb_int("set_readers"); params.push_back(p);
-    p.param = ParamType::dimensions; p.ul = sb_int("set_dimensions"); params.push_back(p);
-    p.param = ParamType::density; p.dbl = sb("set_density"); params.push_back(p);
-    p.param = ParamType::book_sd; p.dbl = sb("set_book_sd"); params.push_back(p);
-    p.param = ParamType::quality_draw_sd; p.dbl = sb("set_quality_draw_sd"); params.push_back(p);
-    p.param = ParamType::cost_fixed; p.dbl = sb("set_cost_fixed"); params.push_back(p);
-    p.param = ParamType::cost_unit; p.dbl = sb("set_cost_unit"); params.push_back(p);
-    p.param = ParamType::sharing_begins; p.ul = sb("set_sharing_begins"); params.push_back(p);
     p.param = ParamType::seed; p.ul = std::stoul(widget<Gtk::Entry>("set_seed")->get_text()); params.push_back(p);
     int threads = widget<Gtk::ComboBoxText>("combo_threads")->get_active_row_number();
     if (threads < 0) threads = 0; // -1 means no item selected (shouldn't be possible, but just in case)
