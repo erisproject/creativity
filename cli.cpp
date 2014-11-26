@@ -1,4 +1,5 @@
 #include "creativity/Creativity.hpp"
+#include "creativity/state/Storage.hpp"
 #include <eris/Simulation.hpp>
 #include <eris/Random.hpp>
 #include <functional>
