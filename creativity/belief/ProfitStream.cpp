@@ -31,8 +31,10 @@ double ProfitStream::predict(SharedMember<Book> book) {
     return Linear::predict(X);
 }
 
-ProfitStream ProfitStream::update(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X) const {
-    return ProfitStream{Linear::update(y, X)};
+ProfitStream ProfitStream::update(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X, const double prior_weight) const {
+    return ProfitStream(prior_weight == 1
+            ? Linear::update(y, X)
+            : weaken(prior_weight).update(y, X));
 }
 
 

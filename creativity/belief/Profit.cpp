@@ -14,6 +14,10 @@ double Profit::predict(double q, unsigned long previousBooks, unsigned long mark
     if (q < 0) throw std::domain_error("Profit::predict(): illegal negative quality value");
     RowVectorXd X(K_);
     X << 1.0, q, q*q, previousBooks == 0 ? 1.0 : 0.0, previousBooks, marketBooks;
+    ERIS_DBGVAR(X);
+    double p = predict(X);
+    ERIS_DBG("at X=(" << X << "), Eprofit=" << p);
+    return p;
     return predict(X);
 }
 
@@ -44,8 +48,11 @@ RowVectorXd Profit::profitRow(eris::SharedMember<Book> book, double quality) con
     return Xi;
 }
 
-Profit Profit::update(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X) const {
-    return Profit{D_, Linear::update(y, X)};
+Profit Profit::update(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X, const double prior_weight) const {
+    return Profit(D_,
+            prior_weight == 1
+                ? Linear::update(y, X)
+                : weaken(prior_weight).update(y, X));
 }
 
 

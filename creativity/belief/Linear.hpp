@@ -187,11 +187,14 @@ class Linear {
          */
         friend std::ostream& operator << (std::ostream &os, const Linear &b);
 
-        /** Combines the stored prior parameters with the provided data to create a new Linear
-         * object.
+        /** Using the calling object as a prior, uses the provided data to create a new Linear
+         * model.
          *
-         * with a prior.  The new object is
-         * suitable as a 
+         * If the prior is a noninformative model, it will be treated as if it has a value of n of
+         * exactly 0 (instead of `NONINFORMATIVE_N`); as such the posterior \f$n\f$ will be exactly
+         * equal to the number of new data observations, and the \f$s^2\f$ value will similarly come
+         * entirely from the new data (i.e. it will not be a weighted sum of s^2 from the new data
+         * plus `NONINFORMATIVE_N * NONINFORMATIVE_S2`).
          *
          * \param X the new X data
          * \param y the new y data
@@ -199,8 +202,32 @@ class Linear {
          * X and y must have the same number of rows, but it is permitted that the number of rows be
          * less than the number of parameters.  Updating iteratively with a data set broken into
          * small portions will yield the same posterior as updating once with the full data set.
+         *
+         * Calling this method with y and X having no rows at all is permitted: in such a case the
+         * returned object is simply a copy of the calling object.
          */
-        Linear update(const Eigen::Ref<const Eigen::VectorXd> &y, const Eigen::Ref<const Eigen::MatrixXd> &X) const __attribute__((warn_unused_result));
+        [[gnu::warn_unused_result]]
+        Linear update(
+                const Eigen::Ref<const Eigen::VectorXd> &y,
+                const Eigen::Ref<const Eigen::MatrixXd> &X) const &;
+
+        /** Exactly like the above update() method, but optimized for the case where the caller is
+         * an rvalue, typically the result of something like:
+         *
+         *     new = linearmodel->weaken(0.9)->update(y, X);
+         */
+        [[gnu::warn_unused_result]]
+        Linear update(
+                const Eigen::Ref<const Eigen::VectorXd> &y,
+                const Eigen::Ref<const Eigen::MatrixXd> &X) &&;
+
+        /** Returns a new Linear object with exactly the same beta, n, and s2 as the caller, but
+         * with its `Vinv()` matrix (and thus the precision matrix) scaled by the given value.  This
+         * is designed to allow using this belief as a prior (via update()), but with a deliberately
+         * weakened weight on the prior.
+         */
+        [[gnu::warn_unused_result]]
+        Linear weaken(double precision_scale) const;
 
     protected:
         /** Called during construction to verify that the given parameters are valid.  Subclasses

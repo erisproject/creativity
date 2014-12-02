@@ -92,7 +92,6 @@ const VectorXd& Linear::draw() {
 
     last_draw_.head(K_) = beta_ + sqrt(s2_ * n_ / rchisqn(rng)) * VcholL() * y;
 
-
     // h has distribution Gamma(n/2, 2/(n*s^2)), and s^2 is the inverse of h:
     last_draw_[K_] = 1.0 / (std::gamma_distribution<double>(n_/2, 2/(s2_*n_))(rng));
 
@@ -125,12 +124,19 @@ std::ostream& operator<<(std::ostream &os, const Linear &b) {
 
 void Linear::verifyParameters() const { NO_EMPTY_MODEL; }
 
-Linear Linear::update(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X) const {
+// Called on an lvalue object
+Linear Linear::update(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X) const & {
+    return Linear(*this).update(y, X); // Invoke rvalue method
+}
+// Called on rvalue, so just update *this as needed, then return std::move(*this)
+Linear Linear::update(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X) && {
     NO_EMPTY_MODEL;
-    if (y.rows() != X.rows())
-        throw std::runtime_error("update(y, X) failed: y and X are non-conformable");
     if (X.cols() != K())
-        throw std::runtime_error("update(y, X) failed: X has wrong number of columns");
+        throw std::logic_error("update(y, X) failed: X has wrong number of columns");
+    if (y.rows() != X.rows())
+        throw std::logic_error("update(y, X) failed: y and X are non-conformable");
+    if (y.rows() == 0) // Nothing to update!
+        return std::move(*this);
 
     MatrixXd Xt = X.transpose();
     MatrixXd XtX = Xt * X;
@@ -141,18 +147,42 @@ Linear Linear::update(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X
     // before the inverse, we may be able to avoid inverting an inverse later: so in such a case we
     // save time *and* avoid the numerical precision loss from taking an extra inverse.
     auto V_post_inv = std::make_shared<MatrixXd>(Vinv() + XtX);
+    V_ = V_post_inv->colPivHouseholderQr().inverse();
+    VectorXd beta_post = V_ * (Vinv() * beta_ + Xt * y);
 
-    MatrixXd V_post = V_post_inv->colPivHouseholderQr().inverse();
-
-    VectorXd beta_post = V_post * (Vinv() * beta_ + Xt * y);
-    double n_post = X.rows();
-    if (not noninformative()) n_post += n_;
+    double n_prior = noninformative() ? 0 : n_;
+    n_ = n_prior + X.rows();
 
     VectorXd residualspost = y - X * beta_post;
     VectorXd beta_diff = beta_post - beta_;
-    double s2_post = (n_ * s2_ + residualspost.transpose() * residualspost + beta_diff.transpose() * Vinv() * beta_diff) / n_post;
+    beta_ = std::move(beta_post);
+    s2_ = (n_prior * s2_ + residualspost.squaredNorm() + beta_diff.transpose() * Vinv() * beta_diff) / n_;
 
-    return Linear(beta_post, s2_post, V_post, n_post, V_post_inv);
+    V_inv_ = V_post_inv;
+    beta_ = std::move(beta_post);
+    if (V_chol_L_) V_chol_L_.reset();
+    if (noninformative_) noninformative_ = false;
+    if (last_draw_.size() > 0) last_draw_.resize(0);
+
+    return std::move(*this);
+}
+
+Linear Linear::weaken(double precision_scale) const {
+    if (precision_scale <= 0 or precision_scale > 1)
+        throw std::logic_error("weaken() called with invalid precision multiplier (not in (0,1])");
+
+    if (noninformative()) // Really nothing to do here; a noninformative prior is already considered "fully" weakened
+        return Linear(K_);
+
+    // Multiply V^-1 by the precision_scale
+    auto V_post_inv_weakened = std::make_shared<MatrixXd>(Vinv() * precision_scale);
+    // If we've already calculated the Cholesky decomposition, the new one is easy to calculate:
+    // just scale the old one by 1/sqrt(w), where w is the prior weight.  (Thus LL^T = 1/w V, as
+    // desired).  If we don't have the decomposition, don't do it.
+    std::shared_ptr<Eigen::MatrixXd> V_chol_L_weakened;
+    if (V_chol_L_) V_chol_L_weakened = std::make_shared<MatrixXd>(*V_chol_L_ / std::sqrt(precision_scale));
+
+    return Linear(beta_, s2_, V() / precision_scale, n_, V_post_inv_weakened, V_chol_L_weakened);
 }
 
 }}

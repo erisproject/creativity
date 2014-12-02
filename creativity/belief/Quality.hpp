@@ -64,8 +64,14 @@ class Quality : public Linear {
          *
          * \param y a vector of new y data
          * \param X a matrix of new X data
+         * \param prior_weight a multiplier with which to call `weaken()` to use a weakened copy of
+         * the caller instead of the caller itself as a prior.  The default, 1, does not perform the
+         * weakening and uses the caller directly.
          */
-        Quality update(const Eigen::Ref<const Eigen::VectorXd> &y, const Eigen::Ref<const Eigen::MatrixXd> &X) const;
+        Quality update(
+                const Eigen::Ref<const Eigen::VectorXd> &y,
+                const Eigen::Ref<const Eigen::MatrixXd> &X,
+                double prior_weight = 1.0) const;
 
         /** Given a container of books, this builds an X matrix of data representing those books.
          */

@@ -150,8 +150,15 @@ class Demand : public LinearRestricted {
          *
          * \param y a vector of new y data
          * \param X a matrix of new X data
+         * \param prior_weight a multiplier with which to call `weaken()` to use a weakened copy of
+         * the caller instead of the caller itself as a prior.  The default, 1, does not perform the
+         * weakening and uses the caller directly.
          */
-        Demand update(const Eigen::Ref<const Eigen::VectorXd> &y, const Eigen::Ref<const Eigen::MatrixXd> &X) const;
+        [[gnu::warn_unused_result]]
+        Demand update(
+                const Eigen::Ref<const Eigen::VectorXd> &y,
+                const Eigen::Ref<const Eigen::MatrixXd> &X,
+                double prior_weight = 1.0) const;
 
     private:
         unsigned int D_;

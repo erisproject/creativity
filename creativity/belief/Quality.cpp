@@ -20,8 +20,10 @@ double Quality::predict(const Book &book) {
 }
 
 
-Quality Quality::update(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X) const {
-    return Quality{Linear::update(y, X)};
+Quality Quality::update(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X, const double prior_weight) const {
+    return Quality(prior_weight == 1
+            ? Linear::update(y, X)
+            : weaken(prior_weight).update(y, X));
 }
 
 
