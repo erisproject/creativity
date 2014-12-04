@@ -313,8 +313,8 @@ void Reader::interApply() {
 
         /// If enabled, add some noise in a random direction to the position
         if (writer_book_sd > 0) {
-            std::normal_distribution<double> step_dist{0, writer_book_sd};
-            newbook->moveBy(step_dist(Random::rng()) * Position::random(bookPos.dimensions));
+            double step_dist = std::normal_distribution<double>(0, writer_book_sd)(Random::rng());
+            newbook->moveBy(step_dist * Position::random(bookPos.dimensions));
         }
 
         wrote_.insert(wrote_.end(), newbook);
@@ -342,8 +342,8 @@ void Reader::interApply() {
     }
 
     // Finally, move N(0,0.25) in a random direction
-    std::normal_distribution<double> step_dist{0, 0.25};
-    moveBy(step_dist(Random::rng()) * Position::random(position().dimensions));
+    double step_dist = std::normal_distribution<double>(0, 0.25)(Random::rng());
+    moveBy(step_dist * Position::random(position().dimensions));
 }
 
 double Reader::uBook(SharedMember<Book> b) const {
