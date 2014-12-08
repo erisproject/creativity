@@ -133,6 +133,16 @@ struct CreativitySettings {
      */
     double piracy_link_proportion = 0.1;
 
+    /** The factor to multiple a belief's \f$V^{-1}\f$ value when using it as a prior in a subsequent
+     * period.
+     */
+    double prior_weight = 0.95;
+
+    /** The factor to multiple a belief's \f$V^{-1}\f$ value when using it as a prior in the first
+     * piracy period.  This value overrides `prior_weight` in the `piracy_begins` period.
+     */
+    double prior_weight_piracy = 0.5;
+
     /** The values in this struct define fixed probabilities and distributions of simulation
      * actions.  This is needed because, in the initial simulation periods, readers only have
      * noninformative beliefs which are completely useless for predicting anything in the model.
@@ -160,7 +170,21 @@ struct CreativitySettings {
          * is 1, then the new price will be 1 + 0.75*(3-1) = 2.5.
          */
         double keep_price = 0.5;
+        /** The minimum number of observations (relative to k) before a belief is used.  Before reaching
+         * this threshold, actions are governed by the `initial` values, above.
+         *
+         * This setting also governs the use of the ProfitStream beliefs of different lengths: authors
+         * will not use ProfitStream belief models that do not have at least this number of
+         * observations.  (For example, if this setting equals 2 and there are ProfitStream beliefs for
+         * 1-, 2-, and 4-period old books, with 15, 7, and 5 observations, only the 1- and 2-period
+         * models will be used.)
+         *
+         * Noninformative beliefs will never be used, so you can set this to a large negative number to
+         * use beliefs when backed by 1 or more observations (even when k > 1).
+         */
+        int32_t belief_threshold = 2;
     } initial;
+
 };
 
 double boundaryFromDensity(uint32_t readers, uint32_t dimensions, double density);

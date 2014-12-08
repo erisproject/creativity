@@ -1,5 +1,5 @@
 #pragma once
-#include "creativity/belief/Linear.hpp"
+#include "creativity/belief/LinearDerived.hpp"
 #include "creativity/Book.hpp"
 #include <eris/algorithms.hpp>
 #include <unordered_set>
@@ -27,7 +27,7 @@ namespace creativity { namespace belief {
  *
  * \f$\beta\f$ values are not restricted.
  */
-class ProfitStream : public Linear {
+class ProfitStream : public LinearDerived<ProfitStream> {
     public:
         /** Default constructor: note that default constructed objects are not valid models.
          * \sa belief::Linear::Linear()
@@ -42,19 +42,15 @@ class ProfitStream : public Linear {
          */
         ProfitStream(unsigned int K);
 
-        /** Constructs a ProfitStream from the given model parameters.
+        /** Constructs a ProfitStream object with the given parameter information.
          *
-         * \param beta the model coefficients.
-         * \param s2 the \f$\sigma^2\f$ or \f$s^2\f$ value of the model.
-         * \param V the estimator covariance term, without the leading `s2` multiple; typically
-         * \f$(X\^topX)^{-1}\f$.
-         * \param n the number of observations behind this estimate.
+         * \param args a parameter pack to forward to the base Linear constructor.
+         *
+         * \sa Linear::Linear
          */
-        ProfitStream(
-                const Eigen::Ref<const Eigen::VectorXd> &beta,
-                double s2,
-                const Eigen::Ref<const Eigen::MatrixXd> &V,
-                double n);
+        template <typename ...Args>
+        ProfitStream(Args &&...args) : Parent(std::forward<Args>(args)...)
+        {}
 
         /** Given a book, this uses the profit of the first \f$K\f$ periods the book has been on the
          * market to predict the remaining cumulative lifetime profit,
@@ -67,27 +63,16 @@ class ProfitStream : public Linear {
 
         using Linear::predict;
 
-        /** Uses the current object's priors to generate a new object whose parameters are the
-         * posteriors of this object after incorporating new data.
-         *
-         * \param y a vector of new y data
-         * \param X a matrix of new X data
-         * \param prior_weight a multiplier with which to call `weaken()` to use a weakened copy of
-         * the caller instead of the caller itself as a prior.  The default, 1, does not perform the
-         * weakening and uses the caller directly.
-         */
-        ProfitStream update(
-                const Eigen::Ref<const Eigen::VectorXd> &y,
-                const Eigen::Ref<const Eigen::MatrixXd> &X,
-                double prior_weight = 1.0) const;
-
     protected:
         /// Ensures that all beta values are non-negative
         /*virtual void verifyParameters() const override;*/
 
+        /// Constructs a new Demand object given a Linear base object.
+        virtual ProfitStream newDerived(Linear &&base) const override;
+
     private:
         // Initialize a ProfitStream from a Linear<K>
-        ProfitStream(Linear &&base) : Linear{std::move(base)} {}
+        explicit ProfitStream(Linear &&base) : Parent(std::move(base)) {}
 };
 
 }}

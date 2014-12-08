@@ -111,9 +111,6 @@ void Creativity::setup() {
         auto r = sim->spawn<Reader>(shared_from_this(),
                 Position{unif_pmb(rng), unif_pmb(rng)},
                 // (Nearly) non-informative priors for the rest:
-                belief::Demand(parameters.dimensions, belief::Demand::parameters()),
-                belief::Profit(parameters.dimensions, belief::Profit::parameters()),
-                belief::Quality(belief::Quality::parameters()),
                 parameters.cost_fixed, parameters.cost_unit, parameters.income
                 );
         r->writer_book_sd = parameters.book_distance_sd;
@@ -148,6 +145,11 @@ void Creativity::setup() {
 bool Creativity::sharing() const {
     if (!setup_sim_) throw std::logic_error("Cannot call sharing() on a non-live or unconfigured simulation");
     return parameters.piracy_begins > 0 and sim->t() >= parameters.piracy_begins;
+}
+
+double Creativity::priorWeight() const {
+    if (!setup_sim_) throw std::logic_error("Cannot call priorWeight() on a non-live or unconfigured simulation");
+    return sim->t() == parameters.piracy_begins ? parameters.prior_weight_piracy : parameters.prior_weight;
 }
 
 std::pair<std::vector<SharedMember<Book>>&, std::unique_lock<std::mutex>> Creativity::newBooks() {

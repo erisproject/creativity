@@ -1,5 +1,6 @@
 #pragma once
 #include "creativity/belief/LinearRestricted.hpp"
+#include "creativity/belief/LinearDerived.hpp"
 #include <eris/algorithms.hpp>
 #include <eris/SharedMember.hpp>
 
@@ -36,12 +37,20 @@ namespace belief {
  * These constraints are combined with a natural conjugate prior for the purposes of updating the
  * beliefs via Bayesian econometrics.
  */
-class Demand : public LinearRestricted {
+class Demand : public LinearDerived<Demand, LinearRestricted> {
     public:
         /** Default constructor: note that default constructed objects are not valid models.
          * \sa belief::Linear::Linear()
          */
         Demand() = default;
+
+        /** Constructs a noninformative demand model.
+         *
+         * \param D the dimensionality of the world.
+         *
+         * \sa Linear::Linear
+         */
+        Demand(unsigned int D) : Demand(D, parameters()) {}
 
         /** Constructs a demand model with the given prior information.
          *
@@ -52,7 +61,7 @@ class Demand : public LinearRestricted {
          */
         template <typename ...Args>
         Demand(unsigned int D, Args &&...args)
-        : LinearRestricted(std::forward<Args>(args)...), D_{D}
+        : Parent(std::forward<Args>(args)...), D_{D}
         {
             // Add restrictions:
             upperBounds()[1] = 0.0; // beta_price <= 0 (higher price <-> lower quantity)
@@ -145,26 +154,14 @@ class Demand : public LinearRestricted {
          */
         Eigen::RowVectorXd bookRow(eris::SharedMember<Book> book, double quality) const;
 
-        /** Uses the current object's priors to generate a new object whose parameters are the
-         * posteriors of this object after incorporating new data.
-         *
-         * \param y a vector of new y data
-         * \param X a matrix of new X data
-         * \param prior_weight a multiplier with which to call `weaken()` to use a weakened copy of
-         * the caller instead of the caller itself as a prior.  The default, 1, does not perform the
-         * weakening and uses the caller directly.
-         */
-        [[gnu::warn_unused_result]]
-        Demand update(
-                const Eigen::Ref<const Eigen::VectorXd> &y,
-                const Eigen::Ref<const Eigen::MatrixXd> &X,
-                double prior_weight = 1.0) const;
+        /// Constructs a new Demand object given a Linear base object.
+        virtual Demand newDerived(Linear &&base) const override;
 
     private:
         unsigned int D_;
 
         // Initialize a Demand from a Linear object of the correct size
-        Demand(unsigned int D, Linear &&base) : LinearRestricted(std::move(base)), D_{D} {}
+        Demand(unsigned int D, Linear &&base) : Parent(std::move(base)), D_{D} {}
 };
 
 }}

@@ -1,3 +1,5 @@
+// Eigen uses deprecated binder1st and binder2nd; until that is fixed, ignore the generated warning:
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #include "creativity/belief/LinearRestricted.hpp"
 #include <cmath>
 
@@ -5,24 +7,56 @@ using namespace Eigen;
 
 namespace creativity { namespace belief {
 
-std::vector<double>::iterator LinearRestricted::lowerBounds() {
-    if (restrict_ge_.size() <= K_) restrict_ge_.resize(K_+1, std::numeric_limits<double>::quiet_NaN());
-    return restrict_ge_.begin();
+LinearRestricted::RestrictionProxyList LinearRestricted::lowerBounds() {
+    return RestrictionProxyList(*this, false);
 }
 
-std::vector<double>::iterator LinearRestricted::upperBounds() {
-    if (restrict_le_.size() <= K_) restrict_le_.resize(K_+1, std::numeric_limits<double>::quiet_NaN());
-    return restrict_le_.begin();
+LinearRestricted::RestrictionProxyList LinearRestricted::upperBounds() {
+    return RestrictionProxyList(*this, true);
 }
 
-void LinearRestricted::addRestriction(RowVectorXd R, double r) {
-    restrict_linear_.emplace_back(std::move(R), std::move(r));
+void LinearRestricted::allocateRestrictions(size_t more) {
+    // Increment by K_ rows at a time.  (This is fairly arbitrary, but at least the number of
+    // restrictions will typically be correlated with the number of regressors)
+    size_t rows = K_ * (size_t) std::ceil((restrict_size_ + more) / (double) K_);
+    if (restrict_select_.cols() != K_) restrict_select_.conservativeResize(rows, K_);
+    else if ((size_t) restrict_select_.rows() < restrict_size_ + more) {
+        restrict_select_.conservativeResize(rows, NoChange);
+    }
+    if ((size_t) restrict_values_.size() < restrict_size_ + more) {
+        restrict_values_.conservativeResize(rows);
+    }
+}
+
+void LinearRestricted::addRestriction(const Ref<const RowVectorXd> &R, double r) {
+    if (R.size() != K_) throw std::logic_error("Unable to add linear restriction: R does not have size K");
+    allocateRestrictions(1);
+    restrict_values_[restrict_size_] = r;
+    restrict_select_.row(restrict_size_) = R;
+    restrict_size_++;
+}
+
+void LinearRestricted::addRestrictionGE(const Ref<const RowVectorXd> &R, double r) {
+    return addRestriction(-R, -r);
+}
+
+void LinearRestricted::addRestrictions(const Ref<const MatrixXd> &R, const Ref<const VectorXd> &r) {
+    if (R.cols() != K_) throw std::logic_error("Unable to add linear restrictions: R does not have K columns");
+    auto num_restr = R.rows();
+    if (num_restr != r.size()) throw std::logic_error("Unable to add linear restrictions: different number of rows in R and r");
+    allocateRestrictions(num_restr);
+    restrict_values_.segment(restrict_size_, num_restr) = r;
+    restrict_select_.middleRows(restrict_size_, num_restr) = R;
+    restrict_size_ += num_restr;
+}
+
+void LinearRestricted::addRestrictionsGE(const Ref<const MatrixXd> &R, const Ref<const VectorXd> &r) {
+    return addRestrictions(-R, -r);
 }
 
 void LinearRestricted::clearRestrictions() {
-    restrict_ge_.clear();
-    restrict_le_.clear();
-    restrict_linear_.clear();
+    restrict_size_ = 0;
+    // Don't need to resize restrict_*, the values aren't used if restrict_size_ = 0
 }
 
 void LinearRestricted::discard(unsigned int burn) {
@@ -35,45 +69,38 @@ void LinearRestricted::discardForce(unsigned int burn) {
     mean_beta_draws_ = 0;
 }
 
+const Ref<const MatrixXd> LinearRestricted::R() const {
+    return restrict_select_.topRows(restrict_size_);
+}
+
+const Ref<const VectorXd> LinearRestricted::r() const {
+    return restrict_values_.head(restrict_size_);
+}
+
 const VectorXd& LinearRestricted::draw() {
-    bool redraw = true;
+    bool redraw;
     draw_discards = 0;
-    while (redraw) {
+    do {
         redraw = false;
         auto &theta = Linear::draw();
-        // First check simple, one-parameter <=/>= restrictions:
-        if (not restrict_le_.empty() or not restrict_ge_.empty()) {
-            for (unsigned int i = 0; i < K_; i++) {
-                if (
-                        (not restrict_le_.empty() and std::isfinite(restrict_le_[i]) and not(theta[i] <= restrict_le_[i]))
-                        or
-                        (not restrict_ge_.empty() and std::isfinite(restrict_ge_[i]) and not(theta[i] >= restrict_ge_[i]))
-                ) {
-                    // beta[i] violates one of its restrictions; try again
-                    redraw = true;
-                    break;
-                }
-            }
-        }
-        // If no single-parameter restriction was violated, now check any more general linear
-        // restrictions:
-        if (not redraw and not restrict_linear_.empty()) {
-            for (auto &r : restrict_linear_) {
-                if (not (r.first * theta.head(K_) <= r.second)) {
-                    redraw = true;
-                    break;
-                }
-            }
-        }
-
-        if (redraw) {
+        if (restrict_size_ > 0 and not (
+                (
+                    (restrict_select_.topRows(restrict_size_) * theta.head(K_)).array()
+                        // Rbeta
+                    <=  // <=
+                        // r
+                    restrict_values_.head(restrict_size_).array()
+                ).all()
+        )) {
+            redraw = true;
             ++draw_discards;
             ++draw_discards_cumulative;
             if (draw_discards > draw_discards_max) {
                 throw std::runtime_error("draw() failed: maximum number of inadmissible draws reached.");
             }
         }
-    }
+    } while (redraw);
+
     ++draw_success_cumulative;
 
     return last_draw_;
@@ -111,6 +138,73 @@ double LinearRestricted::predict(const Eigen::Ref<const Eigen::RowVectorXd> &Xi,
     }
 
     return Xi * mean_beta_;
+}
+
+LinearRestricted::RestrictionProxy::RestrictionProxy(LinearRestricted &lr, size_t k, bool upper)
+    : lr_(lr), k_(k), upper_(upper)
+{}
+
+LinearRestricted::RestrictionProxyList::RestrictionProxyList(LinearRestricted &lr, bool upper)
+    : lr_(lr), upper_(upper)
+{}
+
+LinearRestricted::RestrictionProxy LinearRestricted::RestrictionProxyList::operator[](size_t k) {
+    if (k >= lr_.K()) throw std::out_of_range("LinearRestricted bound restriction: invalid coefficient index `" + std::to_string(k) + "'");
+    return std::move(RestrictionProxy(lr_, k, upper_));
+}
+
+bool LinearRestricted::RestrictionProxy::restricted() const {
+    for (size_t row = 0; row < lr_.restrict_size_; row++) {
+        // Only look at rows with a single non-zero coefficient:
+        if ((lr_.restrict_select_.row(row).array() != 0).count() != 1)
+            continue;
+
+        const double &coef = lr_.restrict_select_(row, k_);
+        if (upper_) {
+            if (coef > 0) return true;
+        }
+        else {
+            if (coef < 0) return true;
+        }
+    }
+    return false;
+}
+
+LinearRestricted::RestrictionProxy::operator double() const {
+    double most_binding = std::numeric_limits<double>::quiet_NaN();
+    for (size_t row = 0; row < lr_.restrict_size_; row++) {
+        // Only look at rows with a single non-zero coefficient:
+        if (lr_.restrict_select_.row(row).cwiseEqual(0).count() != lr_.K()-1)
+            continue;
+
+        double &coef = lr_.restrict_select_(row, k_);
+        if (coef == 0) continue;
+        if (upper_) {
+            if (coef > 0) {
+                double r = lr_.restrict_values_[row] / coef;
+                if (std::isnan(most_binding) or r < most_binding) most_binding = r;
+            }
+        }
+        else {
+            if (coef < 0) {
+                double r = lr_.restrict_values_[row] / coef;
+                if (std::isnan(most_binding) or r > most_binding) most_binding = r;
+            }
+        }
+    }
+    return most_binding;
+}
+
+LinearRestricted::RestrictionProxy& LinearRestricted::RestrictionProxy::operator=(double r) {
+    double Rk = upper_ ? 1.0 : -1.0;
+    if (not upper_) r = -r;
+
+    RowVectorXd R = RowVectorXd::Zero(lr_.K());
+    R[k_] = Rk;
+
+    lr_.addRestriction(R, r);
+
+    return *this;
 }
 
 

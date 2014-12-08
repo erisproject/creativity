@@ -103,9 +103,11 @@ class InfoWindow : public Gtk::Window {
         Gtk::Grid& new_tab_grid(Gtk::Notebook &notebook, const std::string &title);
         // Creates a "value: data" label pair with labels stored in fields_ that can be updated
         // later.  The pair of labels is located at (`row`,`col`) and (`row`,`col+1`).
-        void data_at(Gtk::Grid &grid, const std::string &code, const std::string &value_name, int row, int col);
+        void data_at(Gtk::Grid &grid, const std::string &code, const std::string &value_name, int row, int col,
+                double label_align = 1.0, double value_align = 0.0);
         // Calls data_at to put the label at (`gpos_`, 0), then increments gpos_.
-        void data_append(Gtk::Grid &grid, const std::string &code, const std::string &value_name);
+        void data_append(Gtk::Grid &grid, const std::string &code, const std::string &value_name,
+                double label_align = 1.0, double value_align = 0.0);
         // Creates a label at the given location, taking up the given number of rows and columns,
         // with horizontal alignment as given (0-1).  Intended for static values.
         void label_at(Gtk::Grid &grid, const std::string &label, double alignment, int row, int col, int width, int height);

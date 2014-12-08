@@ -20,14 +20,15 @@ const std::vector<unsigned int> Reader::profit_stream_ages{{1,2,4,8}};
 Reader::Reader(
         std::shared_ptr<Creativity> creativity,
         const Position &pos,
-        belief::Demand &&demand, belief::Profit &&profit, belief::Quality &&quality,
         double cFixed, double cUnit, double inc
         )
-    : WrappedPositional<agent::AssetAgent>(pos, {-creativity->parameters.boundary, -creativity->parameters.boundary}, {creativity->parameters.boundary, creativity->parameters.boundary}),
+    : WrappedPositional<agent::AssetAgent>(pos, creativity->parameters.boundary, -creativity->parameters.boundary),
     cost_fixed{cFixed}, cost_unit{cUnit}, income{inc},
     creativity_{std::move(creativity)},
-    profit_belief_{std::move(profit)}, profit_belief_extrap_{profit_belief_},
-    demand_belief_{std::move(demand)}, quality_belief_{std::move(quality)},
+    profit_belief_(creativity_->parameters.dimensions),
+    profit_belief_extrap_(profit_belief_),
+    demand_belief_(creativity_->parameters.dimensions),
+    quality_belief_(belief::Quality::parameters()),
     profit_stream_beliefs_{{1, 1}}
 {}
 
@@ -201,21 +202,7 @@ void Reader::interOptimize() {
 
     auto &rng = Random::rng();
 
-    // Bypass market predictions if our market demand belief is noninformative:
-    if (demand_belief_.noninformative()) {
-        if (creativity_->parameters.initial.prob_keep > 0) {
-            std::bernoulli_distribution keep(creativity_->parameters.initial.prob_keep);
-            for (auto on_market = wrote_market_.cbegin(); income_available >= cost_fixed and on_market != wrote_market_.cend(); on_market++) {
-                auto &book = *on_market;
-                if (keep(rng)) {
-                    income_available -= cost_fixed;
-                    double new_price = (book->price() - cost_unit) * creativity_->parameters.initial.keep_price + cost_unit;
-                    new_prices_.emplace(book, new_price);
-                }
-            }
-        }
-    }
-    else {
+    if (usableBelief(demand_belief_)) {
         // Figure out the expected profitability of each book; positive ones will be kept on the market
         std::map<double, std::vector<std::pair<SharedMember<Book>, double>>, std::greater<double>> profitability;
         for (auto &book : wrote_market_) {
@@ -250,31 +237,36 @@ void Reader::interOptimize() {
             }
         }
     }
+    else {
+        // Bypass market predictions if our market demand belief is noninformative, or not
+        // sufficiently informed, and use initial model action parameters instead.
+        if (creativity_->parameters.initial.prob_keep > 0) {
+            std::bernoulli_distribution keep(creativity_->parameters.initial.prob_keep);
+            for (auto on_market = wrote_market_.cbegin(); income_available >= cost_fixed and on_market != wrote_market_.cend(); on_market++) {
+                auto &book = *on_market;
+                if (keep(rng)) {
+                    income_available -= cost_fixed;
+                    double new_price = (book->price() - cost_unit) * creativity_->parameters.initial.keep_price + cost_unit;
+                    new_prices_.emplace(book, new_price);
+                }
+            }
+        }
+    }
 
     //// NEW BOOK CREATION:
     create_ = false;
     if (income_available >= cost_fixed) {
-        if (profit_belief_.noninformative()) {
-            // If we have no useful profit belief yet, just use the initial values:
-            if (creativity_->parameters.initial.prob_write > 0 and std::bernoulli_distribution(creativity_->parameters.initial.prob_write)(rng)) {
-                double q = std::uniform_real_distribution<double>(creativity_->parameters.initial.q_min, creativity_->parameters.initial.q_max)(rng);
-                double effort = creationEffort(q);
-                // Make sure the required effort doesn't exceed the available funds
-                if (income_available >= cost_fixed + effort) {
-                    create_ = true;
-                    create_price_ = std::uniform_real_distribution<double>(creativity_->parameters.initial.p_min, creativity_->parameters.initial.p_max)(rng);
-                    create_quality_ = q;
-                    create_effort_ = effort;
-                    ERIS_DBG(id() << " creating (via initial parameters) at q=" << q << ", l=" << effort <<", p=" << create_price_);
-                }
-            }
-        }
-        else {
-            // Otherwise, create a book if E(profit) > effort required
+        // Creating a book requires an ability to predict profit (to determine whether creation is
+        // worthwhile), and an ability to predict demand (to determine the initial price)
+        if (usableBelief(profit_belief_) and usableBelief(demand_belief_)) { // NB: profit_belief_extrap_ is an update of profit_belief_, so will also be usable
+            // Create a book if E(profit) > effort required
 
             // Find the l that maximizes creation profit given current wealth (which would have come from
             // past sales, if non-zero) plus the fixed income we're about to receive, minus whatever we
             // decided to spend above to keep books on the market.
+
+            // FIXME: is this right, w.r.t. Bayesian MC prediction?  (Is averaging being done too
+            // early?)
             double l_max = profit_belief_extrap_.argmaxL(
                     [this] (double l) -> double { return creationQuality(l); },
                     previous_books, market_books, assets()[creativity_->money] + income - cost_fixed
@@ -301,6 +293,21 @@ void Reader::interOptimize() {
             }
             else ERIS_DBG("not creating. :(");
         }
+        else {
+            // If we have no useful profit belief yet, just use the initial values:
+            if (creativity_->parameters.initial.prob_write > 0 and std::bernoulli_distribution(creativity_->parameters.initial.prob_write)(rng)) {
+                double q = std::uniform_real_distribution<double>(creativity_->parameters.initial.q_min, creativity_->parameters.initial.q_max)(rng);
+                double effort = creationEffort(q);
+                // Make sure the required effort doesn't exceed the available funds
+                if (income_available >= cost_fixed + effort) {
+                    create_ = true;
+                    create_price_ = std::uniform_real_distribution<double>(creativity_->parameters.initial.p_min, creativity_->parameters.initial.p_max)(rng);
+                    create_quality_ = q;
+                    create_effort_ = effort;
+                    ERIS_DBG(id() << " creating (via initial parameters) at q=" << q << ", l=" << effort <<", p=" << create_price_);
+                }
+            }
+        }
     }
 }
 
@@ -310,6 +317,8 @@ void Reader::interApply() {
     // to author)
     assets()[creativity_->money] += income;
 
+    auto &rng = Random::rng();
+
     SharedMember<Book> newbook;
     if (create_) {
         // The cost (think of this as an opportunity cost) of creating:
@@ -318,14 +327,14 @@ void Reader::interApply() {
         // The book is centered at the reader's position, plus some noise we add below
         Position bookPos{position()};
 
-        auto qdraw = [this] (const Book &book, const Reader &) -> double {
-            return std::max(0.0, book.quality() + writer_quality_sd * stdnormal(Random::rng()));
+        auto qdraw = [this,&rng] (const Book &book, const Reader &) -> double {
+            return std::max(0.0, book.quality() + writer_quality_sd * stdnormal(rng));
         };
         newbook = simulation()->spawn<Book>(creativity_, bookPos, sharedSelf(), wrote_.size(), create_price_, create_quality_, qdraw);
 
         /// If enabled, add some noise in a random direction to the position
         if (writer_book_sd > 0) {
-            double step_dist = std::normal_distribution<double>(0, writer_book_sd)(Random::rng());
+            double step_dist = std::normal_distribution<double>(0, writer_book_sd)(rng);
             newbook->moveBy(step_dist * Position::random(bookPos.dimensions));
         }
 
@@ -378,14 +387,15 @@ double Reader::quality(SharedMember<Book> b) const {
         return found->second;
 
     double q_hat;
-    if (quality_belief_.noninformative()) {
-        // No informative beliefs above quality, so just use initial parameter midpoint
-        q_hat = (creativity_->parameters.initial.q_max + creativity_->parameters.initial.q_min) / 2.0;
-    }
-    else {
-        // Otherwise we need to use the quality belief to predict the quality
+    if (usableBelief(quality_belief_)) {
+        // Use the quality belief to predict the quality
+        // FIXME: check for proper Bayesian MC averaging
         auto &q_b = const_cast<belief::Quality&>(quality_belief_);
         q_hat = q_b.predict(b);
+    }
+    else {
+        // No informative beliefs above quality, so just use initial parameter mean (= midpoint)
+        q_hat = (creativity_->parameters.initial.q_max + creativity_->parameters.initial.q_min) / 2.0;
     }
     quality_predictions_.emplace(b, q_hat);
 
@@ -407,18 +417,26 @@ const belief::Profit& Reader::profitBelief() const { return profit_belief_; }
 const belief::Profit& Reader::profitExtrapBelief() const { return profit_belief_extrap_; }
 const belief::Demand& Reader::demandBelief() const { return demand_belief_; }
 const belief::Quality& Reader::qualityBelief() const { return quality_belief_; }
-const belief::ProfitStream& Reader::profitStreamBelief(unsigned int age) const {
+const belief::ProfitStream& Reader::profitStreamBelief(const unsigned int age, const bool usable) const {
     // Get the first belief > age
     auto it = profit_stream_beliefs_.upper_bound(age);
     if (it == profit_stream_beliefs_.begin())
         // This probably means age=0 got passed in, since profit_stream_beliefs_ starts with a 1.
         throw std::runtime_error("Invalid age (" + std::to_string(age) + ") passed to Reader::profitStreamBelief");
-    // upper_bound gives first greater than the given value, so we need to back up one:
-    it--;
+    // upper_bound gives first greater than the given value, so we need to back up one; and we may
+    // need to back up more if only usable beliefs were requested
+    do {
+        it--;
+    } while (usable and it != profit_stream_beliefs_.begin() and not usableBelief(it->second));
+
     return it->second;
 }
 const std::map<unsigned int, belief::ProfitStream>& Reader::profitStreamBeliefs() const {
     return profit_stream_beliefs_;
+}
+
+bool Reader::usableBelief(const belief::Linear &model) const {
+    return not(model.noninformative()) and model.n() - model.K() >= creativity_->parameters.initial.belief_threshold;
 }
 
 void Reader::updateBeliefs() {
@@ -439,6 +457,9 @@ void Reader::updateBeliefs() {
 }
 
 void Reader::updateQualityBelief() {
+    double weaken = creativity_->priorWeight();
+    if (weaken != 1.0) quality_belief_ = std::move(quality_belief_).weaken(weaken);
+
     // If we obtained any new books, update the demand belief with them
     if (not newBooks().empty()) {
         std::vector<SharedMember<Book>> books;
@@ -449,10 +470,13 @@ void Reader::updateQualityBelief() {
             y[i++] = library_[a];
         }
 
-        quality_belief_ = quality_belief_.update(y, quality_belief_.bookData(books));
+        quality_belief_ = std::move(quality_belief_).update(y, quality_belief_.bookData(books));
     }
 }
 void Reader::updateDemandBelief() {
+    double weaken = creativity_->priorWeight();
+    if (weaken != 1.0) demand_belief_ = std::move(demand_belief_).weaken(weaken);
+
     if (not newBooks().empty()) {
         std::vector<SharedMember<Book>> books;
         VectorXd y(newBooks().size());
@@ -465,7 +489,7 @@ void Reader::updateDemandBelief() {
             i++;
         }
 
-        demand_belief_ = demand_belief_.update(y, X);
+        demand_belief_ = std::move(demand_belief_).update(y, X);
     }
 }
 void Reader::updateProfitStreamBelief() {
@@ -505,6 +529,14 @@ void Reader::updateProfitStreamBelief() {
                 else
                     break;
             }
+        }
+    }
+
+    double weaken = creativity_->priorWeight();
+    if (weaken != 1.0) {
+        // Weaken existing PS beliefs
+        for (auto &psb : profit_stream_beliefs_) {
+            psb.second = std::move(psb.second).weaken(weaken);
         }
     }
 
@@ -555,6 +587,9 @@ void Reader::updateProfitBelief() {
         }
     }
 
+    double weaken = creativity_->priorWeight();
+    if (weaken != 1.0) profit_belief_ = std::move(profit_belief_).weaken(weaken);
+
     if (not new_prof_books.empty()) {
         MatrixXd X(new_prof_books.size(), profit_belief_.K());
         VectorXd y(new_prof_books.size());
@@ -594,7 +629,7 @@ void Reader::updateProfitBelief() {
             }
         }
 
-        // NB: extrapolation uses just-updated non-extrapolation as prior
+        // NB: extrapolation uses just-updated non-extrapolation as prior, with no weakening
         profit_belief_extrap_ = profit_belief_.update(y, X);
     }
 }

@@ -3,6 +3,7 @@
 #include <limits>
 #include <Eigen/Core>
 #include <Eigen/Cholesky>
+#include <eris/noncopyable.hpp>
 #include "creativity/belief/Linear.hpp"
 
 namespace creativity { namespace belief {
@@ -21,20 +22,38 @@ namespace creativity { namespace belief {
  */
 class LinearRestricted : public Linear {
     public:
+#if !EIGEN_VERSION_AT_LEAST(3,3,0)
+        /** Move constructor for Eigen versions before 3.3.  Eigen 3.2 and earlier don't have proper
+         * move support, and the implicit ones break things, so we work around this by providing a
+         * Move constructor that just calls the implicit copy constructor.  This, of course, means
+         * that for old Eigen versions, almost nothing is saved by moving since we actually copy.
+         *
+         * Eigen 3.3 adds a proper move constructor, and so we don't need this: the default implicit
+         * move constructor should work just fine.
+         *
+         * Note that LinearRestricted subclasses, so long as they aren't storing additional Eigen
+         * types, can rely on their default move constructors.
+         */
+        LinearRestricted(LinearRestricted &&move) : LinearRestricted(move) {}
+        /// Default constructor
+        LinearRestricted() = default;
+        /// Default copy constructor
+        LinearRestricted(const LinearRestricted &copy) = default;
+        /// Default copy assignment operator
+        LinearRestricted& operator=(const LinearRestricted &copy) = default;
+#endif
+
         /// Constructor inherited from Linear
         using Linear::Linear;
 
-        LinearRestricted() = default;
+    protected:
+        // forward declaration
+        class RestrictionProxyList;
 
-        /** Constructor taking a Linear model rvalue.  The given model is used as the base class
-         * object for this restricted model.  No initial restrictions are imposed.
-         */
-        LinearRestricted(Linear &&model) : Linear(std::move(model)) {}
+    public:
 
-        /** Returns a random access iterator (which can be dereferenced via subscripting) to the
-         * beginning of the vector of upper bounds for the \f$\beta\f$ parameters.  Element `i` is
-         * the upper bound for `beta[i]`, for `i` values between 0 and K-1, and is the upper bound
-         * for `s2` for `i=K`.
+        /** Returns a subscriptable object that allows assigning coefficient upper-bounds.  Indexed
+         * element `i` is the upper bound for `beta[i]`, for `i` values between 0 and K-1.
          *
          * For example, to add the restriction \f$\beta_2 \leq 5\f$:
          * 
@@ -51,7 +70,7 @@ class LinearRestricted : public Linear {
          * will result in draw() never returning, as will nonsensical restrictions such as \f$s^2
          * \leq 0\f$.
          */
-        std::vector<double>::iterator upperBounds();
+        RestrictionProxyList upperBounds();
 
         /** Returns a random access iterator (which can be dereferenced via subscripting) to the
          * beginning of the vector of lower bounds for the \f$\beta\f$ parameters.  Element `i` is
@@ -72,7 +91,7 @@ class LinearRestricted : public Linear {
          * conflicting upper and lower bounds (e.g. \f$\beta_2 \geq 3\f$ and \f$\beta_2 \leq 2\f$)
          * will result in draw() never returning.
          */
-        std::vector<double>::iterator lowerBounds();
+        RestrictionProxyList lowerBounds();
 
         /** Adds a restriction of the form \f$R\beta \leq r\f$, where \f$R\f$ is a 1-by-`K()` row
          * vector selecting \f$\beta\f$ elements.  For example, to add a \f$\beta_2 \in [-1, 3.5]\f$
@@ -106,7 +125,35 @@ class LinearRestricted : public Linear {
          *
          * \throws std::logic_error if R has a length other than `K()`.
          */
-        void addRestriction(Eigen::RowVectorXd R, double r);
+        void addRestriction(const Eigen::Ref<const Eigen::RowVectorXd> &R, double r);
+
+        /** Adds a `RB >= r` restriction.  This is simply a shortcut for calling
+         *
+         *     addRestriction(-R, -r)
+         *
+         * \sa addRestriction
+         */
+        void addRestrictionGE(const Eigen::Ref<const Eigen::RowVectorXd> &R, double r);
+
+        /** Adds a set of linear restrictions of the form \f$R\beta \leq r\f$, where \f$R\f$ is a
+         * l-by-`K()` matrix of parameter selection coefficients and \f$r\f$ is a l-by-1 vector of
+         * value restrictions corresponding to the `l` restrictions specified in `R`.  The
+         * restrictions must be satisfied for all `l` rows.
+         *
+         * This is equivalent to using addRestriction() l times, on each row of `R` and `r`.
+         *
+         * `R` and `r` must have the same number of rows.
+         */
+        void addRestrictions(const Eigen::Ref<const Eigen::MatrixXd> &R, const Eigen::Ref<const Eigen::VectorXd> &r);
+
+        /** Adds a set of linear restrictions of the form \f$R\beta \geq r\f$.  This is simply a
+         * shortcut for calling
+         *
+         *     addRestrictions(-R, -r);
+         *
+         * \sa addRestrictions
+         */
+        void addRestrictionsGE(const Eigen::Ref<const Eigen::MatrixXd> &R, const Eigen::Ref<const Eigen::VectorXd> &r);
 
         /** Clears all current model restrictions. */
         void clearRestrictions();
@@ -159,24 +206,99 @@ class LinearRestricted : public Linear {
                       draw_discards_cumulative = 0, ///< Tracks cumulative draw discards over the life of this object
                       draw_success_cumulative = 0; ///< Tracks the number of successful draws over the life of this object
 
+        /// Accesses the restriction coefficient selection matrix (the \f$R\f$ in \f$R\beta <= r\f$).
+        const Eigen::Ref<const Eigen::MatrixXd> R() const;
+
+        /// Accesses the restriction value vector (the \f$r\f$ in \f$R\beta <= r\f$).
+        const Eigen::Ref<const Eigen::VectorXd> r() const;
+
     protected:
+        /// Creates a LinearRestricted from a Linear rvalue
+        LinearRestricted(Linear &&move) : Linear(std::move(move)) {}
+
         /** Overridden to also reset mean_beta_draws_ to 0 (to force predict() value redrawing). */
         virtual void discardForce(unsigned int burn) override;
 
-        /** Stores parameters' upper bounds.  An infinite or NaN value is treated as a non-bounded
-         * parameter.  This vector will be empty until/unless upperBounds() is called, at which
-         * point it will be resized to `K()`.
+        /** Proxy object that converts assignments into restriction rows on the associated
+         * LinearRestricted model.
          */
-        std::vector<double> restrict_le_;
-
-        /** Stores parameters' upper bounds.  An infinite or NaN value is treated as a non-bounded
-         * parameter.  This vector will be empty until/unless lowerBounds() is called, at which
-         * point it will be resized to `K()`.
+        class RestrictionProxy final {
+            public:
+                /** Adds a restriction on the referenced parameter.
+                 *
+                 * \sa RestrictionProxyList
+                 */
+                RestrictionProxy& operator=(double r);
+                /** Returns true if there is a restriction of the appropriate type (upper- or
+                 * lower-bound) on the given parameter.  This method works whether the restriction
+                 * was added via a RestrictionProxy object, or as a single-parameter restriction
+                 * given to addRestriction() (or variants).
+                 *
+                 * Specifically this looks for any restriction with a negative (for lower bounds) or
+                 * positive (for upper bounds) selector for the requested coefficient and 0 for all
+                 * other coefficient selectors.
+                 */
+                bool restricted() const;
+                /** Returns the appropriate value restriction, if there is a single-parameter
+                 * restriction of the given type.  If there is no such restriction, returns a
+                 * quiet_NaN.  If there are multiple restrictions, the most binding restriction is
+                 * returned (that is, 4 is returned if both `>= 3` and `>= 4` lower-bound
+                 * restrictions are found).
+                 *
+                 * Note that restrictions added with non-unitary coefficients are handled properly;
+                 * that is, if a `<=` restriction on a 4-parameter model of R=(0, -2.5, 0, 0), r=1
+                 * is added, the returned lower bound restriction will be -0.4.
+                 */
+                operator double() const;
+            private:
+                /** Creates a new RestrictionProxy object that, when assigned to, adds an upper or
+                 * lower-bound restriction on beta[`k`].
+                 *
+                 * \param the LinearRestricted object where the restriction will be added;
+                 * \param k the parameter index
+                 * \param upper true if this is an upper bound, false if a lower bound
+                 */
+                RestrictionProxy(LinearRestricted &lr, size_t k, bool upper);
+                friend class RestrictionProxyList;
+                LinearRestricted &lr_;
+                const size_t k_;
+                const bool upper_;
+        };
+        /** Object returned by upperBounds() and lowerBounds() that provides subscript access to
+         * add individual parameter restrictions (via a RestrictionProxy object).
          */
-        std::vector<double> restrict_ge_;
+        class RestrictionProxyList final {
+            public:
+                /** Creates and returns a RestrictionProxy object which can be assigned a double
+                 * value to add a restriction on the given parameter to the LinearRestricted model.
+                 */
+                RestrictionProxy operator[](size_t k);
+            private:
+                RestrictionProxyList(LinearRestricted &lr, bool upper);
+                friend class LinearRestricted;
+                LinearRestricted &lr_;
+                size_t k_;
+                bool upper_;
+        };
 
-        /** Stores the linear restrictions passed to addRestriction(). */
-        std::vector<std::pair<Eigen::RowVectorXd, double>> restrict_linear_;
+        /** Stores the coefficient selection matrix for arbitrary linear restrictions passed to
+         * addRestriction() or addRestrictions(). Note that the only the first
+         * `restrict_linear_size_` rows of the matrix will be set, but other rows might exist with
+         * uninitialized values. */
+        Eigen::MatrixXd restrict_select_;
+        /** Stores the value restrictions for arbitrary linear restrictions passed to
+         * addRestriction() or addRestrictions().  Note that the only the first
+         * `restrict_linear_size_` values of the vector will be set, but other values might exist
+         * with uninitialized values. */
+        Eigen::VectorXd restrict_values_;
+        /** Stores the number of arbitrary linear restrictions currently stored in
+         * restrict_linear_select_ and restrict_linear_values_.
+         */
+        size_t restrict_size_ = 0;
+
+        /** Called to ensure the above are set and have (at least) the required number of rows free
+         * (beginning at row `restrict_linear_size_`). */
+        void allocateRestrictions(size_t more);
 
         /// The cache of drawn beta vectors used for prediction.
         Eigen::VectorXd mean_beta_;

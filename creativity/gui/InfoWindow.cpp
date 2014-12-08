@@ -30,16 +30,18 @@ Gtk::Grid& InfoWindow::new_tab_grid(Gtk::Notebook &notebook, const std::string &
     return g;
 }
 
-void InfoWindow::data_at(Gtk::Grid &grid, const std::string &code, const std::string &value_name, int row, int col) {
+void InfoWindow::data_at(Gtk::Grid &grid, const std::string &code, const std::string &value_name, int row, int col,
+        double label_align, double value_align) {
     fields_[code].first.set_markup(value_name + ":");
-    fields_[code].first.set_alignment(1);
-    fields_[code].second.set_alignment(0);
+    fields_[code].first.set_alignment(label_align);
+    fields_[code].second.set_alignment(value_align);
     grid.attach(fields_[code].first, col, row, 1, 1);
     grid.attach(fields_[code].second, col+1, row, 1, 1);
 }
 
-void InfoWindow::data_append(Gtk::Grid &grid, const std::string &code, const std::string &value_name) {
-    data_at(grid, code, value_name, gpos_, 0);
+void InfoWindow::data_append(Gtk::Grid &grid, const std::string &code, const std::string &value_name,
+        double label_align, double value_align) {
+    data_at(grid, code, value_name, gpos_, 0, label_align, value_align);
     gpos_++;
 }
 
@@ -59,7 +61,7 @@ void InfoWindow::matrix_at(Gtk::Grid &grid, const std::string &code, const std::
         for (int j = 1; j <= ncols; j++) {
             labels.emplace_back(new Gtk::Label);
             Gtk::Label &l = *labels.back();
-            l.set_alignment(0); // FIXME?
+            l.set_alignment(1);
             grid.attach(l, col+j, row+i, 1, 1);
         }
     }
@@ -134,7 +136,7 @@ InfoWindow::InfoWindow(std::shared_ptr<const State> state, std::shared_ptr<Gtk::
     data_append(grid_quality, "q_s2", "s<sup>2</sup>");
     std::vector<std::string> q_vars{{"constant", "I(firstBook)", "prevBooks", "age", "price", "price×age", "copiesSold"}};
     for (size_t i = 0; i < q_vars.size(); i++)
-        data_append(grid_quality, "q_" + std::to_string(i), BETA "[" + q_vars[i] + "]");
+        data_append(grid_quality, "q_" + std::to_string(i), BETA "[" + q_vars[i] + "]", 1, 1);
     matrix_at(grid_quality, "q_V", "<b>V</b>", 2, 2, q_vars.size(), q_vars.size());
 
     auto &grid_profit = new_tab_grid(beliefs, "Profit");

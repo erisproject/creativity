@@ -239,17 +239,21 @@ class FileStorage : public Storage, private eris::noncopyable {
                     income = 108, ///< Per-period reader external income (before incurring authorship costs or receiving book profits) (dbl)
                     piracy_begins = 116, ///< the sharing start period (u64)
                     piracy_link_proportion = 124, ///< The proportion of potential friendship links that exist
-                    init_prob_write = 132, ///< The probability of writing (while beliefs noninformative)
-                    init_q_min = 140, ///< `a` in U[a,b], the noninformative belief authorship quality level
-                    init_q_max = 148, ///< `b` in U[a,b], the noninformative belief authorship quality level
-                    init_p_min = 156, ///< `a` in U[a,b], the noninformative belief book price
-                    init_p_max = 164, ///< `b` in U[a,b], the noninformative belief book price
-                    init_prob_keep = 172, ///< The probability of keeping a book on the market (uninformed beliefs)
-                    init_keep_scale = 180, ///< If keeping a book on the market, the new price is (p-c)*s+c, where this is s
+                    prior_weight = 132, ///< The prior 'n' multiplier (usually 0-1)
+                    prior_weight_piracy = 140, ///< The prior 'n' multiplier in the first piracy period
+                    init_prob_write = 148, ///< The probability of writing (while beliefs noninformative)
+                    init_q_min = 156, ///< `a` in U[a,b], the noninformative belief authorship quality level
+                    init_q_max = 164, ///< `b` in U[a,b], the noninformative belief authorship quality level
+                    init_p_min = 172, ///< `a` in U[a,b], the noninformative belief book price
+                    init_p_max = 180, ///< `b` in U[a,b], the noninformative belief book price
+                    init_prob_keep = 188, ///< The probability of keeping a book on the market (uninformed beliefs)
+                    init_keep_price = 196, ///< If keeping a book on the market, the new price is (p-c)*s+c, where this is s
+                    init_belief_threshold = 204, ///< The required n-k value for readers to use beliefs instead of initial behaviour (i32)
                     // NB: this next one should be an integer multiple of 8 (so that states+cont
                     // location go to the end, and so the `states` division below has no remainder)
                     //
-                    state_first = 192, ///< the first state record
+                    // --- no padding needed
+                    state_first = 208, ///< the first state record
                     state_last = size - 16, ///< the last state record
                     continuation = size - 8; ///< the header continuation block pointer (used once header state blocks fill up)
             };

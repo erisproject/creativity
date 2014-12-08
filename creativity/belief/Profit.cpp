@@ -48,12 +48,8 @@ RowVectorXd Profit::profitRow(eris::SharedMember<Book> book, double quality) con
     return Xi;
 }
 
-Profit Profit::update(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X, const double prior_weight) const {
-    return Profit(D_,
-            prior_weight == 1
-                ? Linear::update(y, X)
-                : weaken(prior_weight).update(y, X));
+Profit Profit::newDerived(Linear &&model) const {
+    return Profit(D_, std::move(model));
 }
-
 
 }}

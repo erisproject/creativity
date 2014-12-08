@@ -131,13 +131,10 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
 
         /** Constructor takes the reader position and various reader properties.
          *
-         * ProfitStream beliefs start off with a highly non-informative prior for age=1.
+         * Beliefs start off non-informative.
          *
          * \param creativity the Creativity object owning the simulation this reader is created in
          * \param pos the initial position of the reader
-         * \param demand a per-period demand belief object
-         * \param profit a lifetime profit belief object
-         * \param quality a quality belief object
          * \param cFixed the fixed cost of keeping a book on the market
          * \param cUnit the per-unit cost of producing copies of a book
          * \param income the per-period income of the agent
@@ -145,7 +142,6 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         Reader(
                 std::shared_ptr<Creativity> creativity,
                 const eris::Position &pos,
-                belief::Demand &&demand, belief::Profit &&profit, belief::Quality &&quality,
                 double cFixed, double cUnit, double income
               );
 
@@ -470,13 +466,24 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * When a model for the requested age is not available the model with the highest age less
          * than `age` is returned.
          *
-         * If there are no models at all, a highly noninformative one for `age=1` is created and
-         * returned.
+         * If there are no models at all, a noninformative one for `age=1` is created and returned.
+         *
+         * \param age the requested age, which must be at least 1.
+         * \param usable optional parameter that, when true (defaults to false), specifies that only
+         * usable beliefs (as determined by usableBelief()) should be considered.  Note that if
+         * there are no usable beliefs at all, the noninformative (or insufficiently informed)
+         * `age=1` is still returned (and created, if necessary).
          *
          * Note that the returned model will have, at most, `age` parameters (that is, `model.K() <=
          * age` will always be true).
          */
-        const belief::ProfitStream& profitStreamBelief(unsigned int age) const;
+        const belief::ProfitStream& profitStreamBelief(unsigned int age, bool usable = false) const;
+
+        /** Returns true if the given belief is usable.  Specifically, to be usable it must not be a
+         * noninformative() belief, and must have at least `K` plus `belief_min_n_less_k`
+         * observations.
+         */
+        bool usableBelief(const belief::Linear &model) const;
 
         /** Returns the map of all current profit stream beliefs.  The keys of the map are the
          * minimum age for which the belief applies and the value is the actual belief with `age`
@@ -599,6 +606,9 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * - lifetime profitability
          * - lifetime profitability with profit stream extrapolation for still-in-market books
          *
+         * If the CreativitySettings indicates that existing beliefs should be weakened when used as
+         * a prior, that is done.
+         *
          * After updating beliefs, `library_unlearned_` is updated to remove books that are no
          * longer on the market (since those will have now been incorporated into the beliefs).
          *
@@ -606,10 +616,15 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * \sa updateDemandBelief
          * \sa updateProfitStreamBelief
          * \sa updateProfitBelief
+         * \sa CreativitySettings.prior_weight
+         * \sa CreativitySettings.prior_weight_piracy
          */
         void updateBeliefs();
 
-        /** Updates the quality model based on observations from the previous period.
+        /** Updates the quality model based on observations from the just-finished period.
+         *
+         * The current belief is used as a prior, suitably weakened if
+         * CreativitySettings.prior_weight is not equal to 1.
          */
         void updateQualityBelief();
 
@@ -620,20 +635,30 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * \todo Consider adding books for each period they survive (and past periods).  In other
          * words, if the book is bought when \f$age=2\f$, also add data points for \f$age=0\f$ and
          * \f$age=1\f$, and keep doing so into the future until the book leaves the market.
+         *
+         * The current belief is used as a prior, suitably weakened if
+         * CreativitySettings.prior_weight is not equal to 1.
          */
         void updateDemandBelief();
 
         /** Updates the lifetime profit equation belief based on observations from the previous
          * period.
          *
+         * The current belief is used as a prior, suitably weakened if
+         * CreativitySettings.prior_weight is not equal to 1.
+         *
          * This also updates the lifetime profit extrapolation belief, using the just-updated profit
-         * belief as prior plus extrapolations (via the profit stream belief) for books that are
-         * still on the market.  The previous extrapolated profit belief is discarded.
+         * belief as (non-weakened) prior plus extrapolations (via the profit stream belief) for
+         * books that are still on the market.  The previous extrapolated profit belief is
+         * discarded.
          */
         void updateProfitBelief();
 
         /** Updates the profit stream equation belief based on observations from the previous
          * period.
+         *
+         * The current belief is used as a prior, suitably weakened if
+         * CreativitySettings.prior_weight is not equal to 1.
          */
         void updateProfitStreamBelief();
 

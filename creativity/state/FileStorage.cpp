@@ -37,13 +37,15 @@ constexpr int64_t
         FileStorage::HEADER::pos::income,
         FileStorage::HEADER::pos::piracy_begins,
         FileStorage::HEADER::pos::piracy_link_proportion,
+        FileStorage::HEADER::pos::prior_weight,
+        FileStorage::HEADER::pos::prior_weight_piracy,
         FileStorage::HEADER::pos::init_prob_write,
         FileStorage::HEADER::pos::init_q_min,
         FileStorage::HEADER::pos::init_q_max,
         FileStorage::HEADER::pos::init_p_min,
         FileStorage::HEADER::pos::init_p_max,
         FileStorage::HEADER::pos::init_prob_keep,
-        FileStorage::HEADER::pos::init_keep_scale,
+        FileStorage::HEADER::pos::init_keep_price,
         FileStorage::HEADER::pos::state_first,
         FileStorage::HEADER::pos::state_last,
         FileStorage::HEADER::pos::continuation,
@@ -202,6 +204,8 @@ void FileStorage::writeEmptyHeader() {
     write_value(settings.income);
     write_value(settings.piracy_begins);
     write_value(settings.piracy_link_proportion);
+    write_value(settings.prior_weight);
+    write_value(settings.prior_weight_piracy);
     write_value(settings.initial.prob_write);
     write_value(settings.initial.q_min);
     write_value(settings.initial.q_max);
@@ -209,8 +213,10 @@ void FileStorage::writeEmptyHeader() {
     write_value(settings.initial.p_max);
     write_value(settings.initial.prob_keep);
     write_value(settings.initial.keep_price);
+    write_value(settings.initial.belief_threshold);
 
-    write_u32(0); // Unused padding value
+    // Currently no padding needed:
+    //write_u32(0); // Unused padding value
 
     // State addresses and continuation location (all 0):
     char zeros[8 * (HEADER::states + 1)] = {0};
@@ -318,6 +324,8 @@ void FileStorage::parseMetadata() {
     parse_value(block[HEADER::pos::cost_piracy], settings_.cost_piracy);
     parse_value(block[HEADER::pos::income], settings_.income);
     parse_value(block[HEADER::pos::piracy_begins], settings_.piracy_begins);
+    parse_value(block[HEADER::pos::prior_weight], settings_.prior_weight);
+    parse_value(block[HEADER::pos::prior_weight_piracy], settings_.prior_weight_piracy);
     parse_value(block[HEADER::pos::piracy_link_proportion], settings_.piracy_link_proportion);
     parse_value(block[HEADER::pos::init_prob_write], settings_.initial.prob_write);
     parse_value(block[HEADER::pos::init_q_min], settings_.initial.q_min);
@@ -325,7 +333,8 @@ void FileStorage::parseMetadata() {
     parse_value(block[HEADER::pos::init_p_min], settings_.initial.p_min);
     parse_value(block[HEADER::pos::init_p_max], settings_.initial.p_max);
     parse_value(block[HEADER::pos::init_prob_keep], settings_.initial.prob_keep);
-    parse_value(block[HEADER::pos::init_keep_scale], settings_.initial.keep_price);
+    parse_value(block[HEADER::pos::init_keep_price], settings_.initial.keep_price);
+    parse_value(block[HEADER::pos::init_belief_threshold], settings_.initial.belief_threshold);
 
     if (settings.dimensions == 0) throwParseError("found invalid dimensions == 0");
     if (settings.readers == 0) throwParseError("found invalid readers == 0");

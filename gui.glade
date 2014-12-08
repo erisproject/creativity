@@ -4,7 +4,7 @@
   <requires lib="gtk+" version="3.6"/>
   <object class="GtkAdjustment" id="adj_cost_piracy">
     <property name="upper">100</property>
-    <property name="value">1.0000000002235174</property>
+    <property name="value">1</property>
     <property name="step_increment">0.10000000000000001</property>
     <property name="page_increment">1</property>
   </object>
@@ -37,6 +37,18 @@
     <property name="value">2</property>
     <property name="step_increment">0.10000000000000001</property>
     <property name="page_increment">1</property>
+  </object>
+  <object class="GtkAdjustment" id="adj_prior_piracy">
+    <property name="upper">1</property>
+    <property name="value">0.5</property>
+    <property name="step_increment">0.01</property>
+    <property name="page_increment">0.10000000000000001</property>
+  </object>
+  <object class="GtkAdjustment" id="adj_prior_weight">
+    <property name="upper">1</property>
+    <property name="value">0.94999999999999996</property>
+    <property name="step_increment">0.01</property>
+    <property name="page_increment">0.10000000000000001</property>
   </object>
   <object class="GtkAdjustment" id="adj_prob_keep">
     <property name="upper">1</property>
@@ -125,7 +137,7 @@
   <object class="GtkAdjustment" id="adjust_periods">
     <property name="lower">1</property>
     <property name="upper">1000000</property>
-    <property name="value">100</property>
+    <property name="value">200</property>
     <property name="step_increment">1</property>
     <property name="page_increment">100</property>
   </object>
@@ -182,7 +194,7 @@
   <object class="GtkWindow" id="window1">
     <property name="can_focus">False</property>
     <property name="title" translatable="yes">Creativity Simulator</property>
-    <property name="default_width">800</property>
+    <property name="default_width">900</property>
     <property name="default_height">830</property>
     <property name="icon">creativity.svg</property>
     <child>
@@ -436,7 +448,7 @@
                                           <object class="GtkBox" id="box4">
                                             <property name="visible">True</property>
                                             <property name="can_focus">False</property>
-                                            <property name="orientation">vertical</property>
+                                            <property name="spacing">10</property>
                                             <child>
                                               <object class="GtkRadioButton" id="radio_new">
                                                 <property name="label" translatable="yes">Run new simulation</property>
@@ -479,7 +491,11 @@
                                                   <object class="GtkLabel" id="lbl_load">
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
+                                                    <property name="margin_bottom">4</property>
                                                     <property name="xpad">4</property>
+                                                    <property name="ellipsize">start</property>
+                                                    <property name="single_line_mode">True</property>
+                                                    <property name="max_width_chars">50</property>
                                                     <attributes>
                                                       <attribute name="style" value="italic"/>
                                                     </attributes>
@@ -563,6 +579,7 @@
                                           <object class="GtkGrid" id="grid_sim_attribs">
                                             <property name="visible">True</property>
                                             <property name="can_focus">False</property>
+                                            <property name="margin_bottom">2</property>
                                             <property name="column_spacing">10</property>
                                             <child>
                                               <object class="GtkLabel" id="label8">
@@ -582,6 +599,7 @@
                                                 <property name="can_focus">True</property>
                                                 <property name="tooltip_text" translatable="yes">The reader density (in readers per square unit) of the simulation.  This implicitly defines the simulation boundaries.</property>
                                                 <property name="margin_right">15</property>
+                                                <property name="margin_bottom">1</property>
                                                 <property name="invisible_char">●</property>
                                                 <property name="text" translatable="yes">1.00</property>
                                                 <property name="input_purpose">number</property>
@@ -614,6 +632,7 @@
                                                 <property name="can_focus">True</property>
                                                 <property name="tooltip_text" translatable="yes">The reader density (in readers per square unit) of the simulation.  This implicitly defines the simulation boundaries.</property>
                                                 <property name="margin_right">15</property>
+                                                <property name="margin_bottom">1</property>
                                                 <property name="invisible_char">●</property>
                                                 <property name="text" translatable="yes">1.00</property>
                                                 <property name="input_purpose">number</property>
@@ -684,7 +703,7 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="xalign">0</property>
-                                                <property name="label" translatable="yes">P ~ U[&lt;b&gt;&lt;i&gt;A&lt;/i&gt;&lt;/b&gt;,B]</property>
+                                                <property name="label" translatable="yes">P ~ U[A,&lt;b&gt;&lt;i&gt;B&lt;/i&gt;&lt;/b&gt;]</property>
                                                 <property name="use_markup">True</property>
                                               </object>
                                               <packing>
@@ -697,7 +716,7 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="xalign">0</property>
-                                                <property name="label" translatable="yes">Pr(&lt;i&gt;keep on market&lt;/i&gt;)</property>
+                                                <property name="label" translatable="yes">Pr(&lt;i&gt;keep&lt;/i&gt;)</property>
                                                 <property name="use_markup">True</property>
                                               </object>
                                               <packing>
@@ -710,7 +729,7 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="xalign">0</property>
-                                                <property name="label" translatable="yes">Relative price change</property>
+                                                <property name="label" translatable="yes">Keep price</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">4</property>
@@ -722,6 +741,7 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
                                                 <property name="tooltip_text" translatable="yes">The probability of writing a book (before Profit belief formation).</property>
+                                                <property name="margin_bottom">1</property>
                                                 <property name="adjustment">adj_prob_write</property>
                                                 <property name="digits">2</property>
                                                 <property name="numeric">True</property>
@@ -736,6 +756,7 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
                                                 <property name="tooltip_text" translatable="yes">The distribution of quality of an authored book (before Demand belief is informed).  Readers with uninformed Quality beliefs use the mean of this distribution as a guess of quality.</property>
+                                                <property name="margin_bottom">1</property>
                                                 <property name="adjustment">adj_q_min</property>
                                                 <property name="digits">2</property>
                                                 <property name="numeric">True</property>
@@ -750,6 +771,7 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
                                                 <property name="tooltip_text" translatable="yes">The distribution of quality of an authored book (before Demand belief is informed).  Readers with uninformed Quality beliefs use the mean of this distribution as a guess of quality.</property>
+                                                <property name="margin_bottom">1</property>
                                                 <property name="adjustment">adj_q_max</property>
                                                 <property name="digits">2</property>
                                                 <property name="numeric">True</property>
@@ -764,6 +786,7 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
                                                 <property name="tooltip_text" translatable="yes">The distribution of the initial price an authored book (before Demand belief is informed).</property>
+                                                <property name="margin_bottom">1</property>
                                                 <property name="adjustment">adj_p_min</property>
                                                 <property name="digits">2</property>
                                                 <property name="numeric">True</property>
@@ -778,6 +801,7 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
                                                 <property name="tooltip_text" translatable="yes">The distribution of the initial price an authored book (before Demand belief is informed).</property>
+                                                <property name="margin_bottom">1</property>
                                                 <property name="adjustment">adj_p_max</property>
                                                 <property name="digits">2</property>
                                                 <property name="numeric">True</property>
@@ -792,6 +816,7 @@
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
                                                 <property name="tooltip_text" translatable="yes">The probability that an author keeps the book on the market for another period (before ProfitStream belief formation).</property>
+                                                <property name="margin_bottom">1</property>
                                                 <property name="adjustment">adj_prob_keep</property>
                                                 <property name="digits">2</property>
                                                 <property name="numeric">True</property>
@@ -805,7 +830,9 @@
                                               <object class="GtkSpinButton" id="set_init_keep_price">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
-                                                <property name="tooltip_text" translatable="yes">If an author keeps a book on the market, the price above marginal cost will be this ratio times the old price above marginal cost (before Demand belief formation)</property>
+                                                <property name="tooltip_text" translatable="yes">If an author keeps a book on the market, the price above marginal cost will be this ratio times the old price above marginal cost (before Demand belief formation).
+
+For example, if this is set to 0.6 and, the previous market price was 6, and marginal cost was 1, the price in the next period will be 4 (i.e. P-MC changes from 5 to 3).</property>
                                                 <property name="margin_bottom">1</property>
                                                 <property name="adjustment">adj_keep_price</property>
                                                 <property name="digits">2</property>
@@ -832,8 +859,9 @@
                                               <object class="GtkSpinButton" id="set_book_distance_sd">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
-                                                <property name="tooltip_text" translatable="yes">New books are created |N(0,1)| times this value away from the author, in a random direction.</property>
+                                                <property name="tooltip_text" translatable="yes">New books are created in a random direction at a distance from the author drawn from a normal distribution with mean 0 and the standard deviation specified here.  The absolute value of the draw is used.</property>
                                                 <property name="margin_right">15</property>
+                                                <property name="margin_bottom">1</property>
                                                 <property name="invisible_char">●</property>
                                                 <property name="text" translatable="yes">0.50</property>
                                                 <property name="input_purpose">number</property>
@@ -866,11 +894,11 @@
                                                 <property name="can_focus">True</property>
                                                 <property name="tooltip_text" translatable="yes">The per-period fixed cost of keeping a book on the market.</property>
                                                 <property name="margin_right">15</property>
+                                                <property name="margin_bottom">1</property>
                                                 <property name="invisible_char">●</property>
                                                 <property name="text" translatable="yes">10.00</property>
                                                 <property name="input_purpose">number</property>
                                                 <property name="adjustment">adj_income</property>
-                                                <property name="digits">2</property>
                                                 <property name="numeric">True</property>
                                                 <property name="update_policy">if-valid</property>
                                               </object>
@@ -897,6 +925,7 @@
                                                 <property name="can_focus">True</property>
                                                 <property name="tooltip_text" translatable="yes">The per-period fixed cost of keeping a book on the market.</property>
                                                 <property name="margin_right">15</property>
+                                                <property name="margin_bottom">1</property>
                                                 <property name="invisible_char">●</property>
                                                 <property name="text" translatable="yes">20.00</property>
                                                 <property name="input_purpose">number</property>
@@ -926,8 +955,9 @@
                                               <object class="GtkSpinButton" id="set_book_quality_sd">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
-                                                <property name="tooltip_markup" translatable="yes">When a reader reads a book, his utility is based on his subjective quality &lt;i&gt;q&lt;sup&gt;*&lt;/sup&gt;&lt;/i&gt; ~ N(&lt;i&gt;q&lt;/i&gt;, &lt;i&gt;&lt;b&gt;s&lt;/b&gt;&lt;/i&gt;).  This settings determines &lt;i&gt;&lt;b&gt;s&lt;/b&gt;&lt;/i&gt;.</property>
+                                                <property name="tooltip_markup" translatable="yes">When a reader reads a book, his utility is based on his subjective quality &lt;i&gt;q&lt;sup&gt;*&lt;/sup&gt;&lt;/i&gt;, which is normally distributed around the true quality value with the standard deviation specified here.</property>
                                                 <property name="margin_right">15</property>
+                                                <property name="margin_bottom">1</property>
                                                 <property name="invisible_char">●</property>
                                                 <property name="text" translatable="yes">0.50</property>
                                                 <property name="input_purpose">number</property>
@@ -940,39 +970,6 @@
                                               <packing>
                                                 <property name="left_attach">1</property>
                                                 <property name="top_attach">5</property>
-                                              </packing>
-                                            </child>
-                                            <child>
-                                              <object class="GtkLabel" id="label23">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
-                                                <property name="label" translatable="yes">Piracy begins</property>
-                                              </object>
-                                              <packing>
-                                                <property name="left_attach">0</property>
-                                                <property name="top_attach">6</property>
-                                              </packing>
-                                            </child>
-                                            <child>
-                                              <object class="GtkSpinButton" id="set_piracy_begins">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">True</property>
-                                                <property name="tooltip_text" translatable="yes">The period in which sharing between readers (i.e. piracy) becomes available.
-
-If 0, piracy never becomes available.</property>
-                                                <property name="margin_right">15</property>
-                                                <property name="invisible_char">●</property>
-                                                <property name="text" translatable="yes">100</property>
-                                                <property name="input_purpose">number</property>
-                                                <property name="adjustment">adjust_sharing_begins</property>
-                                                <property name="snap_to_ticks">True</property>
-                                                <property name="numeric">True</property>
-                                                <property name="update_policy">if-valid</property>
-                                              </object>
-                                              <packing>
-                                                <property name="left_attach">1</property>
-                                                <property name="top_attach">6</property>
                                               </packing>
                                             </child>
                                             <child>
@@ -993,6 +990,7 @@ If 0, piracy never becomes available.</property>
                                                 <property name="can_focus">True</property>
                                                 <property name="tooltip_text" translatable="yes">The per-unit cost to the author of creating a copy of a book.</property>
                                                 <property name="margin_right">15</property>
+                                                <property name="margin_bottom">1</property>
                                                 <property name="invisible_char">●</property>
                                                 <property name="text" translatable="yes">0.50</property>
                                                 <property name="input_purpose">number</property>
@@ -1024,6 +1022,7 @@ If 0, piracy never becomes available.</property>
                                                 <property name="can_focus">True</property>
                                                 <property name="tooltip_text" translatable="yes">The per-unit cost to the author of creating a copy of a book.</property>
                                                 <property name="margin_right">15</property>
+                                                <property name="margin_bottom">1</property>
                                                 <property name="invisible_char">●</property>
                                                 <property name="text" translatable="yes">1.00</property>
                                                 <property name="input_purpose">number</property>
@@ -1035,86 +1034,6 @@ If 0, piracy never becomes available.</property>
                                               <packing>
                                                 <property name="left_attach">3</property>
                                                 <property name="top_attach">4</property>
-                                              </packing>
-                                            </child>
-                                            <child>
-                                              <object class="GtkLabel" id="label34">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">False</property>
-                                              </object>
-                                              <packing>
-                                                <property name="left_attach">0</property>
-                                                <property name="top_attach">7</property>
-                                              </packing>
-                                            </child>
-                                            <child>
-                                              <object class="GtkLabel" id="label33">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">False</property>
-                                              </object>
-                                              <packing>
-                                                <property name="left_attach">2</property>
-                                                <property name="top_attach">5</property>
-                                              </packing>
-                                            </child>
-                                            <child>
-                                              <object class="GtkLabel" id="label37">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">False</property>
-                                              </object>
-                                              <packing>
-                                                <property name="left_attach">1</property>
-                                                <property name="top_attach">7</property>
-                                              </packing>
-                                            </child>
-                                            <child>
-                                              <object class="GtkLabel" id="label35">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">False</property>
-                                              </object>
-                                              <packing>
-                                                <property name="left_attach">2</property>
-                                                <property name="top_attach">6</property>
-                                              </packing>
-                                            </child>
-                                            <child>
-                                              <object class="GtkLabel" id="label36">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">False</property>
-                                              </object>
-                                              <packing>
-                                                <property name="left_attach">3</property>
-                                                <property name="top_attach">6</property>
-                                              </packing>
-                                            </child>
-                                            <child>
-                                              <object class="GtkLabel" id="label38">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">False</property>
-                                              </object>
-                                              <packing>
-                                                <property name="left_attach">3</property>
-                                                <property name="top_attach">5</property>
-                                              </packing>
-                                            </child>
-                                            <child>
-                                              <object class="GtkLabel" id="label39">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">False</property>
-                                              </object>
-                                              <packing>
-                                                <property name="left_attach">3</property>
-                                                <property name="top_attach">7</property>
-                                              </packing>
-                                            </child>
-                                            <child>
-                                              <object class="GtkLabel" id="label40">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">False</property>
-                                              </object>
-                                              <packing>
-                                                <property name="left_attach">2</property>
-                                                <property name="top_attach">7</property>
                                               </packing>
                                             </child>
                                             <child>
@@ -1160,6 +1079,337 @@ If 0, piracy never becomes available.</property>
                                                 <property name="left_attach">4</property>
                                                 <property name="top_attach">0</property>
                                                 <property name="width">2</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label17">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">False</property>
+                                                <property name="xalign">0</property>
+                                                <property name="label" translatable="yes">Random step s.d.</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left_attach">0</property>
+                                                <property name="top_attach">3</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkSpinButton" id="set_reader_step_sd">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">True</property>
+                                                <property name="tooltip_text" translatable="yes">Each period, readers take a step in a random direction of distance drawn from a normal distribution with mean 0 and this standard deviation.  The absolute value of the draw is used.</property>
+                                                <property name="margin_right">15</property>
+                                                <property name="margin_bottom">1</property>
+                                                <property name="invisible_char">●</property>
+                                                <property name="text" translatable="yes">1.00</property>
+                                                <property name="input_purpose">number</property>
+                                                <property name="adjustment">adj_step_sd</property>
+                                                <property name="digits">2</property>
+                                                <property name="numeric">True</property>
+                                                <property name="update_policy">if-valid</property>
+                                                <property name="value">1</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left_attach">1</property>
+                                                <property name="top_attach">3</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label18">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">False</property>
+                                                <property name="xalign">0</property>
+                                                <property name="label" translatable="yes">Quality fn. shape</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left_attach">0</property>
+                                                <property name="top_attach">6</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label33">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">False</property>
+                                                <property name="xalign">0</property>
+                                                <property name="label" translatable="yes">Quality fn. scale min</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left_attach">0</property>
+                                                <property name="top_attach">7</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkSpinButton" id="set_reader_creation_shape">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">True</property>
+                                                <property name="tooltip_markup" translatable="yes">Readers expend effort to create a book.  The quality of a book created with effort level ℓ is given by:
+
+q(ℓ) = &lt;b&gt;&lt;i&gt;α&lt;/i&gt;&lt;/b&gt; [(ℓ+1)&lt;sup&gt;&lt;b&gt;&lt;i&gt;β&lt;/i&gt;&lt;/b&gt;&lt;/sup&gt; - 1] / &lt;b&gt;&lt;i&gt;β&lt;/i&gt;&lt;/b&gt;
+
+The value given here is &lt;b&gt;&lt;i&gt;β&lt;/i&gt;&lt;/b&gt;.  Note that &lt;b&gt;&lt;i&gt;β&lt;/i&gt; = 0&lt;/b&gt; is handled specially as q(ℓ) = &lt;b&gt;&lt;i&gt;α&lt;/i&gt;&lt;/b&gt; ln(ℓ+1), which holds mathematically (though not numerically without this special handling).</property>
+                                                <property name="margin_right">15</property>
+                                                <property name="margin_bottom">1</property>
+                                                <property name="invisible_char">●</property>
+                                                <property name="text" translatable="yes">0.50</property>
+                                                <property name="input_purpose">number</property>
+                                                <property name="adjustment">adj_reader_creation_shape</property>
+                                                <property name="digits">2</property>
+                                                <property name="numeric">True</property>
+                                                <property name="update_policy">if-valid</property>
+                                                <property name="value">0.5</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left_attach">1</property>
+                                                <property name="top_attach">6</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkSpinButton" id="set_reader_creation_scale_max">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">True</property>
+                                                <property name="tooltip_markup" translatable="yes">Readers expend effort to create a book.  The quality of a book created with effort level ℓ is given by:
+
+q(ℓ) = &lt;b&gt;&lt;i&gt;α&lt;/i&gt;&lt;/b&gt; [(ℓ+1)&lt;sup&gt;&lt;b&gt;&lt;i&gt;β&lt;/i&gt;&lt;/b&gt;&lt;/sup&gt; - 1] / &lt;b&gt;&lt;i&gt;β&lt;/i&gt;&lt;/b&gt;
+
+&lt;b&gt;&lt;i&gt;α&lt;/i&gt;&lt;/b&gt; ~ U[A,&lt;b&gt;B&lt;/b&gt;], where the value given here is &lt;b&gt;B&lt;/b&gt;.</property>
+                                                <property name="margin_right">15</property>
+                                                <property name="margin_bottom">1</property>
+                                                <property name="invisible_char">●</property>
+                                                <property name="text" translatable="yes">0.50</property>
+                                                <property name="input_purpose">number</property>
+                                                <property name="adjustment">adj_reader_creation_scale_max</property>
+                                                <property name="digits">2</property>
+                                                <property name="numeric">True</property>
+                                                <property name="update_policy">if-valid</property>
+                                                <property name="value">0.5</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left_attach">1</property>
+                                                <property name="top_attach">8</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkSpinButton" id="set_reader_creation_scale_min">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">True</property>
+                                                <property name="tooltip_markup" translatable="yes">Readers expend effort to create a book.  The quality of a book created with effort level ℓ is given by:
+
+q(ℓ) = &lt;b&gt;&lt;i&gt;α&lt;/i&gt;&lt;/b&gt; [(ℓ+1)&lt;sup&gt;&lt;b&gt;&lt;i&gt;β&lt;/i&gt;&lt;/b&gt;&lt;/sup&gt; - 1] / &lt;b&gt;&lt;i&gt;β&lt;/i&gt;&lt;/b&gt;
+
+&lt;b&gt;&lt;i&gt;α&lt;/i&gt;&lt;/b&gt; ~ U[&lt;b&gt;A&lt;/b&gt;,B], where the value given here is &lt;b&gt;A&lt;/b&gt;.</property>
+                                                <property name="margin_right">15</property>
+                                                <property name="margin_bottom">1</property>
+                                                <property name="invisible_char">●</property>
+                                                <property name="text" translatable="yes">0.50</property>
+                                                <property name="input_purpose">number</property>
+                                                <property name="adjustment">adj_reader_creation_scale_min</property>
+                                                <property name="digits">2</property>
+                                                <property name="numeric">True</property>
+                                                <property name="update_policy">if-valid</property>
+                                                <property name="value">0.5</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left_attach">1</property>
+                                                <property name="top_attach">7</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label35">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">False</property>
+                                                <property name="xalign">0</property>
+                                                <property name="label" translatable="yes">Quality fn. scale max</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left_attach">0</property>
+                                                <property name="top_attach">8</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label51">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">False</property>
+                                                <property name="margin_bottom">5</property>
+                                                <property name="label" translatable="yes">&lt;b&gt;&lt;u&gt;Piracy&lt;/u&gt;&lt;/b&gt;</property>
+                                                <property name="use_markup">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left_attach">2</property>
+                                                <property name="top_attach">5</property>
+                                                <property name="width">2</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label23">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">False</property>
+                                                <property name="xalign">0</property>
+                                                <property name="label" translatable="yes">Piracy begins</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left_attach">2</property>
+                                                <property name="top_attach">6</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label31">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">False</property>
+                                                <property name="xalign">0</property>
+                                                <property name="label" translatable="yes">Friendship %</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left_attach">2</property>
+                                                <property name="top_attach">7</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkSpinButton" id="set_piracy_link_proportion">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">True</property>
+                                                <property name="tooltip_markup" translatable="yes">The intensity of the piracy network, as a percentage of the maximum number of possible links.
+
+A value of 100% here corresponds to every reader being directly connected to every other reader.
+
+The maximum number of links in a simulation of &lt;b&gt;&lt;i&gt;R&lt;/i&gt;&lt;/b&gt; readers is &lt;b&gt;&lt;i&gt;R&lt;/i&gt;&lt;/b&gt;(&lt;b&gt;&lt;i&gt;R&lt;/i&gt;&lt;/b&gt;-1) / 2.</property>
+                                                <property name="margin_right">15</property>
+                                                <property name="margin_bottom">1</property>
+                                                <property name="input_purpose">number</property>
+                                                <property name="adjustment">adj_friendship_pct</property>
+                                                <property name="digits">1</property>
+                                                <property name="numeric">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left_attach">3</property>
+                                                <property name="top_attach">7</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkSpinButton" id="set_piracy_begins">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">True</property>
+                                                <property name="tooltip_text" translatable="yes">The period in which sharing between readers (i.e. piracy) becomes available.
+
+If 0, piracy never becomes available.</property>
+                                                <property name="margin_right">15</property>
+                                                <property name="margin_bottom">1</property>
+                                                <property name="invisible_char">●</property>
+                                                <property name="text" translatable="yes">100</property>
+                                                <property name="input_purpose">number</property>
+                                                <property name="adjustment">adjust_sharing_begins</property>
+                                                <property name="snap_to_ticks">True</property>
+                                                <property name="numeric">True</property>
+                                                <property name="update_policy">if-valid</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left_attach">3</property>
+                                                <property name="top_attach">6</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label15">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">False</property>
+                                                <property name="margin_bottom">5</property>
+                                                <property name="label" translatable="yes">&lt;b&gt;&lt;u&gt;Prior weighting&lt;/u&gt;&lt;/b&gt;</property>
+                                                <property name="use_markup">True</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left_attach">2</property>
+                                                <property name="top_attach">8</property>
+                                                <property name="width">2</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label40">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">False</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left_attach">0</property>
+                                                <property name="top_attach">9</property>
+                                                <property name="width">2</property>
+                                                <property name="height">2</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label34">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">False</property>
+                                                <property name="xalign">0</property>
+                                                <property name="label" translatable="yes">Prior weighting</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left_attach">2</property>
+                                                <property name="top_attach">9</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkSpinButton" id="set_prior_weight">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">True</property>
+                                                <property name="tooltip_markup" translatable="yes">The weight factor applied to current period beliefs when used as a prior for the next period.  Must be a value between 0 (no prior weight at all) and 1 (full prior weight).
+
+More specifically, this scales the &lt;tt&gt;n&lt;/tt&gt; of a belief when using that belief as a prior.</property>
+                                                <property name="margin_right">15</property>
+                                                <property name="margin_bottom">1</property>
+                                                <property name="invisible_char">●</property>
+                                                <property name="text" translatable="yes">0.50</property>
+                                                <property name="input_purpose">number</property>
+                                                <property name="adjustment">adj_prior_weight</property>
+                                                <property name="digits">3</property>
+                                                <property name="numeric">True</property>
+                                                <property name="update_policy">if-valid</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left_attach">3</property>
+                                                <property name="top_attach">9</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label66">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">False</property>
+                                                <property name="xalign">0</property>
+                                                <property name="label" translatable="yes">Piracy intro weight</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left_attach">2</property>
+                                                <property name="top_attach">10</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkSpinButton" id="set_prior_weight_piracy">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">True</property>
+                                                <property name="tooltip_markup" translatable="yes">The weight factor applied to priors during the &lt;b&gt;first&lt;/b&gt; period when piracy becomes available.
+
+This value overrides the "Prior weighting" setting in just the "Sharing begins" period.</property>
+                                                <property name="margin_right">15</property>
+                                                <property name="margin_bottom">1</property>
+                                                <property name="invisible_char">●</property>
+                                                <property name="text" translatable="yes">0.50</property>
+                                                <property name="input_purpose">number</property>
+                                                <property name="adjustment">adj_prior_piracy</property>
+                                                <property name="digits">3</property>
+                                                <property name="numeric">True</property>
+                                                <property name="update_policy">if-valid</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left_attach">3</property>
+                                                <property name="top_attach">10</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label36">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">False</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left_attach">4</property>
+                                                <property name="top_attach">8</property>
+                                                <property name="width">2</property>
+                                                <property name="height">3</property>
                                               </packing>
                                             </child>
                                           </object>
@@ -1816,6 +2066,7 @@ If 0, piracy never becomes available.</property>
                                               <object class="GtkComboBoxText" id="combo_threads">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
+                                                <property name="active">0</property>
                                                 <property name="active_id">0</property>
                                                 <items>
                                                   <item id="0" translatable="yes">Don't use threads</item>
@@ -1876,7 +2127,7 @@ If 0, piracy never becomes available.</property>
                                       <object class="GtkBox" id="box6">
                                         <property name="visible">True</property>
                                         <property name="can_focus">False</property>
-                                        <property name="orientation">vertical</property>
+                                        <property name="spacing">10</property>
                                         <child>
                                           <object class="GtkRadioButton" id="radio_memory">
                                             <property name="label" translatable="yes">Don't save results to disk</property>
@@ -1919,7 +2170,11 @@ If 0, piracy never becomes available.</property>
                                               <object class="GtkLabel" id="lbl_save">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
+                                                <property name="margin_bottom">4</property>
                                                 <property name="xpad">4</property>
+                                                <property name="ellipsize">start</property>
+                                                <property name="single_line_mode">True</property>
+                                                <property name="max_width_chars">50</property>
                                                 <attributes>
                                                   <attribute name="style" value="italic"/>
                                                 </attributes>

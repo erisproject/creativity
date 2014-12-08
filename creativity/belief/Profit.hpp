@@ -1,5 +1,6 @@
 #pragma once
 #include "creativity/belief/LinearRestricted.hpp"
+#include "creativity/belief/LinearDerived.hpp"
 #include "creativity/Book.hpp"
 
 namespace creativity { namespace belief {
@@ -26,12 +27,18 @@ namespace creativity { namespace belief {
  * These constraints are combined with a natural conjugate prior for the purposes of updating the
  * beliefs via Bayesian econometrics.
  */
-class Profit : public LinearRestricted {
+class Profit : public LinearDerived<Profit, LinearRestricted> {
     public:
         /** Default constructor: note that default constructed objects are not valid models.
          * \sa belief::Linear::Linear()
          */
         Profit() = default;
+
+        /** Construct a noninformative profit model.
+         *
+         * \sa Linear::Linear
+         */
+        Profit(unsigned int D) : Profit(D, parameters()) {}
 
         /** Constructs a profit model with the given parameter information.
          *
@@ -42,7 +49,7 @@ class Profit : public LinearRestricted {
          */
         template <typename ...Args>
         Profit(unsigned int D, Args &&...args)
-        : LinearRestricted{std::forward<Args>(args)...}, D_{D}
+        : Parent(std::forward<Args>(args)...), D_{D}
         {
             // Add restrictions:
             lowerBounds()[1] = 0.0; // beta_q >= 0 (higher quality <-> higher profits, at least for low quality)
@@ -99,30 +106,19 @@ class Profit : public LinearRestricted {
                 double l_max
                 );
 
-        /** Uses the current object's priors to generate a new object whose parameters are the
-         * posteriors of this object after incorporating new data.
-         *
-         * \param y a vector of new y data
-         * \param X a matrix of new X data
-         * \param prior_weight a multiplier with which to call `weaken()` to use a weakened copy of
-         * the caller instead of the caller itself as a prior.  The default, 1, does not perform the
-         * weakening and uses the caller directly.
-         */
-        Profit update(
-                const Eigen::Ref<const Eigen::VectorXd> &y,
-                const Eigen::Ref<const Eigen::MatrixXd> &X,
-                double prior_weight = 1.0) const;
-
         /** Given a book and perceived quality, this builds an X matrix row of profit data for that
          * book.  This needs to be called after the period has advanced: typically in the
          * inter-period optimization stage.
          */
         Eigen::RowVectorXd profitRow(eris::SharedMember<Book> book, double quality) const;
 
+    protected:
+        /// Constructs a new Demand object given a Linear base object.
+        virtual Profit newDerived(Linear &&model) const override;
+
     private:
         // Initialize a Profit from a Linear<>
-        Profit(unsigned int D, Linear &&base)
-            : LinearRestricted(std::move(base)), D_{D} {}
+        Profit(unsigned int D, Linear &&base) : Parent(std::move(base)), D_{D} {}
 
         unsigned int D_;
 

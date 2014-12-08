@@ -43,7 +43,7 @@ class Linear {
          *   updated data without adding the initial small n value.
          * - noninformative() will return true.
          */
-        Linear(unsigned int K);
+        explicit Linear(unsigned int K);
 
         // NB: if changing these constants, also change the above constructor documentation
         static constexpr double
@@ -75,9 +75,9 @@ class Linear {
          * are not satisfied (where `K` is determined by the number of rows of `beta`).
          */
         Linear(
-                const Eigen::Ref<const Eigen::VectorXd> &beta,
+                const Eigen::Ref<const Eigen::VectorXd> beta,
                 double s2,
-                const Eigen::Ref<const Eigen::MatrixXd> &V,
+                const Eigen::Ref<const Eigen::MatrixXd> V,
                 double n,
                 std::shared_ptr<Eigen::MatrixXd> V_inv = nullptr,
                 std::shared_ptr<Eigen::MatrixXd> V_chol_L = nullptr
@@ -227,7 +227,13 @@ class Linear {
          * weakened weight on the prior.
          */
         [[gnu::warn_unused_result]]
-        Linear weaken(double precision_scale) const;
+        Linear weaken(double precision_scale) const &;
+
+        /** Just like weaken(), but updates the existing Vinv() value of an existing belief.  This
+         * method is externally invoked only when the caller is an rvalue reference.
+         */
+        [[gnu::warn_unused_result]]
+        Linear weaken(double precision_scale) &&;
 
     protected:
         /** Called during construction to verify that the given parameters are valid.  Subclasses
@@ -275,6 +281,10 @@ class Linear {
          * produced by the draw() method.  Will be an empty vector before the first call to draw().
          */
         Eigen::VectorXd last_draw_;
+
+    private:
+        // Checks that the given matrices conform; called during construction; throws on error.
+        void checkLogic();
 };
 
 #undef NO_EMPTY_MODEL

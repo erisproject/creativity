@@ -1,5 +1,5 @@
 #pragma once
-#include "creativity/belief/Linear.hpp"
+#include "creativity/belief/LinearDerived.hpp"
 #include "creativity/Book.hpp"
 #include "creativity/BookMarket.hpp"
 #include <eris/algorithms.hpp>
@@ -28,10 +28,12 @@ namespace belief {
  * The model is updated using Bayesian econometrics as new books (and realized quality values of
  * those books) are obtained.
  */
-class Quality : public Linear {
+class Quality : public LinearDerived<Quality> {
     public:
         /** Default constructor: note that default constructed objects are not valid models.
          * \sa belief::Linear::Linear()
+         *
+         * To construct a noninformative Quality model, use: `Quality(Quality::parameters())`
          */
         Quality() = default;
 
@@ -42,7 +44,7 @@ class Quality : public Linear {
          * \sa Linear::Linear
          */
         template <typename ...Args>
-        Quality(Args &&...args) : Linear{std::forward<Args>(args)...}
+        Quality(Args &&...args) : Parent(std::forward<Args>(args)...)
         {}
 
         /// Returns the number of parameters of this model (7)
@@ -58,20 +60,6 @@ class Quality : public Linear {
         double predict(const Book &book);
 
         using Linear::predict;
-
-        /** Uses the current object's priors to generate a new object whose parameters are the
-         * posteriors of this object after incorporating new data.
-         *
-         * \param y a vector of new y data
-         * \param X a matrix of new X data
-         * \param prior_weight a multiplier with which to call `weaken()` to use a weakened copy of
-         * the caller instead of the caller itself as a prior.  The default, 1, does not perform the
-         * weakening and uses the caller directly.
-         */
-        Quality update(
-                const Eigen::Ref<const Eigen::VectorXd> &y,
-                const Eigen::Ref<const Eigen::MatrixXd> &X,
-                double prior_weight = 1.0) const;
 
         /** Given a container of books, this builds an X matrix of data representing those books.
          */
@@ -92,9 +80,14 @@ class Quality : public Linear {
             }
             return X;
         }
+
+    protected:
+        /// Constructs a new Demand object given a Linear base object.
+        virtual Quality newDerived(Linear &&model) const override;
+
     private:
         // Initialize a Quality from a Linear<7>
-        Quality(Linear &&base) : Linear(std::move(base)) {}
+        explicit Quality(Linear &&base) : Parent(std::move(base)) {}
 };
 
 }}

@@ -54,14 +54,8 @@ RowVectorXd Demand::bookRow(eris::SharedMember<Book> book, double quality) const
     return row;
 }
 
-Demand Demand::update(
-        const Ref<const VectorXd> &y,
-        const Ref<const MatrixXd> &X,
-        const double prior_weight) const {
-    return Demand(D_,
-            prior_weight == 1
-                ? Linear::update(y, X)
-                : weaken(prior_weight).update(y, X));
+Demand Demand::newDerived(Linear &&base) const {
+    return Demand(D_, std::move(base));
 }
 
 }}

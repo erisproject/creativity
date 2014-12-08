@@ -10,16 +10,30 @@ using namespace Eigen;
 constexpr double Linear::NONINFORMATIVE_N, Linear::NONINFORMATIVE_S2;
 
 Linear::Linear(
-        const Ref<const VectorXd> &beta,
+        const Ref<const VectorXd> beta,
         double s2,
-        const Ref<const MatrixXd> &V,
+        const Ref<const MatrixXd> V,
         double n,
         std::shared_ptr<MatrixXd> V_inv,
         std::shared_ptr<MatrixXd> V_chol_L
         )
-    : beta_{beta}, s2_{s2}, V_{V}, V_inv_{std::move(V_inv)}, V_chol_L_{std::move(V_chol_L)}, n_{n}, K_(beta_.rows())
+    : beta_(beta), s2_{s2}, V_(V), V_inv_{std::move(V_inv)}, V_chol_L_{std::move(V_chol_L)}, n_{n}, K_(beta_.rows())
 {
     // Check that the given matrices conform
+    checkLogic();
+}
+
+Linear::Linear(unsigned int K) :
+    beta_{VectorXd::Zero(K)}, s2_{NONINFORMATIVE_S2}, V_{MatrixXd::Identity(K, K)},
+    n_{NONINFORMATIVE_N}, noninformative_{true}, K_{K}
+{
+    if (K < 1) throw std::logic_error("Linear model requires at least one parameter");
+    auto fixed = fixedModelSize();
+    if (fixed and K != fixed) throw std::logic_error("Linear model constructed with incorrect number of model parameters");
+}
+
+
+void Linear::checkLogic() {
     auto k = K();
     if (k < 1) throw std::logic_error("Linear model requires at least one parameter");
     if (V_.rows() != V_.cols()) throw std::logic_error("Linear requires square V matrix");
@@ -30,15 +44,6 @@ Linear::Linear(
         throw std::logic_error("Linear constructed with invalid V_chol_L");
     auto fixed = fixedModelSize();
     if (fixed and k != fixed) throw std::logic_error("Linear model constructed with incorrect number of model parameters");
-}
-
-Linear::Linear(unsigned int K) :
-    beta_{VectorXd::Zero(K)}, s2_{NONINFORMATIVE_S2}, V_{MatrixXd::Identity(K, K)},
-    n_{NONINFORMATIVE_N}, noninformative_{true}, K_{K}
-{
-    if (K < 1) throw std::logic_error("Linear model requires at least one parameter");
-    auto fixed = fixedModelSize();
-    if (fixed and K != fixed) throw std::logic_error("Linear model constructed with incorrect number of model parameters");
 }
 
 unsigned int Linear::fixedModelSize() const { return 0; }
@@ -124,11 +129,12 @@ std::ostream& operator<<(std::ostream &os, const Linear &b) {
 
 void Linear::verifyParameters() const { NO_EMPTY_MODEL; }
 
-// Called on an lvalue object
+// Called on an lvalue object, creates a new object with *this as prior
 Linear Linear::update(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X) const & {
-    return Linear(*this).update(y, X); // Invoke rvalue method
+    return Linear(*this).update(y, X);
 }
-// Called on rvalue, so just update *this as needed, then return std::move(*this)
+
+// Called on rvalue, so just update *this as needed, using itself as the prior, then return std::move(*this)
 Linear Linear::update(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X) && {
     NO_EMPTY_MODEL;
     if (X.cols() != K())
@@ -158,31 +164,47 @@ Linear Linear::update(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X
     beta_ = std::move(beta_post);
     s2_ = (n_prior * s2_ + residualspost.squaredNorm() + beta_diff.transpose() * Vinv() * beta_diff) / n_;
 
-    V_inv_ = V_post_inv;
+    V_inv_ = std::move(V_post_inv);
     beta_ = std::move(beta_post);
-    if (V_chol_L_) V_chol_L_.reset();
-    if (noninformative_) noninformative_ = false;
+    if (V_chol_L_) V_chol_L_.reset(); // This will have to be recalculated
+    if (noninformative_) noninformative_ = false; // If we just updated a noninformative model, we aren't noninformative anymore
     if (last_draw_.size() > 0) last_draw_.resize(0);
 
     return std::move(*this);
 }
 
-Linear Linear::weaken(double precision_scale) const {
+Linear Linear::weaken(const double precision_scale) const & {
+    return Linear(*this).weaken(precision_scale);
+}
+
+Linear Linear::weaken(const double precision_scale) && {
     if (precision_scale <= 0 or precision_scale > 1)
         throw std::logic_error("weaken() called with invalid precision multiplier (not in (0,1])");
 
-    if (noninformative()) // Really nothing to do here; a noninformative prior is already considered "fully" weakened
-        return Linear(K_);
+    if (noninformative() or precision_scale == 1.0) // Nothing to do here
+        return std::move(*this);
 
-    // Multiply V^-1 by the precision_scale
-    auto V_post_inv_weakened = std::make_shared<MatrixXd>(Vinv() * precision_scale);
-    // If we've already calculated the Cholesky decomposition, the new one is easy to calculate:
-    // just scale the old one by 1/sqrt(w), where w is the prior weight.  (Thus LL^T = 1/w V, as
-    // desired).  If we don't have the decomposition, don't do it.
-    std::shared_ptr<Eigen::MatrixXd> V_chol_L_weakened;
-    if (V_chol_L_) V_chol_L_weakened = std::make_shared<MatrixXd>(*V_chol_L_ / std::sqrt(precision_scale));
+    // If V_inv_ is set, scale it (because this is much cheaper than inverting the scaled V_ later)
+    if (V_inv_) {
+        // If we're the unique owner of the inverse matrix, scale it directly
+        if (V_inv_.unique())
+            *V_inv_ *= precision_scale;
+        // Otherwise we have to make a copy (because we don't want to change the original!)
+        else
+            V_inv_ = std::make_shared<Eigen::MatrixXd>(*V_inv_ * precision_scale);
+    }
 
-    return Linear(beta_, s2_, V() / precision_scale, n_, V_post_inv_weakened, V_chol_L_weakened);
+    // Likewise for the Cholesky decomposition
+    if (V_chol_L_) {
+        if (V_chol_L_.unique())
+            *V_chol_L_ /= std::sqrt(precision_scale);
+        else
+            V_chol_L_ = std::make_shared<Eigen::MatrixXd>(*V_chol_L_ / std::sqrt(precision_scale));
+    }
+
+    V_ /= precision_scale;
+
+    return std::move(*this);
 }
 
 }}
