@@ -383,8 +383,9 @@ void FileStorage::parseStateLocations(const char &from, const size_t count, cons
 }
 
 std::shared_ptr<const State> FileStorage::readState() const {
-    auto shst = std::make_shared<const State>();
-    State &state = const_cast<State&>(*shst);
+    State *st_ptr = new State();
+    State &state = *st_ptr;
+    std::shared_ptr<const State> shst(st_ptr);
 
     state.t = read_u64();
 
