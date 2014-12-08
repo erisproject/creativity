@@ -250,6 +250,7 @@ int main(int argc, char *argv[]) {
     std::cout << "Writing simulation results to `" << args.out << "'\n";
 
     creativity->setup();
+    ERIS_DBG("setup done");
     auto sim = creativity->sim;
 
     // Copy the initial state into the storage object
@@ -275,7 +276,7 @@ int main(int argc, char *argv[]) {
         now = std::chrono::high_resolution_clock::now();
         double speed = 1.0 / std::chrono::duration<double>(now - last).count();
         std::swap(last, now);
-        std::cout << "\rRunning simulation [t=" << sim->t() << "; R=" << sim->countAgents<Reader>() << "; B=" << sim->countGoods() << ", newB=" <<
+        std::cout << "\rRunning simulation [t=" << sim->t() << "; R=" << sim->countAgents<Reader>() << "; B=" << sim->countGoods<Book>() << ", newB=" <<
             sim->countGoods<Book>([](const Book &b) -> bool { return b.age() == 0; }) << "] " << speed << " Hz                    " << std::flush;
     }
     ERIS_DBGVAR(creativity->storage().first->size());
