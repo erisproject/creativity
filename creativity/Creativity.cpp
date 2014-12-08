@@ -43,6 +43,10 @@ void Creativity::checkParameters() {
     else { PROHIBIT(boundary, <= 0); }
     PROHIBIT(book_distance_sd, < 0);
     PROHIBIT(book_quality_sd, < 0);
+    PROHIBIT(reader_step_sd, < 0);
+    PROHIBIT(reader_creation_shape, >= 1);
+    PROHIBIT(reader_creation_scale_min, < 0);
+    PROHIBIT(reader_creation_scale_max, < parameters.reader_creation_scale_min);
     PROHIBIT(cost_fixed, < 0);
     PROHIBIT(cost_unit, < 0);
     PROHIBIT(cost_piracy, < 0);
@@ -78,7 +82,8 @@ void Creativity::setup() {
     storage().first = std::make_shared<MemoryStorage>(set_);
 
 
-    std::uniform_real_distribution<double> unif_pmb{-parameters.boundary, parameters.boundary};
+    std::uniform_real_distribution<double> unif_pmb(-parameters.boundary, parameters.boundary);
+    std::uniform_real_distribution<double> unif_cr_shape(parameters.reader_creation_scale_min, parameters.reader_creation_scale_max);
 
     sim = Simulation::create();
 
@@ -111,6 +116,8 @@ void Creativity::setup() {
                 );
         r->writer_book_sd = parameters.book_distance_sd;
         r->writer_quality_sd = parameters.book_quality_sd;
+        r->creation_shape = parameters.reader_creation_shape;
+        r->creation_scale = unif_cr_shape(rng);
 
         if (num_links > 0) {
             for (auto &other : created) {
