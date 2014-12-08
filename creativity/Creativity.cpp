@@ -35,30 +35,30 @@ void Creativity::fileRead(const std::string &filename) {
 }
 
 void Creativity::checkParameters() {
-#define CHECK(FIELD, BAD) \
+#define PROHIBIT(FIELD, BAD) \
     if (parameters.FIELD BAD) throw std::domain_error("Invalid Creativity setting: parameters." #FIELD " " #BAD " is invalid")
-    CHECK(dimensions, < 1);
-    CHECK(readers, < 1);
-    if (parameters.use_density) { CHECK(density, <= 0); }
-    else { CHECK(boundary, <= 0); }
-    CHECK(book_distance_sd, < 0);
-    CHECK(book_quality_sd, < 0);
-    CHECK(cost_fixed, < 0);
-    CHECK(cost_unit, < 0);
-    CHECK(cost_piracy, < 0);
-    CHECK(income, < 0);
-    CHECK(sharing_link_proportion, < 0);
-    CHECK(sharing_link_proportion, > 1);
-    CHECK(initial.prob_write, < 0);
-    CHECK(initial.prob_write, > 1);
-    CHECK(initial.p_min, < 0);
-    CHECK(initial.p_max, < parameters.initial.p_min);
-    // FIXME: Is q_min < 0 a problem?
-    CHECK(initial.q_max, < parameters.initial.q_min);
-    CHECK(initial.prob_keep, < 0);
-    CHECK(initial.prob_keep, > 1);
-    CHECK(initial.keep_price, < 0);
-#undef CHECK
+    PROHIBIT(dimensions, < 1);
+    PROHIBIT(readers, < 1);
+    if (parameters.use_density) { PROHIBIT(density, <= 0); }
+    else { PROHIBIT(boundary, <= 0); }
+    PROHIBIT(book_distance_sd, < 0);
+    PROHIBIT(book_quality_sd, < 0);
+    PROHIBIT(cost_fixed, < 0);
+    PROHIBIT(cost_unit, < 0);
+    PROHIBIT(cost_piracy, < 0);
+    PROHIBIT(income, < 0);
+    PROHIBIT(piracy_link_proportion, < 0);
+    PROHIBIT(piracy_link_proportion, > 1);
+    PROHIBIT(initial.prob_write, < 0);
+    PROHIBIT(initial.prob_write, > 1);
+    PROHIBIT(initial.p_min, < 0);
+    PROHIBIT(initial.p_max, < parameters.initial.p_min);
+    PROHIBIT(initial.q_max, < parameters.initial.q_min);
+    PROHIBIT(initial.q_min, < 0);
+    PROHIBIT(initial.prob_keep, < 0);
+    PROHIBIT(initial.prob_keep, > 1);
+    PROHIBIT(initial.keep_price, < 0);
+#undef PROHIBIT
 }
 
 void Creativity::setup() {
