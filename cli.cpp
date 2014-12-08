@@ -80,50 +80,6 @@ class RangeConstraint : public TCLAP::Constraint<T> {
         const T max = BIGGEST;
 };
 
-/// Constraint for an array of a given length.
-class ArrayConstraint : public TCLAP::Constraint<std::string> {
-    public:
-        ArrayConstraint(unsigned int size) : size_(size) {
-            if (size < 2) throw std::logic_error("ArrayConstraint(s) requires s >= 2");
-        }
-        virtual std::string description() const override {
-            return "Value must be a comma-separated list of " + std::to_string(size_) + " numeric values";
-        }
-        virtual std::string shortID() const override {
-            return "NUMERIC[" + std::to_string(size_) + "]";
-        }
-        virtual bool check(const std::string &val) const override {
-            std::regex re("^(?:(?:^|,)" + number_re_ + "){" + std::to_string(size_) + "}$");
-            return std::regex_match(val, re);
-        }
-    private:
-        const std::string number_re_{"(?:\\d+(?:\\.\\d+)?|\\.\\d+)(?:[eE][-+]?\\d+)?"};
-        const unsigned int size_;
-};
-
-/// Returns vector elements concatenated together with a ,
-std::string vectorString(const Ref<const VectorXd> &v) {
-    std::ostringstream str;
-    for (int i = 0; i < v.cols(); i++) {
-        if (i > 0) str << ",";
-        str << v[i];
-    }
-    return str.str();
-}
-
-/// Returns lower triangle matrix elements in row-major order
-std::string lowerTriangleString(const Ref<const MatrixXd> &M) {
-    if (M.cols() != M.rows()) throw std::logic_error("lowerTriangleString requires a square matrix");
-    std::ostringstream str;
-    for (int r = 0; r < M.rows(); r++) {
-        for (int c = 0; c <= r; c++) {
-            if (r > 0 or c > 0) str << ",";
-            str << M(r,c);
-        }
-    }
-    return str.str();
-}
-
 /** Contains the command line arguments that aren't carried in the Creativity object */
 struct cmd_args {
     unsigned int periods, max_threads;
