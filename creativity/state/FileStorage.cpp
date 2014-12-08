@@ -493,104 +493,50 @@ std::pair<eris::eris_id_t, ReaderState> FileStorage::readReader() const {
 }
 
 FileStorage::belief_data FileStorage::readBelief() const {
-    auto location = read_i64();
-    auto return_loc = f_.tellg();
-    bool seek_back = false;
     belief_data belief;
-    /// Handle magic values:
-    if (location == 0) {
+    auto k = read_i8();
+    // Handle magic values:
+    // — 0 is not allowed.
+    // — Positive values are the number of belief parameters.  We accept up to 127, though
+    //   writeBelief() only writes beliefs with up to 120 parameters
+    // — -1 through -120 are non-informative beliefs with 1 to 120 parameters
+    // — -128 is a default-constructed belief object (i.e. not usable)
+    // — Anything else (-121 to -127) is reserved for future use.
+    if (k == -128) {
         belief.K = 0;
         return belief;
     }
-    else if (location < 0 and location >= -100) {
-        belief.K = (uint32_t) -location;
+    else if (k >= -100 and k < 0) {
+        belief.K = (uint32_t) -k;
         belief.noninformative = true;
         return belief;
     }
-    else if (location == -512) {
-        // Magic value for "immediately follows".  We need a special value because
-        // putting the location there instead means "seek here, read, then seek back"
-        // but -512 means "stay here, keep reading, don't seek back" (that is, the encompassing
-        // record continues immediately after the belief).
-
-        // Update location to the current location, so that it's the right value when caching
-        location = f_.tellg();
+    else if (k <= 0) {
+        throwParseError("Found invalid belief record with k = " + std::to_string(k));
     }
-    else if (location > HEADER::size) {
-        seek_back = true;
-        f_.seekg(location);
-    }
-    else {
-        throwParseError("found invalid belief location value");
-    }
-
-    auto k = read_u32();
-    if (k == 0) throwParseError("Found invalid belief record with k = 0");
-
-    auto size = beliefRecordSize(k);
-    // Let std::vector take care of the memory allocation; we'll allocate it with a double value
-    // type so that things are aligned properly (which saves parse_value a bit of work, at least on
-    // little-endian systems).
-    std::vector<double> record(size);
-    char *data = reinterpret_cast<char*>(record.data());
-    uint32_t *u32data = reinterpret_cast<uint32_t*>(data);
-
-    f_.read(data, size*sizeof(double));
-
-    // Update the belief location cache with the read belief (to enable belief deduplication
-    // compression during belief writing).
-
-    // Generate the checksum by treating the little-endian data as native endian u32s.  Since the
-    // checksum is only ever stored in memory, it doesn't matter if the file and system endianness
-    // differ, so long as checksum calculations are done the same way everywhere.
-    uint32_t checksum = std::accumulate(&u32data[0], &u32data[size*(sizeof(double)/sizeof(uint32_t))], uint32_t{0});
-
-    bool already_known = false;
-    auto range = belief_locations_[k].equal_range(checksum);
-    for (auto it = range.first; it != range.second; ++it) {
-        if (it->second == location) {
-            already_known = true;
-            break;
-        }
-    }
-
-    if (not already_known) {
-        auto val = std::pair<uint32_t, int64_t>(checksum, location);
-        if (range.first != belief_locations_[k].end())
-            // If our range lookup from before found something, pass the hint along for the new element
-            belief_locations_[k].emplace_hint(range.first, std::move(val));
-        else
-            belief_locations_[k].emplace(std::move(val));
-    }
-
-    // The cache record is set, now extract the values from the record block.
+    // Otherwise k is the right value.
 
     belief.K = k;
     belief.noninformative = false;
-    belief.beta = VectorXd(k);
-    belief.s2 = 0.0;
-    belief.n = 0.0;
-    belief.V = MatrixXd(k, k);
 
-    // First K elements are beta values
-    uint32_t offset = 0;
-    for (; offset < k; ++offset)
-        belief.beta[offset] = parse_value<double>(record[offset]);
+    // The first K elements are beta values
+    belief.beta = VectorXd(k);
+    for (unsigned int i = 0; i < belief.K; i++)
+        belief.beta[i] = read_dbl();
 
     // Then s2 and n:
-    belief.s2 = parse_value<double>(record[offset++]);
-    belief.n = parse_value<double>(record[offset++]);
+    belief.s2 = read_dbl();
+    belief.n = read_dbl();
 
-    // The last K*(K+1)/2 are the V values
-    for (unsigned int r = 0; r < k; r++) {
-        for (unsigned int c = r; c < k; c++) {
-            double cov = parse_value<double>(record[offset++]);
+    // The last K*(K+1)/2 are the V values (but we set them symmetrically in V)
+    belief.V = MatrixXd(k, k);
+    for (unsigned int r = 0; r < belief.K; r++) {
+        for (unsigned int c = r; c < belief.K; c++) {
+            double cov = read_dbl();
             belief.V(r,c) = cov;
             belief.V(c,r) = cov;
         }
     }
-
-    if (seek_back) f_.seekg(return_loc);
 
     return belief;
 }
@@ -660,99 +606,38 @@ void FileStorage::writeReader(const ReaderState &r) {
 
 void FileStorage::writeBelief(const Linear &m) {
     auto &k = m.K();
-    if (k == 0) {
-        // If K = 0 (a default-constructed, non-model object), we just write out a 0 and we're done
-        write_i64(0);
+    if (k > 120) {
+        throw std::runtime_error("creativity::state::FileStorage cannot handle beliefs with K > 120");
+    }
+    else if (k == 0) {
+        // If K = 0 (a default-constructed, non-model object), we just write out the special value and we're done
+        write_i8(-128);
         return;
     }
     else if (m.noninformative()) {
         // Non-informative models are easy, too: just write out -K
-        write_i64(-(int64_t) k);
+        write_i8(-(int8_t) k);
         return;
     }
 
-    // Otherwise we need to calculate the data to be written out, then check to see whether it
-    // exists in the cache.  If it does, we write the existing location; otherwise we write -512
-    // followed by a u32 containing k, then the model values, and store the value (starting at the
-    // 'k' value) in the cache.
+    // Otherwise we're all good, write out the record:
+    write_i8(k);
 
-    // Calculate sizes of the stored data, not including the initial u32 'k' value.
-    // `size` is the number of doubles
-    auto size = beliefRecordSize(k);
-    // `size_u32` is the size when interpreted as u32s
-    auto size_u32 = size * (sizeof(double) / sizeof(uint32_t));
-    // `size_bytes` is the size when interpreted as chars.
-    auto size_bytes = size * sizeof(double);
-
-    // Let std::vector allocate the storage we need.  Note that the values in here might not be the
-    // actual double values: the memory will be used to store the values in little-endian order
-    // (i.e. the file order), regardless of the system endianness.  In other words, don't read
-    // double values out of this vector.
-    std::vector<double> record(size);
-
-    size_t pos = 0;
+    auto &beta = m.beta();
     // First K elements are the beta values
-    for (; pos < k; ++pos) {
-        store_value(m.beta()[pos], record[pos]);
-    }
+    for (unsigned int i = 0; i < k; i++)
+        write_dbl(beta[i]);
 
     // Then s2 and n:
-    store_value(m.s2(), record[pos++]);
-    store_value(m.n(), record[pos++]);
+    write_dbl(m.s2());
+    write_dbl(m.n());
 
+    auto &V = m.V();
     // The last k*(k+1)/2 are the lower triangle of the V matrix, in column major order
     for (unsigned int r = 0; r < k; r++) {
         for (unsigned int c = r; c < k; c++) {
-            store_value(m.V()(r,c), record[pos++]);
+            write_dbl(V(r,c));
         }
-    }
-
-    // Safety check that we wrote the amount we expected to write
-    if (pos != size) throw std::runtime_error("Internal error: writeBelief wrote wrong number of elements");
-
-    uint32_t *rec_u32 = reinterpret_cast<uint32_t*>(record.data());
-    uint32_t checksum = std::accumulate(&rec_u32[0], &rec_u32[size_u32], uint32_t{0});
-
-    auto curr_loc = f_.tellp();
-    bool seek_back = false;
-    int64_t found_existing = 0;
-    // Allocate space to store the values we need to check:
-    std::vector<uint32_t> check_value(size_u32);
-    // Now check all matches with the same checksum, read the value, and see if it is exactly
-    // equal (it's possible to have duplicate checksums with different data).
-    auto range = belief_locations_[k].equal_range(checksum);
-    for (auto it = range.first; it != range.second; ++it) {
-        auto &loc = it->second;
-        seek_back = true;
-        f_.seekg(loc + sizeof(uint32_t)); // Skip the "k" value
-        f_.read(reinterpret_cast<char*>(check_value.data()), size_bytes);
-        if (std::equal(check_value.cbegin(), check_value.cend(), &rec_u32[0])) {
-            found_existing = loc;
-            break;
-        }
-    }
-
-    // If we seeked away to check possible matches, seek back:
-    if (seek_back) f_.seekp(curr_loc);
-
-    if (found_existing > 0 and false) {
-        // If we found an exact match, our record is just its memory location
-        write_i64(found_existing);
-    }
-    else {
-        // Otherwise we write the magic value -512 which means "immediately following",
-        // then the k, then the record data.  We also store this location in the cache.
-        write_i64(-512);
-        int64_t cache_loc = f_.tellp();
-        write_u32(k);
-        f_.write(reinterpret_cast<char*>(record.data()), size_bytes);
-
-        auto val = std::pair<uint32_t, int64_t>(checksum, cache_loc);
-        if (range.first != belief_locations_[k].end())
-            // If our range found something, pass it along as a hint
-            belief_locations_[k].emplace_hint(range.first, std::move(val));
-        else
-            belief_locations_[k].emplace(std::move(val));
     }
 }
 

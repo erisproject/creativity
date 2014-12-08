@@ -144,6 +144,9 @@ class FileStorage : public Storage, private eris::noncopyable {
         /** Alias for `read_value<int32_t>()` */
         int32_t read_i32() const { return read_value<int32_t>(); }
 
+        /** Alias for `read_value<int8_t>()` */
+        int8_t read_i8() const { return read_value<int8_t>(); }
+
         /** Alias for `read_value<double>()` */
         double read_dbl() const { return read_value<double>(); }
 
@@ -165,6 +168,9 @@ class FileStorage : public Storage, private eris::noncopyable {
 
         /** Alias for `write_value((int32_t) value)` */
         void write_i32(int32_t value) { write_value(value); }
+
+        /** Alias for `write_value((int8_t) value)` */
+        void write_i8(int8_t value) { write_value(value); }
 
         /** Alias for `write_value((double) value)` */
         void write_dbl(double value) { write_value(value); }
@@ -434,19 +440,6 @@ class FileStorage : public Storage, private eris::noncopyable {
          * \sa readBelief() for the structure and values actually written
          */
         void writeBelief(const belief::Linear &belief);
-
-        /** Structure for storing locations of previous beliefs.  The outer key stores K, the number
-         *
-         * of parameters of the model (which also precisely defines the record size).  The inner key
-         * stores the (overflowed) sum of the belief record (not including the initial K parameter)
-         * interpreted as an array of u32s, while the inner values are the file locations where the
-         * record is stored.  Duplicates are possible: one must actually read the matched records to
-         * verify whether they are exactly identical and not use ones that are different.
-         *
-         * This object only stores locations of beliefs that have been written or parsed; records
-         * from a pre-existing file are not read (and thus unknown) until specifically accessed.
-         */
-        mutable std::unordered_map<uint32_t, std::unordered_multimap<uint32_t, int64_t>> belief_locations_;
 
         /** Returns the belief size (in terms of number of doubles) for an belief record of K
          * parameters, not including the initial u32 K value.  Multiple by `sizeof(double)` to get
