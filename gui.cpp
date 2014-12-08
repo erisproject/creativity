@@ -34,6 +34,7 @@ int main(int argc, char *argv[1]) {
                     if (creativity->parameters.dimensions != 2) throw std::domain_error("Cannot yet handle dimensions ≠ 2");
                     // setup() will check the other parameters for validity
                     creativity->setup();
+                    creativity->sim->maxThreads(max_threads);
                 }
                 setup = true;
                 break;
@@ -68,7 +69,8 @@ int main(int argc, char *argv[1]) {
                 // This is the only setting that *can* be changed after the initial setup.  This
                 // will throw if currently running, but that's okay: the GUI isn't allowed to send
                 // it if the simulation is currently running.
-                max_threads = p.ul;
+                if (creativity->sim) creativity->sim->maxThreads(p.ul);
+                else max_threads = p.ul;
                 break;
         }
     };
