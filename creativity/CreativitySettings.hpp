@@ -59,6 +59,36 @@ struct CreativitySettings {
      */
     double book_quality_sd = 1.0;
 
+    /** Between periods, readers take a random step of length \f$N(0, s^2)\f$.  This value is
+     * \f$s\f$ (the standard deviation, not the variance \f$s^2\f$).  If 0, readers remain at their
+     * initial positions forever.
+     *
+     * More specifically, a random direction vector of length 1 is multiplied by a draw from this
+     * distribution, so negative draws simply reverse the direction of the random vector; hence the
+     * actual distance moved is the absolute value of the draw, in a random direction.
+     *
+     * The default is 0.25.
+     */
+    double reader_step_sd = 0.25;
+
+    /** The "shape" parameter \f$\beta\f$ of the reader effort.
+     *
+     * \sa Reader.creation_shape
+     */
+    double reader_creation_shape = 0.5;
+
+    /** Reader.creation_scale values are drawn from \f$U[a,b]\f$, where this value is the lower
+     * bound.  Defaults to 5.
+     *
+     * \sa Reader.creation_scale
+     */
+    double reader_creation_scale_min = 5.0;
+
+    /** Reader.creation_scale values are drawn from \f$U[a,b]\f$, where this value is the upper
+     * bound.  Defaults to 15.
+     */
+    double reader_creation_scale_max = 15.0;
+
     /** The fixed cost of keeping a book on the market.
      */
     double cost_fixed = 10.0;

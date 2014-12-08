@@ -229,21 +229,27 @@ class FileStorage : public Storage, private eris::noncopyable {
                     boundary = 28, ///< the simulation boundary (positive double)
                     book_distance_sd = 36, ///< standard deviation of distance of new books from authors (positive double)
                     book_quality_sd = 44, ///< standard deviation of perceived book quality draw (draw is normal, with mean = true quality) (dbl)
-                    cost_fixed = 52, ///< Fixed cost of keeping a book on the market (dbl)
-                    cost_unit = 60, ///< Unit cost of an author creating a copy of a book (dbl)
-                    cost_piracy = 68, ///< Unit cost of getting a copy of a book via piracy (dbl)
-                    income = 76, ///< Per-period reader external income (before incurring authorship costs or receiving book profits) (dbl)
-                    piracy_begins = 84, ///< the sharing start period (u64)
-                    piracy_link_proportion = 92, ///< The proportion of potential friendship links that exist
-                    init_prob_write = 100, ///< The probability of writing (while beliefs noninformative)
-                    init_q_min = 108, ///< `a` in U[a,b], the noninformative belief authorship quality level
-                    init_q_max = 116, ///< `b` in U[a,b], the noninformative belief authorship quality level
-                    init_p_min = 124, ///< `a` in U[a,b], the noninformative belief book price
-                    init_p_max = 132, ///< `b` in U[a,b], the noninformative belief book price
-                    init_prob_keep = 140, ///< The probability of keeping a book on the market (uninformed beliefs)
-                    init_keep_scale = 148, ///< If keeping a book on the market, the new price is (p-c)*s+c, where this is s
-                    // NB: this next one MUST be an integer multiple of 8!
-                    state_first = 160, ///< the first state record
+                    reader_step_sd = 52, ///< reader random step sd (dbl)
+                    reader_creation_shape = 60, ///< reader q(l) shape parameter (dbl)
+                    reader_creation_scale_min = 68, ///< reader q(l) scale parameter ~ U[a,b]; this is 'a' (dbl)
+                    reader_creation_scale_max = 76, ///< reader q(l) scale parameter ~ U[a,b]; this is 'b' (dbl)
+                    cost_fixed = 84, ///< Fixed cost of keeping a book on the market (dbl)
+                    cost_unit = 92, ///< Unit cost of an author creating a copy of a book (dbl)
+                    cost_piracy = 100, ///< Unit cost of getting a copy of a book via piracy (dbl)
+                    income = 108, ///< Per-period reader external income (before incurring authorship costs or receiving book profits) (dbl)
+                    piracy_begins = 116, ///< the sharing start period (u64)
+                    piracy_link_proportion = 124, ///< The proportion of potential friendship links that exist
+                    init_prob_write = 132, ///< The probability of writing (while beliefs noninformative)
+                    init_q_min = 140, ///< `a` in U[a,b], the noninformative belief authorship quality level
+                    init_q_max = 148, ///< `b` in U[a,b], the noninformative belief authorship quality level
+                    init_p_min = 156, ///< `a` in U[a,b], the noninformative belief book price
+                    init_p_max = 164, ///< `b` in U[a,b], the noninformative belief book price
+                    init_prob_keep = 172, ///< The probability of keeping a book on the market (uninformed beliefs)
+                    init_keep_scale = 180, ///< If keeping a book on the market, the new price is (p-c)*s+c, where this is s
+                    // NB: this next one should be an integer multiple of 8 (so that states+cont
+                    // location go to the end, and so the `states` division below has no remainder)
+                    //
+                    state_first = 192, ///< the first state record
                     state_last = size - 16, ///< the last state record
                     continuation = size - 8; ///< the header continuation block pointer (used once header state blocks fill up)
             };

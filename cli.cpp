@@ -167,6 +167,10 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         OPTION_BOUND(piracy_link_proportion, "f", "piracy-link-proportion", "Proportion of potential sharing links between readers that are created", 0, 1);
         OPTION_LBOUND(book_distance_sd, "B", "book-distance-sd", "Standard deviation of book distance from author; distance ~ |N(0, B)|", 0);
         OPTION_LBOUND(book_quality_sd, "Q", "book-quality-sd", "Standard deviation of book perceived quality; perceived quality ~ N(q, Q), where q is the innate quality and Q is this value.", 0);
+        OPTION_LBOUND(reader_step_sd, "R", "reader-step-sd", "Standard deviation of the inter-period random-direction reader movement distance ~ |N(0, R)|", 0);
+        OPTION_UBOUND(reader_creation_shape, "s", "reader-creation-shape", "Shape parameter, β, of the creator effort function: q(ℓ) = (α/β)[(ℓ+1)^β - 1]", 1);
+        OPTION_LBOUND(reader_creation_scale_min, "z", "reader-creation-scale-min", "Minimum support of scale parameter α ~ U[a,b] for the creator effort function: q(ℓ) = (α/β)[(ℓ+1)^β - 1]", 0);
+        OPTION_LBOUND(reader_creation_scale_max, "Z", "reader-creation-scale-max", "Maximum support of scale parameter α ~ U[a,b] for the creator effort function: q(ℓ) = (α/β)[(ℓ+1)^β - 1]", 0);
         OPTION_LBOUND(cost_fixed, "C", "cost-fixed", "Fixed cost of keeping a book on the market for a period", 0);
         OPTION_LBOUND(cost_unit, "c", "cost-unit", "Unit cost of making a copy of a book", 0);
         OPTION_LBOUND(cost_piracy, "y", "cost-piracy", "Cost of receiving a pirated copy of a book", 0);

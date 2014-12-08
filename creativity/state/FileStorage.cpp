@@ -27,6 +27,10 @@ constexpr int64_t
         FileStorage::HEADER::pos::boundary,
         FileStorage::HEADER::pos::book_distance_sd,
         FileStorage::HEADER::pos::book_quality_sd,
+        FileStorage::HEADER::pos::reader_step_sd,
+        FileStorage::HEADER::pos::reader_creation_shape,
+        FileStorage::HEADER::pos::reader_creation_scale_min,
+        FileStorage::HEADER::pos::reader_creation_scale_max,
         FileStorage::HEADER::pos::cost_fixed,
         FileStorage::HEADER::pos::cost_unit,
         FileStorage::HEADER::pos::cost_piracy,
@@ -188,6 +192,10 @@ void FileStorage::writeEmptyHeader() {
     write_value(settings.boundary);
     write_value(settings.book_distance_sd);
     write_value(settings.book_quality_sd);
+    write_value(settings.reader_step_sd);
+    write_value(settings.reader_creation_shape);
+    write_value(settings.reader_creation_scale_min);
+    write_value(settings.reader_creation_scale_max);
     write_value(settings.cost_fixed);
     write_value(settings.cost_unit);
     write_value(settings.cost_piracy);
@@ -301,6 +309,10 @@ void FileStorage::parseMetadata() {
     parse_value(block[HEADER::pos::boundary], settings_.boundary);
     parse_value(block[HEADER::pos::book_distance_sd], settings_.book_distance_sd);
     parse_value(block[HEADER::pos::book_quality_sd], settings_.book_quality_sd);
+    parse_value(block[HEADER::pos::reader_step_sd], settings_.reader_step_sd);
+    parse_value(block[HEADER::pos::reader_creation_shape], settings_.reader_creation_shape);
+    parse_value(block[HEADER::pos::reader_creation_scale_min], settings_.reader_creation_scale_min);
+    parse_value(block[HEADER::pos::reader_creation_scale_max], settings_.reader_creation_scale_max);
     parse_value(block[HEADER::pos::cost_fixed], settings_.cost_fixed);
     parse_value(block[HEADER::pos::cost_unit], settings_.cost_unit);
     parse_value(block[HEADER::pos::cost_piracy], settings_.cost_piracy);

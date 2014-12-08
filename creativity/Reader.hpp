@@ -398,29 +398,38 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         double income{0};
 
         /** The reader's creation function shape coefficient.  This reader can exhert effort \f$\ell
-         * \geq 0\f$ to create a book of quality \f$q(\ell) = \beta \frac{(\ell+1)^{1-\alpha} -
-         * 1}{1 - \alpha}\f$, where \f$\alpha\f$ is this value.
+         * \geq 0\f$ to create a book of quality \f$q(\ell) = \alpha \frac{(\ell+1)^\beta -
+         * 1}{\beta}\f$, where \f$\beta\f$ is this value.
          *
-         * Note that \f$\alpha = 1\f$ is handled specially as \f$q(\ell) = \beta ln(\ell+1)\f$ which
-         * holds mathematically (by L'Hôpital's Rule); without this special handling, evaluating the
-         * above numerically would result in a NaN value.
+         * Note that this function is designed to have both domain and range of the non-negative
+         * rationals, and will always have \f$q(0) = 0\f$.
          *
-         * The default value is \f$\alpha = 1\f$, yielding a logarithmic quality/effort relationship.
+         * Note that \f$\beta = 0\f$ is handled specially as \f$q(\ell) = \alpha ln(\ell+1)\f$ which
+         * holds mathematically (by L'Hôpital's Rule). (Without this special handling, evaluating the
+         * above numerically would result in a NaN value.)
          *
-         * The value of this parameter should be strictly greater than 0 to maintain the concavity
-         * of the function.
+         * The default value is \f$\beta = 0\f$, yielding a logarithmic quality/effort relationship.
+         *
+         * The value of this parameter should be strictly less than 1 to maintain the concavity of
+         * the function (at 1, the function becomes linear, and above 1, strictly convex).  Values
+         * less than 0 are permitted as well, but introduce a horizontal asymptote that may or may
+         * not be desirable: in particular they will result in functions that start at 0 and are
+         * bounded by a finite asymptote at \f$\frac{\alpha}{-\beta} > 0\f$.
          */
-        double creation_shape = 1.0;
+        double creation_shape = 0.0;
 
-        /** The reader's creation function scale coefficient.  This reader can exhert effort \f$\ell
-         * \geq 0\f$ to create a book of quality \f$q(\ell) = \beta \frac{(\ell+1)^{1-\alpha} -
-         * 1}{1 - \alpha}\f$, where \f$\beta\f$ is this value.
+        /** The reader's creation function scale coefficient, which is \f$\alpha\f$ in the equation
+         * given in the documentation for `creation_shape`.
          *
-         * The default value is \f$beta = 10\f$.  Changing this value across readers of a simulation
-         * allows readers to differ in ability while maintaining the same functional form.
+         * \sa creation_shape
          *
-         * The specified value must be non-negative, for obvious reasons.  Specifying 0 works as
-         * expected (the reader always produces quality 0 works, regardless of effort).
+         * The default value is \f$\alpha = 10\f$.  Changing this value across readers of a
+         * simulation allows readers to differ in ability while maintaining the same functional
+         * form.
+         *
+         * The specified value must be non-negative, for obvious reasons.  Specifying 0 results in a
+         * reader always producing 0 quality works, regardless of effort (and so will put no effort
+         * at all into creation).
          */
         double creation_scale = 10.0;
 
@@ -433,7 +442,9 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          */
         double creationQuality(double effort) const;
 
-        /** Returns the effort required of the reader to create a book of the given quality.
+        /** Returns the effort required of the reader to create a book of the given quality.  If the
+         * reader cannot produce a book of the given quality at any effort level, infinity is
+         * returned.
          *
          * \sa creation_shape
          * \sa creation_scale

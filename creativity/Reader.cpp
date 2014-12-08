@@ -121,33 +121,45 @@ const std::vector<double>& Reader::penaltyPolynomial() const {
 double Reader::creationQuality(double effort) const {
     if (effort < 0)
         throw std::domain_error("Reader::creationQuality() error: effort cannot be negative");
-    if (creation_shape < 0)
-        throw std::logic_error("Reader::creationQuality() error: creation_shape cannot be negative");
+    if (creation_shape >= 1)
+        throw std::logic_error("Reader::creationQuality() error: creation_shape must be less than 1");
     if (creation_scale < 0)
         throw std::logic_error("Reader::creationQuality() error: creation_scale cannot be negative");
-    if (creation_scale == 0) return 0.0;
+
+    if (creation_scale == 0) return 0.0; // This reader always produces 0 quality
+
+    if (effort == 0) return 0.0; // All of the functional forms of the effort yield q(0) = 0
 
     return creation_scale * (
-            creation_shape == 1.0 ? std::log(effort + 1.0) : // Special case for log
+            creation_shape == 0.0 ? std::log(effort + 1.0) : // Special case for log
             creation_shape == 0.5 ? 2.0 * (std::sqrt(effort + 1.0) - 1.0) : // Slightly more efficient sqrt calculation
-            creation_shape == 0.0 ? effort : // Simple linear
-            (std::pow(effort + 1.0, 1.0 - creation_shape) - 1.0) / (1 - creation_shape) // Otherwise use the full formula
+            (std::pow(effort + 1.0, creation_shape) - 1.0) / creation_shape // Otherwise use the full formula
     );
 }
 
 double Reader::creationEffort(double quality) const {
     if (quality < 0)
         throw std::domain_error("Reader::creationEffort() error: quality cannot be negative");
-    if (creation_shape < 0)
+    if (creation_shape >= 1)
         throw std::logic_error("Reader::creationEffort() error: creation_shape cannot be negative");
     if (creation_scale < 0)
         throw std::logic_error("Reader::creationEffort() error: creation_scale cannot be negative");
-    if (creation_scale == 0) return 0.0;
+
+    if (quality == 0) return 0.0; // All functional forms yield q(0) = 0, and so q^-1(0) = 0.
+    else if (creation_scale == 0) {
+        // If creation_scale is 0, but quality is not, the function is not invertible (because any
+        // level of effort yields 0 quality), so return infinity.
+        return std::numeric_limits<double>::infinity();
+    }
+    else if (creation_scale < 0 and quality >= (creation_scale / -creation_shape)) {
+        // When beta (creation_scale) is below 0, there's an asymptote at alpha/-beta; no effort
+        // level exists that can produce higher quality than that asymptote, so return infinity.
+        return std::numeric_limits<double>::infinity();
+    }
 
     return
-        creation_shape == 1.0 ? std::exp(quality / creation_scale) - 1 : // The special log case
-        creation_shape == 0.0 ? quality / creation_scale : // Simple linear case
-        std::pow(1.0 + quality * (1.0-creation_shape) / creation_scale, 1.0/(1.0 - creation_shape)) - 1;
+        creation_shape == 0.0 ? std::exp(quality / creation_scale) - 1.0 : // The special log case
+        std::pow(quality * creation_shape / creation_scale + 1.0, 1.0/creation_shape) - 1.0; // Non-log case
 }
 
 double Reader::piracyCost() const {
@@ -341,9 +353,12 @@ void Reader::interApply() {
         simulation()->remove(b->market());
     }
 
-    // Finally, move N(0,0.25) in a random direction
-    double step_dist = std::normal_distribution<double>(0, 0.25)(Random::rng());
-    moveBy(step_dist * Position::random(position().dimensions));
+    if (creativity_->parameters.reader_step_sd > 0) {
+        // Finally, move a random distance in a random direction
+        double step_dist = std::normal_distribution<double>(0, creativity_->parameters.reader_step_sd)(rng);
+        if (step_dist != 0)
+            moveBy(step_dist * Position::random(position().dimensions));
+    }
 }
 
 double Reader::uBook(SharedMember<Book> b) const {

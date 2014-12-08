@@ -636,6 +636,10 @@ void GUI::thr_update_parameters() {
     SET_SB(density);
     SET_SB(book_distance_sd);
     SET_SB(book_quality_sd);
+    SET_SB(reader_step_sd);
+    SET_SB(reader_creation_shape);
+    SET_SB(reader_creation_scale_min);
+    SET_SB(reader_creation_scale_max);
     SET_SB(piracy_begins);
     SET_SB(income);
     SET_SB(cost_fixed);
@@ -851,6 +855,10 @@ void GUI::setupSim() {
     COPY_SB_D(piracy_link_proportion) * 0.01; // From percentage
     COPY_SB_D(book_distance_sd);
     COPY_SB_D(book_quality_sd);
+    COPY_SB_D(reader_step_sd);
+    COPY_SB_D(reader_creation_shape);
+    COPY_SB_D(reader_creation_scale_min);
+    COPY_SB_D(reader_creation_scale_max);
     COPY_SB_D(income);
     COPY_SB_D(cost_fixed);
     COPY_SB_D(cost_unit);
