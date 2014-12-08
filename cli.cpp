@@ -180,7 +180,7 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         OPTION_BOUND_INIT(prob_keep, "k", "initial-prob-keep", "The probability of keeping a previously-written book on the market for another period", 0, 1);
         OPTION_BOUND_INIT(keep_price, "K", "keep-price", "The  price-above-marginal-cost level (relative to current P-MC) for a book left on the market for another period", 0, 1);
 
-        OPTION_UNBOUNDED(sharing_begins, "P", "piracy-begins", "The period in which piracy becomes available");
+        OPTION_UNBOUNDED(piracy_begins, "P", "piracy-begins", "The period in which piracy becomes available");
 
         auto periods_constr = RangeConstraint<unsigned int>::GE(1);
         TCLAP::ValueArg<unsigned int> periods_arg("T", "periods", "Number of simulation periods to run", false, 200, &periods_constr, cmd);

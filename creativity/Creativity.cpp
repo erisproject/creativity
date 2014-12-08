@@ -86,11 +86,11 @@ void Creativity::setup() {
 
     auto &rng = eris::Random::rng();
 
-    if (parameters.sharing_link_proportion < 0 or parameters.sharing_link_proportion > 1)
-        throw std::logic_error("Creativity sharing_link_proportion parameter is invalid (not in [0,1])");
+    if (parameters.piracy_link_proportion < 0 or parameters.piracy_link_proportion > 1)
+        throw std::logic_error("Creativity piracy_link_proportion parameter is invalid (not in [0,1])");
 
     unsigned long max_links = parameters.readers * (parameters.readers - 1) / 2;
-    unsigned long num_links = std::lround(parameters.sharing_link_proportion * max_links);
+    unsigned long num_links = std::lround(parameters.piracy_link_proportion * max_links);
 
     // Track ids of created readers, to build the set of all possible edges as we go
     std::vector<eris_id_t> created;
@@ -138,7 +138,7 @@ void Creativity::setup() {
 
 bool Creativity::sharing() const {
     if (!setup_sim_) throw std::logic_error("Cannot call sharing() on a non-live or unconfigured simulation");
-    return parameters.sharing_begins > 0 and sim->t() >= parameters.sharing_begins;
+    return parameters.piracy_begins > 0 and sim->t() >= parameters.piracy_begins;
 }
 
 std::pair<std::vector<SharedMember<Book>>&, std::unique_lock<std::mutex>> Creativity::newBooks() {

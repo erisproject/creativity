@@ -31,8 +31,8 @@ constexpr int64_t
         FileStorage::HEADER::pos::cost_unit,
         FileStorage::HEADER::pos::cost_piracy,
         FileStorage::HEADER::pos::income,
-        FileStorage::HEADER::pos::sharing_begins,
-        FileStorage::HEADER::pos::sharing_link_proportion,
+        FileStorage::HEADER::pos::piracy_begins,
+        FileStorage::HEADER::pos::piracy_link_proportion,
         FileStorage::HEADER::pos::init_prob_write,
         FileStorage::HEADER::pos::init_q_min,
         FileStorage::HEADER::pos::init_q_max,
@@ -192,8 +192,8 @@ void FileStorage::writeEmptyHeader() {
     write_value(settings.cost_unit);
     write_value(settings.cost_piracy);
     write_value(settings.income);
-    write_value(settings.sharing_begins);
-    write_value(settings.sharing_link_proportion);
+    write_value(settings.piracy_begins);
+    write_value(settings.piracy_link_proportion);
     write_value(settings.initial.prob_write);
     write_value(settings.initial.q_min);
     write_value(settings.initial.q_max);
@@ -305,8 +305,8 @@ void FileStorage::parseMetadata() {
     parse_value(block[HEADER::pos::cost_unit], settings_.cost_unit);
     parse_value(block[HEADER::pos::cost_piracy], settings_.cost_piracy);
     parse_value(block[HEADER::pos::income], settings_.income);
-    parse_value(block[HEADER::pos::sharing_begins], settings_.sharing_begins);
-    parse_value(block[HEADER::pos::sharing_link_proportion], settings_.sharing_link_proportion);
+    parse_value(block[HEADER::pos::piracy_begins], settings_.piracy_begins);
+    parse_value(block[HEADER::pos::piracy_link_proportion], settings_.piracy_link_proportion);
     parse_value(block[HEADER::pos::init_prob_write], settings_.initial.prob_write);
     parse_value(block[HEADER::pos::init_q_min], settings_.initial.q_min);
     parse_value(block[HEADER::pos::init_q_max], settings_.initial.q_max);

@@ -233,8 +233,8 @@ class FileStorage : public Storage, private eris::noncopyable {
                     cost_unit = 60, ///< Unit cost of an author creating a copy of a book (dbl)
                     cost_piracy = 68, ///< Unit cost of getting a copy of a book via piracy (dbl)
                     income = 76, ///< Per-period reader external income (before incurring authorship costs or receiving book profits) (dbl)
-                    sharing_begins = 84, ///< the sharing start period (u64)
-                    sharing_link_proportion = 92, ///< The proportion of potential friendship links that exist
+                    piracy_begins = 84, ///< the sharing start period (u64)
+                    piracy_link_proportion = 92, ///< The proportion of potential friendship links that exist
                     init_prob_write = 100, ///< The probability of writing (while beliefs noninformative)
                     init_q_min = 108, ///< `a` in U[a,b], the noninformative belief authorship quality level
                     init_q_max = 116, ///< `b` in U[a,b], the noninformative belief authorship quality level

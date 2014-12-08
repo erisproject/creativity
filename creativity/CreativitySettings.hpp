@@ -84,11 +84,11 @@ struct CreativitySettings {
      */
     double income = 1000.0;
 
-    /** The period in which the sharing network is introduced.  If 0, sharing is never invented.
-     * (Since t=0 is the initial setup, without any actions, set to 1 to having sharing available
+    /** The period in which piracy becomes available.  If 0, piracy is never invented.  (Since t=0
+     * is the initial setup (without any actions), set to 1 to having sharing become available
      * immediately).
      */
-    uint64_t sharing_begins = 100;
+    uint64_t piracy_begins = 100;
 
     /** The number of sharing/friendship links as a proportion of the maxinum number of sharing
      * links possible (which is \f$\frac{R(R-1)}{2}\f$, where \f$R\f$ is the number of readers).
@@ -101,7 +101,7 @@ struct CreativitySettings {
      *
      * The value must be in \f$[0, 1]\f$.
      */
-    double sharing_link_proportion = 0.1;
+    double piracy_link_proportion = 0.1;
 
     /** The values in this struct define fixed probabilities and distributions of simulation
      * actions.  This is needed because, in the initial simulation periods, readers only have

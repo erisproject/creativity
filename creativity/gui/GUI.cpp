@@ -634,14 +634,14 @@ void GUI::thr_update_parameters() {
 #define SET_SB(PARAMETER) widget<Gtk::SpinButton>("set_" #PARAMETER)->set_value(creativity_->parameters.PARAMETER)
     SET_SB(readers);
     SET_SB(density);
-    SET_SB(sharing_link_proportion);
     SET_SB(book_distance_sd);
     SET_SB(book_quality_sd);
-    SET_SB(sharing_begins);
+    SET_SB(piracy_begins);
     SET_SB(income);
     SET_SB(cost_fixed);
     SET_SB(cost_unit);
     SET_SB(cost_piracy);
+    widget<Gtk::SpinButton>("set_piracy_link_proportion")->set_value(creativity_->parameters.piracy_link_proportion * 100.0);
 #define SET_INIT_SB(PARAMETER) widget<Gtk::SpinButton>("set_init_" #PARAMETER)->set_value(creativity_->parameters.initial.PARAMETER)
     SET_INIT_SB(prob_write);
     SET_INIT_SB(q_min);
@@ -694,13 +694,13 @@ void GUI::thr_signal() {
         widget<Gtk::Notebook>("nb_tabs")->set_current_page(1);
 
         // FIXME: This really doesn't look good, and doesn't work properly until the scale has a
-        // range of at least sharing_begins (until then it appears at the beginning).  For now,
+        // range of at least piracy_begins (until then it appears at the beginning).  For now,
         // leave it off, but it might be worthwhile adding in later.
-        //widget<Gtk::Scale>("scale_state")->add_mark(creativity_->parameters.sharing_begins, Gtk::POS_BOTTOM, "Piracy");
+        //widget<Gtk::Scale>("scale_state")->add_mark(creativity_->parameters.piracy_begins, Gtk::POS_BOTTOM, "Piracy");
 
         // Disable spin buttons:
-        for (auto &widg : {"set_readers", "set_density", "set_sharing_link_proportion",
-                "set_book_distance_sd", "set_book_quality_sd", "set_sharing_begins", "set_income",
+        for (auto &widg : {"set_readers", "set_density", "set_piracy_link_proportion",
+                "set_book_distance_sd", "set_book_quality_sd", "set_piracy_begins", "set_income",
                 "set_cost_fixed", "set_cost_unit", "set_cost_piracy", "set_init_prob_write",
                 "set_init_q_min", "set_init_q_max", "set_init_p_min", "set_init_p_max",
                 "set_init_prob_keep", "set_init_keep_price"})
@@ -844,11 +844,11 @@ void GUI::setupSim() {
     // Set the parameters directly
     auto &set = creativity_->set();
     set.readers = lround(sb("set_readers"));
-    set.use_density = false;
-    set.sharing_begins = lround(sb("set_sharing_begins"));
+    set.use_density = true;
+    set.piracy_begins = lround(sb("set_piracy_begins"));
 #define COPY_SB_D(PARAMETER) set.PARAMETER = sb("set_"#PARAMETER)
     COPY_SB_D(density);
-    COPY_SB_D(sharing_link_proportion);
+    COPY_SB_D(piracy_link_proportion) * 0.01; // From percentage
     COPY_SB_D(book_distance_sd);
     COPY_SB_D(book_quality_sd);
     COPY_SB_D(income);
