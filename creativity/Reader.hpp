@@ -662,9 +662,6 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          */
         void updateProfitStreamBelief();
 
-        /** Need a standard normal in various places. */
-        std::normal_distribution<double> stdnormal;
-
     private:
         std::vector<double> u_poly_ = Reader::default_polynomial;
         std::vector<double> pen_poly_ = Reader::default_penalty_polynomial;

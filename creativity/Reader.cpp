@@ -317,8 +317,6 @@ void Reader::interApply() {
     // to author)
     assets()[creativity_->money] += income;
 
-    auto &rng = Random::rng();
-
     SharedMember<Book> newbook;
     if (create_) {
         // The cost (think of this as an opportunity cost) of creating:
@@ -327,14 +325,14 @@ void Reader::interApply() {
         // The book is centered at the reader's position, plus some noise we add below
         Position bookPos{position()};
 
-        auto qdraw = [this,&rng] (const Book &book, const Reader &) -> double {
-            return std::max(0.0, book.quality() + writer_quality_sd * stdnormal(rng));
+        auto qdraw = [this] (const Book &book, const Reader &) -> double {
+            return std::max(0.0, book.quality() + writer_quality_sd * Random::rstdnorm());
         };
         newbook = simulation()->spawn<Book>(creativity_, bookPos, sharedSelf(), wrote_.size(), create_price_, create_quality_, qdraw);
 
         /// If enabled, add some noise in a random direction to the position
         if (writer_book_sd > 0) {
-            double step_dist = std::normal_distribution<double>(0, writer_book_sd)(rng);
+            double step_dist = writer_book_sd * Random::rstdnorm();
             newbook->moveBy(step_dist * Position::random(bookPos.dimensions));
         }
 
@@ -364,7 +362,7 @@ void Reader::interApply() {
 
     if (creativity_->parameters.reader_step_sd > 0) {
         // Finally, move a random distance in a random direction
-        double step_dist = std::normal_distribution<double>(0, creativity_->parameters.reader_step_sd)(rng);
+        double step_dist = Random::rstdnorm() * creativity_->parameters.reader_step_sd;
         if (step_dist != 0)
             moveBy(step_dist * Position::random(position().dimensions));
     }
