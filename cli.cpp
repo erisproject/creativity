@@ -189,7 +189,7 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
 
         OPTION_UNBOUNDED(piracy_begins, "P", "piracy-begins", "The period in which piracy becomes available");
 
-        auto periods_constr = RangeConstraint<unsigned int>::GE(1);
+        auto periods_constr = RangeConstraint<unsigned int>::GE(0);
         TCLAP::ValueArg<unsigned int> periods_arg("T", "periods", "Number of simulation periods to run", false, 200, &periods_constr, cmd);
 
         TCLAP::ValueArg<std::string> output_file("o", "output", "Output file for simulation results", false,
