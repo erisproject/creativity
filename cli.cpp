@@ -51,28 +51,33 @@ std::string output_string(double v) {
 template <class T, class = typename std::enable_if<std::is_arithmetic<T>::value>::type>
 class RangeConstraint : public TCLAP::Constraint<T> {
     public:
-        RangeConstraint() = delete;
-        RangeConstraint(T min) : min_(min), no_max_(true) {}
-        RangeConstraint(T min, T max) : min_(min), max_(max) {}
+        RangeConstraint() = default; // Bounded only by data type limits
+        RangeConstraint(T minimum, T maximum) : min(minimum), max(maximum) {}
+        static RangeConstraint LE(T maximum) { return RangeConstraint(LOWEST, maximum); }
+        static RangeConstraint GE(T minimum) { return RangeConstraint(minimum, BIGGEST); }
         virtual std::string description() const override {
-            if (max_ == std::numeric_limits<double>::infinity())
-                return "Value must be at least " + output_string(min_);
+            if (max == BIGGEST)
+                return "Value must be at least " + output_string(min);
+            else if (min == LOWEST)
+                return "Value must be at most " + output_string(max);
             else
-                return "Value must be between " + output_string(min_) + " and " + output_string(max_);
+                return "Value must be between " + output_string(min) + " and " + output_string(max);
         }
         virtual std::string shortID() const override {
-            if (no_max_)
-                return "V ≥ " + output_string(min_);
+            if (max == BIGGEST)
+                return "V ≥ " + output_string(min);
+            else if (min == LOWEST)
+                return "V ≤ " + output_string(max);
             else
-                return "V ∈ [" + output_string(min_) + "," + output_string(max_) + "]";
+                return "V ∈ [" + output_string(min) + "," + output_string(max) + "]";
         }
         virtual bool check(const T &val) const override {
-            return val >= min_ and val <= max_;
+            return val >= min and val <= max;
         }
-    private:
-        T min_;
-        T max_ = std::numeric_limits<T>::has_infinity ? std::numeric_limits<T>::infinity() : std::numeric_limits<T>::max();
-        bool no_max_ = false;
+        static constexpr T LOWEST = std::numeric_limits<T>::has_infinity ? -std::numeric_limits<T>::infinity() : std::numeric_limits<T>::lowest();
+        static constexpr T BIGGEST = std::numeric_limits<T>::has_infinity ? std::numeric_limits<T>::infinity() : std::numeric_limits<T>::max();
+        const T min = LOWEST;
+        const T max = BIGGEST;
 };
 
 /// Constraint for an array of a given length.
@@ -130,30 +135,55 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         CmdLineHack cmd("Eris-based creativity simulation model", ' ', "0.0.1");
 
         cmd.startReverseHack();
+ 
+#define OPTION_UNBOUNDED_NAME(NAME, PARAM, SHORT, LONG, DESC) \
+         RangeConstraint<decltype(cr.parameters.PARAM)> opt_##NAME##_constr; \
+        TCLAP::ValueArg<decltype(cr.parameters.PARAM)> opt_##NAME##_arg(SHORT, LONG, DESC, false, cr.parameters.PARAM, &opt_##NAME##_constr, cmd)
+#define OPTION_LBOUND_NAME(NAME, PARAM, SHORT, LONG, DESC, LBOUND) \
+        auto opt_##NAME##_constr = RangeConstraint<decltype(cr.parameters.PARAM)>::GE(LBOUND); \
+        TCLAP::ValueArg<decltype(cr.parameters.PARAM)> opt_##NAME##_arg(SHORT, LONG, DESC, false, cr.parameters.PARAM, &opt_##NAME##_constr, cmd)
+#define OPTION_UBOUND_NAME(NAME, PARAM, SHORT, LONG, DESC, UBOUND) \
+        auto opt_##NAME##_constr = RangeConstraint<decltype(cr.parameters.PARAM)>::LE(UBOUND); \
+        TCLAP::ValueArg<decltype(cr.parameters.PARAM)> opt_##NAME##_arg(SHORT, LONG, DESC, false, cr.parameters.PARAM, &opt_##NAME##_constr, cmd)
+#define OPTION_BOUND_NAME(NAME, PARAM, SHORT, LONG, DESC, LBOUND, UBOUND) \
+        RangeConstraint<decltype(cr.parameters.PARAM)> opt_##NAME##_constr(LBOUND, UBOUND); \
+        TCLAP::ValueArg<decltype(cr.parameters.PARAM)> opt_##NAME##_arg(SHORT, LONG, DESC, false, cr.parameters.PARAM, &opt_##NAME##_constr, cmd)
+#define OPTION_LBOUND(PARAM, SHORT, LONG, DESC, LBOUND) OPTION_LBOUND_NAME(PARAM, PARAM, SHORT, LONG, DESC, LBOUND)
+#define OPTION_UBOUND(PARAM, SHORT, LONG, DESC, UBOUND) OPTION_UBOUND_NAME(PARAM, PARAM, SHORT, LONG, DESC, UBOUND)
+#define OPTION_BOUND(PARAM, SHORT, LONG, DESC, LBOUND, UBOUND) OPTION_BOUND_NAME(PARAM, PARAM, SHORT, LONG, DESC, LBOUND, UBOUND)
+#define OPTION_UNBOUNDED(PARAM, SHORT, LONG, DESC) OPTION_UNBOUNDED_NAME(PARAM, PARAM, SHORT, LONG, DESC)
+#define OPTION_LBOUND_INIT(PARAM, SHORT, LONG, DESC, LBOUND) OPTION_LBOUND_NAME(initial_##PARAM, initial.PARAM, SHORT, LONG, DESC, LBOUND)
+#define OPTION_UBOUND_INIT(PARAM, SHORT, LONG, DESC, UBOUND) OPTION_UBOUND_NAME(initial_##PARAM, initial.PARAM, SHORT, LONG, DESC, UBOUND)
+#define OPTION_BOUND_INIT(PARAM, SHORT, LONG, DESC, LBOUND, UBOUND) OPTION_BOUND_NAME(initial_##PARAM, initial.PARAM, SHORT, LONG, DESC, LBOUND, UBOUND)
+#define OPTION_UNBOUNDED_INIT(PARAM, SHORT, LONG, DESC) OPTION_UNBOUNDED_NAME(initial_##PARAM, initial.PARAM, SHORT, LONG, DESC)
 
-#define OPTION_LBOUND(PARAM, SHORT, LONG, DESC, LBOUND) \
-        RangeConstraint<decltype(cr.parameters.PARAM)> opt_##PARAM##_constr(LBOUND); \
-        TCLAP::ValueArg<decltype(cr.parameters.PARAM)> opt_##PARAM##_arg(SHORT, LONG, DESC, false, cr.parameters.PARAM, &opt_##PARAM##_constr, cmd);
+// Single-letter options used:
+// b B c C d D f i j k K m M n N o O P Q r R s T w W x y z Z
 
         OPTION_LBOUND(dimensions, "D", "dimensions", "Number of dimensions of the simulation", 1);
-        OPTION_LBOUND(readers, "r", "readers", "Number of reader/author agents in the simulation", 2);
+        OPTION_LBOUND(readers, "r", "readers", "Number of reader/author agents in the simulation", 1);
         OPTION_LBOUND(density, "d", "density", "Reader density (in readers per unit^(D), where D is the configured # of dimensions)",
                 std::numeric_limits<double>::min());
+        OPTION_BOUND(piracy_link_proportion, "f", "piracy-link-proportion", "Proportion of potential sharing links between readers that are created", 0, 1);
         OPTION_LBOUND(book_distance_sd, "B", "book-distance-sd", "Standard deviation of book distance from author; distance ~ |N(0, B)|", 0);
         OPTION_LBOUND(book_quality_sd, "Q", "book-quality-sd", "Standard deviation of book perceived quality; perceived quality ~ N(q, Q), where q is the innate quality and Q is this value.", 0);
         OPTION_LBOUND(cost_fixed, "C", "cost-fixed", "Fixed cost of keeping a book on the market for a period", 0);
         OPTION_LBOUND(cost_unit, "c", "cost-unit", "Unit cost of making a copy of a book", 0);
+        OPTION_LBOUND(cost_piracy, "y", "cost-piracy", "Cost of receiving a pirated copy of a book", 0);
         OPTION_LBOUND(income, "i", "income", "Per-period external reader income", std::numeric_limits<double>::min());
 
-#define OPTION_VECTOR(PARAM, SHORT, LONG, DESC) \
-        ArrayConstraint opt_##PARAM##_constr(cr.parameters.PARAM.rows()); \
-        TCLAP::ValueArg<std::string> opt_##PARAM##_arg(SHORT, LONG, DESC, false, vectorString(cr.parameters.PARAM), &opt_##PARAM##_constr, cmd);
-#define OPTION_LOWERTRI(PARAM, SHORT, LONG, DESC) \
-        ArrayConstraint opt_##PARAM##_constr(cr.parameters.PARAM.rows() * (cr.parameters.PARAM.rows() + 1) / 2); \
-        TCLAP::ValueArg<std::string> opt_##PARAM##_arg(SHORT, LONG, DESC, false, lowerTriangleString(cr.parameters.PARAM), &opt_##PARAM##_constr, cmd);
+        OPTION_BOUND_INIT(prob_write, "x", "initial-prob-write", "The probability of writing in initial periods", 0, 1);
+        OPTION_LBOUND_INIT(q_min, "m", "initial-quality-min", "The minimum support of quality q ~ U[a,b] for authored books in initial periods", 0);
+        OPTION_LBOUND_INIT(q_max, "M", "initial-quality-max", "The maximum support of quality q ~ U[a,b] for authored books in initial periods", 0);
+        OPTION_LBOUND_INIT(p_min, "n", "initial-price-min", "The minimum support of price p ~ U[a,b] for new books in initial periods", 0);
+        OPTION_LBOUND_INIT(p_max, "N", "initial-price-max", "The maximum support of price p ~ U[a,b] for new books in initial periods", 0);
+        OPTION_BOUND_INIT(prob_keep, "k", "initial-prob-keep", "The probability of keeping a previously-written book on the market for another period", 0, 1);
+        OPTION_BOUND_INIT(keep_price, "K", "keep-price", "The  price-above-marginal-cost level (relative to current P-MC) for a book left on the market for another period", 0, 1);
 
-        RangeConstraint<unsigned int> periods_constr(1);
-        TCLAP::ValueArg<unsigned int> periods_arg("p", "periods", "Number of simulation periods to run", false, 100, &periods_constr, cmd);
+        OPTION_UNBOUNDED(sharing_begins, "P", "piracy-begins", "The period in which piracy becomes available");
+
+        auto periods_constr = RangeConstraint<unsigned int>::GE(1);
+        TCLAP::ValueArg<unsigned int> periods_arg("T", "periods", "Number of simulation periods to run", false, 200, &periods_constr, cmd);
 
         TCLAP::ValueArg<std::string> output_file("o", "output", "Output file for simulation results", false,
                 "creativity-" + std::to_string(Random::seed()) + ".crstate", // default
@@ -162,7 +192,7 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         TCLAP::SwitchArg overwrite_output_file("O", "overwrite", "Allows output file given to -o to be overwritten.", cmd, false);
 
         RangeConstraint<unsigned int> max_threads_constr(0, std::thread::hardware_concurrency());
-        TCLAP::ValueArg<unsigned int> max_threads_arg("T", "threads", "Maximum number of threads to use for the simulation", false, 0, &max_threads_constr, cmd);
+        TCLAP::ValueArg<unsigned int> max_threads_arg("j", "threads", "Maximum number of threads to use for the simulation", false, 0, &max_threads_constr, cmd);
 
         cmd.reverseHack();
 
@@ -205,6 +235,7 @@ int main(int argc, char *argv[]) {
         struct stat buffer;
         if (stat(args.out.c_str(), &buffer) == 0) { // The file exists
             std::cerr << "Error: `" << args.out << "' already exists; specify a different file or add `--overwrite' option to overwrite\n";
+            exit(1);
         }
     }
     creativity->fileWrite(args.out);
@@ -219,6 +250,11 @@ int main(int argc, char *argv[]) {
 
     ERIS_DBG("here we go...!");
 
+    sim->maxThreads(args.max_threads);
+
+    std::chrono::time_point<std::chrono::high_resolution_clock> now,
+        last = std::chrono::high_resolution_clock::now();
+
     while (sim->t() < args.periods) {
         ERIS_DBGVAR(sim->t());
         ERIS_DBGVAR(args.periods);
@@ -228,6 +264,12 @@ int main(int argc, char *argv[]) {
 
         creativity->storage().first->emplace_back(sim);
         ERIS_DBGVAR(sim->t());
+
+        now = std::chrono::high_resolution_clock::now();
+        double speed = 1.0 / std::chrono::duration<double>(now - last).count();
+        std::swap(last, now);
+        std::cout << "\rRunning simulation [t=" << sim->t() << "; R=" << sim->countAgents<Reader>() << "; B=" << sim->countGoods() << ", newB=" <<
+            sim->countGoods<Book>([](const Book &b) -> bool { return b.age() == 0; }) << "] " << speed << " Hz                    " << std::flush;
     }
     ERIS_DBGVAR(creativity->storage().first->size());
 
