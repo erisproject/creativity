@@ -79,8 +79,10 @@ void Creativity::setup() {
         set_.density = densityFromBoundary(parameters.readers, parameters.dimensions, parameters.boundary);
     }
 
-    storage().first = std::make_shared<MemoryStorage>(set_);
-
+    {
+        auto st = storage();
+        if (not st.first) st.first = std::make_shared<MemoryStorage>(set_);
+    }
 
     std::uniform_real_distribution<double> unif_pmb(-parameters.boundary, parameters.boundary);
     std::uniform_real_distribution<double> unif_cr_shape(parameters.reader_creation_scale_min, parameters.reader_creation_scale_max);
