@@ -1,5 +1,6 @@
 #pragma once
 #include <iterator>
+#include <boost/iterator/iterator_facade.hpp>
 #include "creativity/state/State.hpp"
 #include "creativity/CreativitySettings.hpp"
 
@@ -15,7 +16,7 @@ namespace creativity { namespace state {
 class Storage {
     public:
         /** Returns the State at the given position.  It is highly recommended that subclasses store
-         * objects in simulation order, that is, that `storage[j].t == j` is true.
+         * objects in simulation order, that is, that `storage[j]->t == j` is true.
          *
          * \param i the index (if the subclass follows the recommendation above, also the simulation
          * period).
@@ -60,6 +61,36 @@ class Storage {
 
         /// Default destructor
         virtual ~Storage() = default;
+
+        /// Random access iterator
+        class state_iterator : public boost::iterator_facade<state_iterator, const std::shared_ptr<const State>, boost::random_access_traversal_tag> {
+            private:
+                const Storage &storage;
+                size_t i = 0;
+                std::shared_ptr<const State> curr;
+
+                friend class Storage;
+                friend class boost::iterator_core_access;
+
+                state_iterator(const Storage &st, size_t at) : storage(st) { advance(at); }
+
+                reference dereference() const { return curr; }
+                void increment() { advance(1); }
+                void decrement() { advance(-1); }
+                void advance(difference_type n) { i += n; if (i < storage.size()) curr = storage[i]; else curr.reset(); }
+                difference_type distance_to(const state_iterator &it) { return it.i - i; }
+                bool equal(const state_iterator &other) const { return other.i == i; }
+        };
+
+        /** Returns a Random Access Iterator to the beginning of the storage object's states. */
+        state_iterator begin() const {
+            return state_iterator(*this, 0);
+        }
+        /** Returns a Random Access Iterator to the just-past-the-end of the storage object's
+         * states. */
+        state_iterator end() const {
+            return state_iterator(*this, size());
+        }
 
     protected:
         /** The simulation settings, with default initialization of fields to 0.  These settings
