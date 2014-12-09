@@ -68,14 +68,11 @@ class BookState final {
          */
         unsigned long copies;
 
-        /// The age of this book (in simulation periods).  0 means the book was new this period.
-        unsigned long age;
-
         /// The period in which this book ws created.  Directly related to age.
         unsigned long created;
 
         /** The number of periods this book was (or has been) on the market.  If this book is
-         * currently on the market, this is simply `.age + 1`; if not on the market, this is the
+         * currently on the market, this is simply the age plus 1; if not on the market, this is the
          * number of periods that the book was on the market.
          */
         unsigned long lifetime;

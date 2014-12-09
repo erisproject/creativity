@@ -82,6 +82,25 @@ class Creativity : private eris::noncopyable, public std::enable_shared_from_thi
          */
         void setup();
 
+        /** Static method that calculates a boundary given a number of readers, dimensions, and a
+         * desired density.
+         *
+         * \throws std::logic_error if any of the parameters are <= 0.
+         */
+        static double boundaryFromDensity(uint32_t readers, uint32_t dimensions, double density);
+
+        /** Static method that calculates a density given a number of readers, dimensions, and a
+         * desired boundary location.
+         *
+         * \throws std::logic_error if any of the parameters are <= 0.
+         */
+        static double densityFromBoundary(uint32_t readers, uint32_t dimensions, double boundary);
+
+        /** Returns the value of densityFromBoundary called with the current readers, dimensions,
+         * and boundary settings.
+         */
+        double densityFromBoundary() const;
+
         /** Returns true if file sharing exists.  Attempt to call this on a Creativity object that
          * is not a live simulation, or is a live simulation but has not been set up yet, will raise
          * an exception.

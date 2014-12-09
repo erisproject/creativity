@@ -118,8 +118,9 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
 
         OPTION_LBOUND(dimensions, "D", "dimensions", "Number of dimensions of the simulation", 1);
         OPTION_LBOUND(readers, "r", "readers", "Number of reader/author agents in the simulation", 1);
-        OPTION_LBOUND(density, "d", "density", "Reader density (in readers per unit^(D), where D is the configured # of dimensions)",
-                std::numeric_limits<double>::min());
+        auto opt_density_constr = RangeConstraint<double>::GE(std::numeric_limits<double>::min());
+        TCLAP::ValueArg<double> opt_density_arg("d", "density", "Reader density (in readers per unit^(D), where D is the configured # of dimensions)",
+                false, Creativity::densityFromBoundary(cr.parameters.readers, cr.parameters.dimensions, cr.parameters.boundary), &opt_density_constr, cmd);
         OPTION_BOUND(piracy_link_proportion, "f", "piracy-link-proportion", "Proportion of potential sharing links between readers that are created", 0, 1);
         OPTION_LBOUND(book_distance_sd, "B", "book-distance-sd", "Standard deviation of book distance from author; distance ~ |N(0, B)|", 0);
         OPTION_LBOUND(book_quality_sd, "Q", "book-quality-sd", "Standard deviation of book perceived quality; perceived quality ~ N(q, Q), where q is the innate quality and Q is this value.", 0);
@@ -162,9 +163,10 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         cmd.parse(argc, argv);
 
 #define COPY_PARAM_SETTING(PARAM) cr.set().PARAM = opt_##PARAM##_arg.getValue()
-        COPY_PARAM_SETTING(dimensions);
+#define COPY_INIT_PARAM_SETTING(PARAM) cr.set().initial.PARAM = opt_initial_##PARAM##_arg.getValue()
         COPY_PARAM_SETTING(readers);
-        COPY_PARAM_SETTING(density);
+        COPY_PARAM_SETTING(dimensions);
+        cr.set().boundary = Creativity::boundaryFromDensity(cr.parameters.readers, cr.parameters.dimensions, opt_density_arg.getValue());
         COPY_PARAM_SETTING(book_distance_sd);
         COPY_PARAM_SETTING(book_quality_sd);
         COPY_PARAM_SETTING(cost_fixed);

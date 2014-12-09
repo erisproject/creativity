@@ -159,14 +159,14 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
 
                 if (b.market) {
                     if (design.enabled.book_live) {
-                        const double scale = std::max(1.0, design.size.book_live_scale_a - design.size.book_live_scale_b*b.age);
+                        const double scale = std::max(1.0, design.size.book_live_scale_a - design.size.book_live_scale_b*(state->t - b.created));
                         drawPoint(cr, trans, b.position[0], b.position[1], design.style.book_live,
                                 design.colour.book_live, design.size.book_live*scale, design.stroke_width.book_live);
                     }
                 }
                 else {
                     if (design.enabled.book_dead) {
-                        const double scale = std::max(1.0, design.size.book_dead_scale_a - design.size.book_dead_scale_b*b.age);
+                        const double scale = std::max(1.0, design.size.book_dead_scale_a - design.size.book_dead_scale_b*(state->t - b.created));
                         drawPoint(cr, trans, b.position[0], b.position[1], design.style.book_dead,
                                 design.colour.book_dead, design.size.book_dead*scale, design.stroke_width.book_dead);
                     }

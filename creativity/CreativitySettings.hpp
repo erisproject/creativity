@@ -11,32 +11,9 @@ struct CreativitySettings {
     /// The number of dimensions in the simulation
     uint32_t dimensions = 2;
 
-    /** The density of the simulation in average number of readers per \f$unit^{dimensions}\f$.
-     * This, combined with `readers` and `dimensions` implicitly defines the boundaries where the
-     * simulation space wraps to the opposite boundary.
-     *
-     * For example, for `readers = 100, dimensions = 2, density = 1`, the boundaries will be at ±5
-     * in each dimensions.  `readers = 100, dimensions = 3, density = 2` would result in boundaries
-     * at ±1.842 in each of the three dimensions.
-     *
-     * This field is used instead of boundary if `use_density` is true (the default).
-     */
-    double density = 1.0;
-
-    /** The boundary in each dimension to use.  This is used instead of `density` if `use_density`
-     * is false; if it is true, this is updated to the boundary implied by the `density` setting
-     * when the simulation begins.
+    /** The boundary in each dimension to use for simulation members.  Must be a positive value.
      */
     double boundary = 5.0;
-
-    /** When setting up the simulation, if this is true (the default), use `density` to calculate
-     * the boundary (and then replace `boundary` with the calculated value).  If false, use
-     * `boundary` directly, and replace `density` with the appropriately calculated value.
-     *
-     * Once a simulation is configured (or loaded from a file) both density and boundary will agree,
-     * and so this parameter is irrelevant.
-     */
-    bool use_density = true;
 
     /** The standard deviation of a book.  An authored book will be located at a distance drawn from
      * \f$\left|N(0,s)\right|\f$, where \f$s\f$ is this value, in a random direction from the
@@ -186,9 +163,6 @@ struct CreativitySettings {
     } initial;
 
 };
-
-double boundaryFromDensity(uint32_t readers, uint32_t dimensions, double density);
-double densityFromBoundary(uint32_t readers, uint32_t dimensions, double boundary);
 
 }
 

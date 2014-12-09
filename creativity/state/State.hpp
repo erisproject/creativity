@@ -22,13 +22,14 @@ class State final {
         /// The simulation period represented by this state
         uint64_t t = 0;
 
-        /** The simulation boundary.  This is inferred from the first reader found in the
-         * simulation, the first book if there are no readers, and otherwise 0.
+        /** The simulation boundary.  This is inferred from the boundary of the first reader found
+         * in the simulation, the first book if there are no readers, and otherwise remains at its
+         * default, NaN.
          */
-        double boundary{std::numeric_limits<double>::quiet_NaN()};
+        double boundary = std::numeric_limits<double>::quiet_NaN();
 
         /** The simulation dimensions.  This is inferred from the first reader found in the
-         * simulation, the first book if there are no readers, and otherwise 0.
+         * simulation, the first book if there are no readers, and otherwise the default, 0.
          */
         uint32_t dimensions = 0;
 

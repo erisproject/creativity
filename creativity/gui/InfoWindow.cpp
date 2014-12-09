@@ -273,7 +273,7 @@ void InfoWindow::refresh(std::shared_ptr<const State> state) {
         updateValue("booksWritten", r.wrote.size());
         updateValue("bookLast", r.wrote.empty()
                 ? "(never written)"
-                : std::to_string(state->books.at(*r.wrote.crbegin()).age));
+                : std::to_string(state->t - state->books.at(*r.wrote.crbegin()).created));
         updateValue("numFriends", r.friends.size());
 
 #define UPDATE_LIN(PREFIX, VAR) \
@@ -330,7 +330,7 @@ void InfoWindow::refresh(std::shared_ptr<const State> state) {
             updateValue("price", b.price);
             updateValue("quality", b.quality);
             updateValue("created", b.created);
-            updateValue("age", b.age);
+            updateValue("age", state->t - b.created);
             updateValue("revenue", b.revenue_lifetime);
             updateValue("revenueLast", b.revenue);
             updateValue("sales", b.sales_lifetime);

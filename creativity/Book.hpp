@@ -48,7 +48,7 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         unsigned long age() const;
 
         /** Returns the simulation period in which the book became available (i.e. the book was
-         * written between periods `created()-1` and `created()`.
+         * written at the beginning of `created()`.
          */
         const unsigned long& created() const;
 

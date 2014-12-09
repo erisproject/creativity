@@ -466,7 +466,6 @@ class FileStorage : public Storage, private eris::noncopyable {
          *     u64          pirated
          *     u64          piratedLifetime
          *     u64          copies
-         *     u64          age
          *     u64          created
          *     u64          lifetime
          */

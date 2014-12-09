@@ -633,7 +633,7 @@ void GUI::thr_info_dialog(eris_id_t member_id) {
 void GUI::thr_update_parameters() {
 #define SET_SB(PARAMETER) widget<Gtk::SpinButton>("set_" #PARAMETER)->set_value(creativity_->parameters.PARAMETER)
     SET_SB(readers);
-    SET_SB(density);
+    widget<Gtk::SpinButton>("set_density")->set_value(creativity_->densityFromBoundary());
     SET_SB(book_distance_sd);
     SET_SB(book_quality_sd);
     SET_SB(reader_step_sd);
@@ -850,10 +850,9 @@ void GUI::setupSim() {
     // Set the parameters directly
     auto &set = creativity_->set();
     set.readers = lround(sb("set_readers"));
-    set.use_density = true;
+    set.boundary = Creativity::boundaryFromDensity(set.readers, set.dimensions, sb("set_density"));
     set.piracy_begins = lround(sb("set_piracy_begins"));
 #define COPY_SB_D(PARAMETER) set.PARAMETER = sb("set_"#PARAMETER)
-    COPY_SB_D(density);
     COPY_SB_D(piracy_link_proportion) * 0.01; // From percentage
     COPY_SB_D(book_distance_sd);
     COPY_SB_D(book_quality_sd);

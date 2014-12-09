@@ -152,7 +152,6 @@ void FileStorage::push_back(std::shared_ptr<const State> state) {
         f_.seekp(HEADER::pos::boundary);
         write_value(state->boundary);
         settings_.boundary = state->boundary;
-        settings_.density = densityFromBoundary(settings.readers, settings.dimensions, settings.boundary);
     }
 }
 
@@ -188,9 +187,6 @@ void FileStorage::writeEmptyHeader() {
     write_u32(0); // Number of states
     write_value(settings.dimensions);
     write_value(settings.readers);
-    if (settings.use_density) settings_.boundary = boundaryFromDensity(settings.readers, settings.dimensions, settings.density);
-    else                      settings_.density = densityFromBoundary(settings.readers, settings.dimensions, settings.boundary);
-
     write_value(settings.boundary);
     write_value(settings.book_distance_sd);
     write_value(settings.book_quality_sd);
@@ -338,7 +334,7 @@ void FileStorage::parseMetadata() {
 
     if (settings.dimensions == 0) throwParseError("found invalid dimensions == 0");
     if (settings.readers == 0) throwParseError("found invalid readers == 0");
-    if (settings.boundary <= 0) throwParseError("found invalid (non-positive) boundary position");
+    if (settings.boundary <= 0) throwParseError("found invalid (non-positive) boundary");
     if (settings.book_distance_sd < 0) throwParseError("found invalid (negative) book_distance_sd");
     if (settings.book_quality_sd < 0) throwParseError("found invalid (negative) book_quality_sd");
 
@@ -388,6 +384,8 @@ std::shared_ptr<const State> FileStorage::readState() const {
     std::shared_ptr<const State> shst(st_ptr);
 
     state.t = read_u64();
+    state.dimensions = settings.dimensions;
+    state.boundary = settings.boundary;
 
     auto num_readers = read_u32();
     state.readers.reserve(num_readers);
@@ -664,7 +662,6 @@ std::pair<eris_id_t, BookState> FileStorage::readBook() const {
     b.pirated = read_u64();
     b.pirated_lifetime = read_u64();
     b.copies = read_u64();
-    b.age = read_u64();
     b.created = read_u64();
     b.lifetime = read_u64();
 
@@ -687,7 +684,6 @@ void FileStorage::writeBook(const BookState &b) {
     write_u64(b.pirated);
     write_u64(b.pirated_lifetime);
     write_u64(b.copies);
-    write_u64(b.age);
     write_u64(b.created);
     write_u64(b.lifetime);
 }

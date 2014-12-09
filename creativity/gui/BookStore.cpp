@@ -82,7 +82,7 @@ void BookStore::get_value_vfunc(const iterator &iter, int column, Glib::ValueBas
             or column == columns.lifetime.index() or column == columns.copies.index()) {
         Glib::Value<unsigned long> v;
         v.init(v.value_type());
-        v.set(  column == columns.age.index() ? b.age :
+        v.set(  column == columns.age.index() ? state_->t - b.created :
                 column == columns.created.index() ? b.created :
                 column == columns.sales.index() ? b.sales :
                 column == columns.sales_lifetime.index() ? b.sales_lifetime :
@@ -138,7 +138,7 @@ LESS_GREATER(author)
 LESS_GREATER(quality)
 LESS_GREATER(revenue)
 LESS_GREATER(revenue_lifetime)
-LESS_GREATER(age)
+LESS_GREATER_A(age, created)
 LESS_GREATER(created)
 LESS_GREATER(sales)
 LESS_GREATER(sales_lifetime)

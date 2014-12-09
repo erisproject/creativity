@@ -72,7 +72,7 @@ void ReaderStore::get_value_vfunc(const iterator &iter, int column, Glib::ValueB
                 column == columns.books_new_pirated.index() ? r.new_pirated.size() :
                 column == columns.books_written.index() ? r.wrote.size() :
                 column == columns.num_friends.index() ? r.friends.size() :
-                r.wrote.empty() ? state_->t : state_->books.at(*r.wrote.crbegin()).age
+                r.wrote.empty() ? state_->t : state_->t - state_->books.at(*r.wrote.crbegin()).created
              );
         value.init(v.gobj());
     }
@@ -140,12 +140,12 @@ bool ReaderStore::greater_pos_str(const ReaderState &a, const ReaderState &b) {
     return ax == bx ? a.position[1] > b.position[1] : ax > bx;
 }
 bool ReaderStore::less_last_book_age(const ReaderState &a, const ReaderState &b) const {
-    return (a.wrote.empty() ? std::numeric_limits<unsigned long>::max() : state_->books.at(*a.wrote.crbegin()).age)
-         < (b.wrote.empty() ? std::numeric_limits<unsigned long>::max() : state_->books.at(*b.wrote.crbegin()).age);
+    return (a.wrote.empty() ? std::numeric_limits<unsigned long>::max() : state_->books.at(*a.wrote.crbegin()).created)
+         < (b.wrote.empty() ? std::numeric_limits<unsigned long>::max() : state_->books.at(*b.wrote.crbegin()).created);
 }
 bool ReaderStore::greater_last_book_age(const ReaderState &a, const ReaderState &b) const {
-    return (a.wrote.empty() ? std::numeric_limits<unsigned long>::max() : state_->books.at(*a.wrote.crbegin()).age)
-         > (b.wrote.empty() ? std::numeric_limits<unsigned long>::max() : state_->books.at(*b.wrote.crbegin()).age);
+    return (a.wrote.empty() ? std::numeric_limits<unsigned long>::max() : state_->books.at(*a.wrote.crbegin()).created)
+         > (b.wrote.empty() ? std::numeric_limits<unsigned long>::max() : state_->books.at(*b.wrote.crbegin()).created);
 }
 
 void ReaderStore::appendColumnsTo(Gtk::TreeView &v) const {
