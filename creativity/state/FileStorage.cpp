@@ -657,13 +657,13 @@ std::pair<eris_id_t, BookState> FileStorage::readBook() const {
     b.market = not std::isnan(b.price);
     b.revenue = read_dbl();
     b.revenue_lifetime = read_dbl();
-    b.sales = read_u64();
-    b.sales_lifetime = read_u64();
-    b.pirated = read_u64();
-    b.pirated_lifetime = read_u64();
-    b.copies = read_u64();
+    b.sales = read_u32();
+    b.sales_lifetime = read_u32();
+    b.pirated = read_u32();
+    b.pirated_lifetime = read_u32();
+    b.copies = read_u32();
     b.created = read_u64();
-    b.lifetime = read_u64();
+    b.lifetime = read_u32();
 
     return pair;
 }
@@ -679,13 +679,13 @@ void FileStorage::writeBook(const BookState &b) {
     write_dbl(b.price);
     write_dbl(b.revenue);
     write_dbl(b.revenue_lifetime);
-    write_u64(b.sales);
-    write_u64(b.sales_lifetime);
-    write_u64(b.pirated);
-    write_u64(b.pirated_lifetime);
-    write_u64(b.copies);
+    write_u32(b.sales);
+    write_u32(b.sales_lifetime);
+    write_u32(b.pirated);
+    write_u32(b.pirated_lifetime);
+    write_u32(b.copies);
     write_u64(b.created);
-    write_u64(b.lifetime);
+    write_u32(b.lifetime);
 }
 
 }}

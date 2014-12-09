@@ -53,8 +53,8 @@ class GUI : eris::noncopyable {
                  * exception will be displayed to the user as an error message. */
                 std::function<void(Parameter param)> setup,
 
-                /** Called to run the simulation for count periods. */
-                std::function<void(unsigned int rounds)> run,
+                /** Called to run the simulation for `rounds` periods. */
+                std::function<void(eris::eris_time_t rounds)> run,
 
                 /** Called when the user hits the stop button in the GUI. This should pause the
                  * current simulation run loop until either resume or run are called. */

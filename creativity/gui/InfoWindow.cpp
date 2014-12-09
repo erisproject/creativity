@@ -356,15 +356,6 @@ void InfoWindow::refresh(std::shared_ptr<const State> state) {
 void InfoWindow::updateValue(const std::string &code, const std::string &val) {
     fields_[code].second.set_text(val);
 }
-void InfoWindow::updateValue(const std::string &code, unsigned long val) {
-    updateValue(code, std::to_string(val));
-}
-void InfoWindow::updateValue(const std::string &code, long val) {
-    updateValue(code, std::to_string(val));
-}
-void InfoWindow::updateValue(const std::string &code, double val) {
-    updateValue(code, std::to_string(val));
-}
 
 void InfoWindow::updateMatrix(const std::string &code, const Ref<const MatrixXd> &m, bool lower_triangle) {
     size_t pos = 0;

@@ -21,7 +21,7 @@ int main(int argc, char *argv[1]) {
     std::cout << std::setprecision(16);
 
     bool setup = false, stopped = true, step = false, quit = false;
-    unsigned long run_start = 0, run_end = 0;
+    eris_time_t run_start = 0, run_end = 0;
     std::chrono::milliseconds sync_speed{50};
     bool save_to_file = false, load_from_file = false;
     unsigned int max_threads = 0;
@@ -75,7 +75,7 @@ int main(int argc, char *argv[1]) {
         }
     };
 
-    auto on_run = [&](unsigned long periods) { // Run
+    auto on_run = [&](eris_time_t periods) { // Run
         if (not setup)
             throw std::logic_error("Event error: RUN before successful SETUP");
         if (load_from_file)

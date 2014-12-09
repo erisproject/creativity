@@ -208,11 +208,11 @@ class FileStorage : public Storage, private eris::noncopyable {
          */
         mutable std::vector<std::weak_ptr<const State>> states_;
 
-        /** The header contains the first 57 state locations (bytes 48 through 504); if the file has
-         * more states, the location at 504 points to a "continuation block": 63 state locations and
-         * a further continuation block location.  This variable stores the file locations of
-         * continuation blocks, read when the file is first opened and updated as updates require
-         * additional blocks.
+        /** The header contains the first 485 state locations (bytes 208 through 4887); if the file
+         * has more states, the location at 4088 points to a "continuation block": 511 state
+         * locations and a further continuation block location.  This variable stores the file
+         * locations of continuation blocks, read when the file is first opened and updated as
+         * updates require additional blocks.
          */
         std::vector<std::streampos> cont_pos_;
 
@@ -441,16 +441,6 @@ class FileStorage : public Storage, private eris::noncopyable {
          */
         void writeBelief(const belief::Linear &belief);
 
-        /** Returns the belief size (in terms of number of doubles) for an belief record of K
-         * parameters, not including the initial u32 K value.  Multiple by `sizeof(double)` to get
-         * the size in bytes. */
-        static constexpr uint32_t beliefRecordSize(unsigned int K) {
-            return
-                K // beta
-                + 2 // s2 and n
-                + K*(K+1)/2; // V lower triangle
-        }
-
         /** Reads a book state data from the current file position and returns it in a <eris_id_t,
          * BookState> pair, where the eris_id_t is the book id.  The book data is:
          *
@@ -461,13 +451,13 @@ class FileStorage : public Storage, private eris::noncopyable {
          *     dbl          price (market is derived from this: market=true unless price is NaN)
          *     dbl          revenue
          *     dbl          revenueLifetime
-         *     u64          sales
-         *     u64          salesLifetime
-         *     u64          pirated
-         *     u64          piratedLifetime
-         *     u64          copies
+         *     u32          sales
+         *     u32          salesLifetime
+         *     u32          pirated
+         *     u32          piratedLifetime
+         *     u32          copies
          *     u64          created
-         *     u64          lifetime
+         *     u32          lifetime
          */
         std::pair<eris::eris_id_t, BookState> readBook() const;
 

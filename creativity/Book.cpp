@@ -11,7 +11,7 @@ Book::Book(
         std::shared_ptr<Creativity> creativity,
         const Position &p,
         SharedMember<Reader> author,
-        unsigned long order,
+        unsigned int order,
         double initial_price,
         double quality,
         std::function<double(const Book&, const Reader&)> qDraw)
@@ -49,38 +49,38 @@ void Book::weakDepRemoved(SharedMember<Member>, eris_id_t old) {
     }
 }
 
-unsigned long Book::age() const {
+eris_time_t Book::age() const {
     return simulation()->t() - created_;
 }
 
-const unsigned long& Book::created() const {
+const eris_time_t& Book::created() const {
     return created_;
 }
 
-const unsigned long& Book::outOfPrint() const {
+const eris_time_t& Book::outOfPrint() const {
     return out_of_print_;
 }
 
-unsigned long Book::marketPeriods() const {
+unsigned int Book::marketPeriods() const {
     return hasMarket()
         ? age() + 1 // Plus 1 to count the current period
         : outOfPrint() - created();
 }
 
-const unsigned long& Book::order() const {
+const unsigned int& Book::order() const {
     return order_;
 }
 
-unsigned long Book::lifeSales() const {
+unsigned int Book::lifeSales() const {
     auto lock = readLock();
     return copies_sold_total_;
 }
 
-unsigned long Book::currSales() const {
+unsigned int Book::currSales() const {
     return sales(simulation()->t());
 }
 
-unsigned long Book::sales(unsigned long t) const {
+unsigned int Book::sales(eris_time_t t) const {
     if (t < created_) return 0;
     auto lock = readLock();
     auto it = copies_sold_.find(t);
@@ -88,14 +88,14 @@ unsigned long Book::sales(unsigned long t) const {
     return it->second;
 }
 
-unsigned long Book::lifePirated() const {
+unsigned int Book::lifePirated() const {
     auto lock = readLock();
     return copies_pirated_total_;
 }
-unsigned long Book::currPirated() const {
+unsigned int Book::currPirated() const {
     return pirated(simulation()->t());
 }
-unsigned long Book::pirated(unsigned long t) const {
+unsigned int Book::pirated(eris_time_t t) const {
     if (t < created_) return 0;
     auto lock = readLock();
     auto it = copies_pirated_.find(t);
@@ -103,7 +103,7 @@ unsigned long Book::pirated(unsigned long t) const {
     return it->second;
 }
 
-void Book::recordSale(unsigned long count, double revenue) {
+void Book::recordSale(unsigned int count, double revenue) {
     auto lock = writeLock();
     copies_sold_total_ += count;
     revenue_total_ += revenue;
@@ -112,7 +112,7 @@ void Book::recordSale(unsigned long count, double revenue) {
     revenue_[t] += revenue;
 }
 
-void Book::recordPiracy(unsigned long new_copies) {
+void Book::recordPiracy(unsigned int new_copies) {
     auto lock = writeLock();
     copies_pirated_total_ += new_copies;
     copies_pirated_[simulation()->t()] += new_copies;
@@ -127,7 +127,7 @@ double Book::currRevenue() const {
     return revenue(simulation()->t());
 }
 
-double Book::revenue(unsigned long t) const {
+double Book::revenue(eris_time_t t) const {
     if (t < created_) return 0.0;
     auto lock = readLock();
     auto it = revenue_.find(t);
@@ -135,13 +135,13 @@ double Book::revenue(unsigned long t) const {
     return it->second;
 }
 
-unsigned long Book::copies() const {
+unsigned int Book::copies() const {
     auto lock = readLock();
     return lifeSales() + lifePirated();
 }
 
-unsigned long Book::queryCopies() const {
-    unsigned long copies = 0;
+unsigned int Book::queryCopies() const {
+    unsigned int copies = 0;
     SharedMember<Book> me(sharedSelf());
     for (auto &r : simulation()->agents<Reader>()) {
         if (r->library().count(me))

@@ -51,31 +51,31 @@ class BookState final {
         double revenue_lifetime;
 
         /// The number of sales of copies of this book in the current period.
-        unsigned long sales;
+        unsigned int sales;
 
         /// The cumulative lifetime sales of copies of this book, up to and including the current period.
-        unsigned long sales_lifetime;
+        unsigned int sales_lifetime;
 
         /// The number of pirated copies of this book in the current period.
-        unsigned long pirated;
+        unsigned int pirated;
 
         /// The cumulative lifetime pirated copies of the book, up to and including the current period.
-        unsigned long pirated_lifetime;
+        unsigned int pirated_lifetime;
 
         /** The number of copies of this book in the simulation.  This will always be at least
          * `.sales_lifetime + 1` (the `+ 1` because the author has a copy of his own book), and can
          * higher if there are non-sale, i.e., piratic ways of obtaining a copy of a book.
          */
-        unsigned long copies;
+        unsigned int copies;
 
         /// The period in which this book ws created.  Directly related to age.
-        unsigned long created;
+        eris::eris_time_t created;
 
         /** The number of periods this book was (or has been) on the market.  If this book is
          * currently on the market, this is simply the age plus 1; if not on the market, this is the
          * number of periods that the book was on the market.
          */
-        unsigned long lifetime;
+        unsigned int lifetime;
 };
 
 }}

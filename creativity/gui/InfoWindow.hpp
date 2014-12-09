@@ -69,14 +69,14 @@ class InfoWindow : public Gtk::Window {
     protected:
         /// Sets up the dialog window properties, associates it with the parent, etc.
         void initWindow(Gtk::Window &parent);
-        /// Updates a single value Gtk::Label text with the given string
+        /// Updates a single value Gtk::Label text with the given value by passing it to
+        /// std::to_string
+        template <class T, typename = typename std::enable_if<std::is_arithmetic<T>::value>::type>
+        void updateValue(const std::string &code, const T &val) {
+            updateValue(code, std::to_string(val));
+        }
+        /// Updates a single value Gtk::LAbel text with the given string
         void updateValue(const std::string &code, const std::string &val);
-        /// Updates a single value Gtk::Label text with the given unsigned long
-        void updateValue(const std::string &code, unsigned long val);
-        /// Updates a single value Gtk::Label text with the given long
-        void updateValue(const std::string &code, long val);
-        /// Updates a single value Gtk::Label text with the given double
-        void updateValue(const std::string &code, double val);
         /** Updates a matrix set up with matrix_at with the values of the given matrix.  If the
          * optional lower_triangle parameter is given as true, only the lower diagonal of the matrix
          * is displayed; the upper-triangle values are set to blanks.

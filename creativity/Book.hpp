@@ -41,16 +41,16 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
          * Note that a reference to the author is stored internally: even if the author is removed
          * from the simulation, it will still be kept from destruction by this class.
          */
-        Book(std::shared_ptr<Creativity> creativity, const eris::Position &p, eris::SharedMember<Reader> author, unsigned long order,
+        Book(std::shared_ptr<Creativity> creativity, const eris::Position &p, eris::SharedMember<Reader> author, unsigned int order,
                 double initial_price, double quality, std::function<double(const Book&, const Reader&)> qDraw);
 
         /// Returns the age of the book, in simulation periods.
-        unsigned long age() const;
+        eris::eris_time_t age() const;
 
         /** Returns the simulation period in which the book became available (i.e. the book was
          * written at the beginning of `created()`.
          */
-        const unsigned long& created() const;
+        const eris::eris_time_t& created() const;
 
         /** Returns the first simulation period in which the book was no longer on the market.  The
          * returned value should only be used if hasMarket() returns false.
@@ -59,7 +59,7 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
          * \sa marketPeriods()
          * \sa age()
          */
-        const unsigned long& outOfPrint() const;
+        const eris::eris_time_t& outOfPrint() const;
 
         /** Returns the number of periods the book has been (or was) available on the market,
          * including the current period (if the book is still on the market).  The value returned by
@@ -73,12 +73,12 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
          * \sa outOfPrint()
          * \sa created()
          */
-        unsigned long marketPeriods() const;
+        unsigned int marketPeriods() const;
 
         /** Returns the order of this book in the author's set of books.  A value of 0 indicates
          * that this is the author's first book, 3 indicates an author's 4th book, etc.
          */
-        const unsigned long& order() const;
+        const unsigned int& order() const;
 
         /** When the Book is added to the simulation it also creates an associated BookMarket object
          * that handles sales of copies of the book.
@@ -118,22 +118,22 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         double price() const;
 
         /// Returns the lifelong number of sales of this book
-        unsigned long lifeSales() const;
+        unsigned int lifeSales() const;
 
         /// Returns the number of sales of this book so far in the current period
-        unsigned long currSales() const;
+        unsigned int currSales() const;
 
         /// Returns the number of sales in simulation period `t`
-        unsigned long sales(unsigned long t) const;
+        unsigned int sales(eris::eris_time_t t) const;
 
         /// Returns the lifelong number of pirated copies of this book
-        unsigned long lifePirated() const;
+        unsigned int lifePirated() const;
 
         /// Returns the number of pirated copies of this book so far in the current period
-        unsigned long currPirated() const;
+        unsigned int currPirated() const;
 
         /// Returns the number of pirated copies in simulation period `t`
-        unsigned long pirated(unsigned long t) const;
+        unsigned int pirated(eris::eris_time_t t) const;
 
         /// Returns the lifelong revenue of this book
         double lifeRevenue() const;
@@ -142,14 +142,14 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         double currRevenue() const;
 
         /// Returns the revenue earned by this book in simulation period `t`
-        double revenue(unsigned long t) const;
+        double revenue(eris::eris_time_t t) const;
 
         /** Returns `lifeSales() + lifePirated()` (but atomically), reflecting the number of copies
          * of the book that have been made.  This should always be one less than the total in the
          * simulation, as the author also has a copy of the book in his library which is neither a
          * sale nor a pirated copy.
          */
-        unsigned long copies() const;
+        unsigned int copies() const;
 
         /** Queries the simulation for the number of copies of this book in existence.  So long as
          * no readers are removed from the simulation, this should always be exactly one larger than
@@ -158,19 +158,19 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
          * examine the library of every reader in the simulation.  Calling copies() is generally
          * preferable.
          */
-        unsigned long queryCopies() const;
+        unsigned int queryCopies() const;
 
         /** Increase the sales and revenue of this book for the current period.  This can safely be
          * called multiple times per period.  Both the current sales/revenue values and global
          * revenue values will be increased by the call.
          */
-        void recordSale(unsigned long new_sales, double new_revenue);
+        void recordSale(unsigned int new_sales, double new_revenue);
 
         /** Increase the number of pirated copies of this book for the current period.  This can
          * safely be called multiple times per period.  Both the current piracy count and global
          * piracy count will be increased by the call.
          */
-        void recordPiracy(unsigned long new_copies);
+        void recordPiracy(unsigned int new_copies);
 
         /** Returns the actual, fixed quality value of the book.  This is meant to be used by the
          * author and the `qDraw` callable object given during construction; readers of the book
@@ -189,12 +189,13 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
 
     private:
         std::shared_ptr<Creativity> creativity_;
-        unsigned long created_, out_of_print_, copies_sold_total_, copies_pirated_total_;
+        eris::eris_time_t created_, out_of_print_;
+        unsigned int copies_sold_total_, copies_pirated_total_;
         double revenue_total_;
-        std::map<unsigned long, unsigned long> copies_sold_, copies_pirated_;
-        std::map<unsigned long, double> revenue_;
+        std::map<eris::eris_time_t, unsigned int> copies_sold_, copies_pirated_;
+        std::map<eris::eris_time_t, double> revenue_;
         eris::SharedMember<Reader> author_;
-        const unsigned long order_;
+        const unsigned int order_;
         eris::eris_id_t market_;
         const double init_price_, quality_;
         std::function<double(const Book&, const Reader&)> quality_draw_;
