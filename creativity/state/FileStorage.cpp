@@ -656,7 +656,6 @@ std::pair<eris_id_t, BookState> FileStorage::readBook() const {
 
     b.quality = read_dbl();
     b.price = read_dbl();
-    b.market = not std::isnan(b.price);
     b.revenue = read_dbl();
     b.revenue_lifetime = read_dbl();
     b.sales = read_u32();

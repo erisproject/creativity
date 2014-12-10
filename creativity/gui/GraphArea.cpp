@@ -157,7 +157,7 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
                 // Give new books a larger cross: a brand new book gets a point scaled larges; this
                 // scaling decreases linearly until reading the regular size.
 
-                if (b.market) {
+                if (b.market()) {
                     if (design.enabled.book_live) {
                         const double scale = std::max(1.0, design.size.book_live_scale_a - design.size.book_live_scale_b*(state->t - b.created));
                         drawPoint(cr, trans, b.position[0], b.position[1], design.style.book_live,
@@ -205,7 +205,7 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
             cr->save();
             for (auto &bpair : state->books) {
                 auto &b = bpair.second;
-                if (b.market) {
+                if (b.market()) {
                     if (not design.enabled.author_live) continue;
 
                     cr->set_source(design.colour.author_live);

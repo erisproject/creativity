@@ -578,7 +578,7 @@ void GUI::thr_init_rtree(RTree &rt, const std::shared_ptr<const State> &state) c
     }
     if (graph_->design.enabled.book_live or graph_->design.enabled.book_dead) {
         for (auto &b : state->books) {
-            if (b.second.market ? graph_->design.enabled.book_live : graph_->design.enabled.book_dead)
+            if (b.second.market() ? graph_->design.enabled.book_live : graph_->design.enabled.book_dead)
                 rt.insert(std::make_pair(rt_point{b.second.position[0], b.second.position[1]}, b.second.id));
         }
     }

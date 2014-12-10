@@ -326,7 +326,7 @@ void InfoWindow::refresh(std::shared_ptr<const State> state) {
             updateValue("id", b.id);
             updateValue("author", b.author);
             updateValue("position", GUI::pos_to_string(b.position));
-            updateValue("market", b.market ? "yes" : "no");
+            updateValue("market", b.market() ? "yes" : "no");
             updateValue("price", b.price);
             updateValue("quality", b.quality);
             updateValue("created", b.created);
@@ -337,7 +337,7 @@ void InfoWindow::refresh(std::shared_ptr<const State> state) {
             updateValue("salesLast", b.sales);
             updateValue("pirated", b.pirated_lifetime);
             updateValue("piratedLast", b.pirated);
-            updateValue("copies", b.sales_lifetime + b.pirated_lifetime);
+            updateValue("copies", b.copies_lifetime());
         }
         else {
             // If the user navigates back in time to a period where the book doesn't exist, set

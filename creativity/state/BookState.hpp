@@ -1,9 +1,8 @@
 #pragma once
-#include <vector>
-#include <unordered_map>
 #include <eris/Position.hpp>
 #include <eris/SharedMember.hpp>
 #include <eris/noncopyable.hpp>
+#include <cmath>
 
 namespace creativity {
 class Book; // forward declaration
@@ -37,8 +36,10 @@ class BookState final {
         /// The quality parameter of this book, which is the mean of reader quality draws.
         double quality;
 
-        /// True if this book was on the market this period, false if not.
-        bool market;
+        /** Returns true if this book was on the market this period, false if not.  The is implied
+         * by the price: a NaN price indicates a non-market status.
+         */
+        bool market() const { return not std::isnan(price); }
 
         /// The market price of this book; will be NaN if this book was not on the market.
         double price;
@@ -60,6 +61,16 @@ class BookState final {
 
         /// The cumulative lifetime pirated copies of the book, up to and including the current period.
         unsigned int pirated_lifetime;
+
+        /** Returns the number of new copies created in the current period.  This is simply
+         * `sales + pirated`.
+         */
+        unsigned int copies() const { return pirated + sales; }
+
+        /** Returns the cumulative lifetime copies of the book, up to and including the current
+         * period.  This is simply `sales_lifetime + pirated_lifetime`.
+         */
+        inline unsigned int copies_lifetime() const { return pirated_lifetime + sales_lifetime; }
 
         /// The period in which this book ws created.  Directly related to age.
         eris::eris_time_t created;

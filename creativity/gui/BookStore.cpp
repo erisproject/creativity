@@ -67,7 +67,7 @@ void BookStore::get_value_vfunc(const iterator &iter, int column, Glib::ValueBas
     else if (column == columns.market.index()) {
         Glib::Value<bool> v;
         v.init(v.value_type());
-        v.set(b.market);
+        v.set(b.market());
         value.init(v.gobj());
     }
     else if (column == columns.pos_str.index()) {
@@ -89,7 +89,7 @@ void BookStore::get_value_vfunc(const iterator &iter, int column, Glib::ValueBas
                 column == columns.pirated.index() ? b.pirated :
                 column == columns.pirated_lifetime.index() ? b.pirated_lifetime :
                 column == columns.lifetime.index() ? b.lifetime :
-                b.pirated_lifetime + b.sales_lifetime
+                b.copies_lifetime()
              );
         value.init(v.gobj());
     }
@@ -145,11 +145,10 @@ LESS_GREATER(sales_lifetime)
 LESS_GREATER(pirated)
 LESS_GREATER(pirated_lifetime)
 LESS_GREATER(lifetime)
-LESS_GREATER(market)
+LESS_GREATER_A(market, market())
+LESS_GREATER_A(copies, copies_lifetime())
 #undef LESS_GREATER
 #undef LESS_GREATER_A
-bool BookStore::less_copies   (const BookState &a, const BookState &b) { return a.sales_lifetime + a.pirated_lifetime < b.sales_lifetime + b.pirated_lifetime; }
-bool BookStore::greater_copies(const BookState &a, const BookState &b) { return a.sales_lifetime + a.pirated_lifetime > b.sales_lifetime + b.pirated_lifetime; }
 // First x, then y for ties
 bool BookStore::less_pos_str(const BookState &a, const BookState &b) {
     auto ax = a.position[0], bx = b.position[0];
@@ -162,12 +161,12 @@ bool BookStore::greater_pos_str(const BookState &a, const BookState &b) {
 // For sorting purposes, marketless books are considered to have a price of negative infinity
 // (rather than the model value of quiet_NaN) to sort them at one end.
 bool BookStore::less_price(const BookState &a, const BookState &b) {
-    return (a.market ? a.price : -std::numeric_limits<double>::infinity())
-         < (b.market ? b.price : -std::numeric_limits<double>::infinity());
+    return (a.market() ? a.price : -std::numeric_limits<double>::infinity())
+         < (b.market() ? b.price : -std::numeric_limits<double>::infinity());
 }
 bool BookStore::greater_price(const BookState &a, const BookState &b) {
-    return (a.market ? a.price : -std::numeric_limits<double>::infinity())
-         > (b.market ? b.price : -std::numeric_limits<double>::infinity());
+    return (a.market() ? a.price : -std::numeric_limits<double>::infinity())
+         > (b.market() ? b.price : -std::numeric_limits<double>::infinity());
 }
 
 void BookStore::appendColumnsTo(Gtk::TreeView &v) const {
