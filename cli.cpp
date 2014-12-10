@@ -9,6 +9,7 @@
 #include <Eigen/Core>
 #include <tclap/CmdLine.h>
 #include <sys/stat.h>
+#include <typeinfo>
 
 using namespace creativity;
 using namespace creativity::state;
@@ -64,12 +65,17 @@ class RangeConstraint : public TCLAP::Constraint<T> {
                 return "Value must be between " + output_string(min) + " and " + output_string(max);
         }
         virtual std::string shortID() const override {
-            if (max == BIGGEST)
-                return "V ≥ " + output_string(min);
-            else if (min == LOWEST)
-                return "V ≤ " + output_string(max);
-            else
-                return "V ∈ [" + output_string(min) + "," + output_string(max) + "]";
+            std::string type =
+                std::is_floating_point<T>::value ? "real" :
+                std::is_integral<T>::value ? (std::is_unsigned<T>::value ? "positive integer" : "integer") :
+                "v"; // fallback
+            if (max != BIGGEST and min != LOWEST)
+                return type + u8"∈[" + output_string(min) + "," + output_string(max) + "]";
+            else if (max == BIGGEST and min != LOWEST)
+                return type + u8"≥" + output_string(min);
+            else if (max != BIGGEST and min == LOWEST)
+                return type + u8"≤" + output_string(max);
+            else return type;
         }
         virtual bool check(const T &val) const override {
             return val >= min and val <= max;
@@ -93,7 +99,7 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         cmd.startReverseHack();
  
 #define OPTION_UNBOUNDED_NAME(NAME, PARAM, SHORT, LONG, DESC) \
-         RangeConstraint<decltype(cr.parameters.PARAM)> opt_##NAME##_constr; \
+        RangeConstraint<decltype(cr.parameters.PARAM)> opt_##NAME##_constr; \
         TCLAP::ValueArg<decltype(cr.parameters.PARAM)> opt_##NAME##_arg(SHORT, LONG, DESC, false, cr.parameters.PARAM, &opt_##NAME##_constr, cmd)
 #define OPTION_LBOUND_NAME(NAME, PARAM, SHORT, LONG, DESC, LBOUND) \
         auto opt_##NAME##_constr = RangeConstraint<decltype(cr.parameters.PARAM)>::GE(LBOUND); \
@@ -116,8 +122,8 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
 // Single-letter options used:
 // b B c C d D f i j k K m M n N o O P Q r R s T w W x y z Z
 
-        OPTION_LBOUND(dimensions, "D", "dimensions", "Number of dimensions of the simulation", 1);
         OPTION_LBOUND(readers, "r", "readers", "Number of reader/author agents in the simulation", 1);
+        OPTION_LBOUND(dimensions, "D", "dimensions", "Number of dimensions of the simulation", 1);
         auto opt_density_constr = RangeConstraint<double>::GE(std::numeric_limits<double>::min());
         TCLAP::ValueArg<double> opt_density_arg("d", "density", "Reader density (in readers per unit^(D), where D is the configured # of dimensions)",
                 false, Creativity::densityFromBoundary(cr.parameters.readers, cr.parameters.dimensions, cr.parameters.boundary), &opt_density_constr, cmd);
