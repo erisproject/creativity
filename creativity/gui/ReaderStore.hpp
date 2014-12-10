@@ -42,6 +42,7 @@ class ReaderStore : public MemberStore<state::ReaderState>, private Glib::Object
                     u_lifetime, ///< Cumulative lifetime utility of the reader
                     cost_fixed, ///< Fixed cost of keeping a book on the market
                     cost_unit, ///< Unit cost of creating and selling a copy of a book
+                    cost_piracy, ///< Unit cost of receiving a pirated copy of a book
                     income; ///< The reader's external income
                 Gtk::TreeModelColumn<std::string> pos_str; ///< position of the book as a string such as `(-7.16,0.440)`
                 Gtk::TreeModelColumn<size_t> books_owned, ///< Number of books possessed by this reader
@@ -57,7 +58,7 @@ class ReaderStore : public MemberStore<state::ReaderState>, private Glib::Object
             private:
                 ColRec() {
                     add(id); add(pos_x); add(pos_y); add(pos_str); add(u); add(u_lifetime);
-                    add(cost_fixed); add(cost_unit); add(income); add(num_friends);
+                    add(cost_fixed); add(cost_unit); add(cost_piracy); add(income); add(num_friends);
                     add(books_owned); add(books_purchased); add(books_pirated);
                     add(books_new); add(books_new_purchased); add(books_new_pirated);
                     add(books_written); add(last_book_age);
@@ -125,6 +126,7 @@ class ReaderStore : public MemberStore<state::ReaderState>, private Glib::Object
         LESS_GREATER_METHODS(u_lifetime)
         LESS_GREATER_METHODS(cost_fixed)
         LESS_GREATER_METHODS(cost_unit)
+        LESS_GREATER_METHODS(cost_piracy)
         LESS_GREATER_METHODS(income)
         LESS_GREATER_METHODS(books_owned)
         LESS_GREATER_METHODS(books_purchased)

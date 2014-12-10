@@ -451,6 +451,7 @@ std::pair<eris::eris_id_t, ReaderState> FileStorage::readReader() const {
     // Costs
     r.cost_fixed = read_dbl();
     r.cost_unit = read_dbl();
+    r.cost_piracy = read_dbl();
     r.income = read_dbl();
 
     // Beliefs
@@ -583,6 +584,7 @@ void FileStorage::writeReader(const ReaderState &r) {
     // Costs
     write_value(r.cost_fixed);
     write_value(r.cost_unit);
+    write_value(r.cost_piracy);
     write_value(r.income);
 
     // Beliefs

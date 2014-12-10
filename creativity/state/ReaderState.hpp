@@ -58,6 +58,9 @@ class ReaderState final {
         /// Unit cost of creating a copy of a book
         double cost_unit;
 
+        /// Unit cost of obtaining a pirated copy of a book
+        double cost_piracy;
+
         /// Per-period (external) income
         double income;
 

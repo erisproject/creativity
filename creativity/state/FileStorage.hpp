@@ -356,6 +356,7 @@ class FileStorage : public Storage, private eris::noncopyable {
          *     dbl              u_lifetime
          *     dbl              cost_fixed
          *     dbl              cost_unit
+         *     dbl              cost_piracy
          *     dbl              income
          *     BELIEF           profit belief
          *     BELIEF           profit extrapolated belief

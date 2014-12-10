@@ -383,14 +383,20 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         double writer_quality_sd{1.0};
 
         /// The fixed cost of keeping a book on the market for a period.
-        double cost_fixed{0};
+        double cost_fixed;
 
         /** The unit cost of producing a copy of a book on the market.  Copies are produced
          * instantly as required; no preallocated number of copies is performed.
          */
         double cost_unit{0};
 
-        /// The per-unit income the reader receives.
+        /** The unit cost of obtaining a pirated copy of the work from a friend.  This cost is
+         * incurred by the recipient when making the copy, not the source.  Like purchased copies,
+         * pirated copies are created instantly as required.
+         */
+        double cost_piracy{0};
+
+        /// The per-period income the reader receives.
         double income{0};
 
         /** The reader's creation function shape coefficient.  This reader can exhert effort \f$\ell

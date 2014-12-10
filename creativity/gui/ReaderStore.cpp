@@ -39,7 +39,7 @@ void ReaderStore::get_value_vfunc(const iterator &iter, int column, Glib::ValueB
         value.init(v.gobj());
     }
     else if (column == columns.pos_x.index() or column == columns.pos_y.index() or column == columns.u.index() or column == columns.u_lifetime.index()
-            or column == columns.cost_fixed.index() or column == columns.cost_unit.index() or column == columns.income.index()) {
+            or column == columns.cost_fixed.index() or column == columns.cost_unit.index() or columns.cost_piracy.index() or column == columns.income.index()) {
         Glib::Value<double> v;
         v.init(v.value_type());
         v.set(  column == columns.pos_x.index() ? r.position[0] :
@@ -48,6 +48,7 @@ void ReaderStore::get_value_vfunc(const iterator &iter, int column, Glib::ValueB
                 column == columns.u_lifetime.index() ? r.u_lifetime :
                 column == columns.cost_fixed.index() ? r.cost_fixed :
                 column == columns.cost_unit.index() ? r.cost_unit :
+                column == columns.cost_piracy.index() ? r.cost_piracy :
                 r.income
              );
         value.init(v.gobj());
