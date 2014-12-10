@@ -38,7 +38,7 @@ class ReaderState final {
             friends, ///< Friends of the reader
             library_purchased, ///< The set of book IDs in `library` that were purchased.
             library_pirated, ///< The set of book IDs in `library` that were pirated.
-            new_books, ///< The set of book IDs that were newly obtained in the period.
+            new_books, ///< The set of book IDs that were newly obtained in the period, not including self-authored books.
             new_purchased, ///< The set of new book IDs that were purchased in the period.
             new_pirated; ///< The set of new book IDs that were pirated in the period.
 
