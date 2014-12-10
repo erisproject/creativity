@@ -1,7 +1,6 @@
 #pragma once
 #include <vector>
 #include <unordered_map>
-#include <eris/types.hpp>
 #include <eris/Position.hpp>
 #include <eris/SharedMember.hpp>
 #include <eris/noncopyable.hpp>
@@ -61,12 +60,6 @@ class BookState final {
 
         /// The cumulative lifetime pirated copies of the book, up to and including the current period.
         unsigned int pirated_lifetime;
-
-        /** The number of copies of this book in the simulation.  This will always be at least
-         * `.sales_lifetime + 1` (the `+ 1` because the author has a copy of his own book), and can
-         * higher if there are non-sale, i.e., piratic ways of obtaining a copy of a book.
-         */
-        unsigned int copies;
 
         /// The period in which this book ws created.  Directly related to age.
         eris::eris_time_t created;

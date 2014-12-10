@@ -30,7 +30,7 @@ class BookStore : public MemberStore<state::BookState>, Glib::Object {
          * - lifetime sales
          * - current pirated copies
          * - lifetime pirated copies
-         * - copies
+         * - lifetime copies (= lifetime pirated copies + lifetime sales)
          * - lifetime (# periods on market)
          *
          * \param state the simulation state object containing the books to list
@@ -65,11 +65,7 @@ class BookStore : public MemberStore<state::BookState>, Glib::Object {
                     sales_lifetime, ///< Lifetime copies sold
                     pirated, ///< Copies sold in the current period
                     pirated_lifetime, ///< Lifetime copies sold
-                    /** Copies that exist in the simulation.  This is at least one larger than the
-                     * number of lifetime sales because the author has a copy (which wasn't a sale),
-                     * if there is non-sale piracy, this value could be much greater than lifetime
-                     * sales. */
-                    copies,
+                    copies, ///< Lifetime copies (sold + pirated)
                     lifetime; ///< Number of periods the book has been or was on the market
 
             private:

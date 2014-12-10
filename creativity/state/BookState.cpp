@@ -23,7 +23,6 @@ BookState::BookState(const Book &b) :
     sales_lifetime{b.lifeSales()},
     pirated{b.currPirated()},
     pirated_lifetime{b.lifePirated()},
-    copies{b.copies()},
     created{b.created()},
     lifetime{b.marketPeriods()}
 {}

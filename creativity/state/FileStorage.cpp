@@ -661,7 +661,6 @@ std::pair<eris_id_t, BookState> FileStorage::readBook() const {
     b.sales_lifetime = read_u32();
     b.pirated = read_u32();
     b.pirated_lifetime = read_u32();
-    b.copies = read_u32();
     b.created = read_u64();
     b.lifetime = read_u32();
 
@@ -683,7 +682,6 @@ void FileStorage::writeBook(const BookState &b) {
     write_u32(b.sales_lifetime);
     write_u32(b.pirated);
     write_u32(b.pirated_lifetime);
-    write_u32(b.copies);
     write_u64(b.created);
     write_u32(b.lifetime);
 }

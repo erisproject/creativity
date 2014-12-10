@@ -89,7 +89,7 @@ void BookStore::get_value_vfunc(const iterator &iter, int column, Glib::ValueBas
                 column == columns.pirated.index() ? b.pirated :
                 column == columns.pirated_lifetime.index() ? b.pirated_lifetime :
                 column == columns.lifetime.index() ? b.lifetime :
-                b.copies
+                b.pirated_lifetime + b.sales_lifetime
              );
         value.init(v.gobj());
     }
@@ -146,9 +146,10 @@ LESS_GREATER(pirated)
 LESS_GREATER(pirated_lifetime)
 LESS_GREATER(lifetime)
 LESS_GREATER(market)
-LESS_GREATER(copies)
 #undef LESS_GREATER
 #undef LESS_GREATER_A
+bool BookStore::less_copies   (const BookState &a, const BookState &b) { return a.sales_lifetime + a.pirated_lifetime < b.sales_lifetime + b.pirated_lifetime; }
+bool BookStore::greater_copies(const BookState &a, const BookState &b) { return a.sales_lifetime + a.pirated_lifetime > b.sales_lifetime + b.pirated_lifetime; }
 // First x, then y for ties
 bool BookStore::less_pos_str(const BookState &a, const BookState &b) {
     auto ax = a.position[0], bx = b.position[0];
