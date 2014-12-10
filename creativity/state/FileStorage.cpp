@@ -484,7 +484,7 @@ std::pair<eris::eris_id_t, ReaderState> FileStorage::readReader() const {
         belief = readBelief();
         if (belief.K == 0) throwParseError("found illegal profitStream belief with K = 0 (i.e. default constructed model)");
         else if (r.profit_stream.count(belief.K)) throwParseError("found duplicate K value in profit_stream beliefs");
-        r.profit_stream.emplace(belief.beta.rows(), belief.noninformative
+        r.profit_stream.emplace((unsigned int) belief.beta.rows(), belief.noninformative
                 ? ProfitStream(belief.K)
                 : ProfitStream(belief.beta, belief.s2, belief.V, belief.n));
     }
