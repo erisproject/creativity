@@ -531,10 +531,10 @@ FileStorage::belief_data FileStorage::readBelief() const {
     // The last K*(K+1)/2 are the V values (but we set them symmetrically in V)
     belief.V = MatrixXd(k, k);
     for (unsigned int r = 0; r < belief.K; r++) {
-        for (unsigned int c = r; c < belief.K; c++) {
+        for (unsigned int c = 0; c <= r; c++) {
             double cov = read_dbl();
             belief.V(r,c) = cov;
-            belief.V(c,r) = cov;
+            if (c != r) belief.V(c,r) = cov;
         }
     }
 
@@ -634,9 +634,9 @@ void FileStorage::writeBelief(const Linear &m) {
     write_dbl(m.n());
 
     auto &V = m.V();
-    // The last k*(k+1)/2 are the lower triangle of the V matrix, in column major order
+    // The last k*(k+1)/2 are the lower triangle of the V matrix, in row major order
     for (unsigned int r = 0; r < k; r++) {
-        for (unsigned int c = r; c < k; c++) {
+        for (unsigned int c = 0; c <= r; c++) {
             write_dbl(V(r,c));
         }
     }
