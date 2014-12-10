@@ -23,6 +23,27 @@ Linear::Linear(
     checkLogic();
 }
 
+Linear::Linear(
+        const std::vector<double> &beta,
+        double s2,
+        const std::vector<double> &V,
+        double n
+        )
+    : beta_(beta.size()), s2_(s2), V_(beta.size(), beta.size()), n_(n), K_(beta.size())
+{
+    checkLogic();
+    if (V.size() != K_*(K_+1)/2)
+        throw std::logic_error("Linear vector constructor called with invalid V vector for model with K=" + std::to_string(K_) +
+                " (expected " + std::to_string(K_*(K_+1)/2) + " lower triangle elements, received " + std::to_string(V.size()) + ")");
+
+    for (unsigned int k = 0; k < K_; k++) beta_[k] = beta[k];
+    for (unsigned int r = 0, i = 0; r < K_; r++) for (unsigned int c = 0; c <= r; c++, i++) {
+        const double &vij = V[i];
+        V_(r,c) = vij;
+        if (r != c) V_(c,r) = vij;
+    }
+}
+
 Linear::Linear(unsigned int K) :
     beta_{VectorXd::Zero(K)}, s2_{NONINFORMATIVE_S2}, V_{MatrixXd::Identity(K, K)},
     n_{NONINFORMATIVE_N}, noninformative_{true}, K_{K}

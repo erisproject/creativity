@@ -83,6 +83,24 @@ class Linear {
                 std::shared_ptr<Eigen::MatrixXd> V_chol_L = nullptr
         );
 
+        /** Constructs a Linear model from std::vector<double>s containing the coefficients of beta
+         * and the lower triangle of V.
+         *
+         * \param beta a vector of coefficients, which determines k, the number of model parameters.
+         * \param s2 the \f$\sigma^2\f$ value of the error term variance.  Typically the \f$\sigma^2\f$ estimate.
+         * \param V a K*(K+1)/2-length vector of V values which are the lower triangle values of V
+         * in row-major order; upper-triangle values are copied from the (symmetric) lower triangle
+         * values.
+         * \param n the number of data points supporting the other values (which can be a
+         * non-integer value).
+         */
+        Linear(
+                const std::vector<double> &beta,
+                double s2,
+                const std::vector<double> &V,
+                double n
+        );
+
         /** Default constructor: this constructor exists only to allow Linear objects to be default
          * constructed: default constructed objects are models of 0 parameters; such models will
          * throw an std::logic_error exception if any method other than copy or move assignment is
