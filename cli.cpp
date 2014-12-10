@@ -175,9 +175,26 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         cr.set().boundary = Creativity::boundaryFromDensity(cr.parameters.readers, cr.parameters.dimensions, opt_density_arg.getValue());
         COPY_PARAM_SETTING(book_distance_sd);
         COPY_PARAM_SETTING(book_quality_sd);
+        COPY_PARAM_SETTING(reader_step_sd);
+        COPY_PARAM_SETTING(reader_creation_shape);
+        COPY_PARAM_SETTING(reader_creation_scale_min);
+        COPY_PARAM_SETTING(reader_creation_scale_max);
         COPY_PARAM_SETTING(cost_fixed);
         COPY_PARAM_SETTING(cost_unit);
+        COPY_PARAM_SETTING(cost_piracy);
         COPY_PARAM_SETTING(income);
+        COPY_PARAM_SETTING(piracy_begins);
+        COPY_PARAM_SETTING(piracy_link_proportion);
+        COPY_PARAM_SETTING(prior_weight);
+        COPY_PARAM_SETTING(prior_weight_piracy);
+        COPY_INIT_PARAM_SETTING(prob_write);
+        COPY_INIT_PARAM_SETTING(q_min);
+        COPY_INIT_PARAM_SETTING(q_max);
+        COPY_INIT_PARAM_SETTING(p_min);
+        COPY_INIT_PARAM_SETTING(p_max);
+        COPY_INIT_PARAM_SETTING(prob_keep);
+        COPY_INIT_PARAM_SETTING(keep_price);
+        COPY_INIT_PARAM_SETTING(belief_threshold);
 
         cmd_args ret;
         ret.periods = periods_arg.getValue();
