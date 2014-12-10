@@ -20,7 +20,7 @@ class State final {
         State() = default;
 
         /// The simulation period represented by this state
-        uint64_t t = 0;
+        eris::eris_time_t t = 0;
 
         /** The simulation boundary.  This is inferred from the boundary of the first reader found
          * in the simulation, the first book if there are no readers, and otherwise remains at its
