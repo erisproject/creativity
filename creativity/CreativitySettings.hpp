@@ -1,5 +1,5 @@
 #pragma once
-#include <cstdint>
+#include <eris/types.hpp>
 
 namespace creativity {
 
@@ -95,7 +95,7 @@ struct CreativitySettings {
      * is the initial setup (without any actions), set to 1 to having sharing become available
      * immediately).
      */
-    uint64_t piracy_begins = 100;
+    eris::eris_time_t piracy_begins = 100;
 
     /** The number of sharing/friendship links as a proportion of the maxinum number of sharing
      * links possible (which is \f$\frac{R(R-1)}{2}\f$, where \f$R\f$ is the number of readers).
