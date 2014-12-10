@@ -84,6 +84,9 @@ target_link_libraries(creativity-gui creativity creativitygui)
 add_executable(creativity-cli cli.cpp)
 target_link_libraries(creativity-cli creativity)
 
+add_executable(creativity-info info.cpp)
+target_link_libraries(creativity-info creativity)
+
 # Copy the glade and icon to the install datadir
 install(FILES gui.glade creativity.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/creativity/)
 
