@@ -131,6 +131,7 @@ void Creativity::setup() {
     sim->spawn<intraopt::FinishCallback>([this] { new_books_.clear(); });
 
     setup_sim_ = true;
+    storage().first->updateSettings();
 }
 
 double Creativity::boundaryFromDensity(uint32_t readers, uint32_t dimensions, double density) {

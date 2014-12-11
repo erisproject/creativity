@@ -50,10 +50,10 @@ class FileStorage : public Storage, private eris::noncopyable {
          *
          * \param filename the filename to open
          * \param mode the open mode to use
-         * \param settings is a reference to CreativitySettings.  If the file is being created (i.e.
-         * MODE is OVERWRITE, or is APPEND and the file does not exist), the settings stored in
-         * `settings` are written to the file; if an existing file is being read, the settings
-         * contained in the file are copied into `settings`.
+         * \param settings is a reference to CreativitySettings.  If the file is being read (i.e.
+         * it already exists and isn't being overwritten) the file's settings are copied into the
+         * CreativitySettings object.  Otherwise the CreativitySettings object will be copied into
+         * the file during the first push_back() call or the updateSettings() call.
          *
          * Throws various exceptions if the file does not exist, cannot be read, is empty, or
          * contains invalid data.
@@ -81,8 +81,12 @@ class FileStorage : public Storage, private eris::noncopyable {
         /// Returns the number of states currently stored in the file.
         virtual size_t size() const override;
 
-        /// Adds a new State to the file.
-        virtual void push_back(std::shared_ptr<const State> state) override;
+        /** Updates the values in the file header to those currently in the CreativitySettings
+         * reference provided to this FileStorage during construction.
+         *
+         * Existing values are overwritten.
+         */
+        virtual void updateSettings() override;
 
         /** Flushes the file to disc.  This calls `flush()` on the underlying file object.  This is
          * normally not required: any changes will be automatically flushed when the FileStorage
@@ -99,6 +103,9 @@ class FileStorage : public Storage, private eris::noncopyable {
         /** The file buffer object. Mutable because we need to read from it in const methods. */
         mutable std::fstream f_;
 
+        /// Adds a new State to the file.
+        virtual void push_back_(std::shared_ptr<const State> &&state) override;
+
         /** Attempts to parse the metadata (global settings, file locations; essentially everything
          * except for the actual state data) from the opened file.  Throws an exception if parsing
          * fails or the file format appears invalid.
@@ -108,9 +115,9 @@ class FileStorage : public Storage, private eris::noncopyable {
          */
         void parseMetadata();
 
-        /** Writes a header for an empty FileStorage: that is, a header for a file with 0 states.
-         * After this completes, the file output position will be at the end of the header, i.e. at
-         * `FileStorage::HEADER::size`.
+        /** Writes a header for an empty FileStorage: that is, a header for a file with 0 states,
+         * and with all settings initialized to 0.  After this completes, the file output position
+         * will be at the end of the header, i.e. at `FileStorage::HEADER::size`.
          *
          * This method is called during construction when opening a file in OVERWRITE mode or when
          * opening a non-existant or empty file in APPEND mode.
@@ -229,7 +236,7 @@ class FileStorage : public Storage, private eris::noncopyable {
                     fileid = 0, ///< First 4 bytes are File ID such as "CrSt" ("Cr"eative "St"ate file)
                     filever = 4, ///< Second 4 bytes are u32 file format version
                     test_value = 8, ///< the 8-byte test value (which is interpreted as various types)
-                    states = 16, ///< the number of states stored in this file (u32)
+                    num_states = 16, ///< the number of states stored in this file (u32)
                     dimensions = 20, ///< the number of dimensions of the simulation these states belong to (u32)
                     readers = 24, ///< the number of readers in the simulation
                     boundary = 28, ///< the simulation boundary (positive double)
@@ -243,22 +250,22 @@ class FileStorage : public Storage, private eris::noncopyable {
                     cost_unit = 92, ///< Unit cost of an author creating a copy of a book (dbl)
                     cost_piracy = 100, ///< Unit cost of getting a copy of a book via piracy (dbl)
                     income = 108, ///< Per-period reader external income (before incurring authorship costs or receiving book profits) (dbl)
-                    piracy_begins = 116, ///< the sharing start period (u64)
-                    piracy_link_proportion = 124, ///< The proportion of potential friendship links that exist
-                    prior_weight = 132, ///< The prior 'n' multiplier (usually 0-1)
-                    prior_weight_piracy = 140, ///< The prior 'n' multiplier in the first piracy period
-                    init_prob_write = 148, ///< The probability of writing (while beliefs noninformative)
-                    init_q_min = 156, ///< `a` in U[a,b], the noninformative belief authorship quality level
-                    init_q_max = 164, ///< `b` in U[a,b], the noninformative belief authorship quality level
-                    init_p_min = 172, ///< `a` in U[a,b], the noninformative belief book price
-                    init_p_max = 180, ///< `b` in U[a,b], the noninformative belief book price
-                    init_prob_keep = 188, ///< The probability of keeping a book on the market (uninformed beliefs)
-                    init_keep_price = 196, ///< If keeping a book on the market, the new price is (p-c)*s+c, where this is s
-                    init_belief_threshold = 204, ///< The required n-k value for readers to use beliefs instead of initial behaviour (i32)
+                    piracy_begins = 116, ///< the sharing start period (eris_time_t = u32)
+                    piracy_link_proportion = 120, ///< The proportion of potential friendship links that exist
+                    prior_weight = 128, ///< The prior 'n' multiplier (usually 0-1)
+                    prior_weight_piracy = 136, ///< The prior 'n' multiplier in the first piracy period
+                    init_prob_write = 144, ///< The probability of writing (while beliefs noninformative)
+                    init_q_min = 152, ///< `a` in U[a,b], the noninformative belief authorship quality level
+                    init_q_max = 160, ///< `b` in U[a,b], the noninformative belief authorship quality level
+                    init_p_min = 168, ///< `a` in U[a,b], the noninformative belief book price
+                    init_p_max = 176, ///< `b` in U[a,b], the noninformative belief book price
+                    init_prob_keep = 184, ///< The probability of keeping a book on the market (uninformed beliefs)
+                    init_keep_price = 192, ///< If keeping a book on the market, the new price is (p-c)*s+c, where this is s
+                    init_belief_threshold = 200, ///< The required n-k value for readers to use beliefs instead of initial behaviour (i32)
                     // NB: this next one should be an integer multiple of 8 (so that states+cont
                     // location go to the end, and so the `states` division below has no remainder)
                     //
-                    // --- no padding needed
+                    // 4 bytes padding
                     state_first = 208, ///< the first state record
                     state_last = size - 16, ///< the last state record
                     continuation = size - 8; ///< the header continuation block pointer (used once header state blocks fill up)

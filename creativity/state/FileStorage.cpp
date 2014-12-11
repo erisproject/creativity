@@ -21,7 +21,7 @@ constexpr int64_t
         FileStorage::HEADER::pos::fileid,
         FileStorage::HEADER::pos::filever,
         FileStorage::HEADER::pos::test_value,
-        FileStorage::HEADER::pos::states,
+        FileStorage::HEADER::pos::num_states,
         FileStorage::HEADER::pos::dimensions,
         FileStorage::HEADER::pos::readers,
         FileStorage::HEADER::pos::boundary,
@@ -70,7 +70,7 @@ inline bool file_exists(const std::string &name) {
     return stat(name.c_str(), &buffer) == 0;
 }
 
-FileStorage::FileStorage(const std::string &filename, MODE mode, CreativitySettings &settings_in) {
+FileStorage::FileStorage(const std::string &filename, MODE mode, CreativitySettings &settings) : Storage(settings) {
     f_.exceptions(f_.failbit | f_.badbit);
 
     bool parse = true;
@@ -104,11 +104,10 @@ FileStorage::FileStorage(const std::string &filename, MODE mode, CreativitySetti
 
     if (parse) {
         parseMetadata();
-        settings_in = settings;
     }
     else {
-        settings_ = settings_in;
         writeEmptyHeader();
+        need_settings_updated_ = true;
     }
 }
 
@@ -116,14 +115,7 @@ size_t FileStorage::size() const {
     return state_pos_.size();
 }
 
-void FileStorage::push_back(std::shared_ptr<const State> state) {
-    // Make sure the state agrees with the states we already have
-    if (settings.dimensions != 0 and state->dimensions != settings.dimensions)
-        throw std::runtime_error("Cannot add state: state dimensions differ from storage dimensions");
-    if (settings.boundary != 0 and state->boundary != settings.boundary)
-        throw std::runtime_error("Cannot add state: state boundary differs from storage boundary");
-    if (settings.readers != 0 and settings.readers != state->readers.size())
-        throw std::runtime_error("Cannot add state: state #readers differs from storage #readers");
+void FileStorage::push_back_(std::shared_ptr<const State> &&state) {
 
     f_.seekp(0, f_.end);
     auto location = f_.tellp();
@@ -143,12 +135,12 @@ void FileStorage::push_back(std::shared_ptr<const State> state) {
     if (states_.size() < state_pos_.size()) states_.resize(state_pos_.size());
     states_[state_pos_.size()-1] = state;
 
-    if (settings.dimensions == 0 and state->dimensions != 0) {
+    if (settings_.dimensions == 0 and state->dimensions != 0) {
         f_.seekp(HEADER::pos::dimensions);
         write_u32(state->dimensions);
         settings_.dimensions = state->dimensions;
     }
-    if (settings.boundary == 0 and state->boundary != 0) {
+    if (settings_.boundary == 0 and state->boundary != 0) {
         f_.seekp(HEADER::pos::boundary);
         write_value(state->boundary);
         settings_.boundary = state->boundary;
@@ -184,44 +176,50 @@ void FileStorage::writeEmptyHeader() {
     write_u32(1); // file version
     f_.write(HEADER::test_value, sizeof HEADER::test_value); // All test values squished into one
 
-    write_u32(0); // Number of states
-    write_value(settings.dimensions);
-    write_value(settings.readers);
-    write_value(settings.boundary);
-    write_value(settings.book_distance_sd);
-    write_value(settings.book_quality_sd);
-    write_value(settings.reader_step_sd);
-    write_value(settings.reader_creation_shape);
-    write_value(settings.reader_creation_scale_min);
-    write_value(settings.reader_creation_scale_max);
-    write_value(settings.cost_fixed);
-    write_value(settings.cost_unit);
-    write_value(settings.cost_piracy);
-    write_value(settings.income);
-    write_value(settings.piracy_begins);
-    write_value(settings.piracy_link_proportion);
-    write_value(settings.prior_weight);
-    write_value(settings.prior_weight_piracy);
-    write_value(settings.initial.prob_write);
-    write_value(settings.initial.q_min);
-    write_value(settings.initial.q_max);
-    write_value(settings.initial.p_min);
-    write_value(settings.initial.p_max);
-    write_value(settings.initial.prob_keep);
-    write_value(settings.initial.keep_price);
-    write_value(settings.initial.belief_threshold);
-
-    // Currently no padding needed:
-    //write_u32(0); // Unused padding value
-
-    // State addresses and continuation location (all 0):
-    char zeros[8 * (HEADER::states + 1)] = {0};
+    // Write out 0s for everything else:
+    char zeros[HEADER::size - HEADER::pos::num_states] = {0};
     f_.write(zeros, sizeof zeros);
+}
 
-    if (f_.tellp() != HEADER::size) {
+void FileStorage::updateSettings() {
+
+    f_.seekp(HEADER::pos::num_states);
+    write_u32(size()); // Number of states
+    write_value(settings_.dimensions);
+    write_value(settings_.readers);
+    write_value(settings_.boundary);
+    write_value(settings_.book_distance_sd);
+    write_value(settings_.book_quality_sd);
+    write_value(settings_.reader_step_sd);
+    write_value(settings_.reader_creation_shape);
+    write_value(settings_.reader_creation_scale_min);
+    write_value(settings_.reader_creation_scale_max);
+    write_value(settings_.cost_fixed);
+    write_value(settings_.cost_unit);
+    write_value(settings_.cost_piracy);
+    write_value(settings_.income);
+    write_value(settings_.piracy_begins);
+    write_value(settings_.piracy_link_proportion);
+    write_value(settings_.prior_weight);
+    write_value(settings_.prior_weight_piracy);
+    write_value(settings_.initial.prob_write);
+    write_value(settings_.initial.q_min);
+    write_value(settings_.initial.q_max);
+    write_value(settings_.initial.p_min);
+    write_value(settings_.initial.p_max);
+    write_value(settings_.initial.prob_keep);
+    write_value(settings_.initial.keep_price);
+    write_value(settings_.initial.belief_threshold);
+
+    // 4 bytes padding:
+    write_u32(0); // Unused padding value
+
+    if (f_.tellp() != HEADER::pos::state_first) {
         // If this exception occurs, something in the above sequence is wrong.
         throw std::runtime_error("Header writing failed: header size != " + std::to_string(HEADER::size) + " bytes");
     }
+
+    // The rest is state positions, which we aren't supposed to touch.
 }
 
 void FileStorage::addStateLocation(std::streampos location) {
@@ -241,7 +239,7 @@ void FileStorage::addStateLocation(std::streampos location) {
     }
     write_value(location);
 
-    f_.seekp(HEADER::pos::states);
+    f_.seekp(HEADER::pos::num_states);
     write_u32((curr_states + 1));
     state_pos_.push_back(location);
 }
@@ -304,7 +302,7 @@ void FileStorage::parseMetadata() {
     CHECK_TEST(dbl, double);
 
     // number of states:
-    auto num_states = parse_value<uint32_t>(block[HEADER::pos::states]);
+    auto num_states = parse_value<uint32_t>(block[HEADER::pos::num_states]);
 
     parse_value(block[HEADER::pos::dimensions], settings_.dimensions);
     parse_value(block[HEADER::pos::readers], settings_.readers);
@@ -332,11 +330,11 @@ void FileStorage::parseMetadata() {
     parse_value(block[HEADER::pos::init_keep_price], settings_.initial.keep_price);
     parse_value(block[HEADER::pos::init_belief_threshold], settings_.initial.belief_threshold);
 
-    if (settings.dimensions == 0) throwParseError("found invalid dimensions == 0");
-    if (settings.readers == 0) throwParseError("found invalid readers == 0");
-    if (settings.boundary <= 0) throwParseError("found invalid (non-positive) boundary");
-    if (settings.book_distance_sd < 0) throwParseError("found invalid (negative) book_distance_sd");
-    if (settings.book_quality_sd < 0) throwParseError("found invalid (negative) book_quality_sd");
+    if (settings_.dimensions == 0) throwParseError("found invalid dimensions == 0");
+    if (settings_.readers == 0) throwParseError("found invalid readers == 0");
+    if (settings_.boundary <= 0) throwParseError("found invalid (non-positive) boundary");
+    if (settings_.book_distance_sd < 0) throwParseError("found invalid (negative) book_distance_sd");
+    if (settings_.book_quality_sd < 0) throwParseError("found invalid (negative) book_quality_sd");
 
     state_pos_.reserve(num_states);
 
@@ -384,8 +382,8 @@ std::shared_ptr<const State> FileStorage::readState() const {
     std::shared_ptr<const State> shst(st_ptr);
 
     state.t = read_u64();
-    state.dimensions = settings.dimensions;
-    state.boundary = settings.boundary;
+    state.dimensions = settings_.dimensions;
+    state.boundary = settings_.boundary;
 
     auto num_readers = read_u32();
     state.readers.reserve(num_readers);
@@ -405,13 +403,13 @@ std::shared_ptr<const State> FileStorage::readState() const {
 std::pair<eris::eris_id_t, ReaderState> FileStorage::readReader() const {
     auto pair = std::make_pair<eris_id_t, ReaderState>(
             read_u64(),
-            ReaderState(settings.dimensions));
+            ReaderState(settings_.dimensions));
 
     ReaderState &r = pair.second;
     r.id = pair.first;
 
     // Position
-    for (uint32_t d = 0; d < settings.dimensions; d++)
+    for (uint32_t d = 0; d < settings_.dimensions; d++)
         r.position[d] = read_dbl();
 
     // Friends
@@ -458,20 +456,20 @@ std::pair<eris::eris_id_t, ReaderState> FileStorage::readReader() const {
     belief_data belief = readBelief();
     if (belief.K > 0)
         r.profit = belief.noninformative
-            ? Profit(settings.dimensions, belief.K)
-            : Profit(settings.dimensions, belief.beta, belief.s2, belief.V, belief.n);
+            ? Profit(settings_.dimensions, belief.K)
+            : Profit(settings_.dimensions, belief.beta, belief.s2, belief.V, belief.n);
 
     belief = readBelief();
     if (belief.K > 0)
         r.profit_extrap = belief.noninformative
-            ? Profit(settings.dimensions, belief.K)
-            : Profit(settings.dimensions, belief.beta, belief.s2, belief.V, belief.n);
+            ? Profit(settings_.dimensions, belief.K)
+            : Profit(settings_.dimensions, belief.beta, belief.s2, belief.V, belief.n);
 
     belief = readBelief();
     if (belief.K > 0)
         r.demand = belief.noninformative
-            ? Demand(settings.dimensions, belief.K)
-            : Demand(settings.dimensions, belief.beta, belief.s2, belief.V, belief.n);
+            ? Demand(settings_.dimensions, belief.K)
+            : Demand(settings_.dimensions, belief.beta, belief.s2, belief.V, belief.n);
 
     belief = readBelief();
     if (belief.K > 0)
@@ -644,13 +642,13 @@ void FileStorage::writeBelief(const Linear &m) {
 
 std::pair<eris_id_t, BookState> FileStorage::readBook() const {
     auto pair = std::make_pair<eris_id_t, BookState>(
-            read_u64(), BookState(settings.dimensions));
+            read_u64(), BookState(settings_.dimensions));
 
     BookState &b = pair.second;
     b.id = pair.first;
 
     b.author = read_u64();
-    for (uint32_t d = 0; d < settings.dimensions; d++) {
+    for (uint32_t d = 0; d < settings_.dimensions; d++) {
         b.position[d] = read_dbl();
     }
 

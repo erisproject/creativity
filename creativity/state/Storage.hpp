@@ -15,6 +15,13 @@ namespace creativity { namespace state {
  */
 class Storage {
     public:
+        Storage() = delete;
+
+        /** Storage base class constructor, which must be called with a CreativitySettings
+         * reference.
+         */
+        Storage(CreativitySettings &settings) : settings_(settings) {}
+
         /** Returns the State at the given position.  It is highly recommended that subclasses store
          * objects in simulation order, that is, that `storage[j]->t == j` is true.
          *
@@ -29,10 +36,6 @@ class Storage {
          */
         virtual std::shared_ptr<const State> operator[](size_t i) const = 0;
 
-        /** Accesses the simulation settings associated with this storage object.
-         */
-        const CreativitySettings &settings = settings_;
-
         /// Returns the number of states currently stored.
         virtual size_t size() const = 0;
 
@@ -46,8 +49,20 @@ class Storage {
 
         /** Adds a state to this storage container.  Note that it is up to the implementing class
          * whether it stores the given std::shared_ptr or just uses it to access the State.
+         *
+         * This calls the subclass-specific push_back_() method.
          */
-        virtual void push_back(std::shared_ptr<const State> s) = 0;
+        void push_back(std::shared_ptr<const State> s);
+
+        /** Writes the settings stored in `.settings` (which is a reference to the
+         * CreativitySettings given during construction) to the storage medium (if appropriate).
+         * Existing settings are replaced.
+         *
+         * Subclasses should ensure that this is called during the first push_back() call if it
+         * hasn't yet been called and a new data entry was created (rather than an existing one
+         * loaded).
+         */
+        virtual void updateSettings() = 0;
 
         /// Constructs a State using the given arguments, wraps it in a shared_ptr, then inserts it by calling push_back
         template<class... Args>
@@ -62,7 +77,7 @@ class Storage {
         /// Default destructor
         virtual ~Storage() = default;
 
-        /// Random access iterator
+        /// Random access iterator class for iterating through states
         class state_iterator : public boost::iterator_facade<state_iterator, const std::shared_ptr<const State>, boost::random_access_traversal_tag> {
             private:
                 const Storage &storage;
@@ -93,10 +108,20 @@ class Storage {
         }
 
     protected:
-        /** The simulation settings, with default initialization of fields to 0.  These settings
+        /** The simulation settings reference, which subclasses must set during construction, typically from a with default initialization of fields to 0.  These settings
          * should be updated as soon as possible.
          */
-        CreativitySettings settings_ = {};
+        CreativitySettings &settings_;
+
+        /** Adds a state to this storage container.  Note that it is up to the implementing class
+         * whether it stores the given std::shared_ptr or just uses it to access the State.
+         */
+        virtual void push_back_(std::shared_ptr<const State> &&s) = 0;
+
+        /** True if only default settings have been written, in which case updateSettings() will be
+         * called during push_back() before invoking the subclassable push_back_() method.
+         */
+        bool need_settings_updated_ = false;
 };
 
 template <class... Args>

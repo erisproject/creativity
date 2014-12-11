@@ -11,8 +11,8 @@ class MemoryStorage : public Storage {
     public:
         MemoryStorage() = delete;
 
-        /// Creates an empty MemoryStorage object, copying the given creativity settings into it.
-        MemoryStorage(const CreativitySettings &set);
+        /// Creates an empty MemoryStorage object, using the given creativity settings reference.
+        MemoryStorage(CreativitySettings &set);
 
         /** Creates a MemoryStorage object by coping the States and settings of the given Storage
          * object into new in-memory states.  Note that this copies std::shared_ptr<State> from the
@@ -31,8 +31,12 @@ class MemoryStorage : public Storage {
         /// Reserves the requested capacity in the underlying std::vector
         virtual void reserve(size_t capacity) override;
 
+        /// Does nothing; settings are not stored outside the CreativitySettings reference.
+        virtual void updateSettings() override {}
+
+    protected:
         /// Adds a new State pointer to this storage container.
-        virtual void push_back(std::shared_ptr<const State> state) override;
+        virtual void push_back_(std::shared_ptr<const State> &&state) override;
 
     private:
         std::vector<std::shared_ptr<const State>> states_;
