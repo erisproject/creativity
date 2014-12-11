@@ -25,7 +25,6 @@ int main(int argc, char *argv[]) {
     std::cout << "Initial settings:\n=================\n";
 #define PRINT_SETTING(S) do { printf("%-30s", #S); std::cout << creativity->parameters.S << "\n"; } while (0)
     PRINT_SETTING(readers);
-    PRINT_SETTING(readers);
     PRINT_SETTING(dimensions);
     PRINT_SETTING(boundary);
     PRINT_SETTING(book_distance_sd);
@@ -58,17 +57,17 @@ int main(int argc, char *argv[]) {
     std::cout << "Periods: " << st.size()-1 << "\n";
     if (st.size() > 0) {
         std::cout << "Period summary:\n";
-        printf(    "             Total                            Average                    \n");
-        printf(    "       -----------------   -----------------------------------------------\n");
-        printf(    "   t   Rdrs  Books  BNew   Net.Util.   Bought  Pirated  NewBuys  NewPiracy\n");
-        printf(    "  ---  ----  -----  ----   ---------  -------  -------  -------  ---------\n");
-        auto fmt = "  %3d  %4d  %5d  %4d   %+9.3f  %7.2f  %7.2f  %7.3f  %9.3f\n";
+        printf(    "             Total                              Average                     \n");
+        printf(    "       -----------------   -------------------------------------------------\n");
+        printf(    "   t   Rdrs  Books  BNew   Net.Util.  NewBuys  NewPiracy  TotBuys  TotPiracy\n");
+        printf(    "  ---  ----  -----  ----   ---------  -------  ---------  -------  ---------\n");
+        auto fmt = "  %3d  %4d  %5d  %4d   %+9.3f  %7.3f  %9.3f  %7.2f  %9.2f\n";
 
         for (auto &s : st) {
             if (s->t == 0) continue;
             if (s->t == creativity->parameters.piracy_begins)
                 std::cout <<
-                   "  -----------------------------  PIRACY BEGINS  ------------------------------\n";
+                   "  ------------------------------  PIRACY BEGINS  -------------------------------\n";
             double net_u = 0;
             unsigned long books_new = 0, bought = 0, pirated = 0, bought_new = 0, pirated_new = 0;
             for (auto &rp : s->readers) {
@@ -91,10 +90,10 @@ int main(int argc, char *argv[]) {
                     s->books.size(),
                     books_new,
                     net_u / R,
-                    bought / R,
-                    pirated / R,
                     bought_new / R,
-                    pirated_new / R);
+                    pirated_new / R,
+                    bought / R,
+                    pirated / R);
         }
     }
     std::cout << "\n\n\n";
