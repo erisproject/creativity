@@ -2,6 +2,7 @@
 #include <Eigen/Core>
 #include <memory>
 #include <ostream>
+#include <vector>
 
 namespace creativity { namespace belief {
 
