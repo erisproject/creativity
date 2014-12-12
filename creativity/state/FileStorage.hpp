@@ -2,7 +2,7 @@
 #include "creativity/state/Storage.hpp"
 #include <vector>
 #include <fstream>
-#include <boost/predef/other/endian.h>
+#include <boost/detail/endian.hpp>
 
 namespace creativity {
 
@@ -473,9 +473,9 @@ class FileStorage : public Storage, private eris::noncopyable {
 
 };
 
-#if BOOST_ENDIAN_BIG_BYTE
+#if defined(BOOST_BIG_ENDIAN)
 #include "creativity/state/FileStorage-BE.hpp"
-#elif BOOST_ENDIAN_LITTLE_BYTE
+#elif defined(BOOST_LITTLE_ENDIAN)
 #include "creativity/state/FileStorage-LE.hpp"
 #else
 #error System endianness not supported (neither big-byte nor little-byte endianness detected)!
