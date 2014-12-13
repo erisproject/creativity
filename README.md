@@ -12,6 +12,8 @@ creative output where copies of an original are the marketable good.
 
 - [Eris](https://github.com/erisproject/eris)
 - [gtkmm-3.0](http://www.gtkmm.org)
+- A C++ compiler supporting the C++11 standard, such as
+  [clang](http://clang.llvm.org/) (3.3+) or [g++](https://gcc.gnu.org/) (4.9+)
 
 ## License
 
