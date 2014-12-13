@@ -1,5 +1,6 @@
 #include "creativity/Creativity.hpp"
 #include "creativity/state/FileStorage.hpp"
+#include "creativity/state/PsqlStorage.hpp"
 #include "creativity/state/MemoryStorage.hpp"
 #include "creativity/belief/Demand.hpp"
 #include "creativity/belief/Quality.hpp"
@@ -9,6 +10,7 @@
 #include <Eigen/Core>
 #include <cmath>
 #include <algorithm>
+#include <regex>
 
 namespace creativity {
 
@@ -18,13 +20,13 @@ using namespace Eigen;
 
 CreativitySettings& Creativity::set() {
     if (setup_sim_) throw std::logic_error("Cannot change creativity settings after setup()");
-    else if (setup_read_) throw std::logic_error("Cannot change creativity settings after fileRead()");
+    else if (setup_read_) throw std::logic_error("Cannot change creativity settings after loading state data");
     return const_cast<CreativitySettings&>(parameters);
 }
 
 void Creativity::fileWrite(const std::string &filename) {
     if (setup_sim_) throw std::logic_error("Cannot call Creativity::fileWrite() after setup()");
-    else if (setup_read_) throw std::logic_error("Cannot call Creativity::fileWrite() after fileRead()");
+    else if (setup_read_) throw std::logic_error("Cannot call Creativity::fileWrite() after loading state data");
     storage().first = std::make_shared<FileStorage>(filename, FileStorage::MODE::OVERWRITE, set_);
 }
 
@@ -32,6 +34,26 @@ void Creativity::fileRead(const std::string &filename) {
     if (setup_sim_) throw std::logic_error("Cannot call Creativity::fileRead() after setup()");
     storage().first = std::make_shared<FileStorage>(filename, FileStorage::MODE::READONLY, set_);
     setup_read_ = true;
+}
+
+void Creativity::pgsql(std::string url, bool load_only, bool new_only) {
+    if (setup_sim_) throw std::logic_error("Cannot call Creativity::pgsql() after setup()");
+
+    // Figure out whether a "creativity=xyz" setting was provided, and if so, remove it
+    int32_t load_id = -1;
+    std::smatch results;
+    if (std::regex_search(url, results, std::regex("([?&])creativity=(\\d+)(?=&|$)"))) {
+        load_id = std::stoi(results[2].str());
+        if (load_id <= 0) load_id = -1;
+        url = results.prefix().str() + results.suffix().str();
+    }
+
+    if (load_id == -1 and setup_read_) throw std::logic_error("Cannot call Creativity::pgsql() after loading state data");
+    else if (load_id > 0 and new_only) throw std::logic_error("Invalid postgresql URL given: creativity= option cannot be specified here");
+    else if (load_id == -1 and load_only) throw std::logic_error("Invalid postgresql URL given: creativity= option must be specified here");
+
+    storage().first = std::make_shared<PsqlStorage>(url, set_, load_id);
+    setup_read_ = load_id > 0;
 }
 
 void Creativity::checkParameters() {
@@ -65,7 +87,7 @@ void Creativity::checkParameters() {
 }
 
 void Creativity::setup() {
-    if (setup_read_) throw std::logic_error("Cannot call Creativity::setup() after reading a state file");
+    if (setup_read_) throw std::logic_error("Cannot call Creativity::setup() after reading state data");
     else if (setup_sim_) throw std::logic_error("Creativity::setup() cannot be called twice");
 
     checkParameters();

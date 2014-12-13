@@ -28,9 +28,10 @@ include(GNUInstallDirs)
 find_package(PkgConfig REQUIRED)
 set(creativity_pkgconfig_GTKMM gtkmm-3.0)
 set(creativity_pkgconfig_ERIS liberis)
+set(creativity_pkgconfig_PQXX libpqxx)
 
 # pkg-config required packages for libcreativity.so:
-set(creativity_pkgconfig ERIS)
+set(creativity_pkgconfig ERIS PQXX)
 # required packages for libcreativitygui.so:
 set(creativity_gui_pkgconfig GTKMM)
 
@@ -40,8 +41,6 @@ foreach(pkg ${creativity_pkgconfig} ${creativity_gui_pkgconfig})
     link_directories(${${pkg}_LIBRARY_DIRS})
     add_definitions(${${pkg}_CFLAGS_OTHER})
 endforeach()
-
-add_definitions("-DERIS_DEBUG")
 
 find_package(Eigen3 REQUIRED)
 include_directories(${EIGEN3_INCLUDE_DIR})
@@ -72,14 +71,15 @@ add_library(creativity SHARED ${cr_libsrc})
 add_library(creativitygui SHARED ${cr_gui_libsrc})
 foreach(pkg ${creativity_pkgconfig})
     target_link_libraries(creativity ${${pkg}_LIBRARIES})
-    target_link_libraries(creativitygui ${${pkg}_LIBRARIES})
 endforeach()
 foreach(pkg ${creativity_gui_pkgconfig})
     target_link_libraries(creativitygui ${${pkg}_LIBRARIES})
 endforeach()
 
+target_link_libraries(creativitygui creativity)
+
 add_executable(creativity-gui gui.cpp)
-target_link_libraries(creativity-gui creativity creativitygui)
+target_link_libraries(creativity-gui creativitygui)
 
 add_executable(creativity-cli cli.cpp)
 target_link_libraries(creativity-cli creativity)

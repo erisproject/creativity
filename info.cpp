@@ -1,5 +1,6 @@
 #include "creativity/Creativity.hpp"
 #include "creativity/state/Storage.hpp"
+#include "creativity/state/PsqlStorage.hpp"
 #include <cstdio>
 
 using namespace creativity;
@@ -8,18 +9,44 @@ using namespace eris;
 using namespace Eigen;
 
 int main(int argc, char *argv[]) {
-    if (argc <= 1) {
-        std::cerr << "Usage: " << argv[0] << " FILENAME.crstate -- print summary information about a .crstate file\n\n";
+    if (argc != 2) {
+        std::cerr << "Usage: " << argv[0] << " DATASOURCE -- print simulation summary information\n\n";
+        std::cerr << "DATASOURCE can be a filename (typically a .crstate file), or a database URL,\n";
+        std::cerr << "for example: 'postgresql://user:secret@localhost:5432/dbname?sslmode=require&creativity=123'\n\n\n";
         exit(1);
     }
 
+    std::string source(argv[1]);
     auto creativity = Creativity::create();
-    try {
-        creativity->fileRead(argv[1]);
+    if (source.substr(0, 13) == "postgresql://" or source.substr(0, 11) == "postgres://") {
+        try {
+            creativity->pgsql(source, true /*read-only*/);
+
+            PsqlStorage &pgsql = dynamic_cast<PsqlStorage&>(*creativity->storage().first);
+            auto &conn = pgsql.connection();
+            std::cout << "Connected to postgresql://";
+            const char *username = conn.username();
+            if (username) std::cout << username << "@";
+            const char *hostname = conn.hostname();
+            if (hostname) std::cout << hostname;
+            const char *port = conn.port();
+            if (port) std::cout << ":" << port;
+            std::cout << "/" << conn.dbname() << "?creativity=" << pgsql.id << "\n";
+        }
+        catch (std::exception &e) {
+            std::cerr << "Unable to connect to database `" << source << "': " << e.what() << "\n\n";
+            exit(1);
+        }
     }
-    catch (std::exception &e) {
-        std::cerr << "Unable to read `" << argv[1] << "': " << e.what() << "\n\n";
-        exit(1);
+    else {
+        // Filename input
+        try {
+            creativity->fileRead(argv[1]);
+        }
+        catch (std::exception &e) {
+            std::cerr << "Unable to read `" << argv[1] << "': " << e.what() << "\n\n";
+            exit(1);
+        }
     }
 
     std::cout << "Initial settings:\n=================\n";

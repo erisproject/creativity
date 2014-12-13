@@ -1,5 +1,6 @@
 #include "creativity/Creativity.hpp"
 #include "creativity/state/Storage.hpp"
+#include "creativity/state/PsqlStorage.hpp"
 #include <eris/Simulation.hpp>
 #include <eris/Random.hpp>
 #include <functional>
@@ -155,11 +156,11 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         auto periods_constr = RangeConstraint<unsigned int>::GE(0);
         TCLAP::ValueArg<unsigned int> periods_arg("T", "periods", "Number of simulation periods to run", false, 200, &periods_constr, cmd);
 
-        TCLAP::ValueArg<std::string> output_file("o", "output", "Output file for simulation results", false,
+        TCLAP::ValueArg<std::string> output_file("o", "output", "Output file (or database URL) for simulation results.  Example database URL: 'postgresql://user:secret@localhost:5432/dbname?sslmode=require&otheroption=123'", false,
                 "creativity-" + std::to_string(Random::seed()) + ".crstate", // default
-                "filename", cmd);
+                "filename-or-database", cmd);
 
-        TCLAP::SwitchArg overwrite_output_file("O", "overwrite", "Allows output file given to -o to be overwritten.", cmd, false);
+        TCLAP::SwitchArg overwrite_output_file("O", "overwrite", "Allows output file given to -o to be overwritten.  No effect if a database URL is given to -o.", cmd, false);
 
         RangeConstraint<unsigned int> max_threads_constr(0, std::thread::hardware_concurrency());
         TCLAP::ValueArg<unsigned int> max_threads_arg("j", "threads", "Maximum number of threads to use for the simulation", false, 0, &max_threads_constr, cmd);
@@ -218,26 +219,59 @@ int main(int argc, char *argv[]) {
     auto creativity = Creativity::create();
 
     auto args = parseCmdArgs(argc, argv, *creativity);
-    // If the user didn't specify --overwrite, make sure the file doesn't exist
-    if (not args.overwrite) {
-        struct stat buffer;
-        if (stat(args.out.c_str(), &buffer) == 0) { // The file exists
-            std::cerr << "Error: `" << args.out << "' already exists; specify a different file or add `--overwrite' option to overwrite\n";
+
+    std::string results_out_display = args.out;
+
+    if (args.out.substr(0, 13) == "postgresql://" or args.out.substr(0, 11) == "postgres://") {
+        try {
+            creativity->pgsql(args.out, false /*read-only*/, true /*write-only*/);
+
+            PsqlStorage &pgsql = dynamic_cast<PsqlStorage&>(*creativity->storage().first);
+            auto &conn = pgsql.connection();
+            // Rebuild an output URL for the postgresql database
+            std::ostringstream psqlurl("postgresql://");
+            const char *username = conn.username();
+            if (username) psqlurl << username << "@";
+            // Omit password
+            const char *hostname = conn.hostname();
+            if (hostname) psqlurl << hostname;
+            const char *port = conn.port();
+            if (port) psqlurl << ":" << port;
+            psqlurl << "/" << conn.dbname() << "?creativity=" << pgsql.id;
+            results_out_display = psqlurl.str();
+
+        }
+        catch (const std::exception &e) {
+            std::cerr << "Connection to PostgreSQL failed: " << e.what() << "\n";
             exit(1);
         }
     }
-    creativity->fileWrite(args.out);
+    else {
+        // Filename output
 
-    std::cout << "Writing simulation results to `" << args.out << "'\n";
+        try {
+            // If the user didn't specify --overwrite, make sure the file doesn't exist
+            if (not args.overwrite) {
+                struct stat buffer;
+                if (stat(args.out.c_str(), &buffer) == 0) { // The file exists
+                    std::cerr << "Error: `" << args.out << "' already exists; specify a different file or add `--overwrite' option to overwrite\n";
+                    exit(1);
+                }
+            }
+            creativity->fileWrite(args.out);
+        }
+        catch (std::exception &e) {
+            std::cerr << "Unable to write to file: " << e.what() << "\n";
+            exit(1);
+        }
+    }
+    std::cout << "Writing simulation results to " << results_out_display << "\n";
 
     creativity->setup();
-    ERIS_DBG("setup done");
     auto sim = creativity->sim;
 
     // Copy the initial state into the storage object
     creativity->storage().first->emplace_back(sim);
-
-    ERIS_DBG("here we go...!");
 
     sim->maxThreads(args.max_threads);
 
@@ -245,14 +279,9 @@ int main(int argc, char *argv[]) {
         last = std::chrono::high_resolution_clock::now();
 
     while (sim->t() < args.periods) {
-        ERIS_DBGVAR(sim->t());
-        ERIS_DBGVAR(args.periods);
-        ERIS_DBG("running");
         sim->run();
-        ERIS_DBG("done running");
 
         creativity->storage().first->emplace_back(sim);
-        ERIS_DBGVAR(sim->t());
 
         now = std::chrono::high_resolution_clock::now();
         double speed = 1.0 / std::chrono::duration<double>(now - last).count();
@@ -260,9 +289,8 @@ int main(int argc, char *argv[]) {
         std::cout << "\rRunning simulation [t=" << sim->t() << "; R=" << sim->countAgents<Reader>() << "; B=" << sim->countGoods<Book>() << ", newB=" <<
             sim->countGoods<Book>([](const Book &b) -> bool { return b.age() == 0; }) << "] " << speed << " Hz                    " << std::flush;
     }
-    ERIS_DBGVAR(creativity->storage().first->size());
 
     creativity->storage().first->flush();
 
-    std::cout << "\n\nSimulation complete.  Results saved to " << args.out << "\n\n";
+    std::cout << "\n\nSimulation complete.  Results saved to " << results_out_display << "\n\n";
 }
