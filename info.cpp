@@ -84,17 +84,20 @@ int main(int argc, char *argv[]) {
     std::cout << "Periods: " << st.size()-1 << "\n";
     if (st.size() > 0) {
         std::cout << "Period summary:\n";
-        printf(    "             Total                              Average                     \n");
-        printf(    "       -----------------   -------------------------------------------------\n");
-        printf(    "   t   Rdrs  Books  BNew   Net.Util.  NewBuys  NewPiracy  TotBuys  TotPiracy\n");
-        printf(    "  ---  ----  -----  ----   ---------  -------  ---------  -------  ---------\n");
+        auto h1 =  "             Total                              Average                     \n";
+        auto h2 =  "       -----------------   -------------------------------------------------\n";
+        auto h3 =  "   t   Rdrs  Books  BNew   Net.Util.  NewBuys  NewPiracy  TotBuys  TotPiracy\n";
+        auto h4 =  "  ---  ----  -----  ----   ---------  -------  ---------  -------  ---------\n";
         auto fmt = "  %3d  %4d  %5d  %4d   %+9.3f  %7.3f  %9.3f  %7.2f  %9.2f\n";
+
+        std::cout << h1 << h2;
 
         for (auto &s : st) {
             if (s->t == 0) continue;
+            if (s->t % 25 == 1) { if (s->t > 1) std::cout << h4; std::cout << h3 << h4; }
             if (s->t == creativity->parameters.piracy_begins)
                 std::cout <<
-                   "  ------------------------------  PIRACY BEGINS  -------------------------------\n";
+                   "  ----------------------------  PIRACY BEGINS  -----------------------------\n";
             double net_u = 0;
             unsigned long books_new = 0, bought = 0, pirated = 0, bought_new = 0, pirated_new = 0;
             for (auto &rp : s->readers) {
