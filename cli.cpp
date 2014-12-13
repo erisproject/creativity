@@ -54,37 +54,44 @@ template <class T, class = typename std::enable_if<std::is_arithmetic<T>::value>
 class RangeConstraint : public TCLAP::Constraint<T> {
     public:
         RangeConstraint() = default; // Bounded only by data type limits
-        RangeConstraint(T minimum, T maximum) : min(minimum), max(maximum) {}
+        RangeConstraint(T minimum, T maximum, bool strict = false) : min(minimum), max(maximum), strict(strict) {}
         static RangeConstraint LE(T maximum) { return RangeConstraint(LOWEST, maximum); }
         static RangeConstraint GE(T minimum) { return RangeConstraint(minimum, BIGGEST); }
+        static RangeConstraint LT(T maximum) { return RangeConstraint(LOWEST, maximum, true); }
+        static RangeConstraint GT(T minimum) { return RangeConstraint(minimum, BIGGEST, true); }
         virtual std::string description() const override {
             if (max == BIGGEST)
-                return "Value must be at least " + output_string(min);
+                return (strict ? "Value must be greater than " : "Value must be at least ") + output_string(min);
             else if (min == LOWEST)
-                return "Value must be at most " + output_string(max);
+                return (strict ? "Value must be less than " : "Value must be at most ") + output_string(min);
             else
-                return "Value must be between " + output_string(min) + " and " + output_string(max);
+                return (strict ? "Value must be strictly between " : "Value must be between ")
+                    + output_string(min) + " and " + output_string(max);
         }
         virtual std::string shortID() const override {
             std::string type =
-                std::is_floating_point<T>::value ? "real" :
-                std::is_integral<T>::value ? (std::is_unsigned<T>::value ? "positive integer" : "integer") :
+                std::is_floating_point<T>::value ? u8"𝑹" :
+                std::is_integral<T>::value ? (std::is_unsigned<T>::value ? u8"𝑵" : u8"𝒁") :
                 "v"; // fallback
-            if (max != BIGGEST and min != LOWEST)
-                return type + u8"∈[" + output_string(min) + "," + output_string(max) + "]";
-            else if (max == BIGGEST and min != LOWEST)
-                return type + u8"≥" + output_string(min);
-            else if (max != BIGGEST and min == LOWEST)
-                return type + u8"≤" + output_string(max);
-            else return type;
+            bool show_min = (min != LOWEST or LOWEST == 0),
+                 show_max = (max != BIGGEST);
+            return
+                (show_min and show_max) ? output_string(min) + lt_str + type + lt_str + output_string(max) :
+                (show_min) ? type + gt_str + output_string(min) :
+                (show_max) ? type + lt_str + output_string(max) :
+                type;
         }
         virtual bool check(const T &val) const override {
-            return val >= min and val <= max;
+            return strict
+                ? (val > min and val < max)
+                : (val >= min and val <= max);
         }
         static constexpr T LOWEST = std::numeric_limits<T>::has_infinity ? -std::numeric_limits<T>::infinity() : std::numeric_limits<T>::lowest();
         static constexpr T BIGGEST = std::numeric_limits<T>::has_infinity ? std::numeric_limits<T>::infinity() : std::numeric_limits<T>::max();
         const T min = LOWEST;
         const T max = BIGGEST;
+        const bool strict = false;
+        const std::string lt_str{strict ? "<" : u8"⩽"}, gt_str{strict ? ">" : u8"⩾"};
 };
 
 /** Contains the command line arguments that aren't carried in the Creativity object */
@@ -98,21 +105,24 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         CmdLineHack cmd("Eris-based creativity simulation model", ' ', "0.0.1");
 
         cmd.startReverseHack();
- 
+
+#define ARG(NAME, PARAM, SHORT, LONG, DESC) \
+        TCLAP::ValueArg<decltype(cr.parameters.PARAM)> opt_##NAME##_arg(SHORT, LONG, DESC, false, cr.parameters.PARAM, &opt_##NAME##_constr, cmd)
 #define OPTION_UNBOUNDED_NAME(NAME, PARAM, SHORT, LONG, DESC) \
         RangeConstraint<decltype(cr.parameters.PARAM)> opt_##NAME##_constr; \
-        TCLAP::ValueArg<decltype(cr.parameters.PARAM)> opt_##NAME##_arg(SHORT, LONG, DESC, false, cr.parameters.PARAM, &opt_##NAME##_constr, cmd)
-#define OPTION_LBOUND_NAME(NAME, PARAM, SHORT, LONG, DESC, LBOUND) \
-        auto opt_##NAME##_constr = RangeConstraint<decltype(cr.parameters.PARAM)>::GE(LBOUND); \
-        TCLAP::ValueArg<decltype(cr.parameters.PARAM)> opt_##NAME##_arg(SHORT, LONG, DESC, false, cr.parameters.PARAM, &opt_##NAME##_constr, cmd)
-#define OPTION_UBOUND_NAME(NAME, PARAM, SHORT, LONG, DESC, UBOUND) \
-        auto opt_##NAME##_constr = RangeConstraint<decltype(cr.parameters.PARAM)>::LE(UBOUND); \
-        TCLAP::ValueArg<decltype(cr.parameters.PARAM)> opt_##NAME##_arg(SHORT, LONG, DESC, false, cr.parameters.PARAM, &opt_##NAME##_constr, cmd)
+        ARG(NAME,PARAM,SHORT,LONG,DESC)
+#define OPTION_BOUND_TYPE(NAME, PARAM, SHORT, LONG, DESC, METHOD, BOUND) \
+        auto opt_##NAME##_constr = RangeConstraint<decltype(cr.parameters.PARAM)>::METHOD(BOUND); \
+        ARG(NAME,PARAM,SHORT,LONG,DESC)
+#define OPTION_LBOUND_NAME(NAME, PARAM, SHORT, LONG, DESC, LBOUND) OPTION_BOUND_TYPE(NAME, PARAM, SHORT, LONG, DESC, GE, LBOUND)
+#define OPTION_UBOUND_NAME(NAME, PARAM, SHORT, LONG, DESC, UBOUND) OPTION_BOUND_TYPE(NAME, PARAM, SHORT, LONG, DESC, LE, UBOUND)
 #define OPTION_BOUND_NAME(NAME, PARAM, SHORT, LONG, DESC, LBOUND, UBOUND) \
         RangeConstraint<decltype(cr.parameters.PARAM)> opt_##NAME##_constr(LBOUND, UBOUND); \
-        TCLAP::ValueArg<decltype(cr.parameters.PARAM)> opt_##NAME##_arg(SHORT, LONG, DESC, false, cr.parameters.PARAM, &opt_##NAME##_constr, cmd)
+        ARG(NAME,PARAM,SHORT,LONG,DESC)
 #define OPTION_LBOUND(PARAM, SHORT, LONG, DESC, LBOUND) OPTION_LBOUND_NAME(PARAM, PARAM, SHORT, LONG, DESC, LBOUND)
 #define OPTION_UBOUND(PARAM, SHORT, LONG, DESC, UBOUND) OPTION_UBOUND_NAME(PARAM, PARAM, SHORT, LONG, DESC, UBOUND)
+#define OPTION_LBOUND_STRICT(PARAM, SHORT, LONG, DESC, LBOUND) OPTION_BOUND_TYPE(PARAM, PARAM, SHORT, LONG, DESC, GT, LBOUND)
+#define OPTION_UBOUND_STRICT(PARAM, SHORT, LONG, DESC, UBOUND) OPTION_BOUND_TYPE(PARAM, PARAM, SHORT, LONG, DESC, LT, UBOUND)
 #define OPTION_BOUND(PARAM, SHORT, LONG, DESC, LBOUND, UBOUND) OPTION_BOUND_NAME(PARAM, PARAM, SHORT, LONG, DESC, LBOUND, UBOUND)
 #define OPTION_UNBOUNDED(PARAM, SHORT, LONG, DESC) OPTION_UNBOUNDED_NAME(PARAM, PARAM, SHORT, LONG, DESC)
 #define OPTION_LBOUND_INIT(PARAM, SHORT, LONG, DESC, LBOUND) OPTION_LBOUND_NAME(initial_##PARAM, initial.PARAM, SHORT, LONG, DESC, LBOUND)
@@ -125,20 +135,20 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
 
         OPTION_LBOUND(readers, "r", "readers", "Number of reader/author agents in the simulation", 1);
         OPTION_LBOUND(dimensions, "D", "dimensions", "Number of dimensions of the simulation", 1);
-        auto opt_density_constr = RangeConstraint<double>::GE(std::numeric_limits<double>::min());
+        auto opt_density_constr = RangeConstraint<double>::GT(0);
         TCLAP::ValueArg<double> opt_density_arg("d", "density", "Reader density (in readers per unit^(D), where D is the configured # of dimensions)",
                 false, Creativity::densityFromBoundary(cr.parameters.readers, cr.parameters.dimensions, cr.parameters.boundary), &opt_density_constr, cmd);
         OPTION_BOUND(piracy_link_proportion, "f", "piracy-link-proportion", "Proportion of potential sharing links between readers that are created", 0, 1);
         OPTION_LBOUND(book_distance_sd, "B", "book-distance-sd", "Standard deviation of book distance from author; distance ~ |N(0, B)|", 0);
         OPTION_LBOUND(book_quality_sd, "Q", "book-quality-sd", "Standard deviation of book perceived quality; perceived quality ~ N(q, Q), where q is the innate quality and Q is this value.", 0);
         OPTION_LBOUND(reader_step_sd, "R", "reader-step-sd", "Standard deviation of the inter-period random-direction reader movement distance ~ |N(0, R)|", 0);
-        OPTION_UBOUND(reader_creation_shape, "s", "reader-creation-shape", "Shape parameter, β, of the creator effort function: q(ℓ) = (α/β)[(ℓ+1)^β - 1]", 1);
+        OPTION_UBOUND_STRICT(reader_creation_shape, "s", "reader-creation-shape", "Shape parameter, β, of the creator effort function: q(ℓ) = (α/β)[(ℓ+1)^β - 1]", 1);
         OPTION_LBOUND(reader_creation_scale_min, "z", "reader-creation-scale-min", "Minimum support of scale parameter α ~ U[a,b] for the creator effort function: q(ℓ) = (α/β)[(ℓ+1)^β - 1]", 0);
         OPTION_LBOUND(reader_creation_scale_max, "Z", "reader-creation-scale-max", "Maximum support of scale parameter α ~ U[a,b] for the creator effort function: q(ℓ) = (α/β)[(ℓ+1)^β - 1]", 0);
         OPTION_LBOUND(cost_fixed, "C", "cost-fixed", "Fixed cost of keeping a book on the market for a period", 0);
         OPTION_LBOUND(cost_unit, "c", "cost-unit", "Unit cost of making a copy of a book", 0);
         OPTION_LBOUND(cost_piracy, "y", "cost-piracy", "Cost of receiving a pirated copy of a book", 0);
-        OPTION_LBOUND(income, "i", "income", "Per-period external reader income", std::numeric_limits<double>::min());
+        OPTION_LBOUND_STRICT(income, "i", "income", "Per-period external reader income", 0);
         OPTION_BOUND(prior_weight, "w", "prior-weight", "The per-period precision matrix multiplier when using a belief as the next period's prior", 0, 1);
         OPTION_BOUND(prior_weight_piracy, "W", "prior-weight-piracy", "The per-period precision matrix multiplier for the first piracy period", 0, 1);
 
