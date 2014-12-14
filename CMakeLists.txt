@@ -45,6 +45,9 @@ endforeach()
 find_package(Eigen3 REQUIRED)
 include_directories(${EIGEN3_INCLUDE_DIR})
 
+find_package(Boost REQUIRED)
+include_directories(${Boost_INCLUDE_DIRS})
+
 # Find library source/headers
 file(GLOB_RECURSE cr_libsrc creativity/*.cpp)
 file(GLOB_RECURSE cr_gui_libsrc creativity/gui/*.cpp)
