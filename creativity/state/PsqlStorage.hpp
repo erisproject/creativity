@@ -1,6 +1,12 @@
 #pragma once
 #include "creativity/state/Storage.hpp"
 #include <vector>
+// Hack to make libpqxx not try to load <tr1/memory>, which isn't needed or wanted
+#include <pqxx/compiler-public.hxx>
+#undef PQXX_TR1_HEADERS
+#undef PQXXTR1
+#define PQXXTR1 std
+// End hack
 #include <pqxx/pqxx>
 #include <iomanip>
 
