@@ -5,9 +5,9 @@
 
 namespace creativity { namespace state {
 
+using namespace eris;
 using namespace creativity::belief;
 using namespace Eigen;
-using eris::eris_id_t;
 
 /// Member definitions for header/cblock constants
 constexpr unsigned int
@@ -70,7 +70,7 @@ inline bool file_exists(const std::string &name) {
     return stat(name.c_str(), &buffer) == 0;
 }
 
-FileStorage::FileStorage(const std::string &filename, MODE mode, CreativitySettings &settings) : Storage(settings) {
+FileStorage::FileStorage(const std::string &filename, MODE mode) {
     f_.exceptions(f_.failbit | f_.badbit);
 
     bool parse = true;
@@ -104,19 +104,20 @@ FileStorage::FileStorage(const std::string &filename, MODE mode, CreativitySetti
 
     if (parse) {
         parseMetadata();
+        have_settings = true;
     }
     else {
         writeEmptyHeader();
-        need_settings_updated_ = true;
     }
 }
 
 size_t FileStorage::size() const {
+    std::unique_lock<std::mutex> lock(f_mutex_);
     return state_pos_.size();
 }
 
-void FileStorage::push_back_(std::shared_ptr<const State> &&state) {
-
+void FileStorage::thread_insert(std::shared_ptr<const State> &&state) {
+    std::unique_lock<std::mutex> lock(f_mutex_);
     f_.seekp(0, f_.end);
     auto location = f_.tellp();
     if (location < HEADER::size) {
@@ -132,9 +133,7 @@ void FileStorage::push_back_(std::shared_ptr<const State> &&state) {
 
     addStateLocation(location);
 
-    if (states_.size() < state_pos_.size()) states_.resize(state_pos_.size());
-    states_[state_pos_.size()-1] = state;
-
+    // If dimensions and boundary are 0, update them.
     if (settings_.dimensions == 0 and state->dimensions != 0) {
         f_.seekp(HEADER::pos::dimensions);
         write_u32(state->dimensions);
@@ -148,25 +147,20 @@ void FileStorage::push_back_(std::shared_ptr<const State> &&state) {
 }
 
 
-std::shared_ptr<const State> FileStorage::operator[](size_t i) const {
-    std::shared_ptr<const State> ret;
-    if (states_.size() > i and (ret = states_[i].lock())) {
-        return ret;
-    }
+std::shared_ptr<const State> FileStorage::load(eris_time_t t) const {
+    std::unique_lock<std::mutex> lock(f_mutex_);
 
-    if (i >= state_pos_.size())
-        throw std::out_of_range("state::FileStorage: requested State index is invalid");
+    if (t >= state_pos_.size()) return std::shared_ptr<const State>();
 
-    auto state_pos = state_pos_[i];
+    auto state_pos = state_pos_[t];
     f_.seekg(state_pos);
 
-    ret = readState();
-    if (states_.size() <= i) states_.resize(i+1);
-    states_[i] = ret;
-    return ret;
+    return readState();
 }
 
 void FileStorage::flush() {
+    StorageBackend::flush();
+    std::unique_lock<std::mutex> lock(f_mutex_);
     f_.flush();
 }
 
@@ -181,35 +175,45 @@ void FileStorage::writeEmptyHeader() {
     f_.write(zeros, sizeof zeros);
 }
 
-void FileStorage::updateSettings() {
+void FileStorage::readSettings(CreativitySettings &settings) const {
+    settings = settings_;
+}
+
+void FileStorage::writeSettings(const CreativitySettings &settings) {
+    if (settings_.dimensions == 0 and settings_.dimensions != settings.dimensions)
+        throw std::logic_error("Cannot overwrite settings with a difference number of dimensions");
+    if (settings_.boundary != 0 and settings_.boundary != settings.boundary)
+        throw std::logic_error("Cannot overwrite settings with a different boundary");
+
+    std::unique_lock<std::mutex> lock(f_mutex_);
 
     f_.seekp(HEADER::pos::num_states);
-    write_u32(size()); // Number of states
-    write_value(settings_.dimensions);
-    write_value(settings_.readers);
-    write_value(settings_.boundary);
-    write_value(settings_.book_distance_sd);
-    write_value(settings_.book_quality_sd);
-    write_value(settings_.reader_step_sd);
-    write_value(settings_.reader_creation_shape);
-    write_value(settings_.reader_creation_scale_min);
-    write_value(settings_.reader_creation_scale_max);
-    write_value(settings_.cost_fixed);
-    write_value(settings_.cost_unit);
-    write_value(settings_.cost_piracy);
-    write_value(settings_.income);
-    write_value(settings_.piracy_begins);
-    write_value(settings_.piracy_link_proportion);
-    write_value(settings_.prior_weight);
-    write_value(settings_.prior_weight_piracy);
-    write_value(settings_.initial.prob_write);
-    write_value(settings_.initial.q_min);
-    write_value(settings_.initial.q_max);
-    write_value(settings_.initial.p_min);
-    write_value(settings_.initial.p_max);
-    write_value(settings_.initial.prob_keep);
-    write_value(settings_.initial.keep_price);
-    write_value(settings_.initial.belief_threshold);
+    write_u32(state_pos_.size()); // Number of states
+    write_value(settings.dimensions);
+    write_value(settings.readers);
+    write_value(settings.boundary);
+    write_value(settings.book_distance_sd);
+    write_value(settings.book_quality_sd);
+    write_value(settings.reader_step_sd);
+    write_value(settings.reader_creation_shape);
+    write_value(settings.reader_creation_scale_min);
+    write_value(settings.reader_creation_scale_max);
+    write_value(settings.cost_fixed);
+    write_value(settings.cost_unit);
+    write_value(settings.cost_piracy);
+    write_value(settings.income);
+    write_value(settings.piracy_begins);
+    write_value(settings.piracy_link_proportion);
+    write_value(settings.prior_weight);
+    write_value(settings.prior_weight_piracy);
+    write_value(settings.initial.prob_write);
+    write_value(settings.initial.q_min);
+    write_value(settings.initial.q_max);
+    write_value(settings.initial.p_min);
+    write_value(settings.initial.p_max);
+    write_value(settings.initial.prob_keep);
+    write_value(settings.initial.keep_price);
+    write_value(settings.initial.belief_threshold);
 
     // 4 bytes padding:
     write_u32(0); // Unused padding value
@@ -218,6 +222,9 @@ void FileStorage::updateSettings() {
         // If this exception occurs, something in the above sequence is wrong.
         throw std::runtime_error("Header writing failed: header size != " + std::to_string(HEADER::size) + " bytes");
     }
+
+    // Copy the settings (so that readSettings() will return the right thing)
+    settings_ = settings;
 
     // The rest is state positions, which we aren't supposed to touch.
 }

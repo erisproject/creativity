@@ -3,6 +3,7 @@
 #include <boost/iterator/iterator_facade.hpp>
 #include "creativity/state/State.hpp"
 #include "creativity/CreativitySettings.hpp"
+#include "creativity/state/StorageBackend.hpp"
 
 namespace creativity { namespace state {
 
@@ -12,45 +13,53 @@ namespace creativity { namespace state {
  *
  * \sa creativity::state::MemoryStorage
  * \sa creativity::state::FileStorage
+ * \sa creativity::state::PsqlStorage
  */
-class Storage {
+class Storage final {
     public:
         Storage() = delete;
 
-        /** Storage base class constructor, which must be called with a CreativitySettings
-         * reference.
+        /** Storage constructor, which can construct a StorageBackend on the fly.
+         *
+         * \param settings the CreativitySettings reference
+         * \param args parameters to forward to the SB constructor
+         *
+         * \returns a shared pointer to the created Storage object.
          */
-        Storage(CreativitySettings &settings) : settings_(settings) {}
+        template<class SB, class... Args>
+        static typename std::enable_if<std::is_base_of<StorageBackend, SB>::value, std::shared_ptr<Storage>>::type
+        create(CreativitySettings &settings, Args&&... args) {
+            return std::shared_ptr<Storage>(new Storage(settings, new SB(std::forward<Args>(args)...)));
+        }
 
-        /** Returns the State at the given position.  It is highly recommended that subclasses store
-         * objects in simulation order, that is, that `storage[j]->t == j` is true.
+        /** Returns the State for the given simulation time period.
          *
-         * \param i the index (if the subclass follows the recommendation above, also the simulation
-         * period).
+         * \param t the simulation period desired.
          *
-         * \returns A shared pointer to the requested State.  The pointed-at object may or may not
-         * be stored internally by the storage object; in particular, storage-based implementations
-         * may construct and return a new State object each time this operator is called.
+         * \returns A shared pointer to the requested State.  The pointed-at object will be cached,
+         * but may only weakly; thus this method may require the backend storage object to load the
+         * data from the storage medium on a subsequent call for the same index if the returned
+         * reference isn't stored anywhere.
          *
          * \throws std::out_of_range if `t >= size()`
          */
-        virtual std::shared_ptr<const State> operator[](size_t i) const = 0;
+        std::shared_ptr<const State> operator[](eris::eris_time_t t) const;
 
         /// Returns the number of states currently stored.
-        virtual size_t size() const = 0;
+        size_t size() const;
 
         /** Reserves the requested number of states.  By default this does nothing; subclasses
          * should override if they have a useful reserve() implementation.
          */
-        virtual void reserve(size_t capacity);
+        void reserve(size_t capacity);
 
         /// Returns true if the container is empty.
-        virtual bool empty() const;
+        bool empty() const;
 
-        /** Adds a state to this storage container.  Note that it is up to the implementing class
-         * whether it stores the given std::shared_ptr or just uses it to access the State.
+        /** Adds a state to this storage container.  Depending on the backend, the object may only
+         * be queued for addition by a thread and not immediately written to the storage medium.
          *
-         * This calls the subclass-specific push_back_() method.
+         * \sa flush()
          */
         void push_back(std::shared_ptr<const State> s);
 
@@ -58,24 +67,32 @@ class Storage {
          * CreativitySettings given during construction) to the storage medium (if appropriate).
          * Existing settings are replaced.
          *
-         * Subclasses should ensure that this is called during the first push_back() call if it
-         * hasn't yet been called and a new data entry was created (rather than an existing one
-         * loaded).
+         * If not called explicitly, this method will be called by the first push_back() call.
          */
-        virtual void updateSettings() = 0;
+        void updateSettings();
 
         /// Constructs a State using the given arguments, wraps it in a shared_ptr, then inserts it by calling push_back
         template<class... Args>
         void emplace_back(Args&&... args);
 
-        /** Flushes changes, if the underlying storage object has such a concept.  The default
-         * implementation does nothing.  If this is not called at the end of a program, written data
-         * may not actually be saved to the underlying storage system.
+        /** Flushes changes of the backend storage object.  This typically blocks until all data in
+         * the queue has been written to the underlying storage medium.
+         *
+         * flush() is called automatically during object destruction, unless flush_on_destroy has
+         * been set to false.
          */
-        virtual void flush();
+        void flush();
 
-        /// Default destructor
-        virtual ~Storage() = default;
+        /// Accesses the underlying backend storage instance
+        StorageBackend& backend();
+
+        /** If true (the default), flush() is called when the object is destroyed.  If false, it is
+         * not, which may result in data loss.
+         */
+        bool flush_on_destroy = true;
+
+        /// Destructor.  Calls flush() (unless `flush_on_destroy` has been set to false).
+        ~Storage();
 
         /// Random access iterator class for iterating through states
         class state_iterator : public boost::iterator_facade<state_iterator, const std::shared_ptr<const State>, boost::random_access_traversal_tag> {
@@ -87,41 +104,53 @@ class Storage {
                 friend class Storage;
                 friend class boost::iterator_core_access;
 
-                state_iterator(const Storage &st, size_t at) : storage(st) { advance(at); }
+                state_iterator(const Storage &st, size_t at);
 
-                reference dereference() const { return curr; }
-                void increment() { advance(1); }
-                void decrement() { advance(-1); }
-                void advance(difference_type n) { i += n; if (i < storage.size()) curr = storage[i]; else curr.reset(); }
-                difference_type distance_to(const state_iterator &it) { return it.i - i; }
-                bool equal(const state_iterator &other) const { return other.i == i; }
+                reference dereference() const;
+                void increment();
+                void decrement();
+                void advance(difference_type n);
+                difference_type distance_to(const state_iterator &it) const;
+                bool equal(const state_iterator &other) const;
         };
 
         /** Returns a Random Access Iterator to the beginning of the storage object's states. */
-        state_iterator begin() const {
-            return state_iterator(*this, 0);
-        }
+        state_iterator begin() const;
         /** Returns a Random Access Iterator to the just-past-the-end of the storage object's
          * states. */
-        state_iterator end() const {
-            return state_iterator(*this, size());
+        state_iterator end() const;
+
+    private:
+        /** Storage constructor, which must be called with a CreativitySettings reference and
+         * StorageBackend object.
+         *
+         * \param settings the CreativitySettings reference associated with the Creativity object
+         * this storage class represents.
+         * \param backend a StorageBackend-derived object
+         */
+        Storage(CreativitySettings &settings, StorageBackend *sb) : settings_(settings), backend_(sb)
+        {
+            backend_->readSettings(settings_);
+            // Track the number of states using the size of the cache_
+            cache_.reserve(backend_->size());
         }
 
-    protected:
         /** The simulation settings reference, which subclasses must set during construction, typically from a with default initialization of fields to 0.  These settings
          * should be updated as soon as possible.
          */
         CreativitySettings &settings_;
 
-        /** Adds a state to this storage container.  Note that it is up to the implementing class
-         * whether it stores the given std::shared_ptr or just uses it to access the State.
+        /** Weak pointers to stored states.  This cache is automatically managed by this base class.
          */
-        virtual void push_back_(std::shared_ptr<const State> &&s) = 0;
+        mutable std::vector<std::weak_ptr<const State>> cache_;
 
-        /** True if only default settings have been written, in which case updateSettings() will be
-         * called during push_back() before invoking the subclassable push_back_() method.
+        /** The storage backend, providing the actual low-level storage access. */
+        std::unique_ptr<StorageBackend> backend_;
+
+        /** Tracks whether updateSettings() has been called, so that it can be called during
+         * push_back (if needed).
          */
-        bool need_settings_updated_ = false;
+        bool need_settings_updated_ = true;
 };
 
 template <class... Args>

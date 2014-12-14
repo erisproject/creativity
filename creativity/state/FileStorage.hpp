@@ -15,10 +15,10 @@ namespace state {
  * FileStorage object after such an exception is thrown as the result is unpredictable: the object
  * could simply stop writing new data to the file or the file could become corrupted.
  *
- * This object is also not thread-safe on its own: you must ensure that only one thread at a time
- * accesses it, even for read-only methods.
+ * Writing new states is done by a background thread which is spawned the first time enqueue() is
+ * called with a new state.
  */
-class FileStorage : public Storage, private eris::noncopyable {
+class FileStorage final : public StorageBackend {
     public:
         FileStorage() = delete;
 
@@ -46,19 +46,15 @@ class FileStorage : public Storage, private eris::noncopyable {
         };
 
         /** Constructs and returns a FileStorage object that uses the given file for reading and
-         * (optionally) writing state data.
+         * (optionally) writing state data.  The file is read or created immediately.
          *
          * \param filename the filename to open
          * \param mode the open mode to use
-         * \param settings is a reference to CreativitySettings.  If the file is being read (i.e.
-         * it already exists and isn't being overwritten) the file's settings are copied into the
-         * CreativitySettings object.  Otherwise the CreativitySettings object will be copied into
-         * the file during the first push_back() call or the updateSettings() call.
          *
          * Throws various exceptions if the file does not exist, cannot be read, is empty, or
          * contains invalid data.
          */
-        FileStorage(const std::string &filename, MODE mode, CreativitySettings &settings);
+        FileStorage(const std::string &filename, MODE mode);
 
         /** Throws a ParseError exception.  The given message is prefixed with `Parsing file failed
          * [pos=123]: `, where `123` is the current file position.
@@ -76,17 +72,21 @@ class FileStorage : public Storage, private eris::noncopyable {
         /** Loads the requested state data from the open file into a State object and returns it
          * (wrapped in a shared_ptr).
          */
-        virtual std::shared_ptr<const State> operator[](size_t i) const override;
+        virtual std::shared_ptr<const State> load(eris::eris_time_t t) const override;
 
         /// Returns the number of states currently stored in the file.
         virtual size_t size() const override;
 
+        /** Reads the settings stored in the file header into the given CreativitySettings object.
+         */
+        virtual void readSettings(CreativitySettings &settings) const override;
+
         /** Updates the values in the file header to those currently in the CreativitySettings
-         * reference provided to this FileStorage during construction.
+         * reference provided.
          *
          * Existing values are overwritten.
          */
-        virtual void updateSettings() override;
+        virtual void writeSettings(const CreativitySettings &settings) override;
 
         /** Flushes the file to disc.  This calls `flush()` on the underlying file object.  This is
          * normally not required: any changes will be automatically flushed when the FileStorage
@@ -100,11 +100,23 @@ class FileStorage : public Storage, private eris::noncopyable {
         virtual void flush() override;
 
     protected:
+        /// Called from the queue thread to write the given State to the file.
+        virtual void thread_insert(std::shared_ptr<const State> &&s) override;
+
+    private:
         /** The file buffer object. Mutable because we need to read from it in const methods. */
         mutable std::fstream f_;
 
-        /// Adds a new State to the file.
-        virtual void push_back_(std::shared_ptr<const State> &&state) override;
+        /** Mutex guarding f_ and related variables (such as state_pos_).  Some operations (such as
+         * load/saving settings) are done by the main thread, which accesses f_.
+         */
+        mutable std::mutex f_mutex_;
+
+        /// Thread writer loop; runs forever (until destruction).
+        void thread_writer_();
+
+        /// Storage for header data parsing when opening the file, and after writing settings.
+        CreativitySettings settings_;
 
         /** Attempts to parse the metadata (global settings, file locations; essentially everything
          * except for the actual state data) from the opened file.  Throws an exception if parsing
@@ -208,12 +220,6 @@ class FileStorage : public Storage, private eris::noncopyable {
 
         /// Store the locations of the state data for each state;
         std::vector<std::streampos> state_pos_;
-
-        /** Stores weak references of parsed State data; as long as a returned State is still
-         * referenced somewhere else, we can simply return a new reference to it; otherwise it needs
-         * to be recreated.
-         */
-        mutable std::vector<std::weak_ptr<const State>> states_;
 
         /** The header contains the first 485 state locations (bytes 208 through 4887); if the file
          * has more states, the location at 4088 points to a "continuation block": 511 state

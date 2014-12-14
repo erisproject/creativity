@@ -27,12 +27,12 @@ CreativitySettings& Creativity::set() {
 void Creativity::fileWrite(const std::string &filename) {
     if (setup_sim_) throw std::logic_error("Cannot call Creativity::fileWrite() after setup()");
     else if (setup_read_) throw std::logic_error("Cannot call Creativity::fileWrite() after loading state data");
-    storage().first = std::make_shared<FileStorage>(filename, FileStorage::MODE::OVERWRITE, set_);
+    storage().first = Storage::create<FileStorage>(set_, filename, FileStorage::MODE::OVERWRITE);
 }
 
 void Creativity::fileRead(const std::string &filename) {
     if (setup_sim_) throw std::logic_error("Cannot call Creativity::fileRead() after setup()");
-    storage().first = std::make_shared<FileStorage>(filename, FileStorage::MODE::READONLY, set_);
+    storage().first = Storage::create<FileStorage>(set_, filename, FileStorage::MODE::READONLY);
     setup_read_ = true;
 }
 
@@ -52,7 +52,7 @@ void Creativity::pgsql(std::string url, bool load_only, bool new_only) {
     else if (load_id > 0 and new_only) throw std::logic_error("Invalid postgresql URL given: creativity= option cannot be specified here");
     else if (load_id == -1 and load_only) throw std::logic_error("Invalid postgresql URL given: creativity= option must be specified here");
 
-    storage().first = std::make_shared<PsqlStorage>(url, set_, load_id);
+    storage().first = Storage::create<PsqlStorage>(set_, url, load_id);
     setup_read_ = load_id > 0;
 }
 
@@ -94,7 +94,7 @@ void Creativity::setup() {
 
     {
         auto st = storage();
-        if (not st.first) st.first = std::make_shared<MemoryStorage>(set_);
+        if (not st.first) st.first = Storage::create<MemoryStorage>(set_);
     }
 
     std::uniform_real_distribution<double> unif_pmb(-parameters.boundary, parameters.boundary);

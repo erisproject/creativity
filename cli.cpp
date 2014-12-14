@@ -236,8 +236,9 @@ int main(int argc, char *argv[]) {
         try {
             creativity->pgsql(args.out, false /*read-only*/, true /*write-only*/);
 
-            PsqlStorage &pgsql = dynamic_cast<PsqlStorage&>(*creativity->storage().first);
-            auto &conn = pgsql.connection();
+            PsqlStorage &pgsql = dynamic_cast<PsqlStorage&>(creativity->storage().first->backend());
+            auto conn_locked = pgsql.connection();
+            auto &conn = conn_locked.first;
             // Rebuild an output URL for the postgresql database
             std::ostringstream psqlurl("postgresql://");
             const char *username = conn.username();

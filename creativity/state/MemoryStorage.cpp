@@ -1,23 +1,27 @@
 #include "creativity/state/MemoryStorage.hpp"
 
+using namespace eris;
+
 namespace creativity { namespace state {
 
-MemoryStorage::MemoryStorage(CreativitySettings &set) : Storage(set) {}
-
-MemoryStorage::MemoryStorage(const Storage &copy) : Storage(copy) {
+MemoryStorage::MemoryStorage(const Storage &copy) {
     reserve(copy.size());
-    for (size_t i = 0; i < copy.size(); i++) {
-        states_.push_back(copy[i]);
-    }
+    states_.insert(states_.end(), copy.begin(), copy.end());
 }
 
-std::shared_ptr<const State> MemoryStorage::operator[](size_t i) const { return states_[i]; }
+void MemoryStorage::writeSettings(const CreativitySettings&) {}
+void MemoryStorage::readSettings(CreativitySettings&) const {}
+
+std::shared_ptr<const State> MemoryStorage::load(eris_time_t i) const {
+    if (i < states_.size()) return states_[i];
+    return std::shared_ptr<const State>();
+}
 
 size_t MemoryStorage::size() const { return states_.size(); }
 
 void MemoryStorage::reserve(size_t capacity) { states_.reserve(capacity); }
 
-void MemoryStorage::push_back_(std::shared_ptr<const State> &&s) {
+void MemoryStorage::enqueue(std::shared_ptr<const State> &&s) {
     states_.push_back(std::move(s));
 }
 

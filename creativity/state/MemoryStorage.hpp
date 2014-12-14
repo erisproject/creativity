@@ -1,5 +1,6 @@
 #pragma once
 #include "creativity/state/Storage.hpp"
+#include "creativity/state/StorageBackend.hpp"
 #include <vector>
 
 namespace creativity { namespace state {
@@ -7,12 +8,10 @@ namespace creativity { namespace state {
 /** Class for in-memory storage (using an underlying std::vector).  All States are stored in memory
  * (via std::shared_ptr) for immediate retrieval.
  */
-class MemoryStorage : public Storage {
+class MemoryStorage final : public StorageBackend {
     public:
-        MemoryStorage() = delete;
-
-        /// Creates an empty MemoryStorage object, using the given creativity settings reference.
-        MemoryStorage(CreativitySettings &set);
+        /** Creates a new, blank MemoryStorage object. */
+        MemoryStorage() = default;
 
         /** Creates a MemoryStorage object by coping the States and settings of the given Storage
          * object into new in-memory states.  Note that this copies std::shared_ptr<State> from the
@@ -20,23 +19,23 @@ class MemoryStorage : public Storage {
          */
         MemoryStorage(const Storage &copy);
 
-        /** Returns a shared pointer to the stored State data.  Note that since the State object is
-         * stored, this method returns a shared_pointer with `.use_count() > 1`.
-         */
-        virtual std::shared_ptr<const State> operator[](size_t i) const override;
-
         /// Returns the number of states currently stored.
         virtual size_t size() const override;
 
         /// Reserves the requested capacity in the underlying std::vector
         virtual void reserve(size_t capacity) override;
 
-        /// Does nothing; settings are not stored outside the CreativitySettings reference.
-        virtual void updateSettings() override {}
+        /// Does nothing; settings are not stored by this class.
+        virtual void writeSettings(const CreativitySettings&) override;
 
-    protected:
-        /// Adds a new State pointer to this storage container.
-        virtual void push_back_(std::shared_ptr<const State> &&state) override;
+        /// Does nothing; settings are not stored by this class.
+        virtual void readSettings(CreativitySettings&) const override;
+
+        /// Returns the given index.
+        virtual std::shared_ptr<const State> load(eris::eris_time_t t) const override;
+
+        /// Adds the given state to the stored states_ directly.
+        virtual void enqueue(std::shared_ptr<const State> &&s);
 
     private:
         std::vector<std::shared_ptr<const State>> states_;

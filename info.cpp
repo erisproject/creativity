@@ -22,8 +22,9 @@ int main(int argc, char *argv[]) {
         try {
             creativity->pgsql(source, true /*read-only*/);
 
-            PsqlStorage &pgsql = dynamic_cast<PsqlStorage&>(*creativity->storage().first);
-            auto &conn = pgsql.connection();
+            PsqlStorage &pgsql = dynamic_cast<PsqlStorage&>(creativity->storage().first->backend());
+            auto conn_locked = pgsql.connection();
+            auto &conn = conn_locked.first;
             std::cout << "Connected to postgresql://";
             const char *username = conn.username();
             if (username) std::cout << username << "@";

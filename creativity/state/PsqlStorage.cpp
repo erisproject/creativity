@@ -11,9 +11,7 @@ using namespace creativity::belief;
 using namespace Eigen;
 using namespace eris;
 
-PsqlStorage::PsqlStorage(const std::string &connect, CreativitySettings &settings, int32_t id) : Storage(settings) {
-
-    if (id < 0 and id != -1) throw std::logic_error("Invalid id `" + std::to_string(id) + "' passed to PsqlStorage constructor");
+PsqlStorage::PsqlStorage(const std::string &connect, unsigned int id) {
 
     conn_ = std::unique_ptr<pqxx::connection>(new pqxx::connection(connect));
 
@@ -22,12 +20,10 @@ PsqlStorage::PsqlStorage(const std::string &connect, CreativitySettings &setting
     // Connected (on failure, the above throws)
 
     pqxx::work trans(*conn_);
-    if (id == -1) {
-        // New simulation: create a simulation row and copy the settings
+    if (id == 0) {
+        // New simulation: create a simulation row
         trans.exec("INSERT INTO simulation (seed) VALUES (" + std::to_string(eris::Random::seed()) + ")");
         id_ = trans.prepared("lastval").exec()[0][0].as<int32_t>();
-        writeSettings(trans);
-        need_settings_updated_ = true;
     }
     else {
         auto result = trans.exec("SELECT * FROM simulation WHERE id = " + std::to_string(id));
@@ -35,7 +31,7 @@ PsqlStorage::PsqlStorage(const std::string &connect, CreativitySettings &setting
             throw std::out_of_range("Invalid id `" + std::to_string(id) + "' passed to PsqlStorage constructor: the given simulation is not in the database");
         id_ = id;
         seed_ = result[0]["seed"].as<int64_t>();
-        readSettings(trans);
+        have_settings = true;
     }
     trans.commit();
 }
@@ -65,85 +61,91 @@ void PsqlStorage::initialConnection() {
                                                    "($1" ",$2"   ",$3"  ",$4"   ",$5"    ",$6"   ",$7" ",$8"   ",$9"            ",$10"",$11"         ",$12"  ",$13"           ",$14)");
 }
 
-void PsqlStorage::writeSettings(pqxx::work &trans, bool update) {
-    std::string prepst(update ? "update_setting" : "insert_setting");
-    trans.prepared(prepst)(id)("dimensions")()(settings_.dimensions).exec();
-    trans.prepared(prepst)(id)("readers")()(settings_.readers).exec();
-    trans.prepared(prepst)(id)("boundary")(settings_.boundary)().exec();
-    trans.prepared(prepst)(id)("book_distance_sd")(settings_.book_distance_sd)().exec();
-    trans.prepared(prepst)(id)("book_quality_sd")(settings_.book_quality_sd)().exec();
-    trans.prepared(prepst)(id)("reader_step_sd")(settings_.reader_step_sd)().exec();
-    trans.prepared(prepst)(id)("reader_creation_shape")(settings_.reader_creation_shape)().exec();
-    trans.prepared(prepst)(id)("reader_creation_scale_min")(settings_.reader_creation_scale_min)().exec();
-    trans.prepared(prepst)(id)("reader_creation_scale_max")(settings_.reader_creation_scale_max)().exec();
-    trans.prepared(prepst)(id)("cost_fixed")(settings_.cost_fixed)().exec();
-    trans.prepared(prepst)(id)("cost_unit")(settings_.cost_unit)().exec();
-    trans.prepared(prepst)(id)("cost_piracy")(settings_.cost_piracy)().exec();
-    trans.prepared(prepst)(id)("income")(settings_.income)().exec();
-    trans.prepared(prepst)(id)("piracy_begins")()(settings_.piracy_begins).exec();
-    trans.prepared(prepst)(id)("piracy_link_proportion")(settings_.piracy_link_proportion)().exec();
-    trans.prepared(prepst)(id)("prior_weight")(settings_.prior_weight)().exec();
-    trans.prepared(prepst)(id)("prior_weight_piracy")(settings_.prior_weight_piracy)().exec();
-    trans.prepared(prepst)(id)("initial.prob_write")(settings_.initial.prob_write)().exec();
-    trans.prepared(prepst)(id)("initial.q_min")(settings_.initial.q_min)().exec();
-    trans.prepared(prepst)(id)("initial.q_max")(settings_.initial.q_max)().exec();
-    trans.prepared(prepst)(id)("initial.p_min")(settings_.initial.p_min)().exec();
-    trans.prepared(prepst)(id)("initial.p_max")(settings_.initial.p_max)().exec();
-    trans.prepared(prepst)(id)("initial.prob_keep")(settings_.initial.prob_keep)().exec();
-    trans.prepared(prepst)(id)("initial.keep_price")(settings_.initial.keep_price)().exec();
-    trans.prepared(prepst)(id)("initial.belief_threshold")()(settings_.initial.belief_threshold).exec();
-}
-
-void PsqlStorage::updateSettings() {
+void PsqlStorage::writeSettings(const CreativitySettings &settings) {
+    std::unique_lock<std::mutex> lock(conn_mutex_);
     pqxx::work trans(*conn_);
-    writeSettings(trans, true);
+    std::string prepst(have_settings ? "update_setting" : "insert_setting");
+    trans.prepared(prepst)(id)("dimensions")()(settings.dimensions).exec();
+    trans.prepared(prepst)(id)("readers")()(settings.readers).exec();
+    trans.prepared(prepst)(id)("boundary")(settings.boundary)().exec();
+    trans.prepared(prepst)(id)("book_distance_sd")(settings.book_distance_sd)().exec();
+    trans.prepared(prepst)(id)("book_quality_sd")(settings.book_quality_sd)().exec();
+    trans.prepared(prepst)(id)("reader_step_sd")(settings.reader_step_sd)().exec();
+    trans.prepared(prepst)(id)("reader_creation_shape")(settings.reader_creation_shape)().exec();
+    trans.prepared(prepst)(id)("reader_creation_scale_min")(settings.reader_creation_scale_min)().exec();
+    trans.prepared(prepst)(id)("reader_creation_scale_max")(settings.reader_creation_scale_max)().exec();
+    trans.prepared(prepst)(id)("cost_fixed")(settings.cost_fixed)().exec();
+    trans.prepared(prepst)(id)("cost_unit")(settings.cost_unit)().exec();
+    trans.prepared(prepst)(id)("cost_piracy")(settings.cost_piracy)().exec();
+    trans.prepared(prepst)(id)("income")(settings.income)().exec();
+    trans.prepared(prepst)(id)("piracy_begins")()(settings.piracy_begins).exec();
+    trans.prepared(prepst)(id)("piracy_link_proportion")(settings.piracy_link_proportion)().exec();
+    trans.prepared(prepst)(id)("prior_weight")(settings.prior_weight)().exec();
+    trans.prepared(prepst)(id)("prior_weight_piracy")(settings.prior_weight_piracy)().exec();
+    trans.prepared(prepst)(id)("initial.prob_write")(settings.initial.prob_write)().exec();
+    trans.prepared(prepst)(id)("initial.q_min")(settings.initial.q_min)().exec();
+    trans.prepared(prepst)(id)("initial.q_max")(settings.initial.q_max)().exec();
+    trans.prepared(prepst)(id)("initial.p_min")(settings.initial.p_min)().exec();
+    trans.prepared(prepst)(id)("initial.p_max")(settings.initial.p_max)().exec();
+    trans.prepared(prepst)(id)("initial.prob_keep")(settings.initial.prob_keep)().exec();
+    trans.prepared(prepst)(id)("initial.keep_price")(settings.initial.keep_price)().exec();
+    trans.prepared(prepst)(id)("initial.belief_threshold")()(settings.initial.belief_threshold).exec();
     trans.commit();
+    dimensions_ = settings.dimensions;
+    have_settings = true;
 }
 
-void PsqlStorage::readSettings(pqxx::work &trans) {
+void PsqlStorage::readSettings(CreativitySettings &settings) const {
+    std::unique_lock<std::mutex> lock(conn_mutex_);
+    if (not have_settings) return;
+    pqxx::work trans(*conn_);
     auto res = trans.prepared("get_settings")(id).exec();
     int found = 0;
     for (auto row : res) {
         found++;
         std::string setting(row[0].c_str());
-        if (setting == "dimensions") settings_.dimensions = row[2].as<uint32_t>();
-        else if (setting == "readers") settings_.readers = row[2].as<uint32_t>();
-        else if (setting == "boundary") settings_.boundary = row[1].as<double>();
-        else if (setting == "book_distance_sd") settings_.book_distance_sd = row[1].as<double>();
-        else if (setting == "book_quality_sd") settings_.book_quality_sd = row[1].as<double>();
-        else if (setting == "reader_step_sd") settings_.reader_step_sd = row[1].as<double>();
-        else if (setting == "reader_creation_shape") settings_.reader_creation_shape = row[1].as<double>();
-        else if (setting == "reader_creation_scale_min") settings_.reader_creation_scale_min = row[1].as<double>();
-        else if (setting == "reader_creation_scale_max") settings_.reader_creation_scale_max = row[1].as<double>();
-        else if (setting == "cost_fixed") settings_.cost_fixed = row[1].as<double>();
-        else if (setting == "cost_unit") settings_.cost_unit = row[1].as<double>();
-        else if (setting == "cost_piracy") settings_.cost_piracy = row[1].as<double>();
-        else if (setting == "income") settings_.income = row[1].as<double>();
-        else if (setting == "piracy_begins") settings_.piracy_begins = row[2].as<eris_time_t>();
-        else if (setting == "piracy_link_proportion") settings_.piracy_link_proportion = row[1].as<double>();
-        else if (setting == "prior_weight") settings_.prior_weight = row[1].as<double>();
-        else if (setting == "prior_weight_piracy") settings_.prior_weight_piracy = row[1].as<double>();
-        else if (setting == "initial.prob_write") settings_.initial.prob_write = row[1].as<double>();
-        else if (setting == "initial.q_min") settings_.initial.q_min = row[1].as<double>();
-        else if (setting == "initial.q_max") settings_.initial.q_max = row[1].as<double>();
-        else if (setting == "initial.p_min") settings_.initial.p_min = row[1].as<double>();
-        else if (setting == "initial.p_max") settings_.initial.p_max = row[1].as<double>();
-        else if (setting == "initial.prob_keep") settings_.initial.prob_keep = row[1].as<double>();
-        else if (setting == "initial.keep_price") settings_.initial.keep_price = row[1].as<double>();
-        else if (setting == "initial.belief_threshold") settings_.initial.belief_threshold = row[2].as<int32_t>();
+        if (setting == "dimensions") settings.dimensions = row[2].as<uint32_t>();
+        else if (setting == "readers") settings.readers = row[2].as<uint32_t>();
+        else if (setting == "boundary") settings.boundary = row[1].as<double>();
+        else if (setting == "book_distance_sd") settings.book_distance_sd = row[1].as<double>();
+        else if (setting == "book_quality_sd") settings.book_quality_sd = row[1].as<double>();
+        else if (setting == "reader_step_sd") settings.reader_step_sd = row[1].as<double>();
+        else if (setting == "reader_creation_shape") settings.reader_creation_shape = row[1].as<double>();
+        else if (setting == "reader_creation_scale_min") settings.reader_creation_scale_min = row[1].as<double>();
+        else if (setting == "reader_creation_scale_max") settings.reader_creation_scale_max = row[1].as<double>();
+        else if (setting == "cost_fixed") settings.cost_fixed = row[1].as<double>();
+        else if (setting == "cost_unit") settings.cost_unit = row[1].as<double>();
+        else if (setting == "cost_piracy") settings.cost_piracy = row[1].as<double>();
+        else if (setting == "income") settings.income = row[1].as<double>();
+        else if (setting == "piracy_begins") settings.piracy_begins = row[2].as<eris_time_t>();
+        else if (setting == "piracy_link_proportion") settings.piracy_link_proportion = row[1].as<double>();
+        else if (setting == "prior_weight") settings.prior_weight = row[1].as<double>();
+        else if (setting == "prior_weight_piracy") settings.prior_weight_piracy = row[1].as<double>();
+        else if (setting == "initial.prob_write") settings.initial.prob_write = row[1].as<double>();
+        else if (setting == "initial.q_min") settings.initial.q_min = row[1].as<double>();
+        else if (setting == "initial.q_max") settings.initial.q_max = row[1].as<double>();
+        else if (setting == "initial.p_min") settings.initial.p_min = row[1].as<double>();
+        else if (setting == "initial.p_max") settings.initial.p_max = row[1].as<double>();
+        else if (setting == "initial.prob_keep") settings.initial.prob_keep = row[1].as<double>();
+        else if (setting == "initial.keep_price") settings.initial.keep_price = row[1].as<double>();
+        else if (setting == "initial.belief_threshold") settings.initial.belief_threshold = row[2].as<int32_t>();
         else throw std::out_of_range("Simulation with id `" + std::to_string(id) + "' has unknown setting `" + setting + "'");
     }
     if (found != 25) throw std::out_of_range("Simulation with id `" + std::to_string(id) + "' has invalid settings");
+    dimensions_ = settings.dimensions;
+    trans.commit();
 }
 
 size_t PsqlStorage::size() const {
+    std::unique_lock<std::mutex> lock(conn_mutex_);
     pqxx::work trans(*conn_);
     size_t s = trans.prepared("num_states")(id).exec()[0][0].as<size_t>();
     trans.commit();
     return s;
 }
 
-void PsqlStorage::push_back_(std::shared_ptr<const State> &&state) {
+void PsqlStorage::thread_insert(std::shared_ptr<const State> &&state) {
+    std::unique_lock<std::mutex> lock(conn_mutex_);
     pqxx::work trans(*conn_);
     trans.prepared("insert_state")(id)(state->t).exec();
     int32_t state_id = trans.prepared("lastval").exec()[0][0].as<int32_t>();
@@ -161,12 +163,9 @@ void PsqlStorage::push_back_(std::shared_ptr<const State> &&state) {
     trans.commit();
 }
 
-std::shared_ptr<const State> PsqlStorage::operator[](size_t t) const {
+std::shared_ptr<const State> PsqlStorage::load(eris_time_t t) const {
+    std::unique_lock<std::mutex> lock(conn_mutex_);
     std::shared_ptr<const State> ret;
-    // First check to see whether we have it cached
-    if (state_cache_.size() > t and (ret = state_cache_[t].lock())) {
-        return ret;
-    }
     State *st_ptr = new State();
     State &state = *st_ptr;
     ret.reset(st_ptr);
@@ -186,10 +185,6 @@ std::shared_ptr<const State> PsqlStorage::operator[](size_t t) const {
     }
     trans.commit();
 
-    // Store a weak pointer in the cache before returning it--that way as long as someone is still
-    // holding onto the state, calling [t] again is cheap.
-    if (state_cache_.size() <= t) state_cache_.resize(t+1);
-    state_cache_[t] = ret;
     return ret;
 }
 
@@ -256,7 +251,7 @@ std::pair<eris::eris_id_t, ReaderState> PsqlStorage::readReader(const pqxx::tupl
 
     auto pair = std::make_pair<eris_id_t, ReaderState>(
             reader_row["eris_id"].as<eris_id_t>(),
-            ReaderState(settings_.dimensions));
+            ReaderState(dimensions_));
 
     ReaderState &r = pair.second;
     r.id = pair.first;
@@ -307,9 +302,9 @@ std::pair<eris::eris_id_t, ReaderState> PsqlStorage::readReader(const pqxx::tupl
 
         if (noninformative) {
             // If noninformative, s2, n, beta, etc. are null
-            if (type == "profit") r.profit = Profit(settings_.dimensions, k);
-            else if (type == "profit_extrap") r.profit_extrap = Profit(settings_.dimensions, k);
-            else if (type == "demand") r.demand = Demand(settings_.dimensions, k);
+            if (type == "profit") r.profit = Profit(dimensions_, k);
+            else if (type == "profit_extrap") r.profit_extrap = Profit(dimensions_, k);
+            else if (type == "demand") r.demand = Demand(dimensions_, k);
             else if (type == "quality") r.quality = Quality(k);
             else if (type == "profit_stream") r.profit_stream.emplace((unsigned int) k, ProfitStream(k));
             else throw std::out_of_range("Reader with database id `" + std::to_string(id) + "' has invalid belief type `" + type + "'");
@@ -319,9 +314,9 @@ std::pair<eris::eris_id_t, ReaderState> PsqlStorage::readReader(const pqxx::tupl
             double n = b["n"].as<double>();
             auto beta = parseDoubleArray(b["beta"].c_str(), k);
             auto V = parseDoubleArray(b["v_lower"].c_str(), k*(k+1)/2);
-            if (type == "profit") r.profit = Profit(settings_.dimensions, beta, s2, V, n);
-            else if (type == "profit_extrap") r.profit_extrap = Profit(settings_.dimensions, beta, s2, V, n);
-            else if (type == "demand") r.demand = Demand(settings_.dimensions, beta, s2, V, n);
+            if (type == "profit") r.profit = Profit(dimensions_, beta, s2, V, n);
+            else if (type == "profit_extrap") r.profit_extrap = Profit(dimensions_, beta, s2, V, n);
+            else if (type == "demand") r.demand = Demand(dimensions_, beta, s2, V, n);
             else if (type == "quality") r.quality = Quality(beta, s2, V, n);
             else if (type == "profit_stream") r.profit_stream.emplace((unsigned int) k, ProfitStream(beta, s2, V, n));
             else throw std::out_of_range("Reader with database id `" + std::to_string(id) + "' has invalid belief type `" + type + "'");
@@ -334,7 +329,7 @@ std::pair<eris::eris_id_t, ReaderState> PsqlStorage::readReader(const pqxx::tupl
 std::pair<eris::eris_id_t, BookState> PsqlStorage::readBook(const pqxx::tuple &book_row, pqxx::work &) const {
     auto pair = std::make_pair<eris_id_t, BookState>(
             book_row["eris_id"].as<eris_id_t>(),
-            BookState(settings_.dimensions));
+            BookState(dimensions_));
 
     BookState &b = pair.second;
     b.id = pair.first;
@@ -377,6 +372,10 @@ std::vector<double> PsqlStorage::parseDoubleArray(const std::string &doubles, in
     return dbls;
 }
 
-pqxx::connection& PsqlStorage::connection() { return *conn_; }
+std::pair<pqxx::connection&, std::unique_lock<std::mutex>> PsqlStorage::connection() {
+    return std::pair<pqxx::connection&, std::unique_lock<std::mutex>>(
+            std::ref(*conn_),
+            std::unique_lock<std::mutex>(conn_mutex_));
+}
 
 }}

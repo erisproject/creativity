@@ -1,5 +1,5 @@
 #pragma once
-#include "creativity/state/Storage.hpp"
+#include "creativity/state/StorageBackend.hpp"
 #include <vector>
 // Hack to make libpqxx not try to load <tr1/memory>, which isn't needed or wanted
 #include <pqxx/compiler-public.hxx>
@@ -10,11 +10,7 @@
 #include <pqxx/pqxx>
 #include <iomanip>
 
-namespace creativity {
-
-class Creativity;
-
-namespace state {
+namespace creativity { namespace state {
 
 /** Class for PostgreSQL-based storage.  Note that most of the methods of this class will throw
  * errors when the underlying libpqxx library encounters an error.  You should not attempt to use
@@ -26,7 +22,7 @@ namespace state {
  *
  * See database.pgsql included in the creativity distribution for the required table structure.
  */
-class PsqlStorage : public Storage, private eris::noncopyable {
+class PsqlStorage : public StorageBackend {
     public:
         PsqlStorage() = delete;
 
@@ -43,16 +39,11 @@ class PsqlStorage : public Storage, private eris::noncopyable {
          *     "host=somewhere username=myuser dbname=mydb password=mypassword requiressl=true"
          *     "postgresql://other@localhost:5432/otherdb?connect_timeout=10&application_name=myapp"
          *
-         * \param settings a reference to the CreativitySettings object.  If the database loads an
-         * existing simulation (see the `id` parameter), the loaded simulation's settings will be
-         * copied into the object; otherwise the object's settings will be written to the database
-         * the first time push_back() is called, or when updateSettings() is called.
-         *
-         * \param id if passed as a positive integer, the given simulation will be read from the
+         * \param id if passed as a non-zero integer, the given simulation will be read from the
          * database, and an std::out_of_range exception thrown if no simulation with that ID exists.
          * If the record was found, `.seed` is updated with the stored seed value.
          *
-         * Otherwise, with the default value of -1, a new simulation record will be created and
+         * Otherwise, with the default value of 0, a new simulation record will be created and
          * become available in 'id' during construction.  The current value of eris::Random::seed()
          * is stored in the new records seed field, and also stored in `.seed`.
          *
@@ -60,20 +51,21 @@ class PsqlStorage : public Storage, private eris::noncopyable {
          * \throws std::out_of_range if the given id doesn't exist
          * \throws std::logic_error if the given id is invalid (i.e. negative but not -1)
          */
-        PsqlStorage(const std::string &connect, CreativitySettings &settings, int32_t id = -1);
+        PsqlStorage(const std::string &connect, unsigned int id = 0);
 
         /** Loads the requested state data from the database into a State object and returns it
          * (wrapped in a shared_ptr).
          */
-        virtual std::shared_ptr<const State> operator[](size_t i) const override;
+        virtual std::shared_ptr<const State> load(eris::eris_time_t t) const override;
 
-        /** Updates the database with the current settings.  The settings must already exist in the
-         * database; that is normally done when creating a new PsqlStorage object with a new
-         * simulation.
-         *
-         * This method is called during push_back(), and can also be called directly.
+        /** Stores the given settings in the database.  If existing settings are present, they are
+         * replaced.
          */
-        void updateSettings() override;
+        void writeSettings(const CreativitySettings &settings) override;
+
+        /** Reads the settings from the database and sets them into the given settings object.
+         */
+        void readSettings(CreativitySettings &settings) const override;
 
         /// Returns the number of states currently stored in the database.
         virtual size_t size() const override;
@@ -84,49 +76,31 @@ class PsqlStorage : public Storage, private eris::noncopyable {
         /// The simulation seed, as read or determined during construction.
         const int64_t &seed = seed_;
 
-        /// Accesses the pqxx::connection object.  Be careful.
-        pqxx::connection& connection();
+        /// Accesses the pqxx::connection object, locking it out from other threads.  Be careful.
+        std::pair<pqxx::connection&, std::unique_lock<std::mutex>> connection();
 
     protected:
+        /// Inserts the given state into the database.
+        virtual void thread_insert(std::shared_ptr<const State> &&s) override;
+
+    private:
         /// The simulation id (mutable but protected)
         int32_t id_;
 
         /// The simulation seed (mutable but protected);
         int64_t seed_;
 
+        /// The number of dimensions (as last read or written to settings)
+        mutable uint32_t dimensions_;
+
         /** The file buffer object. Mutable because we need to read from it in const methods. */
         mutable std::unique_ptr<pqxx::connection> conn_;
 
+        /** Mutex guarding conn_. */
+        mutable std::mutex conn_mutex_;
+
         /// Sets up various prepared queries, sets required settings, etc.
         void initialConnection();
-
-        /** Reads the settings from the database using the given transaction.
-         *
-         * This method is called immediately after the connection is established if an id to load is
-         * given.
-         */
-        void readSettings(pqxx::work &trans);
-
-        /** Inserts of updates the settings from `settings` into the database using the given
-         * transaction.  The transaction is not committed.
-         *
-         * \param trans the transaction to use
-         * \param update if true, the database is updated (setting must already exist).  Otherwise
-         * (the default), the database is inserted into (settings must not already exist).
-         *
-         * This method is called with `update=false` during construction when creating a new
-         * simulation row, and called with `update=true` by updateSettings().
-         */
-        void writeSettings(pqxx::work &trans, bool update = false);
-
-        /// Adds a new State to the database.
-        virtual void push_back_(std::shared_ptr<const State> &&state) override;
-
-        /** Stores weak references of parsed State data; as long as a returned State is still
-         * referenced somewhere else, we can simply return a new reference to it; otherwise it needs
-         * to be re-queried.
-         */
-        mutable std::vector<std::weak_ptr<const State>> state_cache_;
 
         /// Reads a reader, returns it in a pair suitable for moving into State.readers.
         std::pair<eris::eris_id_t, ReaderState> readReader(const pqxx::tuple &reader_row, pqxx::work &trans) const;
