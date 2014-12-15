@@ -1,4 +1,7 @@
 #pragma once
+#ifdef CREATIVITY_SKIP_PGSQL
+#error Error: building without PsqlStorage
+#endif
 #include "creativity/state/StorageBackend.hpp"
 #include <vector>
 // Hack to make libpqxx not try to load <tr1/memory>, which isn't needed or wanted

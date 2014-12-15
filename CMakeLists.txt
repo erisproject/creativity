@@ -31,9 +31,16 @@ set(creativity_pkgconfig_ERIS liberis)
 set(creativity_pkgconfig_PQXX libpqxx)
 
 # pkg-config required packages for libcreativity.so:
-set(creativity_pkgconfig ERIS PQXX)
+set(creativity_pkgconfig ERIS)
 # required packages for libcreativitygui.so:
 set(creativity_gui_pkgconfig GTKMM)
+
+option(PGSQL "Enable postgresql support" ON)
+if (PGSQL)
+    list(APPEND creativity_pkgconfig PQXX)
+else()
+    add_definitions("-DCREATITIVY_SKIP_PGSQL")
+endif()
 
 foreach(pkg ${creativity_pkgconfig} ${creativity_gui_pkgconfig})
     pkg_check_modules(${pkg} REQUIRED ${creativity_pkgconfig_${pkg}})
@@ -52,6 +59,10 @@ include_directories(${Boost_INCLUDE_DIRS})
 file(GLOB_RECURSE cr_libsrc creativity/*.cpp)
 file(GLOB_RECURSE cr_gui_libsrc creativity/gui/*.cpp)
 list(REMOVE_ITEM cr_libsrc ${cr_gui_libsrc})
+if (NOT ${PGSQL})
+    file(GLOB_RECURSE cr_psql creativity/state/PsqlStorage.cpp)
+    list(REMOVE_ITEM cr_libsrc ${cr_psql})
+endif()
 # doc/CMakeLists.txt needs the list of headers:
 file(GLOB_RECURSE cr_headers creativity/*.hpp)
 

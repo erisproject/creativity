@@ -1,6 +1,8 @@
 #include "creativity/Creativity.hpp"
 #include "creativity/state/Storage.hpp"
+#ifndef CREATIVITY_SKIP_PGSQL
 #include "creativity/state/PsqlStorage.hpp"
+#endif
 #include <cstdio>
 
 using namespace creativity;
@@ -22,6 +24,7 @@ int main(int argc, char *argv[]) {
         try {
             creativity->pgsql(source, true /*read-only*/);
 
+#ifndef CREATIVITY_SKIP_PGSQL
             PsqlStorage &pgsql = dynamic_cast<PsqlStorage&>(creativity->storage().first->backend());
             auto conn_locked = pgsql.connection();
             auto &conn = conn_locked.first;
@@ -33,6 +36,7 @@ int main(int argc, char *argv[]) {
             const char *port = conn.port();
             if (port) std::cout << ":" << port;
             std::cout << "/" << conn.dbname() << "?creativity=" << pgsql.id << "\n";
+#endif
         }
         catch (std::exception &e) {
             std::cerr << "Unable to connect to database `" << source << "': " << e.what() << "\n\n";

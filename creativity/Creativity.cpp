@@ -1,6 +1,8 @@
 #include "creativity/Creativity.hpp"
 #include "creativity/state/FileStorage.hpp"
+#ifndef CREATIVITY_SKIP_PGSQL
 #include "creativity/state/PsqlStorage.hpp"
+#endif
 #include "creativity/state/MemoryStorage.hpp"
 #include "creativity/belief/Demand.hpp"
 #include "creativity/belief/Quality.hpp"
@@ -36,6 +38,7 @@ void Creativity::fileRead(const std::string &filename) {
     setup_read_ = true;
 }
 
+#ifndef CREATIVITY_SKIP_PGSQL
 void Creativity::pgsql(std::string url, bool load_only, bool new_only) {
     if (setup_sim_) throw std::logic_error("Cannot call Creativity::pgsql() after setup()");
 
@@ -55,6 +58,11 @@ void Creativity::pgsql(std::string url, bool load_only, bool new_only) {
     storage().first = Storage::create<PsqlStorage>(set_, url, load_id);
     setup_read_ = load_id > 0;
 }
+#else
+void Creativity::pgsql(std::string, bool, bool) {
+    throw std::runtime_error("Postgresql support disabled at build time!");
+}
+#endif
 
 void Creativity::checkParameters() {
 #define PROHIBIT(FIELD, BAD) \

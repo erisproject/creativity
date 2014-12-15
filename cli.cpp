@@ -1,6 +1,8 @@
 #include "creativity/Creativity.hpp"
 #include "creativity/state/Storage.hpp"
+#ifndef CREATIVITY_SKIP_PGSQL
 #include "creativity/state/PsqlStorage.hpp"
+#endif
 #include <eris/Simulation.hpp>
 #include <eris/Random.hpp>
 #include <functional>
@@ -236,6 +238,7 @@ int main(int argc, char *argv[]) {
         try {
             creativity->pgsql(args.out, false /*read-only*/, true /*write-only*/);
 
+#ifndef CREATIVITY_SKIP_PGSQL
             PsqlStorage &pgsql = dynamic_cast<PsqlStorage&>(creativity->storage().first->backend());
             auto conn_locked = pgsql.connection();
             auto &conn = conn_locked.first;
@@ -250,7 +253,7 @@ int main(int argc, char *argv[]) {
             if (port) psqlurl << ":" << port;
             psqlurl << "/" << conn.dbname() << "?creativity=" << pgsql.id;
             results_out_display = psqlurl.str();
-
+#endif
         }
         catch (const std::exception &e) {
             std::cerr << "Connection to PostgreSQL failed: " << e.what() << "\n";
