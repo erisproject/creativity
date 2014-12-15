@@ -180,10 +180,12 @@ void FileStorage::readSettings(CreativitySettings &settings) const {
 }
 
 void FileStorage::writeSettings(const CreativitySettings &settings) {
-    if (settings_.dimensions == 0 and settings_.dimensions != settings.dimensions)
-        throw std::logic_error("Cannot overwrite settings with a difference number of dimensions");
-    if (settings_.boundary != 0 and settings_.boundary != settings.boundary)
-        throw std::logic_error("Cannot overwrite settings with a different boundary");
+    if (have_settings) {
+        if (settings_.dimensions != settings.dimensions)
+            throw std::logic_error("Cannot overwrite settings with a difference number of dimensions");
+        if (settings_.boundary != settings.boundary)
+            throw std::logic_error("Cannot overwrite settings with a different boundary");
+    }
 
     std::unique_lock<std::mutex> lock(f_mutex_);
 
@@ -247,8 +249,8 @@ void FileStorage::addStateLocation(std::streampos location) {
     write_value(location);
 
     f_.seekp(HEADER::pos::num_states);
-    write_u32((curr_states + 1));
     state_pos_.push_back(location);
+    write_u32(curr_states + 1);
 }
 
 void FileStorage::createContinuationBlock() {

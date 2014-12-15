@@ -82,7 +82,9 @@ int main(int argc, char *argv[]) {
     auto stpair = creativity->storage();
     auto &st = *stpair.first; 
     std::cout << "\n\nSimulation details:\n===================\n";
-    std::cout << "Periods: " << st.size()-1 << "\n";
+    auto disp_size = st.size();
+    if (disp_size > 0) disp_size--;
+    std::cout << "Periods: " << disp_size << "\n";
     if (st.size() > 0) {
         std::cout << "Period summary:\n";
         auto h1 =  "             Total                              Average                     \n";

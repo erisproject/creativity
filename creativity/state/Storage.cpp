@@ -52,8 +52,6 @@ void Storage::push_back(std::shared_ptr<const State> state) {
         throw std::runtime_error("Cannot add state: state dimensions differ from storage dimensions");
     if (settings_.boundary != 0 and state->boundary != settings_.boundary)
         throw std::runtime_error("Cannot add state: state boundary differs from storage boundary");
-    if (settings_.readers != 0 and settings_.readers != state->readers.size())
-        throw std::runtime_error("Cannot add state: state #readers differs from storage #readers");
 
     if (need_settings_updated_) {
         updateSettings();

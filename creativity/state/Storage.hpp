@@ -130,9 +130,9 @@ class Storage final {
          */
         Storage(CreativitySettings &settings, StorageBackend *sb) : settings_(settings), backend_(sb)
         {
-            backend_->readSettings(settings_);
+            if (backend_->have_settings) backend_->readSettings(settings_);
             // Track the number of states using the size of the cache_
-            cache_.reserve(backend_->size());
+            cache_.resize(backend_->size());
         }
 
         /** The simulation settings reference, which subclasses must set during construction, typically from a with default initialization of fields to 0.  These settings
