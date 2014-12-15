@@ -13,13 +13,13 @@ StorageBackend& Storage::backend() { return *backend_; }
 
 Storage::~Storage() { if (flush_on_destroy) flush(); }
 
-Storage::state_iterator::state_iterator(const Storage &st, size_t at) : storage(st) { advance(at); }
+Storage::state_iterator::state_iterator(const Storage &st, size_t at) : storage(&st) { advance(at); }
 Storage::state_iterator::reference Storage::state_iterator::dereference() const { return curr; }
 void Storage::state_iterator::increment() { advance(1); }
 void Storage::state_iterator::decrement() { advance(-1); }
 void Storage::state_iterator::advance(difference_type n) {
     i += n;
-    if (i < storage.size()) curr = storage[i];
+    if (i < storage->size()) curr = (*storage)[i];
     else curr.reset();
 }
 Storage::state_iterator::difference_type Storage::state_iterator::distance_to(const state_iterator &it) const {

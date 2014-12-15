@@ -97,7 +97,7 @@ class Storage final {
         /// Random access iterator class for iterating through states
         class state_iterator : public boost::iterator_facade<state_iterator, const std::shared_ptr<const State>, boost::random_access_traversal_tag> {
             private:
-                const Storage &storage;
+                const Storage *storage;
                 size_t i = 0;
                 std::shared_ptr<const State> curr;
 
