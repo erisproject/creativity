@@ -6,7 +6,7 @@ namespace creativity { namespace gui {
 /** Gtk::TreeModel::ColumnRecord subclass for handling Book information in the list of books in
  * the main GUI window, and the list of authored books on the reader dialog.
  */
-class BookStore : public MemberStore<state::BookState>, Glib::Object {
+class BookStore : public MemberStore<state::BookState>, public virtual Glib::Object {
     public:
         BookStore() = delete;
 
@@ -19,7 +19,7 @@ class BookStore : public MemberStore<state::BookState>, Glib::Object {
          * - y position
          * - position string (made from x position and y position)
          * - author ID
-         * - quality
+         * - quality (reader-perceived quality may diff)
          * - price (NaN if not on market)
          * - revenue
          * - revenueLifetime
@@ -34,7 +34,7 @@ class BookStore : public MemberStore<state::BookState>, Glib::Object {
          * - lifetime (# periods on market)
          *
          * \param state the simulation state object containing the books to list
-         * \param author the author whose books to list.  Omit to list all state books.
+         * \param author the author whose books to list.  Omit or set to 0 to list all books.
          */
         static Glib::RefPtr<BookStore> create(std::shared_ptr<const state::State> state, eris::eris_id_t author = 0);
 
@@ -58,7 +58,7 @@ class BookStore : public MemberStore<state::BookState>, Glib::Object {
 
                 Gtk::TreeModelColumn<std::string> pos_str; ///< position of the book as a string such as `(-7.16,0.440)`
                 Gtk::TreeModelColumn<bool> market; ///< True if the book is currently on the market
-                Gtk::TreeModelColumn<unsigned long>
+                Gtk::TreeModelColumn<unsigned int>
                     age, ///< Age of the book in simulation periods since it was written
                     created, ///< Age of the book in simulation periods since it was written
                     sales, ///< Copies sold in the current period
@@ -68,7 +68,7 @@ class BookStore : public MemberStore<state::BookState>, Glib::Object {
                     copies, ///< Lifetime copies (sold + pirated)
                     lifetime; ///< Number of periods the book has been or was on the market
 
-            private:
+            protected:
                 ColRec() {
                     add(id); add(author); add(market); add(pos_x); add(pos_y); add(pos_str);
                     add(quality); add(price); add(revenue); add(revenue_lifetime);
@@ -80,18 +80,34 @@ class BookStore : public MemberStore<state::BookState>, Glib::Object {
         };
 
         /** The columns of this BookStore.  For example, to access the price column, use
-         * `bookstore.columns.price`.
+         * `bookstore.columns->price`.
          */
-        ColRec columns;
+        std::unique_ptr<ColRec> columns{new ColRec};
 
         /** Takes a Gtk::TreeView and adds this object's columns to it. */
-        void appendColumnsTo(Gtk::TreeView &v) const;
+        virtual void appendColumnsTo(Gtk::TreeView &v) const;
 
     protected:
         /// Protected constructor; this object should be constructed using create().
         BookStore(std::shared_ptr<const state::State> &&state, eris::eris_id_t author);
 
-        /** Returns `obj.columns.size()`, the number of book model columns. */
+        /// Protected constructor that overrides the default set of columns (for use by subclasses).
+        BookStore(std::shared_ptr<const state::State> &&state, eris::eris_id_t author, std::unique_ptr<ColRec> &&cols);
+
+        /** Protected constructor that overrides the default set of columns but has no author
+         * parameter at all: members_ will not be populated (but should be populated by the
+         * subclass).
+         */
+        BookStore(std::shared_ptr<const state::State> &&state, std::unique_ptr<ColRec> &&cols);
+
+        /** Called during construction to populated members_ with either all books (if the author
+         * constructor parameter is 0) or an author's written books (if the author constructor
+         * parameter is non-zero).  This is not called in the subclass constructor that has no
+         * author parameter (explicit or implicit) at all.
+         */
+        void initializeBooks();
+
+        /** Returns `obj.columns->size()`, the number of book model columns. */
         virtual int get_n_columns_vfunc() const override;
 
         /** Returns the column type of the given position.  See the list of virtual columns in the
@@ -127,7 +143,8 @@ class BookStore : public MemberStore<state::BookState>, Glib::Object {
 
 
     private:
-        // If non-zero, this is an author-specific list; otherwise it's a global list
+        // Filter by author, if non-zero; otherwise, this is a global book list (or a subclass
+        // handles the list)
         const eris::eris_id_t author_ = 0;
 
         // The various comparison functions; one of these gets passed to std::stable_sort.

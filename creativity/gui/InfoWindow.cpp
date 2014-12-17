@@ -191,18 +191,34 @@ InfoWindow::InfoWindow(std::shared_ptr<const State> state, std::shared_ptr<Gtk::
             "still-on-market books using ProfitStream beliefs, while Profit beliefs only include books once they leave the market.</i>",
             p_vars.size() + 3);
 
-    bk_model_ = BookStore::create(state, reader);
-    bk_tree_.set_model(bk_model_);
-    bk_model_->appendColumnsTo(bk_tree_);
-    bk_tree_.set_fixed_height_mode(true);
-    bk_model_->set_sort_column(bk_model_->columns.id, Gtk::SortType::SORT_DESCENDING);
-    bk_tree_.signal_row_activated().connect([this] (const Gtk::TreeModel::Path &path, Gtk::TreeViewColumn*) -> void {
-        open_info_dialog_(bk_model_->member(path).id);
+    bk_authored_model_ = BookStore::create(state, reader);
+    bk_authored_tree_.set_model(bk_authored_model_);
+    bk_authored_model_->appendColumnsTo(bk_authored_tree_);
+    bk_authored_tree_.set_fixed_height_mode(true);
+    bk_authored_model_->set_sort_column(bk_authored_model_->columns->id, Gtk::SortType::SORT_DESCENDING);
+    bk_authored_tree_.signal_row_activated().connect([this] (const Gtk::TreeModel::Path &path, Gtk::TreeViewColumn*) -> void {
+        open_info_dialog_(bk_authored_model_->member(path).id);
     });
     swins_.emplace_back();
-    swins_.back().add(bk_tree_);
+    swins_.back().add(bk_authored_tree_);
     swins_.back().set_policy(Gtk::POLICY_NEVER, Gtk::POLICY_AUTOMATIC);
-    tabs.append_page(swins_.back(), "Authored Books");
+    fields_["authored_books_tab"].second.set_text("Authored Books");
+    tabs.append_page(swins_.back(), fields_["authored_books_tab"].second);
+
+    bk_library_model_ = LibraryStore::create(state, reader);
+    bk_library_tree_.set_model(bk_library_model_);
+    bk_library_model_->appendColumnsTo(bk_library_tree_);
+    bk_library_tree_.set_fixed_height_mode(true);
+    bk_library_model_->set_sort_column(static_cast<LibraryStore::ColRec&>(*bk_library_model_->columns).id, Gtk::SortType::SORT_DESCENDING);
+    bk_library_tree_.signal_row_activated().connect([this] (const Gtk::TreeModel::Path &path, Gtk::TreeViewColumn*) -> void {
+        open_info_dialog_(bk_library_model_->member(path).id);
+    });
+    swins_.emplace_back();
+    swins_.back().add(bk_library_tree_);
+    swins_.back().set_policy(Gtk::POLICY_NEVER, Gtk::POLICY_AUTOMATIC);
+    fields_["library_tab"].second.set_text("Library");
+    tabs.append_page(swins_.back(), fields_["library_tab"].second);
+    
 
     add(tabs);
 
@@ -260,21 +276,25 @@ void InfoWindow::refresh(std::shared_ptr<const State> state) {
 
     if (reader) {
         auto &r = state->readers.at(reader);
+
         updateValue("id", r.id);
         updateValue("position", GUI::pos_to_string(r.position));
         updateValue("utility", r.u);
         updateValue("uLife", r.u_lifetime);
         updateValue("books", r.library.size());
-        updateValue("booksPurchased", r.library_purchased.size());
-        updateValue("booksPirated", r.library_pirated.size());
+        updateValue("booksPurchased", r.library_purchased);
+        updateValue("booksPirated", r.library_pirated);
         updateValue("booksNew", r.new_books.size());
-        updateValue("booksNewPurchased", r.new_purchased.size());
-        updateValue("booksNewPirated", r.new_pirated.size());
+        updateValue("booksNewPurchased", r.library_purchased_new);
+        updateValue("booksNewPirated", r.library_pirated_new);
         updateValue("booksWritten", r.wrote.size());
         updateValue("bookLast", r.wrote.empty()
                 ? "(never written)"
                 : std::to_string(state->t - state->books.at(*r.wrote.crbegin()).created));
         updateValue("numFriends", r.friends.size());
+
+        updateValue("library_tab", "Library (" + std::to_string(r.library.size() - r.wrote.size()) + ")");
+        updateValue("authored_books_tab", "Authored Books (" + std::to_string(r.wrote.size()) + ")");
 
 #define UPDATE_LIN(PREFIX, VAR) \
         updateValue(PREFIX + std::string("n"), VAR.n()); \
@@ -308,15 +328,20 @@ void InfoWindow::refresh(std::shared_ptr<const State> state) {
             }
         }
 
-        // Update the books tree
+        // Update the books trees
         if (not initial_refresh_) {
             // Preserve the current sort column/order, if any
             int sort_col;
             Gtk::SortType sort_order;
-            bool resort = bk_model_->get_sort_column_id(sort_col, sort_order);
-            bk_model_ = BookStore::create(state, reader);
-            if (resort) bk_model_->set_sort_column(sort_col, sort_order);
-            bk_tree_.set_model(bk_model_);
+            bool resort = bk_authored_model_->get_sort_column_id(sort_col, sort_order);
+            bk_authored_model_ = BookStore::create(state, reader);
+            if (resort) bk_authored_model_->set_sort_column(sort_col, sort_order);
+            bk_authored_tree_.set_model(bk_authored_model_);
+
+            resort = bk_library_model_->get_sort_column_id(sort_col, sort_order);
+            bk_library_model_ = LibraryStore::create(state, reader);
+            if (resort) bk_library_model_->set_sort_column(sort_col, sort_order);
+            bk_library_tree_.set_model(bk_library_model_);
         }
     }
     else {

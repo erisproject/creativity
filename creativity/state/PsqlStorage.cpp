@@ -50,12 +50,13 @@ void PsqlStorage::initialConnection() {
     conn_->prepare("select_readers", "SELECT * FROM reader WHERE state = $1");
     conn_->prepare("select_books", "SELECT * FROM book WHERE state = $1");
     conn_->prepare("friend_ids", "SELECT friend_eris_id FROM friend WHERE reader = $1");
-    conn_->prepare("select_library", "SELECT * FROM library WHERE reader = $1 ORDER BY book_eris_id");
+    conn_->prepare("select_library", "SELECT * FROM library WHERE simulation = $1 AND reader_eris_id = $2 WHERE acquired <= $3");
     conn_->prepare("select_beliefs", "SELECT * FROM belief WHERE reader = $1");
     conn_->prepare("insert_reader", "INSERT INTO reader (state,eris_id,position,u,u_lifetime,cost_fixed,cost_unit,cost_piracy,income) VALUES "
                                                        "($1" ",$2"   ",$3"    ",$4,$5"     ",$6"      ",$7"     ",$8"       ",$9)");
     conn_->prepare("insert_friend", "INSERT INTO friend (reader,friend_eris_id) VALUES ($1,$2)");
-    conn_->prepare("insert_library_book", "INSERT INTO library (reader,book_eris_id,type,new,quality) VALUES ($1,$2,$3,$4,$5)");
+    conn_->prepare("exists_library_book", "SELECT COUNT(*) FROM library WHERE simulation = $1 AND reader_eris_id = $2 AND book_eris_id = $3");
+    conn_->prepare("insert_library_book", "INSERT INTO library (simulation,reader_eris_id,book_eris_id,type,acquired,quality) VALUES ($1,$2,$3,$4,$5,$6)");
     conn_->prepare("insert_belief", "INSERT INTO belief (reader, type, k, noninformative, s2, n, beta, v_lower) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)");
     conn_->prepare("insert_book", "INSERT INTO book (state,eris_id,author_eris_id,created,position,quality,price,revenue,revenue_lifetime,sales,sales_lifetime,pirated,pirated_lifetime,lifetime) VALUES "
                                                    "($1" ",$2"   ",$3"  ",$4"   ",$5"    ",$6"   ",$7" ",$8"   ",$9"            ",$10"",$11"         ",$12"  ",$13"           ",$14)");
@@ -178,7 +179,7 @@ std::shared_ptr<const State> PsqlStorage::load(eris_time_t t) const {
     state.t = state_row[0]["t"].as<eris_time_t>();
 
     for (auto reader_row : trans.prepared("select_readers")(state_id).exec()) {
-        state.readers.insert(readReader(reader_row, trans));
+        state.readers.insert(readReader(reader_row, state.t, trans));
     }
     for (auto book_row : trans.prepared("select_books")(state_id).exec()) {
         state.books.insert(readBook(book_row, trans));
@@ -189,9 +190,9 @@ std::shared_ptr<const State> PsqlStorage::load(eris_time_t t) const {
 }
 
 
-void PsqlStorage::insertReader(const ReaderState &reader, int32_t state, pqxx::work &trans) {
+void PsqlStorage::insertReader(const ReaderState &reader, int32_t state_id, pqxx::work &trans) {
 
-    trans.prepared("insert_reader")(state)(reader.id)(createDoubleArray(reader.position.begin(), reader.position.end()))
+    trans.prepared("insert_reader")(state_id)(reader.id)(createDoubleArray(reader.position.begin(), reader.position.end()))
             (reader.u)(reader.u_lifetime)(reader.cost_fixed)(reader.cost_unit)(reader.cost_piracy)(reader.income).exec();
 
     int64_t rowid = trans.prepared("lastval").exec()[0][0].as<int64_t>();
@@ -204,12 +205,17 @@ void PsqlStorage::insertReader(const ReaderState &reader, int32_t state, pqxx::w
     // Library:
     for (auto &l : reader.library) {
         auto &bid = l.first;
-        auto insert = trans.prepared("insert_library_book");
-        insert(rowid)(bid);
-        if (reader.wrote.count(bid) > 0) insert("wrote")(false);
-        else insert(reader.library_purchased.count(bid) > 0 ? "bought" : "pirated")(reader.new_books.count(bid) > 0);
-        insert(l.second);
-        insert.exec();
+        auto &bc = l.second;
+        // FIXME: could optimize this to select for all books at once.
+        int have_book_already = trans.prepared("exists_library_book")(id_)(reader.id)(bid).exec()[0][0].as<int>();
+        if (have_book_already == 0) {
+            auto insert = trans.prepared("insert_library_book");
+            insert(id_)(reader.id)(bid);
+            insert(bc.wrote() ? "wrote" : bc.purchased() ? "bought" : "pirated");
+            insert(bc.acquired);
+            insert(bc.quality);
+            insert.exec();
+        }
     }
 
     // Beliefs:
@@ -245,7 +251,7 @@ void PsqlStorage::insertBelief(eris_id_t dbid, const std::string &type, const Li
     insert.exec();
 }
 
-std::pair<eris::eris_id_t, ReaderState> PsqlStorage::readReader(const pqxx::tuple &reader_row, pqxx::work &trans) const {
+std::pair<eris::eris_id_t, ReaderState> PsqlStorage::readReader(const pqxx::tuple &reader_row, const eris_time_t t, pqxx::work &trans) const {
 
     int64_t id = reader_row["id"].as<int64_t>(); // The internal id (NOT the eris_id_t)
 
@@ -272,26 +278,20 @@ std::pair<eris::eris_id_t, ReaderState> PsqlStorage::readReader(const pqxx::tupl
     }
 
     // Library:
-    for (auto l : trans.prepared("select_library")(id).exec()) {
+    for (auto l : trans.prepared("select_library")(id_)(r.id)(t).exec()) {
         eris_id_t book_id = l["book_eris_id"].as<eris_id_t>();
-        r.library.emplace(book_id, l["quality"].as<double>()); // Add to library
-        bool new_book = l["new"].as<bool>();
-
-        if (new_book) r.new_books.insert(book_id); // Add to new_books
-
         std::string type(l["type"].c_str());
-        if (type == "wrote")
-            r.wrote.insert(book_id); // Add to wrote
-        else if (type == "bought") {
-            r.library_purchased.insert(book_id); // Add to library_purchased
-            if (new_book) r.new_purchased.insert(book_id); // Add to new_purchased
-        }
-        else if (type == "pirated") {
-            r.library_pirated.insert(book_id); // Add to library_pirated
-            if (new_book) r.new_pirated.insert(book_id); // Add to new_pirated
-        }
-        else throw std::out_of_range("Reader with database id `" + std::to_string(id) + "' has library row with an invalid type");
+        BookCopy copy(
+                l["quality"].as<double>(),
+                type == "wrote" ? BookCopy::Status::wrote :  type == "bought" ? BookCopy::Status::purchased :  BookCopy::Status::pirated,
+                l["acquired"].as<eris_time_t>());
+        if (copy.wrote())
+            r.wrote.insert(book_id);
+        else if (copy.acquired == t)
+            r.new_books.insert(book_id);
+        r.library.emplace(std::move(book_id), std::move(copy));
     }
+    r.updateLibraryCounts(t);
 
     // Beliefs:
     for (auto b : trans.prepared("select_beliefs")(id).exec()) {

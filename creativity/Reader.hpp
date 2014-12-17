@@ -3,10 +3,11 @@
 #include <eris/agent/AssetAgent.hpp>
 #include <eris/Market.hpp>
 #include <Eigen/Core>
-#include "belief/Profit.hpp"
-#include "belief/ProfitStream.hpp"
-#include "belief/Demand.hpp"
-#include "belief/Quality.hpp"
+#include "creativity/belief/Profit.hpp"
+#include "creativity/belief/ProfitStream.hpp"
+#include "creativity/belief/Demand.hpp"
+#include "creativity/belief/Quality.hpp"
+#include "creativity/BookCopy.hpp"
 #include <string>
 #include <vector>
 #include <unordered_set>
@@ -137,12 +138,13 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * \param pos the initial position of the reader
          * \param cFixed the fixed cost of keeping a book on the market
          * \param cUnit the per-unit cost of producing copies of a book
+         * \param cPiracy the per-unit cost of obtaining a pirated copy of a book
          * \param income the per-period income of the agent
          */
         Reader(
                 std::shared_ptr<Creativity> creativity,
                 const eris::Position &pos,
-                double cFixed, double cUnit, double income
+                double cFixed, double cUnit, double cPiracy, double income
               );
 
         /** Takes a money value and a container of SharedMember<Book> objects and returns the
@@ -176,6 +178,11 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
             return u;
         }
 
+        /** Similar to the above, but operators on an unordered_map of book -> bookcopy-reference
+         * pairs, using the quality from the BookCopy object instead of looking it up.
+         */
+        double u(double money, const std::unordered_map<eris::SharedMember<Book>, std::reference_wrapper<BookCopy>> &books) const;
+
         /** Returns the utility (or potential utility) of the agent.  This is updating during the
          * intra-apply phases; before that runs, it returns the utility in the previous period.
          */
@@ -188,61 +195,23 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
 
         /** Returns/accesses the library of books owned by this Reader.
          *
-         * The reader's library() contains the books returned by libraryPurchased(),
-         * libraryPirated(), and wrote().
+         * The reader's library() contains all books purchased, pirated, and written by this reader.
          *
-         * \returns map where keys are the books and values are the realized quality of the books.
+         * \returns map where keys are the books and values are the reader-specific BookCopy values.
          */
-        const std::unordered_map<eris::SharedMember<Book>, double>& library() const;
+        const std::unordered_map<eris::SharedMember<Book>, BookCopy>& library() const;
 
-        /** Returns/accesses the set of books in this reader's library that were purchased by the
-         * Reader.
-         *
-         *
-         * The reader's library() contains the books returned by libraryPurchased(),
-         * libraryPirated(), and wrote().
-         */
-        const std::unordered_set<eris::SharedMember<Book>>& libraryPurchased() const;
-
-        /** Returns/accesses the set of books in this reader's library that were pirated by the
-         * Reader.
-         *
-         *
-         * The reader's library() contains the books returned by libraryPurchased(),
-         * libraryPirated(), and wrote().
-         */
-        const std::unordered_set<eris::SharedMember<Book>>& libraryPirated() const;
-
-        /** Returns the set of Books that were obtained in the last period, whether purchased or
-         * obtained through sharing.  Books newly authored by this reader are not included.
+        /** Returns the Books that were obtained in the last period, whether purchased or obtained
+         * through sharing.  Books newly authored by this reader are not included.
          *
          * This is updated only during the agent's intraApply() phase; it intra stages before
          * "apply" it gives the new books in the previous period.
          */
-        const std::unordered_set<eris::SharedMember<Book>>& newBooks() const;
-
-        /** Returns the set of Books that were purchased in the last period, excluding pirated
-         * works.
-         *
-         * This is updated only during the agent's intraApply() phase; it intra stages before
-         * "apply" it gives the new books in the previous period.
-         */
-        const std::unordered_set<eris::SharedMember<Book>>& newPurchased() const;
-
-        /** Returns the set of Books that were obtained through sharing (not purchasing) in the last
-         * period.
-         *
-         * This is updated only during the agent's intraApply() phase; it intra stages before
-         * "apply" it gives the new books in the previous period.
-         */
-        const std::unordered_set<eris::SharedMember<Book>>& newPirated() const;
+        const std::unordered_map<eris::SharedMember<Book>, std::reference_wrapper<BookCopy>>& newBooks() const;
 
         /** Returns the set of Books that this reader wrote, sorted by id (which is also sorted by
          * creation date of the book, from oldest to newest).  These books are included in the
          * reader's library but aren't available for sharing with friends.
-         *
-         * The reader's library() contains the books returned by libraryPurchased(),
-         * libraryPirated(), and wrote().
          */
         const std::set<eris::SharedMember<Book>>& wrote() const;
 
@@ -264,7 +233,10 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * \returns the estimated utility from reading the given book, if not in the reader's
          * library; the realized utility from reading the given book if in the reader's library.
          */
-        virtual double uBook(eris::SharedMember<Book> b) const;
+        virtual double uBook(const eris::SharedMember<Book> &b) const;
+
+        /** Just like uBook, but uses the given quality value instead of looking it up. */
+        virtual double uBook(const eris::SharedMember<Book> &b, double quality) const;
 
         /** Returns the quality of a given book.  If the given book is already in the user's
          * library, this returns the realized quality value determined when the book was added;
@@ -272,7 +244,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * quantity may be stochastic for the initial call, but subsequent calls will return the same
          * predicted value until the quality belief is updated.
          */
-        virtual double quality(eris::SharedMember<Book> b) const;
+        virtual double quality(const eris::SharedMember<Book> &b) const;
 
         /** Utility penalty from reading `books` books in the same period.  The basic idea behind
          * this penalty is that reading more books has a larger opportunity cost (or equivalently,
@@ -383,7 +355,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         double writer_quality_sd{1.0};
 
         /// The fixed cost of keeping a book on the market for a period.
-        double cost_fixed;
+        double cost_fixed{0};
 
         /** The unit cost of producing a copy of a book on the market.  Copies are produced
          * instantly as required; no preallocated number of copies is performed.
@@ -456,12 +428,10 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
 
         /** Called at the end of a period (from BookMarket::intraFinish) to transfer book revenue
          * earned during a period back to the author.  The author subtracts variable cost (if any)
-         * and keeps the remaining profit.  Note that fixed costs have already been removed, and so
-         * this should never result in a negative profit value.
-         *
-         * FIXME: make sure fixed costs are already removed!
+         * and keeps the remaining revenue.  Note that fixed costs are incurred at the beginning of
+         * the period, and so this will never attempt to "receive" a negative amount.
          */
-        void receiveProfits(eris::SharedMember<Book> book, const eris::Bundle &revenue);
+        void receiveProceeds(const eris::SharedMember<Book> &book, const eris::Bundle &revenue);
 
         /// Read-only access to this reader's profit belief
         const belief::Profit& profitBelief() const;
@@ -671,29 +641,23 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
     private:
         std::vector<double> u_poly_ = Reader::default_polynomial;
         std::vector<double> pen_poly_ = Reader::default_penalty_polynomial;
-        /// Map of books owned to realized quality of those books:
-        std::unordered_map<eris::SharedMember<Book>, double> library_;
+        /// Map of books owned to {date,realized quality} of those books:
+        std::unordered_map<eris::SharedMember<Book>, BookCopy> library_;
         /** Cache of quality predictions used so that quality(book) returns the same value if called
          * multiple times.  The cache is reset whenever the library or quality belief changes.
          */
         mutable std::unordered_map<eris::SharedMember<Book>, double> quality_predictions_;
-        std::unordered_set<eris::SharedMember<Book>>
-            /// Books in `library_` that were purchased by this reader
-            library_purchased_,
-            /// Books in `library_` that were pirated by this reader
-            library_pirated_,
+        std::unordered_map<eris::SharedMember<Book>, std::reference_wrapper<BookCopy>>
             /// Books obtained in the just-finished period
             library_new_,
-            /// Books *purchased* in the just-finished period
-            library_new_purchased_,
-            /// Books obtained through sharing in the just-finished period
-            library_new_pirated_,
             /** Set of books that haven't been used for learning yet (either because they are still
              * on the market, or because they were just pirated). */
-            library_unlearned_,
+            library_unlearned_;
+
+        std::unordered_set<eris::SharedMember<Book>>
             /// Books written by this reader that are still on the market
             wrote_market_,
-            /// Cache of the set of books that haven't been read yet
+            /// Cache of the set of all simulation books that haven't been read yet
             book_cache_;
         /** The set of books associated with reservations_ and reserved_piracy_cost_; the bool is
          * true if this is a pirated book, false for a purchased book. */

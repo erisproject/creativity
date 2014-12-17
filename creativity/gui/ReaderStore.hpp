@@ -7,7 +7,7 @@ namespace creativity { namespace gui {
 /** Gtk::TreeModel::ColumnRecord subclass for handling Reader information in the list of readers in
  * the main GUI window.
  */
-class ReaderStore : public MemberStore<state::ReaderState>, private Glib::Object {
+class ReaderStore : public MemberStore<state::ReaderState>, private virtual Glib::Object {
     public:
         /** Interface class between a simulation state's Reader information and a Gtk::TreeView.
          *

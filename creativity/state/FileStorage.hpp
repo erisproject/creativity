@@ -17,6 +17,10 @@ namespace state {
  *
  * Writing new states is done by a background thread which is spawned the first time enqueue() is
  * called with a new state.
+ *
+ * Note that this object is unable to write simulations with more than 2 billion members (in
+ * particular, it stores IDs in the file as 32-bit quantities, and will throw an exception if a
+ * value that does not fit in a uint32_t is encountered).
  */
 class FileStorage final : public StorageBackend {
     public:
@@ -194,6 +198,13 @@ class FileStorage final : public StorageBackend {
         /** Alias for `write_value((double) value)` */
         void write_dbl(double value) { write_value(value); }
 
+        /** Seeks to the end of the file, where a new block can be written.  If required, padding is
+         * added to the end of the file so that the new block is on a block alignment boundary.  The
+         * file output position will be at the end of the file after this call; the location is also
+         * returned for convenience.
+         */
+        int64_t newBlock();
+
         /** Copies the appropriate number of bytes from memory from the location of `from` into a
          * variable of type T and returns it.  This is safer than a reinterpret_cast as it avoids
          * alignment issues (i.e. where `from` has a memory alignment that is invalid for T
@@ -229,9 +240,14 @@ class FileStorage final : public StorageBackend {
          */
         std::vector<std::streampos> cont_pos_;
 
+        /** Everything (header, library blocks, continuation blocks, states) gets aligned to this size,
+         * with padding added as required before beginning a new block.
+         */
+        static constexpr unsigned int BLOCK_SIZE = 4096;
+
         /// Constants for header attributes
         struct HEADER {
-            static constexpr unsigned int size = 4096; ///< Size of the header, in bytes
+            static constexpr unsigned int size = BLOCK_SIZE; ///< Size of the header, in bytes
             /// The magic value 'CrSt' that identifies the file as created by this class
             static constexpr char fileid[4] = {'C', 'r', 'S', 't'};
             /// The test value bytes, which should be interpreted as the various test values below
@@ -292,9 +308,25 @@ class FileStorage final : public StorageBackend {
 
         /// Constants for continuation blocks
         struct CBLOCK {
-            static constexpr unsigned int size = HEADER::size; ///< Size of the continuation block
-            static constexpr unsigned int states = (size / 8) - 1; ///< Number of states stored in a continuation block
-            static constexpr int64_t next_cblock = size - 8; ///< Relative position of the pointer to the next continuation block
+            static constexpr unsigned int states = (BLOCK_SIZE / 8) - 1; ///< Number of states stored in a continuation block
+            static constexpr unsigned int next_cblock = states * 8; ///< Relative position of the pointer to the next continuation block
+        };
+
+        /// A BLOCK_SIZE block of 0s
+        static constexpr char ZERO_BLOCK[BLOCK_SIZE] = {0};
+
+        /** Constants for library storage.  Libraries are stored in blocks of many packed
+         * (bookid,t,quality,status) tuples followed by a pointer to the next library block.  When
+         * reading a reader state, the first block of the library is pointed to, and is read until
+         * either a 0 id or a `t` value larger than that of the state being read is found.
+         */
+        struct LIBRARY {
+            /** a reader library record size: the book id (u32), the acquisition period (u32), the
+             * reader-specific quality (dbl), and the library book status (u8: 0=wrote, 1=bought,
+             * 2=pirated).
+             */
+            static constexpr unsigned int record_size = sizeof(uint32_t) + sizeof(uint32_t) + sizeof(double) + sizeof(uint8_t);
+            static constexpr unsigned int block_records = (BLOCK_SIZE - 8)/record_size; ///< Number of records that will fit in a block
         };
 
         /// Flags for opening in read-only mode
@@ -339,10 +371,66 @@ class FileStorage final : public StorageBackend {
          */
         void createContinuationBlock();
 
+        // Sorting method that sorts by the library item's acquired date
+        class lib_comp_less final {
+            public:
+                using ref = const std::pair<const uint32_t, BookCopy>&;
+                bool operator()(ref a, ref b) const {
+                    return a.second.acquired < b.second.acquired;
+                }
+        };
+
+        // Reader library data
+        struct lib_data {
+            int64_t pos_next; // Next library row position
+            unsigned int records_remaining; // How many library rows are remaining (0 = need a new block)
+            // book id to BookCopy
+            std::unordered_map<uint32_t, BookCopy> library;
+            // library, but sorted by acquired date (for fast retrieval)
+            std::multiset<std::reference_wrapper<std::pair<const uint32_t, BookCopy>>, lib_comp_less> library_acq_sorted;
+            lib_data(int64_t pos_next) : pos_next(pos_next), records_remaining(LIBRARY::block_records) {}
+        };
+
+        /** Reader library data.  Key is the reader id, value is the data. */
+        std::unordered_map<unsigned int, lib_data> reader_lib_;
+
+        /** Read the reader library pointer block, which immediately follows the header.
+         *
+         * The block consists of num_reader (reader id, library block pointer) tuples.
+         *
+         * The pointed at library block consists of (bookid,t,quality,status) tuples for all books
+         * in the reader's library over all stored simulation periods.  If the block overflows,
+         * additional continued blocks are created and pointed at by a pointer at the end of the
+         * library block.
+         *
+         * Reader blocks are stored in memory when the file is opened and updated (both in memory
+         * and on disk) as states are added.
+         */
+        void parseLibraryPointerBlock();
+
+        /** Writes the reader library pointer block.  This is called when the very first state is
+         * added to a new file, and as a result will end up putting the reader pointer block
+         * immediately after the header.  The keys of the given map are used to write the locations.
+         */
+        void writeLibraryPointerBlock(const std::unordered_map<eris::eris_id_t, ReaderState> &readers);
+
+        /** Ensures that the library block for reader `r` has all of the reader's library books in
+         * it.  If any are missing, they are added to disk and to reader_lib_.
+         */
+        void updateLibrary(const ReaderState &r);
+
+        /** Creates an empty library block at the end of the file and returns the location of the
+         * beginning of the block.
+         *
+         * The file output position is not guaranteed to be at any particular position after this
+         * call.
+         */
+        int64_t createLibraryBlock();
+
         /** Reads a state starting at the current file position.  The state data structure is as
          * follows:
          *
-         *     u64      t (simulation time period)
+         *     u32      t (simulation time period)
          *     READER[] readers array
          *     BOOK[]   books
          *
@@ -361,10 +449,9 @@ class FileStorage final : public StorageBackend {
         /** Reads a ReaderState record from the current file position and returns it in an
          * {eris_id_t, ReaderState} pair, where `.first` is the id.  Such a record consists of:
          *
-         *     u64              id
+         *     u32              id
          *     dbl*DIM          position (DIM = dimensions)
-         *     u64[]            friend ids
-         *     (u8,u64,dbl)[]   library; see below for the u8 values.
+         *     u32[]            friend ids
          *     dbl              u
          *     dbl              u_lifetime
          *     dbl              cost_fixed
@@ -384,21 +471,17 @@ class FileStorage final : public StorageBackend {
          * and (type1,type2) indicates a single type1 value followed immediately by a single type2
          * value.
          *
-         * The u8 in the library indicates the property of the book made up of the following bits:
-         *     1 - set if this reader wrote the book
-         *     2 - set if the reader pirated the book (instead of purchasing)
-         *     4 - set if the book is new (i.e. added to library this period)
-         *     >4 - reserved
-         * 1 is exclusive of the other bits (they may not be set when 1 is set).
+         * The reader's library is also read, but is not contained in the reader block; rather it is
+         * stored in the locations referenced in the dedicated reader library section at the
+         * beginning of the file.
          *
-         * BELIEF is a i64 belief location (or special value) and possibly a set of belief data, as
-         * handled by readBelief(int64_t).
+         * BELIEF is a set of belief data, as handled by readBelief(int64_t).
          *
          * profit stream beliefs may not be placeholder beliefs (i.e. default constructed objects);
          * such objects should simply be omitted when writing the data.  Each profit stream belief K
          * value must also be unique.
          */
-        std::pair<eris::eris_id_t, ReaderState> readReader() const;
+        std::pair<eris::eris_id_t, ReaderState> readReader(eris::eris_time_t t) const;
 
         /// Writes a reader state at the current file position.
         void writeReader(const ReaderState& reader);
@@ -458,8 +541,8 @@ class FileStorage final : public StorageBackend {
         /** Reads a book state data from the current file position and returns it in a <eris_id_t,
          * BookState> pair, where the eris_id_t is the book id.  The book data is:
          *
-         *     u64          id
-         *     u64          author id
+         *     u32          id
+         *     u32          author id
          *     dbl*DIM      position (DIM = dimensions)
          *     dbl          quality
          *     dbl          price (market is derived from this: market=true unless price is NaN)
@@ -469,7 +552,7 @@ class FileStorage final : public StorageBackend {
          *     u32          salesLifetime
          *     u32          pirated
          *     u32          piratedLifetime
-         *     u64          created
+         *     u32          created
          *     u32          lifetime
          */
         std::pair<eris::eris_id_t, BookState> readBook() const;

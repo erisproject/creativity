@@ -14,7 +14,7 @@ Book::Book(
         unsigned int order,
         double initial_price,
         double quality,
-        std::function<double(const Book&, const Reader&)> qDraw)
+        std::function<double(const Book&)> qDraw)
     : WrappedPositional<Good::Discrete>(p, author->wrapLowerBound(), author->wrapUpperBound()),
         creativity_{std::move(creativity)},
         author_{std::move(author)},
@@ -176,8 +176,8 @@ const double& Book::quality() const {
     return quality_;
 }
 
-double Book::qualityDraw(const Reader &reader) {
-    return std::max(0.0, quality_draw_(*this, reader));
+double Book::qualityDraw() {
+    return std::max(0.0, quality_draw_(*this));
 }
 
 }

@@ -3,6 +3,19 @@
 #include <cmath>
 #include <sys/stat.h>
 
+#ifdef ERIS_DEBUG
+#define FILESTORAGE_DEBUG_WRITE_START \
+    int64_t debug_start_location = f_.tellp();
+#define FILESTORAGE_DEBUG_WRITE_CHECK(EXPECT) \
+    int64_t debug_length = f_.tellp() - debug_start_location; \
+    int64_t debug_expect = EXPECT; \
+    if (debug_length != debug_expect) \
+        throw std::runtime_error("Internal FileStorage error: " + std::string(__func__) + " wrote " + std::to_string(debug_length) + ", expected " + std::to_string(debug_expect));
+#else
+#define FILESTORAGE_DEBUG_WRITE_START
+#define FILESTORAGE_DEBUG_WRITE_CHECK(EXPECT)
+#endif
+
 namespace creativity { namespace state {
 
 using namespace eris;
@@ -11,11 +24,17 @@ using namespace Eigen;
 
 /// Member definitions for header/cblock constants
 constexpr unsigned int
+        FileStorage::BLOCK_SIZE,
         FileStorage::HEADER::size,
         FileStorage::HEADER::states,
-        FileStorage::CBLOCK::size,
-        FileStorage::CBLOCK::states;
-constexpr char FileStorage::HEADER::fileid[], FileStorage::HEADER::test_value[];
+        FileStorage::CBLOCK::states,
+        FileStorage::CBLOCK::next_cblock,
+        FileStorage::LIBRARY::record_size,
+        FileStorage::LIBRARY::block_records;
+constexpr char
+        FileStorage::HEADER::fileid[],
+        FileStorage::HEADER::test_value[],
+        FileStorage::ZERO_BLOCK[];
 constexpr uint64_t FileStorage::HEADER::u64_test;
 constexpr int64_t
         FileStorage::HEADER::pos::fileid,
@@ -49,8 +68,7 @@ constexpr int64_t
         FileStorage::HEADER::pos::state_first,
         FileStorage::HEADER::pos::state_last,
         FileStorage::HEADER::pos::continuation,
-        FileStorage::HEADER::i64_test,
-        FileStorage::CBLOCK::next_cblock;
+        FileStorage::HEADER::i64_test;
 constexpr uint32_t FileStorage::HEADER::u32_test;
 constexpr int32_t FileStorage::HEADER::i32_test;
 constexpr double FileStorage::HEADER::dbl_test;
@@ -123,14 +141,25 @@ void FileStorage::thread_insert(std::shared_ptr<const State> &&state) {
     if (location < HEADER::size) {
         throw std::runtime_error("File size is invalid, unable to write new State");
     }
+    else if (location == HEADER::size) {
+        // This is the first insertion, so we need to write the library pointer block
+        writeLibraryPointerBlock(state->readers);
+    }
+
     // We're now at the end of the file, which is where we want to put it.
+
+    // Before actually writing the state, we need to make sure the reader library blocks are
+    // populated.
+    for (auto &r : state->readers) {
+        updateLibrary(r.second);
+    }
 
     // Write out the record before storing its location: if writing fails, there may be some
     // unreferences garbage (a partially written state) at the end of the file, but the file will
     // still be consistent: the garbage won't be referenced anywhere and so will just be ignored
     // if the file is reloaded.
+    location = newBlock();
     writeState(*state);
-
     addStateLocation(location);
 
     // If dimensions and boundary are 0, update them.
@@ -171,8 +200,7 @@ void FileStorage::writeEmptyHeader() {
     f_.write(HEADER::test_value, sizeof HEADER::test_value); // All test values squished into one
 
     // Write out 0s for everything else:
-    char zeros[HEADER::size - HEADER::pos::num_states] = {0};
-    f_.write(zeros, sizeof zeros);
+    f_.write(ZERO_BLOCK, HEADER::size - HEADER::pos::num_states);
 }
 
 void FileStorage::readSettings(CreativitySettings &settings) const {
@@ -231,6 +259,142 @@ void FileStorage::writeSettings(const CreativitySettings &settings) {
     // The rest is state positions, which we aren't supposed to touch.
 }
 
+void FileStorage::parseLibraryPointerBlock() {
+    f_.seekg(HEADER::size, f_.beg);
+    std::vector<std::pair<uint32_t, int64_t>> blocks;
+    for (uint32_t i = 0; i < settings_.readers; i++) {
+        auto rid = read_u32();
+        auto loc = read_i64();
+        blocks.emplace_back(std::move(rid), std::move(loc));
+    }
+
+    for (auto &b : blocks) {
+        auto &rid = b.first;
+        f_.seekg(b.second, f_.beg);
+        lib_data data(0); // Will come back to reset the "0"
+        while (true) {
+            if (data.records_remaining > 0) {
+                uint32_t bid = read_u32();
+                if (bid > 0) {
+                    uint32_t acquired = read_u32();
+                    double quality = read_dbl();
+                    uint8_t status = read_u8();
+                    BookCopy copy(
+                            quality,
+                            status == 0 ? BookCopy::Status::wrote :  status == 1 ? BookCopy::Status::purchased :  BookCopy::Status::pirated,
+                            acquired);
+                    auto ins = data.library.emplace(std::move(bid), std::move(copy));
+                    data.library_acq_sorted.emplace(std::ref(*ins.first));
+                    data.records_remaining--;
+                }
+                else {
+                    // The book id is 0, which means there are no more library books, so done.
+                    // The next pos is the u32 (=0) we just read
+                    data.pos_next = -4 + f_.tellg();
+                    break;
+                }
+            }
+            else {
+                // Nothing left in this block, so the next thing is a pointer to the next block
+                int64_t next_block = read_i64();
+                if (next_block > 0) {
+                    f_.seekg(next_block, f_.beg);
+                    data.records_remaining = LIBRARY::block_records;
+                }
+                else {
+                    // The pointer is 0, which means there is no next block, so done.
+                    // the next pos is the block (=0) we just read
+                    data.pos_next = -8 + f_.tellg();
+                    break;
+                }
+            }
+        }
+
+        reader_lib_.emplace((unsigned int) rid, std::move(data));
+    }
+}
+
+int64_t FileStorage::newBlock() {
+    f_.seekp(0, f_.end);
+    int64_t location = f_.tellp();
+    int padding = location % BLOCK_SIZE;
+    if (padding > 0) {
+        f_.write(ZERO_BLOCK, padding);
+        location += padding;
+    }
+    return location;
+}
+
+void FileStorage::writeLibraryPointerBlock(const std::unordered_map<eris_id_t, ReaderState> &readers) {
+    f_.seekp(0, f_.end);
+    if (f_.tellp() != HEADER::size)
+        throwParseError("writing library pointer block failed: file is not just the header");
+    // We're going to write out the first library blocks immediately after this section, so figure
+    // out where the first one is: it'll be at the end, padding out to the next block.
+    int64_t first_lib_block = HEADER::size + 12 * readers.size();
+    first_lib_block += first_lib_block % BLOCK_SIZE;
+    int64_t next_lib_block = first_lib_block;
+    for (auto &r : readers) {
+        write_u32(r.first);
+        write_i64(next_lib_block);
+        reader_lib_.emplace((unsigned int) r.first, lib_data(next_lib_block));
+        next_lib_block += BLOCK_SIZE;
+    }
+    // Call newBlock() to add the padding, and check to make sure it's in the right place
+    if (newBlock() != first_lib_block)
+        throw std::runtime_error("writeLibraryPointBlock failed: next block isn't where it should be!");
+
+    // Now write out the (empty) library blocks we just promised were there
+    for (unsigned int i = 0; i < readers.size(); i++) {
+        f_.write(ZERO_BLOCK, BLOCK_SIZE);
+    }
+}
+
+void FileStorage::updateLibrary(const ReaderState &r) {
+    lib_data *libd;
+    try { libd = &reader_lib_.at(r.id); }
+    catch (const std::out_of_range &e) {
+        throwParseError("Write failed: reader not found in library (perhaps readers aren't constant over sim periods?)");
+    }
+    auto &lib = *libd;
+    for (auto &l : r.library) {
+        bool first = true;
+        if (lib.library.count(l.first) == 0) { // Need to insert
+            if (lib.records_remaining == 0) {
+                // There is no more space in the current block, so create a new one:
+                int64_t next_block = newBlock();
+                f_.write(ZERO_BLOCK, BLOCK_SIZE);
+                // Now seek back to the end of the old record and write the new block location:
+                f_.seekp(lib.pos_next);
+                write_i64(next_block);
+                // Now seek to the first location in the new block, to write the value (below)
+                f_.seekp(next_block);
+                lib.records_remaining = LIBRARY::block_records;
+                lib.pos_next = next_block;
+                first = false;
+            }
+            else if (first) {
+                // If this is the first insertion for this reader, the current file pointer could be
+                // anywhere; seek to the next positions.  (After the first insertion, the file
+                // pointer will be just after the previous insertion, which is where we want it)
+                f_.seekp(lib.pos_next);
+                first = false;
+            }
+            // Otherwise we're already there from the last write
+            write_u32(l.first);
+            write_u32(l.second.acquired);
+            write_dbl(l.second.quality);
+            write_u8(l.second.wrote() ? 0 : l.second.purchased() ? 1 : 2);
+            lib.records_remaining--;
+            lib.pos_next += LIBRARY::record_size;
+
+            auto ins = lib.library.emplace(l.first, l.second);
+            lib.library_acq_sorted.emplace(std::ref(*ins.first));
+        }
+    }
+}
+
+
 void FileStorage::addStateLocation(std::streampos location) {
     uint32_t curr_states = state_pos_.size();
     int past_header = curr_states - HEADER::states;
@@ -254,10 +418,8 @@ void FileStorage::addStateLocation(std::streampos location) {
 }
 
 void FileStorage::createContinuationBlock() {
-    f_.seekp(0, f_.end);
-    std::streampos location = f_.tellp();
-    char blank[CBLOCK::size] = {0};
-    f_.write(blank, CBLOCK::size);
+    int64_t location = newBlock();
+    f_.write(ZERO_BLOCK, BLOCK_SIZE);
     // Write the new block location either in the header (if this is the first cblock) or in the
     // previous cblock
     f_.seekp(cont_pos_.empty() ? HEADER::pos::continuation : (int64_t) cont_pos_.back() + CBLOCK::next_cblock);
@@ -345,6 +507,12 @@ void FileStorage::parseMetadata() {
     if (settings_.book_distance_sd < 0) throwParseError("found invalid (negative) book_distance_sd");
     if (settings_.book_quality_sd < 0) throwParseError("found invalid (negative) book_quality_sd");
 
+    if (num_states > 0) {
+        // A reader library block is written immediately after the header before writing the first
+        // state, so parse it.
+        parseLibraryPointerBlock();
+    }
+
     state_pos_.reserve(num_states);
 
     size_t header_states = std::min(num_states, HEADER::states);
@@ -357,7 +525,7 @@ void FileStorage::parseMetadata() {
             throwParseError("found invalid continuation location");
         cont_pos_.push_back(cont);
 
-        char cblock[CBLOCK::size];
+        char cblock[BLOCK_SIZE];
         f_.seekg(cont, f_.beg);
         f_.read(cblock, sizeof cblock);
 
@@ -390,14 +558,14 @@ std::shared_ptr<const State> FileStorage::readState() const {
     State &state = *st_ptr;
     std::shared_ptr<const State> shst(st_ptr);
 
-    state.t = read_u64();
+    state.t = read_u32();
     state.dimensions = settings_.dimensions;
     state.boundary = settings_.boundary;
 
     auto num_readers = read_u32();
     state.readers.reserve(num_readers);
     for (uint32_t i = 0; i < num_readers; i++) {
-        state.readers.insert(readReader());
+        state.readers.insert(readReader(state.t));
     }
 
     auto num_books = read_u32();
@@ -409,9 +577,9 @@ std::shared_ptr<const State> FileStorage::readState() const {
     return shst;
 }
 
-std::pair<eris::eris_id_t, ReaderState> FileStorage::readReader() const {
+std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
     auto pair = std::make_pair<eris_id_t, ReaderState>(
-            read_u64(),
+            read_u32(),
             ReaderState(settings_.dimensions));
 
     ReaderState &r = pair.second;
@@ -425,33 +593,22 @@ std::pair<eris::eris_id_t, ReaderState> FileStorage::readReader() const {
     auto num_friends = read_u32();
     r.friends.reserve(num_friends);
     for (uint32_t i = 0; i < num_friends; i++)
-        r.friends.insert(read_u64());
+        r.friends.insert(read_u32());
 
     // Library
-    auto libsize = read_u32();
-    r.library.reserve(libsize);
-    for (uint32_t i = 0; i < libsize; i++) {
-        auto status = read_u8();
-        auto id = read_u64();
-        auto quality = read_dbl();
-        r.library.emplace(id, quality);
-        bool pirated = status & 1<<1, new_book = status & 1<<2;
-        if (status == 1) // Wrote it (other bits not allowed)
-            r.wrote.insert(r.wrote.end(), id);
-        else if (status & ~(1<<1 | 1<<2))
-            throwParseError("found illegal book status (invalid status bits set)");
-        else {
-            if (new_book) r.new_books.insert(id);
-            if (pirated) {
-                r.library_pirated.insert(id);
-                if (new_book) r.new_pirated.insert(id);
-            }
-            else {
-                r.library_purchased.insert(id);
-                if (new_book) r.new_purchased.insert(id);
-            }
-        }
+    auto &lib = reader_lib_.at(r.id);
+    for (auto &l : lib.library_acq_sorted) {
+        auto &id = l.get().first;
+        auto &bc = l.get().second;
+        if (bc.acquired > t) break;
+        r.library.emplace(id, bc);
+        if (bc.wrote())
+            r.wrote.insert(id);
+        else if (bc.acquired == t) // else if because new_books isn't supposed to contain self-authored books
+            r.new_books.insert(id);
     }
+    r.updateLibraryCounts(t);
+
     // Utility
     r.u = read_dbl();
     r.u_lifetime = read_dbl();
@@ -549,7 +706,12 @@ FileStorage::belief_data FileStorage::readBelief() const {
 }
 
 void FileStorage::writeState(const State &state) {
-    write_u64(state.t);
+
+    // Now write the state:
+    write_u32(state.t);
+    if (state.readers.size() != settings_.readers)
+        throw std::runtime_error("FileStorage error: cannot write a simulation where the number of readers changes");
+
     write_u32(state.readers.size());
     for (auto &r : state.readers) {
         writeReader(r.second);
@@ -561,7 +723,13 @@ void FileStorage::writeState(const State &state) {
 }
 
 void FileStorage::writeReader(const ReaderState &r) {
-    write_u64(r.id);
+#ifdef ERIS_DEBUG
+    int64_t debug_start_location = f_.tellp();
+#endif
+
+    if (r.id > std::numeric_limits<uint32_t>::max())
+        throw std::runtime_error("FileStorage error: cannot handle reader ids > 32 bits");
+    write_u32(r.id);
 
     // Position
     for (size_t i = 0; i < r.position.dimensions; i++)
@@ -570,21 +738,8 @@ void FileStorage::writeReader(const ReaderState &r) {
     // Friends
     write_u32(r.friends.size());
     for (auto &f : r.friends)
-        write_u64(f);
+        write_u32(f);
 
-    // Library
-    write_u32(r.library.size());
-    for (auto &l : r.library) {
-        uint8_t status = 0;
-        if (r.wrote.count(l.first)) status = 1;
-        else {
-            if (r.library_pirated.count(l.first)) status |= 1<<1;
-            if (r.new_books.count(l.first)) status |= 1<<2;
-        }
-        write_u8(status);
-        write_u64(l.first);
-        write_dbl(l.second);
-    } 
     // Utility
     write_value(r.u);
     write_value(r.u_lifetime);
@@ -594,6 +749,12 @@ void FileStorage::writeReader(const ReaderState &r) {
     write_value(r.cost_piracy);
     write_value(r.income);
 
+#ifdef ERIS_DEBUG
+    int64_t debug_length = f_.tellp() - debug_start_location;
+    int64_t debug_expect = 4*(1+2*settings_.dimensions+1+r.friends.size()+2+2+2+2+2+2);
+    if (debug_length != debug_expect)
+        throw std::runtime_error("Internal FileStorage error: writeReader() wrote " + std::to_string(debug_length) + ", expected " + std::to_string(debug_expect));
+#endif
     // Beliefs
     writeBelief(r.profit);
     writeBelief(r.profit_extrap);
@@ -613,6 +774,7 @@ void FileStorage::writeReader(const ReaderState &r) {
 }
 
 void FileStorage::writeBelief(const Linear &m) {
+    FILESTORAGE_DEBUG_WRITE_START
     auto &k = m.K();
     if (k > 120) {
         throw std::runtime_error("creativity::state::FileStorage cannot handle beliefs with K > 120");
@@ -647,16 +809,17 @@ void FileStorage::writeBelief(const Linear &m) {
             write_dbl(V(r,c));
         }
     }
+    FILESTORAGE_DEBUG_WRITE_CHECK(1+8*(2+k+k*(k+1)/2))
 }
 
 std::pair<eris_id_t, BookState> FileStorage::readBook() const {
     auto pair = std::make_pair<eris_id_t, BookState>(
-            read_u64(), BookState(settings_.dimensions));
+            read_u32(), BookState(settings_.dimensions));
 
     BookState &b = pair.second;
     b.id = pair.first;
 
-    b.author = read_u64();
+    b.author = read_u32();
     for (uint32_t d = 0; d < settings_.dimensions; d++) {
         b.position[d] = read_dbl();
     }
@@ -669,15 +832,17 @@ std::pair<eris_id_t, BookState> FileStorage::readBook() const {
     b.sales_lifetime = read_u32();
     b.pirated = read_u32();
     b.pirated_lifetime = read_u32();
-    b.created = read_u64();
+    b.created = read_u32();
     b.lifetime = read_u32();
 
     return pair;
 }
 
 void FileStorage::writeBook(const BookState &b) {
-    write_u64(b.id);
-    write_u64(b.author);
+    if (b.id > std::numeric_limits<uint32_t>::max())
+        throw std::runtime_error("FileStorage error: cannot handle reader ids > 32 bits");
+    write_u32(b.id);
+    write_u32(b.author);
 
     for (size_t i = 0; i < b.position.dimensions; i++)
         write_dbl(b.position[i]);
@@ -690,7 +855,7 @@ void FileStorage::writeBook(const BookState &b) {
     write_u32(b.sales_lifetime);
     write_u32(b.pirated);
     write_u32(b.pirated_lifetime);
-    write_u64(b.created);
+    write_u32(b.created);
     write_u32(b.lifetime);
 }
 

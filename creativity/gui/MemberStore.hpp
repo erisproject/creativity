@@ -17,7 +17,7 @@ namespace creativity { namespace gui {
  * `ReaderState`.
  */
 template <class M>
-class MemberStore : public Gtk::TreeModel, public Gtk::TreeSortable {
+class MemberStore : public virtual Gtk::TreeModel, public virtual Gtk::TreeSortable {
     public:
         MemberStore() = delete;
 

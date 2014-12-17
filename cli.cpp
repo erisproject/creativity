@@ -301,9 +301,24 @@ int main(int argc, char *argv[]) {
         double speed = 1.0 / std::chrono::duration<double>(now - last).count();
         std::swap(last, now);
         std::cout << "\rRunning simulation [t=" << sim->t() << "; R=" << sim->countAgents<Reader>() << "; B=" << sim->countGoods<Book>() << ", newB=" <<
-            sim->countGoods<Book>([](const Book &b) -> bool { return b.age() == 0; }) << "] " << speed << " Hz                    " << std::flush;
+            sim->countGoods<Book>([](const Book &b) -> bool { return b.age() == 0; }) << "] " << speed << " Hz";
+        std::cout << " (output pending: " << creativity->storage().first->backend().pending() << ")              " << std::flush;
     }
 
+    std::cout << "\nSimulation done.";
+    unsigned int pending = creativity->storage().first->backend().pending();
+    if (pending > 0) {
+        std::string waiting = "Waiting for output data to finish writing... ";
+        std::cout << "\n" << waiting;
+        while (pending > 0) {
+            std::cout << "\r" << waiting << "(" << pending << " states pending)  " << std::flush;
+            std::this_thread::sleep_for(std::chrono::milliseconds(250));
+            pending = creativity->storage().first->backend().pending();
+        }
+        std::cout << "\r" << waiting << "done.               " << std::flush;
+    }
+
+    std::cout << std::endl;
     creativity->storage().first->flush();
 
     std::cout << "\n\nSimulation complete.  Results saved to " << results_out_display << "\n\n";

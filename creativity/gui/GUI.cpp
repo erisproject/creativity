@@ -437,7 +437,7 @@ void GUI::thr_set_state(unsigned long t) {
         // new state transitions; if the user changes the sort order, it's that new order rather
         // than this default order that we want to apply.
         rdr_models_[t]->set_sort_column(rdr_models_[t]->columns.id, Gtk::SortType::SORT_ASCENDING);
-        bk_models_[t]->set_sort_column(bk_models_[t]->columns.age, Gtk::SortType::SORT_ASCENDING);
+        bk_models_[t]->set_sort_column(bk_models_[t]->columns->age, Gtk::SortType::SORT_ASCENDING);
     }
     else {
         // Transitioning from one (actual) state to another: preserve sort order and reader/book

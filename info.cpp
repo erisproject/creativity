@@ -104,16 +104,17 @@ int main(int argc, char *argv[]) {
             if (s->t % 25 == 1) { if (s->t > 1) std::cout << h4; std::cout << h3 << h4; }
             if (s->t == creativity->parameters.piracy_begins)
                 std::cout <<
-                   "  ----------------------------  PIRACY BEGINS  -----------------------------\n";
+                   "  ============================  PIRACY BEGINS  =============================\n";
             double net_u = 0;
             unsigned long books_new = 0, bought = 0, pirated = 0, bought_new = 0, pirated_new = 0;
             for (auto &rp : s->readers) {
                 auto &r = rp.second;
                 net_u += r.u - 1000;
-                bought += r.library_purchased.size();
-                pirated += r.library_pirated.size();
-                bought_new += r.new_purchased.size();
-                pirated_new += r.new_pirated.size();
+
+                bought += r.library_purchased;
+                bought_new += r.library_purchased_new;
+                pirated += r.library_pirated;
+                pirated_new += r.library_pirated_new;
             }
             for (auto &bp : s->books) {
                 auto &b = bp.second;

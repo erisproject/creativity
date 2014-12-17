@@ -12,6 +12,7 @@
 #include <mutex>
 #include <memory>
 #include "creativity/gui/BookStore.hpp"
+#include "creativity/gui/LibraryStore.hpp"
 #include "creativity/state/State.hpp"
 
 using namespace Eigen;
@@ -75,7 +76,7 @@ class InfoWindow : public Gtk::Window {
         void updateValue(const std::string &code, const T &val) {
             updateValue(code, std::to_string(val));
         }
-        /// Updates a single value Gtk::LAbel text with the given string
+        /// Updates a single value Gtk::Label text with the given string
         void updateValue(const std::string &code, const std::string &val);
         /** Updates a matrix set up with matrix_at with the values of the given matrix.  If the
          * optional lower_triangle parameter is given as true, only the lower diagonal of the matrix
@@ -127,8 +128,9 @@ class InfoWindow : public Gtk::Window {
 
         std::function<void(eris::eris_id_t)> open_info_dialog_;
 
-        Glib::RefPtr<BookStore> bk_model_;
-        Gtk::TreeView bk_tree_;
+        Glib::RefPtr<BookStore> bk_authored_model_;
+        Glib::RefPtr<LibraryStore> bk_library_model_;
+        Gtk::TreeView bk_authored_tree_, bk_library_tree_;
         
         // The time currently being shown (don't need to do anything in refresh() if this doesn't
         // change)

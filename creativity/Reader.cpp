@@ -20,10 +20,10 @@ const std::vector<unsigned int> Reader::profit_stream_ages{{1,2,4,8}};
 Reader::Reader(
         std::shared_ptr<Creativity> creativity,
         const Position &pos,
-        double cFixed, double cUnit, double inc
+        double cFixed, double cUnit, double cPiracy, double inc
         )
     : WrappedPositional<agent::AssetAgent>(pos, creativity->parameters.boundary, -creativity->parameters.boundary),
-    cost_fixed{cFixed}, cost_unit{cUnit}, income{inc},
+    cost_fixed{cFixed}, cost_unit{cUnit}, cost_piracy{cPiracy}, income{inc},
     creativity_{std::move(creativity)},
     profit_belief_(creativity_->parameters.dimensions),
     profit_belief_extrap_(profit_belief_),
@@ -62,26 +62,21 @@ void Reader::uPolynomial(std::vector<double> coef) {
     u_poly_ = std::move(coef);
 }
 
+double Reader::u(double money, const std::unordered_map<eris::SharedMember<Book>, std::reference_wrapper<BookCopy>> &books) const {
+    double u = money - penalty(books.size());
+    for (auto &bc : books) {
+        u += uBook(bc.first, bc.second.get().quality);
+    }
+    return u;
+}
 const double& Reader::u() const {
     return u_curr_;
 }
 const double& Reader::uLifetime() const {
     return u_lifetime_;
 }
-const std::unordered_set<SharedMember<Book>>& Reader::newBooks() const {
+const std::unordered_map<SharedMember<Book>, std::reference_wrapper<BookCopy>>& Reader::newBooks() const {
     return library_new_;
-}
-const std::unordered_set<SharedMember<Book>>& Reader::newPurchased() const {
-    return library_new_purchased_;
-}
-const std::unordered_set<SharedMember<Book>>& Reader::newPirated() const {
-    return library_new_pirated_;
-}
-const std::unordered_set<SharedMember<Book>>& Reader::libraryPirated() const {
-    return library_pirated_;
-}
-const std::unordered_set<SharedMember<Book>>& Reader::libraryPurchased() const {
-    return library_purchased_;
 }
 const std::set<SharedMember<Book>>& Reader::wrote() const {
     return wrote_;
@@ -317,18 +312,20 @@ void Reader::interApply() {
     // to author)
     assets()[creativity_->money] += income;
 
+    auto sim = simulation();
     SharedMember<Book> newbook;
     if (create_) {
-        // The cost (think of this as an opportunity cost) of creating:
+        // The cost (think of this as an opportunity cost) of creating, and the first period fixed
+        // cost:
         assets()[creativity_->money] -= create_effort_ + cost_fixed;
 
         // The book is centered at the reader's position, plus some noise we add below
         Position bookPos{position()};
 
-        auto qdraw = [this] (const Book &book, const Reader &) -> double {
+        auto qdraw = [this] (const Book &book) -> double {
             return std::max(0.0, book.quality() + writer_quality_sd * Random::rstdnorm());
         };
-        newbook = simulation()->spawn<Book>(creativity_, bookPos, sharedSelf(), wrote_.size(), create_price_, create_quality_, qdraw);
+        newbook = sim->spawn<Book>(creativity_, bookPos, sharedSelf(), wrote_.size(), create_price_, create_quality_, qdraw);
 
         /// If enabled, add some noise in a random direction to the position
         if (writer_book_sd > 0) {
@@ -338,19 +335,19 @@ void Reader::interApply() {
 
         wrote_.insert(wrote_.end(), newbook);
         wrote_market_.insert(newbook);
-        library_.emplace(newbook, create_quality_);
-        library_unlearned_.insert(newbook);
+        auto ins = library_.emplace(SharedMember<Book>(newbook), BookCopy(create_quality_, BookCopy::Status::wrote, sim->t()));
+        library_unlearned_.emplace(newbook, std::ref(ins.first->second));
     }
 
     std::vector<SharedMember<Book>> remove;
     for (auto &b : wrote_market_) {
+        // If it's staying on the market, update the price and incur the fixed cost
         if (new_prices_.count(b) > 0) {
-            // Set the new price
             b->market()->setPrice(new_prices_[b]);
             assets()[creativity_->money] -= cost_fixed;
         }
         else if (not create_ or b != newbook) {
-            // No new price, which means we remove the book from the market
+            // No new price, which means we're removing the book from the market
             remove.push_back(b);
         }
     }
@@ -360,29 +357,32 @@ void Reader::interApply() {
         simulation()->remove(b->market());
     }
 
+    // Finally, move a random distance in a random direction
     if (creativity_->parameters.reader_step_sd > 0) {
-        // Finally, move a random distance in a random direction
         double step_dist = Random::rstdnorm() * creativity_->parameters.reader_step_sd;
         if (step_dist != 0)
             moveBy(step_dist * Position::random(position().dimensions));
     }
 }
 
-double Reader::uBook(SharedMember<Book> b) const {
-    double u = evalPolynomial(distance(b), u_poly_);
-    u += quality(b);
-    if (u < 0) u = 0.0;
-    return u;
+double Reader::uBook(const SharedMember<Book> &b) const {
+    return uBook(b, quality(b));
 }
 
-double Reader::quality(SharedMember<Book> b) const {
+double Reader::uBook(const SharedMember<Book> &b, double quality) const {
+    quality += evalPolynomial(distance(b), u_poly_);
+    if (quality < 0) quality = 0.0;
+    return quality;
+}
+
+double Reader::quality(const SharedMember<Book> &b) const {
     auto found = library_.find(b);
     if (found != library_.end())
-        return found->second;
+        return found->second.quality;
 
-    found = quality_predictions_.find(b);
-    if (found != quality_predictions_.end())
-        return found->second;
+    auto found_pred = quality_predictions_.find(b);
+    if (found_pred != quality_predictions_.end())
+        return found_pred->second;
 
     double q_hat;
     if (usableBelief(quality_belief_)) {
@@ -404,9 +404,9 @@ double Reader::penalty(unsigned long n) const {
     return evalPolynomial(n, pen_poly_);
 }
 
-const std::unordered_map<SharedMember<Book>, double>& Reader::library() const { return library_; }
+const std::unordered_map<SharedMember<Book>, BookCopy>& Reader::library() const { return library_; }
 
-void Reader::receiveProfits(SharedMember<Book> book, const Bundle &revenue) {
+void Reader::receiveProceeds(const SharedMember<Book> &book, const Bundle &revenue) {
     assets() += revenue;
     assets()[creativity_->money] -= book->currSales() * cost_unit;
 }
@@ -447,8 +447,8 @@ void Reader::updateBeliefs() {
     // incorporated into the beliefs above.
     std::vector<SharedMember<Book>> remove;
     for (auto &book : library_unlearned_) {
-        if (not book->hasMarket())
-            remove.push_back(book);
+        if (not book.first->hasMarket())
+            remove.push_back(book.first);
     }
     for (auto &book : remove)
         library_unlearned_.erase(book);
@@ -464,8 +464,8 @@ void Reader::updateQualityBelief() {
         VectorXd y(newBooks().size());
         size_t i = 0;
         for (auto &a : newBooks()) {
-            books.push_back(a);
-            y[i++] = library_[a];
+            books.push_back(a.first);
+            y[i++] = a.second.get().quality;
         }
 
         quality_belief_ = std::move(quality_belief_).update(y, quality_belief_.bookData(books));
@@ -482,8 +482,8 @@ void Reader::updateDemandBelief() {
         auto t = simulation()->t();
         size_t i = 0;
         for (auto &b : newBooks()) {
-            y[i] = b->sales(t);
-            X.row(i) = demand_belief_.bookRow(b, library_[b]);
+            y[i] = b.first->sales(t);
+            X.row(i) = demand_belief_.bookRow(b.first, b.second.get().quality);
             i++;
         }
 
@@ -496,7 +496,8 @@ void Reader::updateProfitStreamBelief() {
     // *just* left the market: it might have just left, but it also might be a pirated book that
     // left the market a long time ago.
     std::map<unsigned int, std::vector<SharedMember<Book>>> to_learn;
-    for (auto &book : library_unlearned_) {
+    for (auto &bu : library_unlearned_) {
+        auto &book = bu.first;
         if (not book->hasMarket()) {
             unsigned long periods = book->marketPeriods();
             // We only look for the predefined age values, and only include books with
@@ -571,17 +572,17 @@ void Reader::updateProfitStreamBelief() {
 }
 
 void Reader::updateProfitBelief() {
-    std::vector<SharedMember<Book>> new_prof_books, extrap_books;
-    for (auto &book : library_unlearned_) {
-        if (book->hasMarket()) {
+    std::vector<std::pair<SharedMember<Book>, std::reference_wrapper<BookCopy>>> new_prof_books, extrap_books;
+    for (auto &bc : library_unlearned_) {
+        if (bc.first->hasMarket()) {
             // The book is still on the market, so we'll have to extrapolate using profit stream
             // beliefs
-            extrap_books.push_back(book);
+            extrap_books.push_back(bc);
         }
         else {
             // The book either just left the market or we just obtained an off-market book via
             // piracy; in either case, incorporate it into the profit belief.
-            new_prof_books.push_back(book);
+            new_prof_books.push_back(bc);
         }
     }
 
@@ -593,9 +594,9 @@ void Reader::updateProfitBelief() {
         VectorXd y(new_prof_books.size());
 
         size_t i = 0;
-        for (auto &book : new_prof_books) {
-            y[i] = book->lifeRevenue();
-            X.row(i) = profit_belief_.profitRow(book, library_[book]);
+        for (auto &bc : new_prof_books) {
+            y[i] = bc.first->lifeRevenue();
+            X.row(i) = profit_belief_.profitRow(bc.first, bc.second.get().quality);
             i++;
         }
 
@@ -613,14 +614,14 @@ void Reader::updateProfitBelief() {
         VectorXd y(extrap_books.size());
 
         size_t i = 0;
-        for (auto &book : extrap_books) {
+        for (auto &bc : extrap_books) {
             // Look for the largest model that doesn't exceed the book's age, then use it for
             // prediction
             for (auto it = profit_stream_beliefs_.rbegin(); it != profit_stream_beliefs_.rend(); it++) {
-                if (it->first <= book->age() and it->second.n() >= 1) {
+                if (it->first <= bc.first->age() and it->second.n() >= 1) {
                     // We have a winner:
-                    y[i] = it->second.predict(book);
-                    X.row(i) = profit_belief_.profitRow(book, library_[book]);
+                    y[i] = it->second.predict(bc.first);
+                    X.row(i) = profit_belief_.profitRow(bc.first, bc.second.get().quality);
                     i++;
                     break;
                 }
@@ -777,27 +778,21 @@ void Reader::intraApply() {
     reservations_.clear();
 
     library_new_.clear();
-    library_new_pirated_.clear();
-    library_new_purchased_.clear();
 
     for (auto &new_book : reserved_books_) {
         auto &book = new_book.first;
         auto &pirated = new_book.second;
 
-        double q = book->qualityDraw(*this);
-        library_.emplace(book, q);
-        library_unlearned_.insert(book);
-        library_new_.insert(book);
+        auto inserted = library_.emplace(
+                SharedMember<Book>(book),
+                BookCopy(book->qualityDraw(), pirated ? BookCopy::Status::pirated : BookCopy::Status::purchased, simulation()->t()));
+
+        library_unlearned_.emplace(book, std::ref(inserted.first->second));
+        library_new_.emplace(book, std::ref(inserted.first->second));
         if (pirated) {
             book->recordPiracy(1);
-            library_pirated_.insert(book);
-            library_new_pirated_.insert(book);
         }
-        else {
-            // book->recordSale not needed here: it's called during the BookMarket transaction
-            library_purchased_.insert(book);
-            library_new_purchased_.insert(book);
-        }
+        //else {} -- // book->recordSale not needed here: it's called during the BookMarket transaction
     }
     reserved_books_.clear();
 

@@ -34,15 +34,15 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
          * \param initial_price the price of the book for the next period
          * \param quality the quality of the book
          * \param qDraw a callable object that can be called upon to produce a quality draw for a
-         * given book and reader, passed as arguments.  This is often a random draw (and so
-         * different readers can get different quality values).  The returned value should ideally
-         * be non-negative; negative draws will be changed to 0 values.
+         * given book, passed as the argument.  This is often a random draw (and so different
+         * readers can get different quality values).  The returned value should ideally be
+         * non-negative; negative draws will be changed to 0 values.
          *
          * Note that a reference to the author is stored internally: even if the author is removed
          * from the simulation, it will still be kept from destruction by this class.
          */
         Book(std::shared_ptr<Creativity> creativity, const eris::Position &p, eris::SharedMember<Reader> author, unsigned int order,
-                double initial_price, double quality, std::function<double(const Book&, const Reader&)> qDraw);
+                double initial_price, double quality, std::function<double(const Book&)> qDraw);
 
         /// Returns the age of the book, in simulation periods.
         eris::eris_time_t age() const;
@@ -178,14 +178,14 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
          */
         const double& quality() const;
 
-        /** Draws a quality value for this book and the given reader.  This is intended to be called
-         * once per reader *after* the reader has obtained a copy of the book; the reader should
-         * then maintain the value.  (Before the reader obtains the copy, they have to use their
-         * prior and/or any network information to predict a quality).
+        /** Draws a quality value for this book.  This is intended to be called once per reader
+         * *after* the reader has obtained a copy of the book; the reader should then maintain the
+         * value.  (Before the reader obtains the copy, they have to use their prior and/or any
+         * network information to predict a quality).
          *
          * The returned value will always be non-negative.
          */
-        double qualityDraw(const Reader &reader);
+        double qualityDraw();
 
     private:
         std::shared_ptr<Creativity> creativity_;
@@ -198,7 +198,7 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         const unsigned int order_;
         eris::eris_id_t market_;
         const double init_price_, quality_;
-        std::function<double(const Book&, const Reader&)> quality_draw_;
+        std::function<double(const Book&)> quality_draw_;
 };
 
 }

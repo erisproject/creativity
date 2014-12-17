@@ -83,7 +83,7 @@ void BookMarket::buy_(Reservation_ &res) {
 void BookMarket::intraFinish() {
     auto author = book_->author();
     auto lock = writeLock(book_, author);
-    author->receiveProfits(book_, proceeds_);
+    author->receiveProceeds(book_, proceeds_);
     proceeds_.clear();
 }
 

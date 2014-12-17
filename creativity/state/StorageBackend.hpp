@@ -74,6 +74,9 @@ class StorageBackend : private eris::noncopyable {
          */
         virtual void enqueue(std::shared_ptr<const State> &&s);
 
+        /** Returns the number of states still pending in the queue. */
+        virtual size_t pending() const;
+
         /** Gets the requested state from the backend.  This is not required to check for objects in
          * the queue: the caller is responsible for caching queued objects.
          *
@@ -104,7 +107,7 @@ class StorageBackend : private eris::noncopyable {
          * mutex before manipulating queue_.  The methods of this base class automatically obtain a
          * lock before using queue_.
          */
-        std::mutex queue_mutex_;
+        mutable std::mutex queue_mutex_;
 
         /** Condition variable for the queue for use by a subclass.  This is signalled after the
          * base class adds to queue_.

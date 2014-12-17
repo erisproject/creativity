@@ -32,6 +32,7 @@ void ReaderStore::get_value_vfunc(const iterator &iter, int column, Glib::ValueB
     if (iter.get_stamp() != stamp_ or column > get_n_columns_vfunc()) return;
 
     auto &r = members_.at((size_t) iter.gobj()->user_data).get();
+
     if (column == columns.id.index()) {
         Glib::Value<eris_id_t> v;
         v.init(v.value_type());
@@ -39,7 +40,7 @@ void ReaderStore::get_value_vfunc(const iterator &iter, int column, Glib::ValueB
         value.init(v.gobj());
     }
     else if (column == columns.pos_x.index() or column == columns.pos_y.index() or column == columns.u.index() or column == columns.u_lifetime.index()
-            or column == columns.cost_fixed.index() or column == columns.cost_unit.index() or columns.cost_piracy.index() or column == columns.income.index()) {
+            or column == columns.cost_fixed.index() or column == columns.cost_unit.index() or column == columns.cost_piracy.index() or column == columns.income.index()) {
         Glib::Value<double> v;
         v.init(v.value_type());
         v.set(  column == columns.pos_x.index() ? r.position[0] :
@@ -66,11 +67,11 @@ void ReaderStore::get_value_vfunc(const iterator &iter, int column, Glib::ValueB
         Glib::Value<size_t> v;
         v.init(v.value_type());
         v.set(  column == columns.books_owned.index() ? r.library.size() :
-                column == columns.books_purchased.index() ? r.library_purchased.size() :
-                column == columns.books_pirated.index() ? r.library_pirated.size() :
+                column == columns.books_purchased.index() ? r.library_purchased :
+                column == columns.books_pirated.index() ? r.library_pirated :
                 column == columns.books_new.index() ? r.new_books.size() :
-                column == columns.books_new_purchased.index() ? r.new_purchased.size() :
-                column == columns.books_new_pirated.index() ? r.new_pirated.size() :
+                column == columns.books_new_purchased.index() ? r.library_purchased_new :
+                column == columns.books_new_pirated.index() ? r.library_pirated_new :
                 column == columns.books_written.index() ? r.wrote.size() :
                 column == columns.num_friends.index() ? r.friends.size() :
                 r.wrote.empty() ? state_->t : state_->t - state_->books.at(*r.wrote.crbegin()).created
@@ -122,11 +123,11 @@ LESS_GREATER(u)
 LESS_GREATER(u_lifetime)
 LESS_GREATER_A(num_friends, friends.size())
 LESS_GREATER_A(books_owned, library.size())
-LESS_GREATER_A(books_purchased, library_purchased.size())
-LESS_GREATER_A(books_pirated, library_pirated.size())
+LESS_GREATER_A(books_purchased, library_purchased)
+LESS_GREATER_A(books_pirated, library_pirated)
 LESS_GREATER_A(books_new, new_books.size())
-LESS_GREATER_A(books_new_purchased, new_purchased.size())
-LESS_GREATER_A(books_new_pirated, new_pirated.size())
+LESS_GREATER_A(books_new_purchased, library_purchased_new);
+LESS_GREATER_A(books_new_pirated, library_pirated_new);
 LESS_GREATER_A(books_written, wrote.size())
 #undef LESS_GREATER
 #undef LESS_GREATER_A

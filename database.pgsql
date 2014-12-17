@@ -14,13 +14,11 @@ SET search_path = public, pg_catalog;
 ALTER TABLE IF EXISTS ONLY public.state DROP CONSTRAINT IF EXISTS state_sim_fkey;
 ALTER TABLE IF EXISTS ONLY public.setting DROP CONSTRAINT IF EXISTS setting_sim_fkey;
 ALTER TABLE IF EXISTS ONLY public.reader DROP CONSTRAINT IF EXISTS reader_state_fkey;
-ALTER TABLE IF EXISTS ONLY public.library DROP CONSTRAINT IF EXISTS library_reader_fkey;
-ALTER TABLE IF EXISTS ONLY public.library DROP CONSTRAINT IF EXISTS library_book_fkey;
+ALTER TABLE IF EXISTS ONLY public.library DROP CONSTRAINT IF EXISTS library_simulation_fkey;
 ALTER TABLE IF EXISTS ONLY public.friend DROP CONSTRAINT IF EXISTS friend_reader_fkey;
-ALTER TABLE IF EXISTS ONLY public.friend DROP CONSTRAINT IF EXISTS friend_friend_fkey;
 ALTER TABLE IF EXISTS ONLY public.book DROP CONSTRAINT IF EXISTS book_state_fkey;
-ALTER TABLE IF EXISTS ONLY public.book DROP CONSTRAINT IF EXISTS book_author_fkey;
 ALTER TABLE IF EXISTS ONLY public.belief DROP CONSTRAINT IF EXISTS belief_reader_fkey;
+DROP INDEX IF EXISTS public.library_simulation_reader_eris_id_acquired_idx;
 ALTER TABLE IF EXISTS ONLY public.state DROP CONSTRAINT IF EXISTS state_sim_t_key;
 ALTER TABLE IF EXISTS ONLY public.state DROP CONSTRAINT IF EXISTS state_pkey;
 ALTER TABLE IF EXISTS ONLY public.simulation DROP CONSTRAINT IF EXISTS simulation_seed_key;
@@ -184,10 +182,11 @@ CREATE TABLE friend (
 --
 
 CREATE TABLE library (
-    reader bigint NOT NULL,
+    simulation integer NOT NULL,
+    reader_eris_id bigint NOT NULL,
     book_eris_id bigint NOT NULL,
+    acquired integer NOT NULL,
     type library_type NOT NULL,
-    new boolean NOT NULL,
     quality double precision NOT NULL
 );
 
@@ -248,7 +247,7 @@ CREATE TABLE setting (
 CREATE TABLE simulation (
     id integer NOT NULL,
     seed bigint NOT NULL,
-    created timestamp with time zone DEFAULT NOW()
+    created timestamp with time zone DEFAULT now()
 );
 
 
@@ -366,7 +365,7 @@ ALTER TABLE ONLY friend
 --
 
 ALTER TABLE ONLY library
-    ADD CONSTRAINT library_pkey PRIMARY KEY (reader, book_eris_id);
+    ADD CONSTRAINT library_pkey PRIMARY KEY (simulation, reader_eris_id, book_eris_id);
 
 
 --
@@ -426,6 +425,13 @@ ALTER TABLE ONLY state
 
 
 --
+-- Name: library_simulation_reader_eris_id_acquired_idx; Type: INDEX; Schema: public; Owner: -; Tablespace: 
+--
+
+CREATE INDEX library_simulation_reader_eris_id_acquired_idx ON library USING btree (simulation, reader_eris_id, acquired);
+
+
+--
 -- Name: belief_reader_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -450,11 +456,11 @@ ALTER TABLE ONLY friend
 
 
 --
--- Name: library_reader_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: library_simulation_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY library
-    ADD CONSTRAINT library_reader_fkey FOREIGN KEY (reader) REFERENCES reader(id) ON DELETE CASCADE;
+    ADD CONSTRAINT library_simulation_fkey FOREIGN KEY (simulation) REFERENCES simulation(id);
 
 
 --

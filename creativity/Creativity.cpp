@@ -43,17 +43,16 @@ void Creativity::pgsql(std::string url, bool load_only, bool new_only) {
     if (setup_sim_) throw std::logic_error("Cannot call Creativity::pgsql() after setup()");
 
     // Figure out whether a "creativity=xyz" setting was provided, and if so, remove it
-    int32_t load_id = -1;
+    unsigned int load_id = 0;
     std::smatch results;
     if (std::regex_search(url, results, std::regex("([?&])creativity=(\\d+)(?=&|$)"))) {
         load_id = std::stoi(results[2].str());
-        if (load_id <= 0) load_id = -1;
         url = results.prefix().str() + results.suffix().str();
     }
 
-    if (load_id == -1 and setup_read_) throw std::logic_error("Cannot call Creativity::pgsql() after loading state data");
+    if (load_id == 0 and setup_read_) throw std::logic_error("Cannot call Creativity::pgsql() after loading state data");
     else if (load_id > 0 and new_only) throw std::logic_error("Invalid postgresql URL given: creativity= option cannot be specified here");
-    else if (load_id == -1 and load_only) throw std::logic_error("Invalid postgresql URL given: creativity= option must be specified here");
+    else if (load_id == 0 and load_only) throw std::logic_error("Invalid postgresql URL given: creativity= option must be specified here");
 
     storage().first = Storage::create<PsqlStorage>(set_, url, load_id);
     setup_read_ = load_id > 0;
@@ -132,7 +131,7 @@ void Creativity::setup() {
         auto r = sim->spawn<Reader>(shared_from_this(),
                 Position{unif_pmb(rng), unif_pmb(rng)},
                 // (Nearly) non-informative priors for the rest:
-                parameters.cost_fixed, parameters.cost_unit, parameters.income
+                parameters.cost_fixed, parameters.cost_unit, parameters.cost_piracy, parameters.income
                 );
         r->writer_book_sd = parameters.book_distance_sd;
         r->writer_quality_sd = parameters.book_quality_sd;

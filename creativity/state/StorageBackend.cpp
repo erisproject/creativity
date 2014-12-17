@@ -8,12 +8,18 @@ bool StorageBackend::empty() const { return size() == 0; }
 
 void StorageBackend::reserve(size_t) {}
 
+size_t StorageBackend::pending() const {
+    if (not thread_.joinable()) return 0;
+    std::unique_lock<std::mutex> lock(queue_mutex_);
+    return queue_.size();
+}
+
 void StorageBackend::enqueue(std::shared_ptr<const State> &&s) {
     if (not thread_.joinable())
         thread_ = std::thread(&StorageBackend::thread_inserter_, this);
 
     {
-        std::unique_lock<std::mutex> queue_mutex_;
+        std::unique_lock<std::mutex> lock(queue_mutex_);
         queue_.push(std::move(s));
     }
     queue_cv_.notify_one();

@@ -8,13 +8,34 @@ using namespace std::placeholders;
 using namespace creativity::state;
 
 namespace creativity { namespace gui {
-    
-BookStore::BookStore(std::shared_ptr<const State> &&state, eris_id_t author)
+
+BookStore::BookStore(std::shared_ptr<const State> &&state, eris_id_t author, std::unique_ptr<ColRec> &&cols)
     : Glib::ObjectBase(typeid(BookStore)), MemberStore(std::move(state)),
-    author_{author}
+    columns(std::move(cols)), author_(std::move(author))
 {
-    if (author) {
-        auto &wrote = state_->readers.at(author).wrote;
+    initializeBooks();
+}
+
+BookStore::BookStore(std::shared_ptr<const State> &&state, eris_id_t author)
+    : Glib::ObjectBase(typeid(BookStore)), MemberStore(std::move(state)), author_(std::move(author))
+{
+    initializeBooks();
+}
+
+BookStore::BookStore(std::shared_ptr<const State> &&state, std::unique_ptr<ColRec> &&cols)
+    : Glib::ObjectBase(typeid(BookStore)), MemberStore(std::move(state)), columns(std::move(cols))
+{
+    // Don't initializeBooks()--the subclass is going to take care of it
+}
+
+
+Glib::RefPtr<BookStore> BookStore::create(std::shared_ptr<const State> state, eris_id_t author) {
+    return Glib::RefPtr<BookStore>(new BookStore(std::move(state), author));
+}
+
+void BookStore::initializeBooks() {
+    if (author_) {
+        auto &wrote = state_->readers.at(author_).wrote;
         members_.reserve(wrote.size());
         for (auto &bid : wrote) {
             members_.emplace_back(state_->books.at(bid));
@@ -28,67 +49,63 @@ BookStore::BookStore(std::shared_ptr<const State> &&state, eris_id_t author)
     }
 }
 
-Glib::RefPtr<BookStore> BookStore::create(std::shared_ptr<const State> state, eris_id_t author) {
-    return Glib::RefPtr<BookStore>(new BookStore(std::move(state), author));
-}
-
 int BookStore::get_n_columns_vfunc() const {
-    return columns.size();
+    return columns->size();
 }
 
 GType BookStore::get_column_type_vfunc(int index) const {
-    if ((unsigned int) index >= columns.size()) throw std::out_of_range("Invalid column index accessed");
-    return columns.types()[index];
+    if ((unsigned int) index >= columns->size()) throw std::out_of_range("Invalid column index accessed");
+    return columns->types()[index];
 }
 
 void BookStore::get_value_vfunc(const iterator &iter, int column, Glib::ValueBase &value) const {
     if (iter.get_stamp() != stamp_ or column > get_n_columns_vfunc()) return;
 
     auto &b = members_.at((size_t) iter.gobj()->user_data).get();
-    if (column == columns.id.index() || column == columns.author.index()) {
+    if (column == columns->id.index() || column == columns->author.index()) {
         Glib::Value<eris_id_t> v;
         v.init(v.value_type());
-        v.set(column == columns.id.index() ? b.id : b.author);
+        v.set(column == columns->id.index() ? b.id : b.author);
         value.init(v.gobj());
     }
-    else if (column == columns.pos_x.index() or column == columns.pos_y.index() or column == columns.quality.index() or column == columns.price.index()
-            or column == columns.revenue.index() or column == columns.revenue_lifetime.index()) {
+    else if (column == columns->pos_x.index() or column == columns->pos_y.index() or column == columns->quality.index() or column == columns->price.index()
+            or column == columns->revenue.index() or column == columns->revenue_lifetime.index()) {
         Glib::Value<double> v;
         v.init(v.value_type());
-        v.set(  column == columns.pos_x.index() ? b.position[0] :
-                column == columns.pos_y.index() ? b.position[1] :
-                column == columns.quality.index() ? b.quality :
-                column == columns.price.index() ? b.price :
-                column == columns.revenue.index() ? b.revenue :
+        v.set(  column == columns->pos_x.index() ? b.position[0] :
+                column == columns->pos_y.index() ? b.position[1] :
+                column == columns->quality.index() ? b.quality :
+                column == columns->price.index() ? b.price :
+                column == columns->revenue.index() ? b.revenue :
                 b.revenue_lifetime
              );
         value.init(v.gobj());
     }
-    else if (column == columns.market.index()) {
+    else if (column == columns->market.index()) {
         Glib::Value<bool> v;
         v.init(v.value_type());
         v.set(b.market());
         value.init(v.gobj());
     }
-    else if (column == columns.pos_str.index()) {
+    else if (column == columns->pos_str.index()) {
         Glib::Value<std::string> v;
         v.init(v.value_type());
         v.set(GUI::pos_to_string(b.position));
         value.init(v.gobj());
     }
-    else if (column == columns.age.index() or column == columns.created.index()
-            or column == columns.sales.index() or column == columns.sales_lifetime.index()
-            or column == columns.pirated.index() or column == columns.pirated_lifetime.index()
-            or column == columns.lifetime.index() or column == columns.copies.index()) {
-        Glib::Value<unsigned long> v;
+    else if (column == columns->age.index() or column == columns->created.index()
+            or column == columns->sales.index() or column == columns->sales_lifetime.index()
+            or column == columns->pirated.index() or column == columns->pirated_lifetime.index()
+            or column == columns->lifetime.index() or column == columns->copies.index()) {
+        Glib::Value<unsigned int> v;
         v.init(v.value_type());
-        v.set(  column == columns.age.index() ? state_->t - b.created :
-                column == columns.created.index() ? b.created :
-                column == columns.sales.index() ? b.sales :
-                column == columns.sales_lifetime.index() ? b.sales_lifetime :
-                column == columns.pirated.index() ? b.pirated :
-                column == columns.pirated_lifetime.index() ? b.pirated_lifetime :
-                column == columns.lifetime.index() ? b.lifetime :
+        v.set(  column == columns->age.index() ? state_->t - b.created :
+                column == columns->created.index() ? b.created :
+                column == columns->sales.index() ? b.sales :
+                column == columns->sales_lifetime.index() ? b.sales_lifetime :
+                column == columns->pirated.index() ? b.pirated :
+                column == columns->pirated_lifetime.index() ? b.pirated_lifetime :
+                column == columns->lifetime.index() ? b.lifetime :
                 b.copies_lifetime()
              );
         value.init(v.gobj());
@@ -102,8 +119,8 @@ void BookStore::set_sort_column_id_vfunc(int sort_column_id, Gtk::SortType order
     bool ascending = (order == Gtk::SORT_ASCENDING);
     std::function<bool(const BookState &a, const BookState &b)> compare;
 #define ELSE_IF_COL(COL) \
-    else if (sort_column_id == columns.COL.index()) compare = ascending ? less_##COL : greater_##COL
-    if (sort_column_id == columns.id.index() || sort_column_id == DEFAULT_SORT_COLUMN_ID)
+    else if (sort_column_id == columns->COL.index()) compare = ascending ? less_##COL : greater_##COL
+    if (sort_column_id == columns->id.index() || sort_column_id == DEFAULT_SORT_COLUMN_ID)
         compare = ascending ? less_id : greater_id;
     ELSE_IF_COL(author);
     ELSE_IF_COL(market);
@@ -170,18 +187,18 @@ bool BookStore::greater_price(const BookState &a, const BookState &b) {
 }
 
 void BookStore::appendColumnsTo(Gtk::TreeView &v) const {
-    appendCol(v, "ID", columns.id, 50);
-    appendCol(v, "Position", columns.pos_str, 110);
-    if (not author_) appendCol(v, "Author", columns.author, 80);
-    appendCol(v, "Created", columns.created, 85);
-    appendCol(v, "Life", columns.lifetime, 65);
-    appendCol(v, "Mkt?", columns.market, 65);
-    appendCol(v, "Quality", columns.quality, 85);
-    appendCol(v, "Price", columns.price, 75);
-    appendCol(v, "Rev.", columns.revenue_lifetime, 75);
-    appendCol(v, "Sales", columns.sales_lifetime, 75);
-    appendCol(v, "Pirated", columns.pirated_lifetime, 85);
-    appendCol(v, "Copies", columns.copies, 80);
+    appendCol(v, "ID", columns->id, 50);
+    appendCol(v, "Position", columns->pos_str, 110);
+    if (not author_) appendCol(v, "Author", columns->author, 80);
+    appendCol(v, "Created", columns->created, 85);
+    appendCol(v, "Life", columns->lifetime, 65);
+    appendCol(v, "Mkt?", columns->market, 65);
+    appendCol(v, "Quality", columns->quality, 85);
+    appendCol(v, "Price", columns->price, 75);
+    appendCol(v, "Rev.", columns->revenue_lifetime, 75);
+    appendCol(v, "Sales", columns->sales_lifetime, 75);
+    appendCol(v, "Pirated", columns->pirated_lifetime, 85);
+    appendCol(v, "Copies", columns->copies, 80);
 }
 
 }}

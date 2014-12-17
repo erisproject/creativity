@@ -106,10 +106,10 @@ class PsqlStorage : public StorageBackend {
         void initialConnection();
 
         /// Reads a reader, returns it in a pair suitable for moving into State.readers.
-        std::pair<eris::eris_id_t, ReaderState> readReader(const pqxx::tuple &reader_row, pqxx::work &trans) const;
+        std::pair<eris::eris_id_t, ReaderState> readReader(const pqxx::tuple &reader_row, const eris::eris_time_t t, pqxx::work &trans) const;
 
         /// Adds a reader to the database associated with the given state id.
-        void insertReader(const ReaderState &reader, int32_t state, pqxx::work &trans);
+        void insertReader(const ReaderState &reader, int32_t state_id, pqxx::work &trans);
 
         /// Inserts a belief record for a reader
         void insertBelief(eris::eris_id_t dbid, const std::string &type, const belief::Linear &belief, pqxx::work &trans);
