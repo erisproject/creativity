@@ -25,7 +25,7 @@ class LinearDerived : public B {
          */
         [[gnu::warn_unused_result]]
         D update(const Eigen::Ref<const Eigen::VectorXd> &y, const Eigen::Ref<const Eigen::MatrixXd> &X) const & {
-            return newDerived(Linear::update(y, X));
+            return newDerived(B::update(y, X));
         }
 
         /** Updates the current object, using its current values as a prior, incorporating the
@@ -40,7 +40,7 @@ class LinearDerived : public B {
          */
         [[gnu::warn_unused_result]]
         D update(const Eigen::Ref<const Eigen::VectorXd> &y, const Eigen::Ref<const Eigen::MatrixXd> &X) && {
-            return newDerived(std::move(*this).Linear::update(y, X));
+            return newDerived(std::move(*this).B::update(y, X));
         }
 
         /** Weakens a Derived belief, returning a new, weakened Derived object.
@@ -49,7 +49,7 @@ class LinearDerived : public B {
          */
         [[gnu::warn_unused_result]]
         D weaken(double prior_weight) const & {
-            return newDerived(Linear::weaken(prior_weight));
+            return newDerived(B::weaken(prior_weight));
         }
 
         /** Weakens a Derived belief, updating the current rvalue-reference then returning it.
@@ -58,7 +58,7 @@ class LinearDerived : public B {
          */
         [[gnu::warn_unused_result]]
         D weaken(double prior_weight) && {
-            return newDerived(std::move(*this).Linear::weaken(prior_weight));
+            return newDerived(std::move(*this).B::weaken(prior_weight));
         }
 
     protected:
