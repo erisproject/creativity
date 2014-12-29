@@ -153,12 +153,12 @@ class Linear {
          */
         const Eigen::MatrixXd& VcholL() const;
 
-        /** Given a row vector of values \f$X^*\f$, predicts \f$y^*\f$ using the current model values.
-         * The default implementation provided by this class simply returns the mean \f$X^*
-         * \beta\f$ (the mean of the multivariate \f$t\f$ density for an unrestricted,
-         * natural conjugate prior); subclasses may override, particularly for models with
-         * restrictions or other model parameter distribution assumptions where the parameter means
-         * may be quite different than the distributional mean parameters due to the restrictions.
+        /** Given a row vector of values \f$X^*\f$, predicts \f$y^*\f$ using the current model
+         * values.  The default implementation provided by this class simply returns the mean \f$X^*
+         * \beta\f$ (the mean of the multivariate \f$t\f$ density for an unrestricted, natural
+         * conjugate prior); subclasses may override, particularly for models with restrictions or
+         * other model parameter distribution assumptions where the parameter means may have
+         * differences from the restricted distribution means due to the restrictions.
          *
          * \throws std::logic_error if attempting to call predict() on an empty or noninformative
          * model.  (The default implementation would always simply return 0 for noninformative
