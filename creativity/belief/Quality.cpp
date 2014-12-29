@@ -16,7 +16,7 @@ double Quality::predict(const Book &book) {
         price = book.market()->price();
     RowVectorXd X(K());
     X << 1, book.order() == 0, book.order(), book.age(), price, price*book.age(), book.lifeSales();
-    return Linear::predict(X);
+    return predict(X);
 }
 
 
