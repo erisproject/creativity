@@ -479,10 +479,11 @@ void Reader::updateDemandBelief() {
         std::vector<SharedMember<Book>> books;
         VectorXd y(newBooks().size());
         MatrixXd X(newBooks().size(), demand_belief_.K());
-        auto t = simulation()->t();
+        // NB: this runs in the interoptimizer, which means t has already been incremented
+        auto last_t = simulation()->t() - 1;
         size_t i = 0;
         for (auto &b : newBooks()) {
-            y[i] = b.first->sales(t);
+            y[i] = b.first->sales(last_t);
             X.row(i) = demand_belief_.bookRow(b.first, b.second.get().quality);
             i++;
         }
