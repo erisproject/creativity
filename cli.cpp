@@ -37,12 +37,12 @@ class CmdLineHack : public TCLAP::CmdLine {
         void reverseHack() { std::reverse(_argList.begin(), rev_end_); }
 };
 
-// Returns a double converted to a string, trimming off insignificant 0s.
+// Returns a value converted to a string; if the value is a double, the specialized version below
+// trims off insignificant 0s (and a trailing .).
 template <typename T, typename = typename std::enable_if<std::is_arithmetic<T>::value>::type>
 std::string output_string(T v) {
     return std::to_string(v);
 }
-
 template <>
 std::string output_string(double v) {
     std::string z = std::to_string(v);
@@ -109,7 +109,8 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         cmd.startReverseHack();
 
 #define ARG(NAME, PARAM, SHORT, LONG, DESC) \
-        TCLAP::ValueArg<decltype(cr.parameters.PARAM)> opt_##NAME##_arg(SHORT, LONG, DESC, false, cr.parameters.PARAM, &opt_##NAME##_constr, cmd)
+        TCLAP::ValueArg<decltype(cr.parameters.PARAM)> opt_##NAME##_arg(SHORT, LONG, DESC ".  Default: " + output_string(cr.parameters.PARAM) + ".", \
+                false, cr.parameters.PARAM, &opt_##NAME##_constr, cmd)
 #define OPTION_UNBOUNDED_NAME(NAME, PARAM, SHORT, LONG, DESC) \
         RangeConstraint<decltype(cr.parameters.PARAM)> opt_##NAME##_constr; \
         ARG(NAME,PARAM,SHORT,LONG,DESC)
@@ -138,15 +139,16 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         OPTION_LBOUND(readers, "r", "readers", "Number of reader/author agents in the simulation", 1);
         OPTION_LBOUND(dimensions, "D", "dimensions", "Number of dimensions of the simulation", 1);
         auto opt_density_constr = RangeConstraint<double>::GT(0);
-        TCLAP::ValueArg<double> opt_density_arg("d", "density", "Reader density (in readers per unit^(D), where D is the configured # of dimensions)",
+        TCLAP::ValueArg<double> opt_density_arg("d", "density", "Reader density (in readers per unit^D, where D is the configured # of dimensions).  "
+                u8"The default is the density required to have simulation boundaries at ±" + std::to_string(cr.parameters.boundary) + " in each dimension.",
                 false, Creativity::densityFromBoundary(cr.parameters.readers, cr.parameters.dimensions, cr.parameters.boundary), &opt_density_constr, cmd);
         OPTION_BOUND(piracy_link_proportion, "f", "piracy-link-proportion", "Proportion of potential sharing links between readers that are created", 0, 1);
         OPTION_LBOUND(book_distance_sd, "B", "book-distance-sd", "Standard deviation of book distance from author; distance ~ |N(0, B)|", 0);
-        OPTION_LBOUND(book_quality_sd, "Q", "book-quality-sd", "Standard deviation of book perceived quality; perceived quality ~ N(q, Q), where q is the innate quality and Q is this value.", 0);
+        OPTION_LBOUND(book_quality_sd, "Q", "book-quality-sd", "Standard deviation of book perceived quality; perceived quality ~ N(q, Q), where q is the innate quality and Q is this value", 0);
         OPTION_LBOUND(reader_step_sd, "R", "reader-step-sd", "Standard deviation of the inter-period random-direction reader movement distance ~ |N(0, R)|", 0);
-        OPTION_UBOUND_STRICT(reader_creation_shape, "s", "reader-creation-shape", "Shape parameter, β, of the creator effort function: q(ℓ) = (α/β)[(ℓ+1)^β - 1]", 1);
-        OPTION_LBOUND(reader_creation_scale_min, "z", "reader-creation-scale-min", "Minimum support of scale parameter α ~ U[a,b] for the creator effort function: q(ℓ) = (α/β)[(ℓ+1)^β - 1]", 0);
-        OPTION_LBOUND(reader_creation_scale_max, "Z", "reader-creation-scale-max", "Maximum support of scale parameter α ~ U[a,b] for the creator effort function: q(ℓ) = (α/β)[(ℓ+1)^β - 1]", 0);
+        OPTION_UBOUND_STRICT(reader_creation_shape, "s", "reader-creation-shape", u8"Shape parameter, β, of the creator effort function: q(ℓ) = (α/β)[(ℓ+1)^β - 1]", 1);
+        OPTION_LBOUND(reader_creation_scale_min, "z", "reader-creation-scale-min", u8"Minimum support of scale parameter α ~ U[a,b] for the creator effort function: q(ℓ) = (α/β)[(ℓ+1)^β - 1]", 0);
+        OPTION_LBOUND(reader_creation_scale_max, "Z", "reader-creation-scale-max", u8"Maximum support of scale parameter α ~ U[a,b] for the creator effort function: q(ℓ) = (α/β)[(ℓ+1)^β - 1]", 0);
         OPTION_LBOUND(cost_fixed, "C", "cost-fixed", "Fixed cost of keeping a book on the market for a period", 0);
         OPTION_LBOUND(cost_unit, "c", "cost-unit", "Unit cost of making a copy of a book", 0);
         OPTION_LBOUND(cost_piracy, "y", "cost-piracy", "Cost of receiving a pirated copy of a book", 0);
@@ -166,16 +168,24 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         OPTION_UNBOUNDED(piracy_begins, "P", "piracy-begins", "The period in which piracy becomes available");
 
         auto periods_constr = RangeConstraint<unsigned int>::GE(0);
-        TCLAP::ValueArg<unsigned int> periods_arg("T", "periods", "Number of simulation periods to run", false, 200, &periods_constr, cmd);
+        TCLAP::ValueArg<unsigned int> periods_arg("T", "periods", "Number of simulation periods to run.  Default: 200.", false, 200, &periods_constr, cmd);
 
-        TCLAP::ValueArg<std::string> output_file("o", "output", "Output file (or database URL) for simulation results.  Example database URL: 'postgresql://user:secret@localhost:5432/dbname?sslmode=require&otheroption=123'", false,
-                "creativity-" + std::to_string(Random::seed()) + ".crstate", // default
-                "filename-or-database", cmd);
+        std::string default_output("creativity-" + std::to_string(Random::seed()) + ".crstate");
+        TCLAP::ValueArg<std::string> output_file("o", "output", "Output file "
+#ifndef CREATIVITY_SKIP_PGSQL
+                "(or database URL) "
+#endif
+                "for simulation results.  Default (which incorporates the random seed): " + default_output, false,
+                default_output, "filename"
+#ifndef CREATIVITY_SKIP_PGSQL
+                "-or-database"
+#endif
+                , cmd);
 
         TCLAP::SwitchArg overwrite_output_file("O", "overwrite", "Allows output file given to -o to be overwritten.  No effect if a database URL is given to -o.", cmd, false);
 
         RangeConstraint<unsigned int> max_threads_constr(0, std::thread::hardware_concurrency());
-        TCLAP::ValueArg<unsigned int> max_threads_arg("j", "threads", "Maximum number of threads to use for the simulation", false, 0, &max_threads_constr, cmd);
+        TCLAP::ValueArg<unsigned int> max_threads_arg("j", "threads", "Maximum number of threads to use for the simulation.  0 (the default) disables threading.", false, 0, &max_threads_constr, cmd);
 
         cmd.reverseHack();
 
@@ -237,6 +247,8 @@ int main(int argc, char *argv[]) {
     if (args.out.substr(0, 13) == "postgresql://" or args.out.substr(0, 11) == "postgres://") {
         try {
             creativity->pgsql(args.out, false /*read-only*/, true /*write-only*/);
+
+            // NB: the above throws if CREATIVITY_SKIP_PGSQL is set
 
 #ifndef CREATIVITY_SKIP_PGSQL
             PsqlStorage &pgsql = dynamic_cast<PsqlStorage&>(creativity->storage().first->backend());
