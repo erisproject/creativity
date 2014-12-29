@@ -11,8 +11,8 @@ namespace creativity { namespace belief {
 /** Extension to the base Linear class that supports prior restrictions on parameters via Monte
  * Carlo integration that rejects restricted draws.
  *
- * Single variable restrictions can be specified via the lowerBounds() and upperBounds() methods
- * while more general linear restrictions can be specified by calling addRestriction().
+ * Single variable restrictions can be specified via the lowerBound(), upperBound(), and restrict()
+ * methods while more general linear restrictions can be specified by calling addRestriction().
  *
  * This implementation simply calls the base Linear::draw() repeatedly until the base draw() method
  * returns an admissible value.  If the restrictions eliminate a significant portion of the
@@ -75,7 +75,7 @@ class LinearRestricted : public Linear {
          *
          * For example, to add the restriction \f$\beta_2 \geq 0\f$:
          * 
-         *     model.lowerBounds(2) = 0.0;
+         *     model.lowerBound(2) = 0.0;
          *
          * Warning: no checking is performed for the viability of specified bounds: specifying
          * conflicting upper and lower bounds (e.g. \f$\beta_2 \geq 3\f$ and \f$\beta_2 \leq 2\f$)
@@ -109,10 +109,12 @@ class LinearRestricted : public Linear {
 
         /** Adds a restriction of the form \f$R\beta \leq r\f$, where \f$R\f$ is a 1-by-`K()` row
          * vector selecting \f$\beta\f$ elements.  For example, to add a \f$\beta_2 \in [-1, 3.5]\f$
-         * restriction, either of the following two approaches can be used:
+         * restriction, any of the following two approaches can be used:
          *
-         *     model.upperBounds()[2] = 3.5;
-         *     model.lowerBounds()[2] = -1;
+         *     model.upperBound(2) = 3.5;
+         *     model.lowerBound(2) = -1;
+         *
+         *     model.restrict(2) >= -1 <= 3.5;
          *
          *     Eigen::RowVectorXd R = Eigen::RowVectorXd::Zero(K());
          *     R[2] = 1;
