@@ -48,50 +48,42 @@ class LinearRestricted : public Linear {
 
     protected:
         // forward declaration
-        class RestrictionProxyList;
+        class RestrictionProxy;
 
     public:
 
-        /** Returns a subscriptable object that allows assigning coefficient upper-bounds.  Indexed
-         * element `i` is the upper bound for `beta[i]`, for `i` values between 0 and K-1.
+        /** Returns a proxy object that allows assigning coefficient upper bounds.  Element `i` is
+         * the upper bound for `beta[i]`, for `i` values between 0 and K-1.
          *
          * For example, to add the restriction \f$\beta_2 \leq 5\f$:
          * 
-         *     model.upperBounds()[2] = 5.0;
-         *
-         * NaN and infinity (positive or negative) are treated as non-binding values.  The default
-         * for all parameters is std::numeric_limits<double>::quiet_NaN().  To remove a previously
-         * set restriction, set its value to NaN:
-         *
-         *     model.upperBounds()[2] = std::numeric_limits<double>::quiet_NaN();
+         *     model.upperBound(2) = 5.0;
          *
          * Warning: no checking is performed for the viability of specified bounds: specifying
          * conflicting upper and lower bounds (e.g. \f$\beta_2 \geq 3\f$ and \f$\beta_2 \leq 2\f$)
          * will result in draw() never returning, as will nonsensical restrictions such as \f$s^2
          * \leq 0\f$.
          */
-        RestrictionProxyList upperBounds();
+        RestrictionProxy upperBound(size_t k);
 
-        /** Returns a random access iterator (which can be dereferenced via subscripting) to the
-         * beginning of the vector of lower bounds for the \f$\beta\f$ parameters.  Element `i` is
-         * the lower bound for `beta[i]`, for `i` values between 0 and K-1, and is the upper bound
-         * for `s2` for `i=K`.
+        /** Const version of above. */
+        const RestrictionProxy upperBound(size_t k) const;
+
+        /** Returns a proxy object that allows assigning coefficient lower bounds.  Element `i` is
+         * the lower bound for `beta[i]`, for `i` values between 0 and K-1.
          *
          * For example, to add the restriction \f$\beta_2 \geq 0\f$:
          * 
-         *     model.lowerBounds()[2] = 0.0;
-         *
-         * NaN and infinity (positive or negative) are treated as non-binding values.  The default
-         * for all parameters is std::numeric_limits<double>::quiet_NaN().  To remove a previously
-         * set restriction, set its value to NaN:
-         *
-         *     model.lowerBounds()[2] = std::numeric_limits<double>::quiet_NaN();
+         *     model.lowerBounds(2) = 0.0;
          *
          * Warning: no checking is performed for the viability of specified bounds: specifying
          * conflicting upper and lower bounds (e.g. \f$\beta_2 \geq 3\f$ and \f$\beta_2 \leq 2\f$)
          * will result in draw() never returning.
          */
-        RestrictionProxyList lowerBounds();
+        RestrictionProxy lowerBound(size_t k);
+
+        /** Const version of above. */
+        const RestrictionProxy lowerBound(size_t k) const;
 
         /** Adds a restriction of the form \f$R\beta \leq r\f$, where \f$R\f$ is a 1-by-`K()` row
          * vector selecting \f$\beta\f$ elements.  For example, to add a \f$\beta_2 \in [-1, 3.5]\f$
@@ -221,12 +213,13 @@ class LinearRestricted : public Linear {
 
         /** Proxy object that converts assignments into restriction rows on the associated
          * LinearRestricted model.
+         *
+         * \sa upperBound()
+         * \sa lowerBound()
          */
         class RestrictionProxy final {
             public:
                 /** Adds a restriction on the referenced parameter.
-                 *
-                 * \sa RestrictionProxyList
                  */
                 RestrictionProxy& operator=(double r);
                 /** Returns true if there is a restriction of the appropriate type (upper- or
@@ -259,27 +252,24 @@ class LinearRestricted : public Linear {
                  * \param upper true if this is an upper bound, false if a lower bound
                  */
                 RestrictionProxy(LinearRestricted &lr, size_t k, bool upper);
-                friend class RestrictionProxyList;
+                friend class LinearRestricted;
                 LinearRestricted &lr_;
                 const size_t k_;
                 const bool upper_;
         };
-        /** Object returned by upperBounds() and lowerBounds() that provides subscript access to
-         * add individual parameter restrictions (via a RestrictionProxy object).
+
+        /** Returns true if there is a upper/lower-bound restriction on `beta[k]`.
+         *
+         * \sa RestrictionProxy::restricted()
          */
-        class RestrictionProxyList final {
-            public:
-                /** Creates and returns a RestrictionProxy object which can be assigned a double
-                 * value to add a restriction on the given parameter to the LinearRestricted model.
-                 */
-                RestrictionProxy operator[](size_t k);
-            private:
-                RestrictionProxyList(LinearRestricted &lr, bool upper);
-                friend class LinearRestricted;
-                LinearRestricted &lr_;
-                size_t k_;
-                bool upper_;
-        };
+        bool hasRestriction(size_t k, bool upper) const;
+
+        /** Returns the most-binding upper/lower-bound restriction on `beta[k]`, or NaN if `beta[k]`
+         * has no such restriction.
+         *
+         * \sa RestrictionProxy::operator double()
+         */
+        double getRestriction(size_t k, bool upper) const;
 
         /** Stores the coefficient selection matrix for arbitrary linear restrictions passed to
          * addRestriction() or addRestrictions(). Note that the only the first

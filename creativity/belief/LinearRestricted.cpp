@@ -7,12 +7,18 @@ using namespace Eigen;
 
 namespace creativity { namespace belief {
 
-LinearRestricted::RestrictionProxyList LinearRestricted::lowerBounds() {
-    return RestrictionProxyList(*this, false);
+LinearRestricted::RestrictionProxy LinearRestricted::lowerBound(size_t k) {
+    return RestrictionProxy(*this, k, false);
 }
-
-LinearRestricted::RestrictionProxyList LinearRestricted::upperBounds() {
-    return RestrictionProxyList(*this, true);
+const LinearRestricted::RestrictionProxy LinearRestricted::lowerBound(size_t k) const {
+    return RestrictionProxy(const_cast<LinearRestricted&>(*this), k, false);
+}
+LinearRestricted::RestrictionProxy LinearRestricted::upperBound(size_t k) {
+    return RestrictionProxy(*this, k, true);
+}
+const LinearRestricted::RestrictionProxy LinearRestricted::upperBound(size_t k) const {
+    return RestrictionProxy(const_cast<LinearRestricted&>(*this), k, true);
+}
 }
 
 void LinearRestricted::allocateRestrictions(size_t more) {
@@ -140,27 +146,14 @@ double LinearRestricted::predict(const Eigen::Ref<const Eigen::RowVectorXd> &Xi,
     return Xi * mean_beta_;
 }
 
-LinearRestricted::RestrictionProxy::RestrictionProxy(LinearRestricted &lr, size_t k, bool upper)
-    : lr_(lr), k_(k), upper_(upper)
-{}
-
-LinearRestricted::RestrictionProxyList::RestrictionProxyList(LinearRestricted &lr, bool upper)
-    : lr_(lr), upper_(upper)
-{}
-
-LinearRestricted::RestrictionProxy LinearRestricted::RestrictionProxyList::operator[](size_t k) {
-    if (k >= lr_.K()) throw std::out_of_range("LinearRestricted bound restriction: invalid coefficient index `" + std::to_string(k) + "'");
-    return std::move(RestrictionProxy(lr_, k, upper_));
-}
-
-bool LinearRestricted::RestrictionProxy::restricted() const {
-    for (size_t row = 0; row < lr_.restrict_size_; row++) {
+bool LinearRestricted::hasRestriction(size_t k, bool upper) const {
+    for (size_t row = 0; row < restrict_size_; row++) {
         // Only look at rows with a single non-zero coefficient:
-        if ((lr_.restrict_select_.row(row).array() != 0).count() != 1)
+        if ((restrict_select_.row(row).array() != 0).count() != 1)
             continue;
 
-        const double &coef = lr_.restrict_select_(row, k_);
-        if (upper_) {
+        const double &coef = restrict_select_(row, k);
+        if (upper) {
             if (coef > 0) return true;
         }
         else {
@@ -170,29 +163,40 @@ bool LinearRestricted::RestrictionProxy::restricted() const {
     return false;
 }
 
-LinearRestricted::RestrictionProxy::operator double() const {
+double LinearRestricted::getRestriction(size_t k, bool upper) const {
     double most_binding = std::numeric_limits<double>::quiet_NaN();
-    for (size_t row = 0; row < lr_.restrict_size_; row++) {
+    for (size_t row = 0; row < restrict_size_; row++) {
         // Only look at rows with a single non-zero coefficient:
-        if (lr_.restrict_select_.row(row).cwiseEqual(0).count() != lr_.K()-1)
+        if (restrict_select_.row(row).cwiseEqual(0).count() != K()-1)
             continue;
 
-        double &coef = lr_.restrict_select_(row, k_);
+        const double &coef = restrict_select_(row, k);
         if (coef == 0) continue;
-        if (upper_) {
+        if (upper) {
             if (coef > 0) {
-                double r = lr_.restrict_values_[row] / coef;
+                double r = restrict_values_[row] / coef;
                 if (std::isnan(most_binding) or r < most_binding) most_binding = r;
             }
         }
         else {
             if (coef < 0) {
-                double r = lr_.restrict_values_[row] / coef;
+                double r = restrict_values_[row] / coef;
                 if (std::isnan(most_binding) or r > most_binding) most_binding = r;
             }
         }
     }
     return most_binding;
+}
+
+LinearRestricted::RestrictionProxy::RestrictionProxy(LinearRestricted &lr, size_t k, bool upper)
+    : lr_(lr), k_(k), upper_(upper)
+{}
+
+bool LinearRestricted::RestrictionProxy::restricted() const {
+    return lr_.hasRestriction(k_, upper_);
+}
+LinearRestricted::RestrictionProxy::operator double() const {
+    return lr_.getRestriction(k_, upper_);
 }
 
 LinearRestricted::RestrictionProxy& LinearRestricted::RestrictionProxy::operator=(double r) {
