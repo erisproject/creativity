@@ -34,14 +34,6 @@ class ProfitStream : public LinearDerived<ProfitStream> {
          */
         ProfitStream() = default;
 
-        /** Constructs a ProfitStream with a weak prior for a model of `K` parameters.  This model
-         * will have `beta` set to `0` for the first `K-1` parameters and `1` for the last
-         * parameter; `s2` will be set to 1; `V` will be set to an identity matrix, and `n` will be
-         * set to `1e-6`, so as to make this an extremely weak prior when used for generating a
-         * posterior.
-         */
-        ProfitStream(unsigned int K);
-
         /** Constructs a ProfitStream object with the given parameter information.
          *
          * \param args a parameter pack to forward to the base Linear constructor.
