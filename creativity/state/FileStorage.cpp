@@ -354,7 +354,7 @@ void FileStorage::updateLibrary(const ReaderState &r) {
     lib_data *libd;
     try { libd = &reader_lib_.at(r.id); }
     catch (const std::out_of_range &e) {
-        throwParseError("Write failed: reader not found in library (perhaps readers aren't constant over sim periods?)");
+        return throwParseError("Write failed: reader not found in library (perhaps readers aren't constant over sim periods?)");
     }
     auto &lib = *libd;
     for (auto &l : r.library) {
