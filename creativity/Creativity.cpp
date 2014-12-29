@@ -130,7 +130,6 @@ void Creativity::setup() {
     for (unsigned int i = 0; i < parameters.readers; i++) {
         auto r = sim->spawn<Reader>(shared_from_this(),
                 Position{unif_pmb(rng), unif_pmb(rng)},
-                // (Nearly) non-informative priors for the rest:
                 parameters.cost_fixed, parameters.cost_unit, parameters.cost_piracy, parameters.income
                 );
         r->writer_book_sd = parameters.book_distance_sd;
