@@ -641,7 +641,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
     private:
         std::vector<double> u_poly_ = Reader::default_polynomial;
         std::vector<double> pen_poly_ = Reader::default_penalty_polynomial;
-        /// Map of books owned to {date,realized quality} of those books:
+        /// Map of books owned to properties of those books (in BookCopy container objects):
         std::unordered_map<eris::SharedMember<Book>, BookCopy> library_;
         /** Cache of quality predictions used so that quality(book) returns the same value if called
          * multiple times.  The cache is reset whenever the library or quality belief changes.
