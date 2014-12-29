@@ -83,6 +83,10 @@ class InfoWindow : public Gtk::Window {
          * is displayed; the upper-triangle values are set to blanks.
          */
         void updateMatrix(const std::string &code, const Ref<const MatrixXd> &m, bool lower_triangle = false);
+        /** Clears all values of a matrix set up with matrix_at, setting all values to the given
+         * value (defaulting to an empty string).
+         */
+        void clearMatrix(const std::string &code, const std::string &value = "");
 
     private:
         std::unordered_map<std::string, std::pair<Gtk::Label, Gtk::Label>> fields_;

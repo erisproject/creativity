@@ -323,6 +323,8 @@ void InfoWindow::refresh(std::shared_ptr<const State> state) {
             }
             else {
                 updateValue(code_prefix + "n", "0");
+                updateValue(code_prefix + "s2", "");
+                clearMatrix(code_prefix + "V");
                 for (size_t j = 0; j < a; j++)
                     updateValue(code_prefix + std::to_string(j), "");
             }
@@ -385,12 +387,15 @@ void InfoWindow::updateValue(const std::string &code, const std::string &val) {
 void InfoWindow::updateMatrix(const std::string &code, const Ref<const MatrixXd> &m, bool lower_triangle) {
     size_t pos = 0;
     auto &labels = matrix_[code];
-    for (int i = 0; i < m.rows(); i++) { for (int j = 0; j < m.cols(); j++) {
+    for (int i = 0; i < m.rows(); i++) for (int j = 0; j < m.cols(); j++) {
         if (pos >= labels.size()) return;
         labels[pos]->set_markup((lower_triangle and j > i) ? "" : std::to_string(m(i,j)));
         pos++;
-    }}
+    }
 }
 
+void InfoWindow::clearMatrix(const std::string &code, const std::string &value) {
+    for (auto &label : matrix_[code]) label->set_markup(value);
+}
 
 } }
