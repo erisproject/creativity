@@ -49,6 +49,7 @@ class LinearRestricted : public Linear {
     protected:
         // forward declaration
         class RestrictionProxy;
+        class RestrictionIneqProxy;
 
     public:
 
@@ -84,6 +85,27 @@ class LinearRestricted : public Linear {
 
         /** Const version of above. */
         const RestrictionProxy lowerBound(size_t k) const;
+
+        /** Returns a proxy object that allows adding both upper and lower bounds for an individual
+         * parameter.  Element `i` is the restriction object for `beta[i]`, for `i` values between 0
+         * and K-1.
+         *
+         * To add a restriction, use the <= or >= operator.
+         *
+         * For example, to add the restrictions \f$0 \leq \beta_2 \leq 5\f$:
+         *
+         *     model.restrict(2) >= 0;
+         *     model.restrict(2) <= 5;
+         *
+         * The restriction object's <= and >= operators return the object itself, so you can chain
+         * restrictions together, such as the following (equivalent to the above):
+         *
+         *     model.restrict(2) >= 0 <= 5;
+         */
+        RestrictionIneqProxy restrict(size_t k);
+
+        /** Const version of above. */
+        const RestrictionIneqProxy restrict(size_t k) const;
 
         /** Adds a restriction of the form \f$R\beta \leq r\f$, where \f$R\f$ is a 1-by-`K()` row
          * vector selecting \f$\beta\f$ elements.  For example, to add a \f$\beta_2 \in [-1, 3.5]\f$
@@ -256,6 +278,56 @@ class LinearRestricted : public Linear {
                 LinearRestricted &lr_;
                 const size_t k_;
                 const bool upper_;
+        };
+
+        /** Proxy object that converts <= and >= inequality operators into new restriction rows on
+         * the associated LinearRestricted model.
+         *
+         * \sa restrict()
+         */
+        class RestrictionIneqProxy final {
+            public:
+                /** Adds an upper-bound restriction on the referenced parameter.
+                 */
+                RestrictionIneqProxy& operator<=(double r);
+                /** Adds a lower-bound restriction on the referenced parameter.
+                 */
+                RestrictionIneqProxy& operator>=(double r);
+                /** Returns true if there is an upper-bound restriction on the associated parameter.
+                 * This method works whether the restriction was added via a proxy object or as a
+                 * single-parameter restriction given to addRestriction() (or variants).
+                 *
+                 * Specifically this looks for any restriction with a positive selector for the
+                 * requested coefficient and 0 for all other coefficient selectors.
+                 */
+                bool hasUpperBound() const;
+                /** Returns the most-binding upper-bound restriction on the associated parameter.
+                 * If the parameter has no upper-bound restrictions at all, returns NaN.
+                 */
+                double upperBound() const;
+                /** Returns true if there is an lower-bound restriction on the associated parameter.
+                 * This method works whether the restriction was added via a proxy object or as a
+                 * single-parameter restriction given to addRestriction() (or variants).
+                 *
+                 * Specifically this looks for any restriction with a negative selector for the
+                 * requested coefficient and 0 for all other coefficient selectors.
+                 */
+                bool hasLowerBound() const;
+                /** Returns the most-binding lower-bound restriction on the associated parameter.
+                 * If the parameter has no lower-bound restrictions at all, returns NaN.
+                 */
+                double lowerBound() const;
+            private:
+                /** Creates a new RestrictionProxy object that, when assigned to, adds an upper or
+                 * lower-bound restriction on beta[`k`].
+                 *
+                 * \param the LinearRestricted object where the restriction will be added;
+                 * \param k the parameter index
+                 */
+                RestrictionIneqProxy(LinearRestricted &lr, size_t k);
+                friend class LinearRestricted;
+                LinearRestricted &lr_;
+                const size_t k_;
         };
 
         /** Returns true if there is a upper/lower-bound restriction on `beta[k]`.

@@ -19,6 +19,11 @@ LinearRestricted::RestrictionProxy LinearRestricted::upperBound(size_t k) {
 const LinearRestricted::RestrictionProxy LinearRestricted::upperBound(size_t k) const {
     return RestrictionProxy(const_cast<LinearRestricted&>(*this), k, true);
 }
+LinearRestricted::RestrictionIneqProxy LinearRestricted::restrict(size_t k) {
+    return RestrictionIneqProxy(*this, k);
+}
+const LinearRestricted::RestrictionIneqProxy LinearRestricted::restrict(size_t k) const {
+    return RestrictionIneqProxy(const_cast<LinearRestricted&>(*this), k);
 }
 
 void LinearRestricted::allocateRestrictions(size_t more) {
@@ -208,6 +213,40 @@ LinearRestricted::RestrictionProxy& LinearRestricted::RestrictionProxy::operator
 
     lr_.addRestriction(R, r);
 
+    return *this;
+}
+
+LinearRestricted::RestrictionIneqProxy::RestrictionIneqProxy(LinearRestricted &lr, size_t k)
+    : lr_(lr), k_(k)
+{}
+
+bool LinearRestricted::RestrictionIneqProxy::hasUpperBound() const {
+    return lr_.hasRestriction(k_, true);
+}
+
+double LinearRestricted::RestrictionIneqProxy::upperBound() const {
+    return lr_.getRestriction(k_, true);
+}
+
+bool LinearRestricted::RestrictionIneqProxy::hasLowerBound() const {
+    return lr_.hasRestriction(k_, false);
+}
+
+double LinearRestricted::RestrictionIneqProxy::lowerBound() const {
+    return lr_.getRestriction(k_, false);
+}
+
+LinearRestricted::RestrictionIneqProxy& LinearRestricted::RestrictionIneqProxy::operator<=(double r) {
+    RowVectorXd R = RowVectorXd::Zero(lr_.K());
+    R[k_] = 1.0;
+    lr_.addRestriction(R, r);
+    return *this;
+}
+
+LinearRestricted::RestrictionIneqProxy& LinearRestricted::RestrictionIneqProxy::operator>=(double r) {
+    RowVectorXd R = RowVectorXd::Zero(lr_.K());
+    R[k_] = -1.0;
+    lr_.addRestriction(R, -r);
     return *this;
 }
 

@@ -64,10 +64,10 @@ class Demand : public LinearDerived<Demand, LinearRestricted> {
         : Parent(std::forward<Args>(args)...), D_{D}
         {
             // Add restrictions:
-            upperBounds()[1] = 0.0; // beta_price <= 0 (higher price <-> lower quantity)
-            lowerBounds()[3] = 0.0; // beta_q >= 0
-            upperBounds()[4] = 0.0; // beta_{q^2} <= 0
-            upperBounds()[9] = 0.0; // more competition <-> lower demand
+            restrict(1) <= 0.0; // beta_price <= 0 (higher price <-> lower quantity)
+            restrict(3) >= 0.0; // beta_q >= 0
+            restrict(4) <= 0.0; // beta_{q^2} <= 0
+            restrict(9) <= 0.0; // more competition <-> lower demand
         }
 
         /// Returns the number of parameters of this model
