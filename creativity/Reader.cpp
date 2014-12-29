@@ -253,7 +253,7 @@ void Reader::interOptimize() {
     if (income_available >= cost_fixed) {
         // Creating a book requires an ability to predict profit (to determine whether creation is
         // worthwhile), and an ability to predict demand (to determine the initial price)
-        if (usableBelief(profit_belief_) and usableBelief(demand_belief_)) { // NB: profit_belief_extrap_ is an update of profit_belief_, so will also be usable
+        if (usableBelief(profit_belief_) and usableBelief(demand_belief_)) { // NB: profit_belief_extrap_ is a copy or update of profit_belief_, so will also be usable
             // Create a book if E(profit) > effort required
 
             // Find the l that maximizes creation profit given current wealth (which would have come from
@@ -262,31 +262,25 @@ void Reader::interOptimize() {
 
             // FIXME: is this right, w.r.t. Bayesian MC prediction?  (Is averaging being done too
             // early?)
-            double l_max = profit_belief_extrap_.argmaxL(
+            double effort = profit_belief_extrap_.argmaxL(
                     [this] (double l) -> double { return creationQuality(l); },
-                    previous_books, market_books, assets()[creativity_->money] + income - cost_fixed
+                    previous_books, market_books, income_available - cost_fixed
                     );
-            ERIS_DBGVAR(id());
-            ERIS_DBGVAR(l_max);
-            double quality = creationQuality(l_max);
-            ERIS_DBGVAR(quality);
+            double quality = creationQuality(effort);
 
-            double exp_profit = profit_belief_.predict(quality, previous_books, market_books);
-            ERIS_DBGVAR(exp_profit);
+            double exp_profit = profit_belief_extrap_.predict(quality, previous_books, market_books);
 
             // If the optimal effort level gives a book with positive expected profits, do it:
-            if (l_max < exp_profit) {
-                ERIS_DBG("CREATING! =)");
+            if (exp_profit > effort) {
                 // We're going to create, so calculate the optimal first-period price.  It's possible that
                 // we get back cost_unit (and so predicted profit is non-positive); write the book anyway:
                 // perhaps profits are expected to come in later periods?
                 auto max = demand_belief_.argmaxP(quality, 0, previous_books, market_books, cost_unit);
                 create_price_ = max.first;
                 create_quality_ = quality;
-                create_effort_ = l_max;
+                create_effort_ = effort;
                 create_ = true;
             }
-            else ERIS_DBG("not creating. :(");
         }
         else {
             // If we have no useful profit belief yet, just use the initial values:
@@ -299,7 +293,6 @@ void Reader::interOptimize() {
                     create_price_ = std::uniform_real_distribution<double>(creativity_->parameters.initial.p_min, creativity_->parameters.initial.p_max)(rng);
                     create_quality_ = q;
                     create_effort_ = effort;
-                    ERIS_DBG(id() << " creating (via initial parameters) at q=" << q << ", l=" << effort <<", p=" << create_price_);
                 }
             }
         }
@@ -493,27 +486,38 @@ void Reader::updateDemandBelief() {
 }
 void Reader::updateProfitStreamBelief() {
     // Map book age into lists of books that survived on the market at least that long.  Only books
-    // that have left the market are considered.  Note that being added here doesn't mean the book
-    // *just* left the market: it might have just left, but it also might be a pirated book that
-    // left the market a long time ago.
+    // that have just left the market are considered (whether or not this reader bought or obtained
+    // by piracy).
     std::map<unsigned int, std::vector<SharedMember<Book>>> to_learn;
     for (auto &bu : library_unlearned_) {
         auto &book = bu.first;
-        if (not book->hasMarket()) {
+        if (not book->hasMarket()) { // The last time we checked, it had a market, so it just left
             unsigned long periods = book->marketPeriods();
+            if (periods <= 1) continue; // We can't do anything with a single-period book
+
             // We only look for the predefined age values, and only include books with
             // marketPeriods() strictly greater than the predefined age values (because a book on
             // the market for x periods can only contribute to models with (x-1) past profit
             // variables.
             //
             // However, it's possible that the book was kept on the market for too long (i.e. it had
-            // no sales on the last 2+ periods), so reduce `periods` until either the last or
-            // second-last referenced period had positive sales.  (The last having zero sales is
-            // fine, because it will be the dependent variable for the model including the
-            // second-last).
+            // negative profits in the last 2+ periods), so reduce `periods` until either the last or
+            // second-last referenced period had positive profits.  (The last having negative
+            // profits is fine, because it will be the dependent variable for the model which only
+            // goes up to the second-last, and we want the model to be able to predict the *first*
+            // period the remaining profit becomes negative).
+            //
+            // Note that "profits" here are calculated as what profits would be with *this* reader's
+            // fixed and unit costs, even if the actual author has different costs.  This is because
+            // this belief is for predicting what the profit stream would have been for *this* reader.
             const unsigned long &created = book->created();
-            while (periods > 1 and book->sales(created + periods - 1) == 0 and book->sales(created + periods - 2) == 0)
+            double last_profit = book->revenue(created+periods-1) - cost_fixed - cost_unit*book->sales(created+periods-1);
+            double second_last_profit = book->revenue(created+periods-2) - cost_fixed - cost_unit*book->sales(created+periods-2);
+            while (periods > 1 and last_profit <= 0 and second_last_profit <= 0) {
                 periods--;
+                last_profit = second_last_profit;
+                second_last_profit = book->revenue(created+periods-2) - cost_fixed - cost_unit*book->sales(created+periods-2);
+            }
 
             // If there weren't at least 2 meaningful sales periods, we can't use this book to infer
             // anything.
@@ -546,6 +550,7 @@ void Reader::updateProfitStreamBelief() {
         MatrixXd X(learn.second.size(), age);
 
         size_t row = 0;
+/*
         for (auto &book : learn.second) {
             double cumul_rev = 0;
             const unsigned long &created = book->created();
@@ -557,13 +562,43 @@ void Reader::updateProfitStreamBelief() {
             y[row] = book->lifeRevenue() - cumul_rev;
             row++;
         }
+*/
+        for (auto &book : learn.second) {
+            double total_profit = 0;
+            // Figure out total profit for the book, but skip any trailing negative profit periods
+            // In other words, figure out profits under the optimal removal decision.
+            eris_time_t last_profit_t = 0; // Will be > 0 once we've figured it out
+            for (auto t = book->outOfPrint()-1; t >= book->created(); t--) {
+                double prof_t = book->revenue(t) - cost_fixed - cost_unit * book->sales(t);
+                if (last_profit_t == 0) {
+                    if (prof_t <= 0) continue;
+                    // Else this book had positive profits in t, so stop skipping
+                    last_profit_t = t;
+                }
+                total_profit += prof_t;
+            }
 
-        // Create a new belief of the given size if none exists yet
+            double cumul_profit = 0;
+            const unsigned long &created = book->created();
+            for (unsigned int i = 0; i < age; i++) {
+                eris_time_t t = created + i;
+                double prof_t = book->revenue(t) - cost_fixed - cost_unit * book->sales(t);
+                X(row, i) = prof_t;
+                cumul_profit += prof_t;
+            }
+            // Handle the special case described above where the last period is negative but the second
+            // last is positive; in such a case, total_profit == cumul_profit, but we actually want
+            // to use the final negative profit value instead of 0.  Otherwise, we want the
+            // difference between total_profit and cumul_profit (== profit remaining).
+            if (last_profit_t == created + age - 1)
+                y[row] = book->revenue(created+age-1) - cost_fixed - cost_unit*book->sales(created+age-1);
+            else
+                y[row] = total_profit - cumul_profit;
+            row++;
+        }
+
+        // Create a new non-informative belief of the given size if none exists yet
         if (profit_stream_beliefs_.count(age) == 0) {
-            // We'll just use a highly noninformative prior, so the update below will determine
-            // almost everything.
-            VectorXd beta = VectorXd::Zero(age, 1);
-
             profit_stream_beliefs_.emplace(age, age);
         }
 
@@ -596,7 +631,25 @@ void Reader::updateProfitBelief() {
 
         size_t i = 0;
         for (auto &bc : new_prof_books) {
-            y[i] = bc.first->lifeRevenue();
+            auto &book = bc.first;
+            // Calculate the book's total (optimal) profit, ignoring trailing negative profit
+            // periods (which would be non-optimal for this reader (and probably for the actual
+            // author, though not necessarily because the actual author might have different
+            // costs)).
+            double profit_total = 0;
+            for (auto t = book->outOfPrint()-1; t >= book->created(); t--) {
+                double prof_t = book->revenue(t) - cost_fixed - cost_unit * book->sales(t);
+                profit_total += prof_t;
+                if (profit_total < 0) {
+                    // Total profit is negative, which means that keeping the book past this point
+                    // was non-optimal, so reset to 0 (i.e. don't count profits from this point on).
+                    // This only happens when the period's profits are negative, but doesn't
+                    // *necessarily* happen in such a case: it could also be that negative profits
+                    // are followed by larger, positive profits.
+                    profit_total = 0;
+                }
+            }
+            y[i] = profit_total;
             X.row(i) = profit_belief_.profitRow(bc.first, bc.second.get().quality);
             i++;
         }
@@ -771,13 +824,16 @@ void Reader::intraOptimize() {
 }
 void Reader::intraApply() {
     auto lock = writeLock();
+    // Apply the reserved transactions (i.e. pay for book copies and receive the book)
     for (auto &res : reservations_) {
         res->buy();
     }
+    // Also remove any cost associated with obtaining pirated copies of books:
     assets()[creativity_->money] -= reserved_piracy_cost_;
     reserved_piracy_cost_ = 0.0;
     reservations_.clear();
 
+    // Reset the "new" books list to the set of just-bought and just-pirated books
     library_new_.clear();
 
     for (auto &new_book : reserved_books_) {
@@ -788,12 +844,18 @@ void Reader::intraApply() {
                 SharedMember<Book>(book),
                 BookCopy(book->qualityDraw(), pirated ? BookCopy::Status::pirated : BookCopy::Status::purchased, simulation()->t()));
 
-        library_unlearned_.emplace(book, std::ref(inserted.first->second));
+        // If the book is still on the market (which it must be if we just bought it, and might be
+        // if we just pirated it), stash a copy in library_unlearned_ so that it will (eventually)
+        // get incorporated into profit stream beliefs.
+        if (book->hasMarket())
+            library_unlearned_.emplace(book, std::ref(inserted.first->second));
+
+        // And it's always considered a "new" (to us) book, so stash it there:
         library_new_.emplace(book, std::ref(inserted.first->second));
-        if (pirated) {
-            book->recordPiracy(1);
-        }
-        //else {} -- // book->recordSale not needed here: it's called during the BookMarket transaction
+
+        // If we obtained a pirated book, record that in the base book metadata:
+        if (pirated) book->recordPiracy(1);
+        //else {} -- // book->recordSale() not needed here: it's called during the BookMarket transaction
     }
     reserved_books_.clear();
 

@@ -80,9 +80,25 @@ class Creativity;
  * ---------------
  * Readers have a belief about the lifetime profitability of a single book which depends on various
  * author attributes and the book quality.  This belief is updated based on all books this Reader
- * has obtained plus his own previous books (if any).
+ * has obtained plus his own previous books (if any).  This is not *directly* used for prediction:
+ * instead prediction uses the extrapolated beliefs, below, which incorporate profit predictions for
+ * still-on-market books.
  * 
  * See creativity::belief::Profit for details.
+ *
+ * Lifetime profit (extrapolated)
+ * ------------------------------
+ * This is identical to the lifetime profit belief, above, but also includes predicted profit levels
+ * of books that are still on the market (and hence have unknown final profit).  This belief is
+ * discarded when advancing to the next period: the extrapolated belief is rebuilt from the next
+ * period's updated profit belief.
+ *
+ * Profit stream beliefs
+ * ---------------------
+ * The reader has beliefs for books of various ages.  These stream beliefs are used to supplement
+ * the lifetime profit with predictions for books still on the market in the extrapolated belief.
+ *
+ * See creativity::belief::ProfitStream for details.
  *
  * Per-period demand
  * -----------------
@@ -568,7 +584,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         belief::Quality quality_belief_; ///< Belief about book quality
         /** Profit stream beliefs for books on market for various lengths of time.  E.g.
          * `profit_stream_beliefs_[3]` is the model of future profits for books that stayed on the
-         * market for at least 3 periods.
+         * market for at least 3 periods.  Used to build profit_belief_extrap_.
          */
         std::map<unsigned int, belief::ProfitStream> profit_stream_beliefs_;
 
@@ -650,8 +666,8 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         std::unordered_map<eris::SharedMember<Book>, std::reference_wrapper<BookCopy>>
             /// Books obtained in the just-finished period
             library_new_,
-            /** Set of books that haven't been used for learning yet (either because they are still
-             * on the market, or because they were just pirated). */
+            /** Set of books that haven't been used for learning yet (because they are still
+             * on the market, or have just left the market). */
             library_unlearned_;
 
         std::unordered_set<eris::SharedMember<Book>>
