@@ -1,6 +1,6 @@
 #pragma once
 #ifdef CREATIVITY_SKIP_PGSQL
-#error Error: building without PsqlStorage
+#error Error: building without PsqlStorage, but PsqlStorage.hpp was included
 #endif
 #include "creativity/state/StorageBackend.hpp"
 #include <vector>
