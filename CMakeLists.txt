@@ -32,8 +32,15 @@ set(creativity_pkgconfig_PQXX libpqxx)
 
 # pkg-config required packages for libcreativity.so:
 set(creativity_pkgconfig ERIS)
-# required packages for libcreativitygui.so:
-set(creativity_gui_pkgconfig GTKMM)
+
+option(GUI "Enable gtkmm GUI interface" ON)
+if (GUI)
+    # required packages for libcreativitygui.so:
+    set(creativity_gui_pkgconfig GTKMM)
+else()
+    message(STATUS "GUI disabled.")
+    add_definitions("-DCREATIVITY_SKIP_GUI")
+endif()
 
 option(PGSQL "Enable PostgreSQL support" OFF)
 if (PGSQL)
@@ -83,18 +90,9 @@ configure_file(${CMAKE_SOURCE_DIR}/creativity/config.hpp.in
 include_directories(${CMAKE_BINARY_DIR})
 
 add_library(creativity SHARED ${cr_libsrc})
-add_library(creativitygui SHARED ${cr_gui_libsrc})
 foreach(pkg ${creativity_pkgconfig})
     target_link_libraries(creativity ${${pkg}_LIBRARIES})
 endforeach()
-foreach(pkg ${creativity_gui_pkgconfig})
-    target_link_libraries(creativitygui ${${pkg}_LIBRARIES})
-endforeach()
-
-target_link_libraries(creativitygui creativity)
-
-add_executable(creativity-gui gui.cpp)
-target_link_libraries(creativity-gui creativitygui)
 
 add_executable(creativity-cli cli.cpp)
 target_link_libraries(creativity-cli creativity)
@@ -102,12 +100,24 @@ target_link_libraries(creativity-cli creativity)
 add_executable(creativity-info info.cpp)
 target_link_libraries(creativity-info creativity)
 
-# Copy the glade and icon to the install datadir
-install(FILES gui.glade creativity.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/creativity/)
+if (GUI)
+    add_library(creativitygui SHARED ${cr_gui_libsrc})
+    foreach(pkg ${creativity_gui_pkgconfig})
+        target_link_libraries(creativitygui ${${pkg}_LIBRARIES})
+    endforeach()
 
-# Also copy them into the build dir (so that running ./creativity-gui from build/ works)
-configure_file(gui.glade ${CMAKE_BINARY_DIR}/gui.glade COPYONLY)
-configure_file(creativity.svg ${CMAKE_BINARY_DIR}/creativity.svg COPYONLY)
+    target_link_libraries(creativitygui creativity)
+
+    add_executable(creativity-gui gui.cpp)
+    target_link_libraries(creativity-gui creativitygui)
+
+    # Copy the glade and icon to the install datadir
+    install(FILES gui.glade creativity.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/creativity/)
+
+    # Also copy them into the build dir (so that running ./creativity-gui from build/ works)
+    configure_file(gui.glade ${CMAKE_BINARY_DIR}/gui.glade COPYONLY)
+    configure_file(creativity.svg ${CMAKE_BINARY_DIR}/creativity.svg COPYONLY)
+endif()
 
 add_subdirectory(doc)
 
