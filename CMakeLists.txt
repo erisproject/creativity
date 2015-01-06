@@ -35,11 +35,12 @@ set(creativity_pkgconfig ERIS)
 # required packages for libcreativitygui.so:
 set(creativity_gui_pkgconfig GTKMM)
 
-option(PGSQL "Enable postgresql support" ON)
+option(PGSQL "Enable PostgreSQL support" OFF)
 if (PGSQL)
     list(APPEND creativity_pkgconfig PQXX)
 else()
-    add_definitions("-DCREATITIVY_SKIP_PGSQL")
+    message(STATUS "PostgreSQL support disabled.")
+    add_definitions("-DCREATIVITY_SKIP_PGSQL")
 endif()
 
 foreach(pkg ${creativity_pkgconfig} ${creativity_gui_pkgconfig})
