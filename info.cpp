@@ -13,8 +13,12 @@ using namespace Eigen;
 int main(int argc, char *argv[]) {
     if (argc != 2) {
         std::cerr << "Usage: " << argv[0] << " DATASOURCE -- print simulation summary information\n\n";
+#ifndef CREATIVITY_SKIP_PGSQL
+        std::cerr << "DATASOURCE should be a filename (typically a .crstate file)\n";
+#else
         std::cerr << "DATASOURCE can be a filename (typically a .crstate file), or a database URL,\n";
         std::cerr << "for example: 'postgresql://user:secret@localhost:5432/dbname?sslmode=require&creativity=123'\n\n\n";
+#endif
         exit(1);
     }
 
