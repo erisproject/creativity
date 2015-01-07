@@ -1,34 +1,8 @@
-/** \file This script is a wrapper around creativity-cli that allows argument values to be drawn
- * from distributions.  In particular, it looks for any arguments of the following forms:
- *
- *     U[a,b] - draws a uniformly distributed double from [a, b)
- *     iU[a,b] - draws a uniformly distributed integer from [a,b]
- *     N(m,sd) - draws a normally distributed double with mean m and standard deviation sd
- *     N(m,sd)[a,b] - draws a normally distributed double, truncated to the range [a, b].  The value
- *       is redrawn until a value in the range is found.  'a' or 'b' can be omitted to not specify
- *       an lower or upper bound, respectively.
- *     N(m,sd)+ - equivalent to N(m,sd)[0,].
- *     iN(m,sd) - like N(m,sd), but rounds the drawn value to the nearest integer.
- *     iN(m,sd)[a,b] - Like N(m,sd), but rounds the drawn value to the nearest integer, and repeats
- *       until a value in [a,b] is found.
- *
- * Any other argument is left as is.
- *
- * Thus you can run:
- *
- *     ./creativity-random -D 2 -r 'iN(100,25)[50,150]' -f 'U[0.01,0.25]' -Q 'N(0,1)+'
- *
- * which would take the appropriate draws and could, for example, execute the following:
- *
- *     ./creativity-cli -D 2 -r 105 -f 0.19650807491555314 -Q 0.86839032695624874
- *
- * Note that if ERIS_RNG_SEED is set, the given seed is used for *both* the creativity-random and
- * creativity-cli processes.
- */
 #include <eris/Random.hpp>
 #include <regex>
 #include <functional>
 #include <string>
+#include <sstream>
 #include <iomanip>
 #include <iostream>
 #include <cstring>
@@ -37,6 +11,36 @@
 extern "C" {
 #include <unistd.h>
 }
+
+const std::string help_message = u8R"(
+This script is a wrapper around creativity-cli that allows argument values to be drawn from
+distributions.  In particular, it looks for any arguments of the following forms:
+
+    U[a,b] - draws a uniformly distributed double from [a, b)
+    iU[a,b] - draws a uniformly distributed integer from [a,b]
+    N(m,sd) - draws a normally distributed double with mean m and standard deviation sd
+    N(m,sd)[a,b] - draws a normally distributed double, truncated to the range [a, b].  The value is
+                   redrawn until a value in the range is found.  'a' or 'b' can be omitted to not
+                   specify an lower or upper bound, respectively.
+    N(m,sd)+ - equivalent to N(m,sd)[0,].
+    iN(m,sd) - like N(m,sd), but rounds the drawn value to the nearest integer.
+    iN(m,sd)[a,b] - Like N(m,sd), but rounds the drawn value to the nearest integer, and repeats
+                    until a (rounded) value in [a,b] is found.
+
+Any other argument is passed through as is.
+
+Example:
+
+    ./creativity-random -D 2 -r 'iN(100,25)[50,150]' -f 'U[0.01,0.25]' -Q 'N(0,1)+'
+
+which would take the appropriate draws and could, for example, execute the following:
+
+    ./creativity-cli -D 2 -r 105 -f 0.19650807491555314 -Q 0.86839032695624874
+
+Note that if ERIS_RNG_SEED is set, the given seed is used (independently) for *both* the
+creativity-random and creativity-cli processes.
+)";
+
 
 const std::string
     re_double("[-+]?[0-9]*\\.?[0-9]+(?:[eE][-+]?[0-9]+)?"),
@@ -114,10 +118,12 @@ int main (int argc, char* argv[]) {
 
     auto try_match = load_patterns();
 
+    bool help = false;
     std::vector<std::string> args;
     args.reserve(argc-1);
     for (int i = 1; i < argc; i++) args.push_back(argv[i]);
     for (auto &arg : args) {
+        if (arg == "--help") help = true;
         for (auto &p : try_match) {
             std::smatch match_res;
             if (std::regex_match(arg, match_res, p.first)) {
@@ -132,6 +138,11 @@ int main (int argc, char* argv[]) {
     cli_argv.push_back(const_cast<char*>(cli.c_str()));
     for (auto &arg : args) cli_argv.push_back(const_cast<char*>(arg.c_str()));
     cli_argv.push_back(nullptr);
+
+    // --help gets passed through, but we *also* handle it by printing help for creativity-random
+    if (help) {
+        std::cout << "USAGE: " << argv[0] << " ARG ...\n" << help_message << "\n";
+    }
 
     std::cout << "Executing";
     for (auto &argv : cli_argv) if (argv) std::cout << " " << argv;
