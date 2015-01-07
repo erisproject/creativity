@@ -290,7 +290,7 @@ void Reader::interOptimize() {
                 // Make sure the required effort doesn't exceed the available funds
                 if (income_available >= cost_fixed + effort) {
                     create_ = true;
-                    create_price_ = std::uniform_real_distribution<double>(creativity_->parameters.initial.p_min, creativity_->parameters.initial.p_max)(rng);
+                    create_price_ = cost_unit + std::uniform_real_distribution<double>(creativity_->parameters.initial.p_min, creativity_->parameters.initial.p_max)(rng);
                     create_quality_ = q;
                     create_effort_ = effort;
                 }

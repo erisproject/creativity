@@ -915,7 +915,7 @@
                                               <object class="GtkSpinButton" id="set_init_p_min">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
-                                                <property name="tooltip_text" translatable="yes">The distribution of the initial price an authored book (before Demand belief is informed).</property>
+                                                <property name="tooltip_text" translatable="yes">The distribution of the initial price above marginal cost of an authored book (before Demand belief is informed).</property>
                                                 <property name="margin_bottom">1</property>
                                                 <property name="adjustment">adj_p_min</property>
                                                 <property name="digits">2</property>
@@ -930,7 +930,7 @@
                                               <object class="GtkSpinButton" id="set_init_p_max">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
-                                                <property name="tooltip_text" translatable="yes">The distribution of the initial price an authored book (before Demand belief is informed).</property>
+                                                <property name="tooltip_text" translatable="yes">The distribution of the initial price above marginal cost of an authored book (before Demand belief is informed).</property>
                                                 <property name="margin_bottom">1</property>
                                                 <property name="adjustment">adj_p_max</property>
                                                 <property name="digits">2</property>

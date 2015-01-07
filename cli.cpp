@@ -160,8 +160,8 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         OPTION_BOUND_INIT(prob_write, "x", "initial-prob-write", "The probability of writing in initial periods", 0, 1);
         OPTION_LBOUND_INIT(q_min, "m", "initial-quality-min", "The minimum support of quality q ~ U[a,b] for authored books in initial periods", 0);
         OPTION_LBOUND_INIT(q_max, "M", "initial-quality-max", "The maximum support of quality q ~ U[a,b] for authored books in initial periods", 0);
-        OPTION_LBOUND_INIT(p_min, "n", "initial-price-min", "The minimum support of price p ~ U[a,b] for new books in initial periods", 0);
-        OPTION_LBOUND_INIT(p_max, "N", "initial-price-max", "The maximum support of price p ~ U[a,b] for new books in initial periods", 0);
+        OPTION_LBOUND_INIT(p_min, "n", "initial-price-min", "The minimum support of price c + U[a,b] for new books in initial periods", 0);
+        OPTION_LBOUND_INIT(p_max, "N", "initial-price-max", "The maximum support of price c + U[a,b] for new books in initial periods", 0);
         OPTION_BOUND_INIT(prob_keep, "k", "initial-prob-keep", "The probability of keeping a previously-written book on the market for another period", 0, 1);
         OPTION_BOUND_INIT(keep_price, "K", "keep-price", "The  price-above-marginal-cost level (relative to current P-MC) for a book left on the market for another period", 0, 1);
 

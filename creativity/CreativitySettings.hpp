@@ -136,9 +136,9 @@ struct CreativitySettings {
         /** Initial book qualities are distributed Uniform[`q_min`, `q_max`].  Uninformed readers
          * draw from this same distribution when guessing quality. */
         double q_max = 10.0;
-        /** Initial book prices are distributed Uniform[`p_min`, `p_max`] */
-        double p_min = 2.0;
-        /** Initial book prices are distributed Uniform[`p_min`, `p_max`] */
+        /** Initial book prices are distributed `cost_unit +` Uniform[`p_min`, `p_max`] */
+        double p_min = 0.5;
+        /** Initial book prices are distributed `cost_unit +` Uniform[`p_min`, `p_max`] */
         double p_max = 5.0;
         /** The probability of a book being kept on the market for another period. */
         double prob_keep = 0.5;
