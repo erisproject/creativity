@@ -168,12 +168,12 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         auto periods_constr = RangeConstraint<unsigned int>::GE(0);
         TCLAP::ValueArg<unsigned int> periods_arg("T", "periods", "Number of simulation periods to run.  Default: 200.", false, 200, &periods_constr, cmd);
 
-        std::string default_output("creativity-" + std::to_string(Random::seed()) + ".crstate");
+        std::string default_output("creativity-SEED.crstate");
         TCLAP::ValueArg<std::string> output_file("o", "output", "Output file "
 #ifndef CREATIVITY_SKIP_PGSQL
                 "(or database URL) "
 #endif
-                "for simulation results.  Default (which incorporates the random seed): " + default_output, false,
+                "for simulation results.  If found, SEED will be replaced with the random seed value.  Default: " + default_output, false,
                 default_output, "filename"
 #ifndef CREATIVITY_SKIP_PGSQL
                 "-or-database"
@@ -220,7 +220,7 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         cmd_args ret;
         ret.periods = periods_arg.getValue();
         ret.max_threads = max_threads_arg.getValue();
-        ret.out = output_file.getValue();
+        ret.out = std::regex_replace(output_file.getValue(), std::regex("SEED"), std::to_string(Random::seed()));
         ret.overwrite = overwrite_output_file.getValue();
 
         return ret;
