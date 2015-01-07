@@ -116,9 +116,6 @@ class FileStorage final : public StorageBackend {
          */
         mutable std::mutex f_mutex_;
 
-        /// Thread writer loop; runs forever (until destruction).
-        void thread_writer_();
-
         /// Storage for header data parsing when opening the file, and after writing settings.
         CreativitySettings settings_;
 
