@@ -33,6 +33,14 @@ set(creativity_pkgconfig_PQXX libpqxx)
 # pkg-config required packages for libcreativity.so:
 set(creativity_pkgconfig ERIS)
 
+option(DEBUG "Enable debugging output" OFF)
+if (DEBUG)
+    message(STATUS "Debugging enabled.")
+    add_definitions("-DERIS_DEBUG")
+else()
+    message(STATUS "Debugging disabled.")
+endif()
+
 option(GUI "Enable gtkmm GUI interface" ON)
 if (GUI)
     # required packages for libcreativitygui.so:
