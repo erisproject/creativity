@@ -159,7 +159,7 @@ double Reader::creationEffort(double quality) const {
 }
 
 double Reader::piracyCost() const {
-    return creativity_->parameters.cost_unit;
+    return creativity_->parameters.cost_piracy;
 }
 
 const std::unordered_set<SharedMember<Reader>>& Reader::friends() const {
