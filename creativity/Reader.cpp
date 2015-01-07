@@ -401,7 +401,8 @@ const std::unordered_map<SharedMember<Book>, BookCopy>& Reader::library() const 
 
 void Reader::receiveProceeds(const SharedMember<Book> &book, const Bundle &revenue) {
     assets() += revenue;
-    assets()[creativity_->money] -= book->currSales() * cost_unit;
+    Bundle tvc(creativity_->money, book->currSales() * cost_unit);
+    tvc.transferApprox(tvc, assets());
 }
 
 const belief::Profit& Reader::profitBelief() const { return profit_belief_; }
