@@ -100,6 +100,9 @@ target_link_libraries(creativity-cli creativity)
 add_executable(creativity-info info.cpp)
 target_link_libraries(creativity-info creativity)
 
+add_executable(creativity-random random.cpp)
+target_link_libraries(creativity-random ${ERIS_LIBRARIES})
+
 if (GUI)
     add_library(creativitygui SHARED ${cr_gui_libsrc})
     foreach(pkg ${creativity_gui_pkgconfig})
