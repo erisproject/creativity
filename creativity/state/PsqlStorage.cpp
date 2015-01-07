@@ -63,7 +63,9 @@ void PsqlStorage::initialConnection() {
 }
 
 void PsqlStorage::writeSettings(const CreativitySettings &settings) {
+#ifndef CREATIVITY_DISABLE_THREADED_STORAGE
     std::unique_lock<std::mutex> lock(conn_mutex_);
+#endif
     pqxx::work trans(*conn_);
     std::string prepst(have_settings ? "update_setting" : "insert_setting");
     trans.prepared(prepst)(id)("dimensions")()(settings.dimensions).exec();
@@ -97,7 +99,9 @@ void PsqlStorage::writeSettings(const CreativitySettings &settings) {
 }
 
 void PsqlStorage::readSettings(CreativitySettings &settings) const {
+#ifndef CREATIVITY_DISABLE_THREADED_STORAGE
     std::unique_lock<std::mutex> lock(conn_mutex_);
+#endif
     if (not have_settings) return;
     pqxx::work trans(*conn_);
     auto res = trans.prepared("get_settings")(id).exec();
@@ -138,7 +142,9 @@ void PsqlStorage::readSettings(CreativitySettings &settings) const {
 }
 
 size_t PsqlStorage::size() const {
+#ifndef CREATIVITY_DISABLE_THREADED_STORAGE
     std::unique_lock<std::mutex> lock(conn_mutex_);
+#endif
     pqxx::work trans(*conn_);
     size_t s = trans.prepared("num_states")(id).exec()[0][0].as<size_t>();
     trans.commit();
@@ -146,7 +152,9 @@ size_t PsqlStorage::size() const {
 }
 
 void PsqlStorage::thread_insert(std::shared_ptr<const State> &&state) {
+#ifndef CREATIVITY_DISABLE_THREADED_STORAGE
     std::unique_lock<std::mutex> lock(conn_mutex_);
+#endif
     pqxx::work trans(*conn_);
     trans.prepared("insert_state")(id)(state->t).exec();
     int32_t state_id = trans.prepared("lastval").exec()[0][0].as<int32_t>();
@@ -165,7 +173,9 @@ void PsqlStorage::thread_insert(std::shared_ptr<const State> &&state) {
 }
 
 std::shared_ptr<const State> PsqlStorage::load(eris_time_t t) const {
+#ifndef CREATIVITY_DISABLE_THREADED_STORAGE
     std::unique_lock<std::mutex> lock(conn_mutex_);
+#endif
     std::shared_ptr<const State> ret;
     State *st_ptr = new State();
     State &state = *st_ptr;
@@ -375,7 +385,11 @@ std::vector<double> PsqlStorage::parseDoubleArray(const std::string &doubles, in
 std::pair<pqxx::connection&, std::unique_lock<std::mutex>> PsqlStorage::connection() {
     return std::pair<pqxx::connection&, std::unique_lock<std::mutex>>(
             std::ref(*conn_),
-            std::unique_lock<std::mutex>(conn_mutex_));
+            std::unique_lock<std::mutex>(
+#ifndef CREATIVITY_DISABLE_THREADED_STORAGE
+                conn_mutex_
+#endif
+                ));
 }
 
 }}

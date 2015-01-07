@@ -20,8 +20,8 @@ namespace creativity { namespace state {
  * the PsqlStorage object after such an exception is thrown as the result is unpredictable: the
  * object could fail to write new data or could write data inconsistently.
  *
- * This object is also not thread-safe on its own: you must ensure that only one thread at a time
- * accesses it, even for read-only methods.
+ * This object is also not externally thread-safe on its own: you must ensure that only one thread
+ * at a time accesses it, even for read-only methods.
  *
  * See database.pgsql included in the creativity distribution for the required table structure.
  */
@@ -99,8 +99,10 @@ class PsqlStorage : public StorageBackend {
         /** The file buffer object. Mutable because we need to read from it in const methods. */
         mutable std::unique_ptr<pqxx::connection> conn_;
 
+#ifndef CREATIVITY_DISABLE_THREADED_STORAGE
         /** Mutex guarding conn_. */
         mutable std::mutex conn_mutex_;
+#endif
 
         /// Sets up various prepared queries, sets required settings, etc.
         void initialConnection();

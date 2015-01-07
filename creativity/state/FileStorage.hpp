@@ -104,6 +104,7 @@ class FileStorage final : public StorageBackend {
         virtual void flush() override;
 
     protected:
+
         /// Called from the queue thread to write the given State to the file.
         virtual void thread_insert(std::shared_ptr<const State> &&s) override;
 
@@ -111,10 +112,12 @@ class FileStorage final : public StorageBackend {
         /** The file buffer object. Mutable because we need to read from it in const methods. */
         mutable std::fstream f_;
 
+#ifndef CREATIVITY_DISABLE_THREADED_STORAGE
         /** Mutex guarding f_ and related variables (such as state_pos_).  Some operations (such as
          * load/saving settings) are done by the main thread, which accesses f_.
          */
         mutable std::mutex f_mutex_;
+#endif
 
         /// Storage for header data parsing when opening the file, and after writing settings.
         CreativitySettings settings_;
