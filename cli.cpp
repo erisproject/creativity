@@ -5,14 +5,11 @@
 #endif
 #include <eris/Simulation.hpp>
 #include <eris/Random.hpp>
-#include <functional>
 #include <iostream>
 #include <iomanip>
 #include <regex>
-#include <Eigen/Core>
 #include <tclap/CmdLine.h>
 #include <sys/stat.h>
-#include <typeinfo>
 
 using namespace creativity;
 using namespace creativity::state;
@@ -108,6 +105,7 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
 
         cmd.startReverseHack();
 
+// Various macros to help with declaring arguments
 #define ARG(NAME, PARAM, SHORT, LONG, DESC) \
         TCLAP::ValueArg<decltype(cr.parameters.PARAM)> opt_##NAME##_arg(SHORT, LONG, DESC ".  Default: " + output_string(cr.parameters.PARAM) + ".", \
                 false, cr.parameters.PARAM, &opt_##NAME##_constr, cmd)
