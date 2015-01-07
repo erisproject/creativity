@@ -402,7 +402,7 @@ const std::unordered_map<SharedMember<Book>, BookCopy>& Reader::library() const 
 void Reader::receiveProceeds(const SharedMember<Book> &book, const Bundle &revenue) {
     assets() += revenue;
     Bundle tvc(creativity_->money, book->currSales() * cost_unit);
-    tvc.transferApprox(tvc, assets());
+    tvc.transferApprox(tvc, assets(), 1e-8);
 }
 
 const belief::Profit& Reader::profitBelief() const { return profit_belief_; }
@@ -551,19 +551,6 @@ void Reader::updateProfitStreamBelief() {
         MatrixXd X(learn.second.size(), age);
 
         size_t row = 0;
-/*
-        for (auto &book : learn.second) {
-            double cumul_rev = 0;
-            const unsigned long &created = book->created();
-            for (unsigned int i = 0; i < age; i++) {
-                double r_i = book->revenue(created + i);
-                X(row, i) = r_i;
-                cumul_rev += r_i;
-            }
-            y[row] = book->lifeRevenue() - cumul_rev;
-            row++;
-        }
-*/
         for (auto &book : learn.second) {
             double total_profit = 0;
             // Figure out total profit for the book, but skip any trailing negative profit periods
