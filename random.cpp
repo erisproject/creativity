@@ -119,6 +119,7 @@ int main (int argc, char* argv[]) {
     auto try_match = load_patterns();
 
     bool help = false;
+    bool found = false;
     std::vector<std::string> args;
     args.reserve(argc-1);
     for (int i = 1; i < argc; i++) args.push_back(argv[i]);
@@ -127,6 +128,7 @@ int main (int argc, char* argv[]) {
         for (auto &p : try_match) {
             std::smatch match_res;
             if (std::regex_match(arg, match_res, p.first)) {
+                found = true;
                 arg = p.second(match_res);
                 break;
             }
@@ -140,8 +142,12 @@ int main (int argc, char* argv[]) {
     cli_argv.push_back(nullptr);
 
     // --help gets passed through, but we *also* handle it by printing help for creativity-random
-    if (help) {
+    if (help or not found) {
         std::cout << "USAGE: " << argv[0] << " ARG ...\n" << help_message << "\n";
+        if (not found) {
+            std::cout << "Aborting because no random signatures found in argument list!\n";
+            exit(1);
+        }
     }
 
     std::cout << "Executing";
