@@ -251,18 +251,16 @@ bool exists(const std::string &p) {
     return (stat(p.c_str(), &buffer) == 0);
 }
 
-std::string random_filename() {
+std::string random_filename(const std::string &basename) {
     std::random_device rd;
     std::uniform_int_distribution<unsigned char> rand_index(0, 35);
     constexpr char map[37] = "0123456789abcdefghijklmnopqrstuvwxyz";
 
     std::ostringstream buf;
-    buf << "creativity";
-    for (int i = 0; i < 15; i++) {
-        if (i % 5 == 0) buf << "-";
+    buf << basename << ".partial.";
+    for (int i = 0; i < 7; i++) {
         buf << map[rand_index(rd)];
     }
-    buf << ".crstate";
     return buf.str();
 }
 
@@ -319,35 +317,38 @@ int main(int argc, char *argv[]) {
                 }
             }
 
-            // Make sure the parent of the output file exists
-            std::string final_parent = std::regex_replace(args.out, std::regex("/?[^/]+$"), "");
-            if (not final_parent.empty() and not exists_dir(final_parent)) {
-                std::cerr << "Error: Directory `" << final_parent << "' does not exist or is not a directory\n";
-                exit(1);
-            }
+            std::string basename = std::regex_replace(args.out, std::regex(".*/"), "");
+            std::string dirname = std::regex_replace(args.out, std::regex("/?[^/]+$"), "");
+            if (dirname.empty()) dirname = ".";
 
-            // If the user wants intermediate results written to a tmpfile, oblige:
+            if (basename.empty()) throw std::runtime_error("Invalid output filename (" + args.out + ")");
+
+            // Make sure the parent of the output file exists
+            if (not exists_dir(dirname))
+                throw std::runtime_error("Directory `" + dirname + "' does not exist or is not a directory");
+
+            // We always write to an intermediate file, then move it into place at the end; by
+            // default, that file is in the same directory as the output file, but the user might
+            // want to put it somewhere else (e.g. if local storage is much faster than remote
+            // storage, but the final result should be copied to the remote storage.)
             if (not args.tmpdir.empty()) {
                 // First check and make sure that the parent of the requested output file exists
-                if (not exists_dir(args.tmpdir)) {
-                    std::cerr << "Error: --tmpdir `" << args.tmpdir << "' does not exist or is not a directory\n";
-                    exit(1);
-                }
+                if (not exists_dir(args.tmpdir))
+                    throw std::runtime_error("Error: --tmpdir `" + args.tmpdir + "' does not exist or is not a directory");
 
-                std::string tmpfile;
-                int tries = 0;
-                do {
-                    if (tries++ > 10) { std::cerr << "Error: unable to create non-existant tmpfile (tried 10 times)\n"; exit(2); }
-                    tmpfile = args.tmpdir + "/" + random_filename();
-                } while (exists(tmpfile));
+                dirname = args.tmpdir;
+            }
 
-                creativity->fileWrite(tmpfile);
-                results_out = tmpfile;
-                need_copy = true;
-            }
-            else {
-                creativity->fileWrite(args.out);
-            }
+            std::string tmpfile;
+            int tries = 0;
+            do {
+                if (tries++ > 10) { std::cerr << "Error: unable to generate suitable tmpfile name (tried 10 times)\n"; exit(2); }
+                tmpfile = dirname + "/" + random_filename(basename);
+            } while (exists(tmpfile));
+
+            creativity->fileWrite(tmpfile);
+            results_out = tmpfile;
+            need_copy = true;
         }
         catch (std::exception &e) {
             std::cerr << "Unable to write to file: " << e.what() << "\n";
@@ -402,11 +403,9 @@ int main(int argc, char *argv[]) {
     creativity.reset();
 
     if (need_copy) {
-        std::cout << "Renaming tmpfile to " << args.out << "..." << std::flush;
+        std::cout << "Moving tmpfile to " << args.out << "..." << std::flush;
         int error = std::rename(results_out.c_str(), args.out.c_str());
         if (error) { // Rename failed (perhaps across filesystems) so do a copy-and-delete
-            std::cout << " rename failed. Copying and deleting instead...\n";
-
             if (not args.overwrite) {
                 if (exists(args.out)) {
                     std::cerr << "\nError: `" << args.out << "' already exists; specify a different file or add `--overwrite' option to overwrite\n";
@@ -436,14 +435,20 @@ int main(int argc, char *argv[]) {
                 }
             }
 
+            std::cout << " done.\n" << std::flush;
+
             // Copy succeeded, so delete the tmpfile
             error = std::remove(results_out.c_str());
-            if (error) { // If we can't remove it, print a warning (but don't die, because we also copied it to the right place)
-                std::cerr << "\nWarning: removing tmpfile failed: " << std::strerror(errno) << "\n";
+            if (error) {
+                // If we can't remove it, print a warning (but don't die, because we also copied it to the right place)
+                std::cerr << "\nWarning: removing tmpfile `" << results_out << "' failed: " << std::strerror(errno) << "\n";
             }
+        }
+        else {
+            std::cout << " done.\n" << std::flush;
         }
         results_out = args.out;
     }
 
-    std::cout << "\n\nSimulation complete.  Results saved to " << results_out << "\n\n";
+    std::cout << "\nSimulation complete.  Results saved to " << results_out << "\n\n";
 }
