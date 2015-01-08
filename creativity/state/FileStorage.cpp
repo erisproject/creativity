@@ -422,7 +422,7 @@ void FileStorage::addStateLocation(std::streampos location) {
     else {
         f_.seekp(cont_pos_.back() + (std::streampos) 8 * (past_header % CBLOCK::states));
     }
-    write_value(location);
+    write_u64(location);
 
     f_.seekp(HEADER::pos::num_states);
     state_pos_.push_back(location);
