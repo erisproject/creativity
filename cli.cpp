@@ -9,15 +9,16 @@
 #include <fstream>
 #include <iomanip>
 #include <regex>
+#include <cstdio>
 #include <tclap/CmdLine.h>
-#include <boost/version.hpp>
-#include <boost/filesystem.hpp>
+extern "C" {
+#include <sys/stat.h>
+}
 
 using namespace creativity;
 using namespace creativity::state;
 using namespace eris;
 using namespace Eigen;
-namespace fs = boost::filesystem;
 
 // For some unknown reason, TCLAP adds arguments to its internal list in reverse order, so the
 // generated --help output will be in reverse order from the order arguments are added in the code.
@@ -240,6 +241,31 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
     }
 }
 
+bool exists_dir(const std::string &p) {
+    struct stat buffer;
+    return (stat(p.c_str(), &buffer) == 0 and S_ISDIR(buffer.st_mode));
+}
+
+bool exists(const std::string &p) {
+    struct stat buffer;
+    return (stat(p.c_str(), &buffer) == 0);
+}
+
+std::string random_filename() {
+    std::random_device rd;
+    std::uniform_int_distribution<unsigned char> rand_index(0, 35);
+    constexpr char map[37] = "0123456789abcdefghijklmnopqrstuvwxyz";
+
+    std::ostringstream buf;
+    buf << "creativity";
+    for (int i = 0; i < 15; i++) {
+        if (i % 5 == 0) buf << "-";
+        buf << map[rand_index(rd)];
+    }
+    buf << ".crstate";
+    return buf.str();
+}
+
 int main(int argc, char *argv[]) {
     std::cerr << std::setprecision(16);
     std::cout << std::setprecision(16);
@@ -287,37 +313,36 @@ int main(int argc, char *argv[]) {
             // get created before we finish the simulation, but at least we can abort now in a
             // typical case).
             if (not args.overwrite) {
-                if (fs::exists(args.out)) {
+                if (exists(args.out)) {
                     std::cerr << "Error: `" << args.out << "' already exists; specify a different file or add `--overwrite' option to overwrite\n";
                     exit(1);
                 }
             }
 
             // Make sure the parent of the output file exists
-            fs::path final_parent = fs::path(args.out).parent_path();
-            if (not final_parent.empty() and not fs::is_directory(final_parent)) {
+            std::string final_parent = std::regex_replace(args.out, std::regex("/?[^/]*$"), "");
+            if (not final_parent.empty() and not exists_dir(final_parent)) {
                 std::cerr << "Error: Directory `" << final_parent << "' does not exist or is not a directory\n";
                 exit(1);
             }
 
             // If the user wants intermediate results written to a tmpfile, oblige:
             if (not args.tmpdir.empty()) {
-                fs::path tmpdir(args.tmpdir);
                 // First check and make sure that the parent of the requested output file exists
-                if (not fs::exists(tmpdir)) {
-                    std::cerr << "Error: --tmpdir `" << args.tmpdir << "' does not exist\n";
+                if (not exists_dir(args.tmpdir)) {
+                    std::cerr << "Error: --tmpdir `" << args.tmpdir << "' does not exist or is not a directory\n";
                     exit(1);
                 }
 
-                fs::path tmpfile;
+                std::string tmpfile;
                 int tries = 0;
                 do {
                     if (tries++ > 10) { std::cerr << "Error: unable to create non-existant tmpfile (tried 10 times)\n"; exit(2); }
-                    tmpfile = tmpdir / fs::unique_path();
-                } while (fs::exists(tmpfile));
+                    tmpfile = args.tmpdir + "/" + random_filename();
+                } while (exists(tmpfile));
 
-                creativity->fileWrite(tmpfile.string());
-                results_out = tmpfile.string();
+                creativity->fileWrite(tmpfile);
+                results_out = tmpfile;
                 need_copy = true;
             }
             else {
@@ -370,43 +395,51 @@ int main(int argc, char *argv[]) {
         std::cout << "\r" << waiting << "done.               " << std::flush;
     }
 
-    std::cout << std::endl;
+    std::cout << "\n";
     creativity->storage().first->flush();
 
     // Destroy the simulation (which also closes the storage)
     creativity.reset();
 
     if (need_copy) {
-        std::cout << "\n\nMoving tmpfile to " << args.out << "...\n";
-        boost::system::error_code ec;
-        fs::rename(results_out, args.out, ec);
-        if (ec) { // Rename failed (perhaps across filesystems) so do a copy-and-delete
-            // boost::filesystem::copy_file is broken in boost < 1.57 (see boost bug 6779)
-            /*
-            fs::copy_file(results_out, args.out, ec);
-            if (ec) { // The copy failed, too.  Uh oh.
-                std::cerr << "Unable to copy " << results_out << " to " << args.out << ": " << ec.message() << "\n";
-                exit(3);
-            }*/
+        std::cout << "Renaming tmpfile to " << args.out << "..." << std::flush;
+        int error = std::rename(results_out.c_str(), args.out.c_str());
+        if (error) { // Rename failed (perhaps across filesystems) so do a copy-and-delete
+            std::cout << " rename failed. Copying and deleting instead...\n";
 
             if (not args.overwrite) {
-                if (fs::exists(args.out)) {
-                    std::cerr << "Error: `" << args.out << "' already exists; specify a different file or add `--overwrite' option to overwrite\n";
+                if (exists(args.out)) {
+                    std::cerr << "\nError: `" << args.out << "' already exists; specify a different file or add `--overwrite' option to overwrite\n";
                     exit(1);
                 }
             }
-            try {
-                std::ofstream(args.out, std::ios::binary) << std::ifstream(results_out, std::ios::binary).rdbuf();
-            }
-            catch (std::ios_base::failure &f) {
-                std::cerr << "Unable to copy " << results_out << " to " << args.out << ": " << f.what() << "\n";
-                exit(1);
+
+            {
+                std::ifstream src; src.exceptions(src.failbit);
+                std::ofstream dst; dst.exceptions(dst.failbit);
+                try { src.open(results_out, std::ios::binary); }
+                catch (std::ios_base::failure&) {
+                    std::cerr << "\nUnable to read " << results_out << ": " << std::strerror(errno) << "\n";
+                    exit(1);
+                }
+
+                try { dst.open(args.out, std::ios::binary | std::ios::trunc); }
+                catch (std::ios_base::failure&) {
+                    std::cerr << "\nUnable to write to " << args.out << ": " << std::strerror(errno) << "\n";
+                    exit(1);
+                }
+
+                try { dst << src.rdbuf(); }
+                catch (std::ios_base::failure&) {
+                    std::cerr << "\nUnable to copy file contents: " << std::strerror(errno) << "\n";
+                    exit(1);
+                }
             }
 
             // Copy succeeded, so delete the tmpfile
-            fs::remove(results_out, ec);
-            if (ec) { // If we can't remove it, print a warning (but don't die, because we also copied it to the right place)
-                std::cerr << "Warning: removing tmpfile failed: " << ec.message() << "\n";
+            error = std::remove(results_out.c_str());
+            if (error) { // If we can't remove it, print a warning (but don't die, because we also copied it to the right place)
+                std::cerr << "\nWarning: removing tmpfile failed: " << std::strerror(errno) << "\n";
             }
         }
         results_out = args.out;

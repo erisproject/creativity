@@ -76,9 +76,8 @@ endforeach()
 find_package(Eigen3 REQUIRED)
 include_directories(${EIGEN3_INCLUDE_DIR})
 
-find_package(Boost REQUIRED COMPONENTS filesystem system)
+find_package(Boost REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
-link_directories(${Boost_LIBRARY_DIRS})
 
 # Find library source/headers
 file(GLOB_RECURSE cr_libsrc creativity/*.cpp)
@@ -113,7 +112,6 @@ endforeach()
 
 add_executable(creativity-cli cli.cpp)
 target_link_libraries(creativity-cli creativity)
-target_link_libraries(creativity-cli ${Boost_LIBRARIES})
 
 add_executable(creativity-info info.cpp)
 target_link_libraries(creativity-info creativity)
