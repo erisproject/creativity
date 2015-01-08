@@ -6,15 +6,18 @@
 #include <eris/Simulation.hpp>
 #include <eris/Random.hpp>
 #include <iostream>
+#include <fstream>
 #include <iomanip>
 #include <regex>
 #include <tclap/CmdLine.h>
-#include <sys/stat.h>
+#include <boost/version.hpp>
+#include <boost/filesystem.hpp>
 
 using namespace creativity;
 using namespace creativity::state;
 using namespace eris;
 using namespace Eigen;
+namespace fs = boost::filesystem;
 
 // For some unknown reason, TCLAP adds arguments to its internal list in reverse order, so the
 // generated --help output will be in reverse order from the order arguments are added in the code.
@@ -97,6 +100,7 @@ class RangeConstraint : public TCLAP::Constraint<T> {
 struct cmd_args {
     unsigned int periods, max_threads;
     std::string out;
+    std::string tmpdir;
     bool overwrite;
 };
 cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
@@ -180,6 +184,10 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
 #endif
                 , cmd);
 
+        TCLAP::ValueArg<std::string> tmpdir("", "tmpdir", "Output directory in which to write the output file while running the simulation.  When "
+                "the simulation finishes, the temporary file is moved to the output location specified by -o.  If this argument is omitted, the "
+                "file is written directly in its final location.", false, "", "directory", cmd);
+
         TCLAP::SwitchArg overwrite_output_file("O", "overwrite", "Allows output file given to -o to be overwritten.  No effect if a database URL is given to -o.", cmd, false);
 
         RangeConstraint<unsigned int> max_threads_constr(0, std::thread::hardware_concurrency());
@@ -221,6 +229,7 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         ret.periods = periods_arg.getValue();
         ret.max_threads = max_threads_arg.getValue();
         ret.out = std::regex_replace(output_file.getValue(), std::regex("SEED"), std::to_string(Random::seed()));
+        ret.tmpdir = tmpdir.getValue();
         ret.overwrite = overwrite_output_file.getValue();
 
         return ret;
@@ -231,7 +240,6 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
     }
 }
 
-
 int main(int argc, char *argv[]) {
     std::cerr << std::setprecision(16);
     std::cout << std::setprecision(16);
@@ -240,7 +248,8 @@ int main(int argc, char *argv[]) {
 
     auto args = parseCmdArgs(argc, argv, *creativity);
 
-    std::string results_out_display = args.out;
+    std::string results_out = args.out;
+    bool need_copy = false; // Whether we need to copy from results_out to args.out (if using --tmpdir)
 
     if (args.out.substr(0, 13) == "postgresql://" or args.out.substr(0, 11) == "postgres://") {
         try {
@@ -262,7 +271,7 @@ int main(int argc, char *argv[]) {
             const char *port = conn.port();
             if (port) psqlurl << ":" << port;
             psqlurl << "/" << conn.dbname() << "?creativity=" << pgsql.id;
-            results_out_display = psqlurl.str();
+            results_out = psqlurl.str();
 #endif
         }
         catch (const std::exception &e) {
@@ -274,22 +283,55 @@ int main(int argc, char *argv[]) {
         // Filename output
 
         try {
-            // If the user didn't specify --overwrite, make sure the file doesn't exist
+            // If the user didn't specify --overwrite, make sure the file doesn't exist.  (It might
+            // get created before we finish the simulation, but at least we can abort now in a
+            // typical case).
             if (not args.overwrite) {
-                struct stat buffer;
-                if (stat(args.out.c_str(), &buffer) == 0) { // The file exists
+                if (fs::exists(args.out)) {
                     std::cerr << "Error: `" << args.out << "' already exists; specify a different file or add `--overwrite' option to overwrite\n";
                     exit(1);
                 }
             }
-            creativity->fileWrite(args.out);
+
+            // Make sure the parent of the output file exists
+            fs::path final_parent = fs::path(args.out).parent_path();
+            if (not final_parent.empty() and not fs::is_directory(final_parent)) {
+                std::cerr << "Error: Directory `" << final_parent << "' does not exist or is not a directory\n";
+                exit(1);
+            }
+
+            // If the user wants intermediate results written to a tmpfile, oblige:
+            if (not args.tmpdir.empty()) {
+                fs::path tmpdir(args.tmpdir);
+                // First check and make sure that the parent of the requested output file exists
+                if (not fs::exists(tmpdir)) {
+                    std::cerr << "Error: --tmpdir `" << args.tmpdir << "' does not exist\n";
+                    exit(1);
+                }
+
+                fs::path tmpfile;
+                int tries = 0;
+                do {
+                    if (tries++ > 10) { std::cerr << "Error: unable to create non-existant tmpfile (tried 10 times)\n"; exit(2); }
+                    tmpfile = tmpdir / fs::unique_path();
+                } while (fs::exists(tmpfile));
+
+                creativity->fileWrite(tmpfile.string());
+                results_out = tmpfile.string();
+                need_copy = true;
+            }
+            else {
+                creativity->fileWrite(args.out);
+            }
         }
         catch (std::exception &e) {
             std::cerr << "Unable to write to file: " << e.what() << "\n";
             exit(1);
         }
     }
-    std::cout << "Writing simulation results to " << results_out_display << "\n";
+    std::cout << "Writing simulation results to ";
+    if (need_copy) std::cout << "temp file: ";
+    std::cout << results_out << "\n";
 
     creativity->setup();
     auto sim = creativity->sim;
@@ -331,5 +373,44 @@ int main(int argc, char *argv[]) {
     std::cout << std::endl;
     creativity->storage().first->flush();
 
-    std::cout << "\n\nSimulation complete.  Results saved to " << results_out_display << "\n\n";
+    // Destroy the simulation (which also closes the storage)
+    creativity.reset();
+
+    if (need_copy) {
+        std::cout << "\n\nMoving tmpfile to " << args.out << "...\n";
+        boost::system::error_code ec;
+        fs::rename(results_out, args.out, ec);
+        if (ec) { // Rename failed (perhaps across filesystems) so do a copy-and-delete
+            // boost::filesystem::copy_file is broken in boost < 1.57 (see boost bug 6779)
+            /*
+            fs::copy_file(results_out, args.out, ec);
+            if (ec) { // The copy failed, too.  Uh oh.
+                std::cerr << "Unable to copy " << results_out << " to " << args.out << ": " << ec.message() << "\n";
+                exit(3);
+            }*/
+
+            if (not args.overwrite) {
+                if (fs::exists(args.out)) {
+                    std::cerr << "Error: `" << args.out << "' already exists; specify a different file or add `--overwrite' option to overwrite\n";
+                    exit(1);
+                }
+            }
+            try {
+                std::ofstream(args.out, std::ios::binary) << std::ifstream(results_out, std::ios::binary).rdbuf();
+            }
+            catch (std::ios_base::failure &f) {
+                std::cerr << "Unable to copy " << results_out << " to " << args.out << ": " << f.what() << "\n";
+                exit(1);
+            }
+
+            // Copy succeeded, so delete the tmpfile
+            fs::remove(results_out, ec);
+            if (ec) { // If we can't remove it, print a warning (but don't die, because we also copied it to the right place)
+                std::cerr << "Warning: removing tmpfile failed: " << ec.message() << "\n";
+            }
+        }
+        results_out = args.out;
+    }
+
+    std::cout << "\n\nSimulation complete.  Results saved to " << results_out << "\n\n";
 }
