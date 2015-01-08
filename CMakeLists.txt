@@ -97,8 +97,8 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mllvm -inline-threshold=10000")
 endif()
 
-# Force on ERIS_DEBUG and -O0 for a Debug build
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 -DERIS_DEBUG")
+# Add -g for a Debug build
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
 
 # Generate the config.hpp file (which needs to know where gui.glade was installed)
 configure_file(${CMAKE_SOURCE_DIR}/creativity/config.hpp.in
