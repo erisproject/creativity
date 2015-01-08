@@ -320,7 +320,7 @@ int main(int argc, char *argv[]) {
             }
 
             // Make sure the parent of the output file exists
-            std::string final_parent = std::regex_replace(args.out, std::regex("/?[^/]*$"), "");
+            std::string final_parent = std::regex_replace(args.out, std::regex("/?[^/]+$"), "");
             if (not final_parent.empty() and not exists_dir(final_parent)) {
                 std::cerr << "Error: Directory `" << final_parent << "' does not exist or is not a directory\n";
                 exit(1);
