@@ -367,22 +367,37 @@ int main(int argc, char *argv[]) {
 
     sim->maxThreads(args.max_threads);
 
-    std::chrono::time_point<std::chrono::high_resolution_clock> now,
-        last = std::chrono::high_resolution_clock::now();
+    constexpr size_t avg_times = 5;
+    std::chrono::time_point<std::chrono::high_resolution_clock> started = std::chrono::high_resolution_clock::now();
+    std::queue<std::chrono::time_point<std::chrono::high_resolution_clock>> times;
+    times.push(started);
+    unsigned int max_bnew_digits = 0;
+    auto count_bnew = [](const Book &b) -> bool { return b.age() == 0; };
 
     while (sim->t() < args.periods) {
         sim->run();
 
         creativity->storage().first->emplace_back(sim);
 
-        now = std::chrono::high_resolution_clock::now();
-        double speed = 1.0 / std::chrono::duration<double>(now - last).count();
-        std::swap(last, now);
+        auto now = std::chrono::high_resolution_clock::now();
+        std::ostringstream speed;
+        speed << std::setprecision(6) << std::showpoint;
+        speed << std::setw(7) << 1.0 / std::chrono::duration<double>(now - times.back()).count() << " Hz ";
+        while (times.size() > avg_times) times.pop();
+        if (times.size() > 1)
+            speed << std::setw(7) << times.size() / std::chrono::duration<double>(now - times.front()).count() << " Hz[" << times.size() << "] ";
+
+        auto bnew = sim->countGoods<Book>(count_bnew);
+        max_bnew_digits = std::max(max_bnew_digits, bnew == 0 ? 1 : 1 + (unsigned) std::lround(std::floor(std::log10(bnew))));
+
+        speed << std::setw(7) << sim->t() / std::chrono::duration<double>(now - started).count() << " Hz[A]";
+        times.push(std::move(now));
+
+
         std::cout << "\rRunning simulation [t=" << sim->t() << "; " <<
             (sim->t() >= creativity->parameters.piracy_begins ? u8"P✔" : u8"P✘") <<
             "; R=" << sim->countAgents<Reader>() << "; B=" << sim->countGoods<Book>() << "; Bnew=" <<
-            sim->countGoods<Book>([](const Book &b) -> bool { return b.age() == 0; }) << "] " << speed << " Hz";
-        std::cout << " (output pending: " << creativity->storage().first->backend().pending() << ")              " << std::flush;
+            std::setw(max_bnew_digits) << bnew << "] " << speed.str() << std::flush;
     }
 
     std::cout << "\nSimulation done.";
