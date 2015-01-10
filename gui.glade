@@ -2196,8 +2196,7 @@ This value overrides the "Prior weighting" setting in just the "Sharing begins" 
                                               <object class="GtkComboBoxText" id="combo_threads">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="active">0</property>
-                                                <property name="active_id">0</property>
+                                                <property name="active">1</property>
                                                 <items>
                                                   <item id="0" translatable="yes">Don't use threads</item>
                                                   <item id="1" translatable="yes">Use threads</item>
