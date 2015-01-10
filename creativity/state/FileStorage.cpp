@@ -737,10 +737,7 @@ void FileStorage::writeState(const State &state) {
 }
 
 void FileStorage::writeReader(const ReaderState &r) {
-#ifdef ERIS_DEBUG
-    int64_t debug_start_location = f_.tellp();
-#endif
-
+    FILESTORAGE_DEBUG_WRITE_START
     if (r.id > std::numeric_limits<uint32_t>::max())
         throw std::runtime_error("FileStorage error: cannot handle reader ids > 32 bits");
     write_u32(r.id);
@@ -766,12 +763,7 @@ void FileStorage::writeReader(const ReaderState &r) {
     write_value(r.creation_shape);
     write_value(r.creation_scale);
 
-#ifdef ERIS_DEBUG
-    int64_t debug_length = f_.tellp() - debug_start_location;
-    int64_t debug_expect = 4*(1+2*settings_.dimensions+1+r.friends.size()+2+2+2+2+2+2);
-    if (debug_length != debug_expect)
-        throw std::runtime_error("Internal FileStorage error: writeReader() wrote " + std::to_string(debug_length) + ", expected " + std::to_string(debug_expect));
-#endif
+    FILESTORAGE_DEBUG_WRITE_CHECK(4*(1+2*settings_.dimensions+1+r.friends.size()+2+2+2+2+2+2))
     // Beliefs
     writeBelief(r.profit);
     writeBelief(r.profit_extrap);
