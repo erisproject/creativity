@@ -15,13 +15,13 @@ namespace creativity { namespace state {
 class ReaderState final {
     public:
         /// Constructs a new ReaderState, settings its values using the given Reader.
-        ReaderState(const Reader &r);
+        explicit ReaderState(const Reader &r);
 
         /** Constructs a new blank ReaderState for a reader with a position of the given number of
          * dimensions.  All values will be default initialized.  (The number of dimensions is needed
          * for Position initialization).
          */
-        ReaderState(const unsigned int dimensions);
+        explicit ReaderState(const unsigned int dimensions);
 
         /// Unique simulation ID of the reader
         eris::eris_id_t id;
