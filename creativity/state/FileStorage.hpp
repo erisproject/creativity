@@ -458,6 +458,8 @@ class FileStorage final : public StorageBackend {
          *     dbl              cost_unit
          *     dbl              cost_piracy
          *     dbl              income
+         *     dbl              creation_shape
+         *     dbl              creation_scale
          *     BELIEF           profit belief
          *     BELIEF           profit extrapolated belief
          *     BELIEF           demand belief

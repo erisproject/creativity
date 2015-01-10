@@ -442,6 +442,28 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          */
         double creationEffort(double quality) const;
 
+        /** Returns the resulting quality of a reader with the given `scale` and `shape` parameters
+         * who expends effort `effort` to create a book.
+         *
+         * This static version of the method is called by the non-static method.
+         *
+         * \sa creation_shape
+         * \sa creation_scale
+         * \sa creationQuality
+         */
+        static double creationQuality(double shape, double scale, double effort);
+
+        /** Returns the required effort of a reader with the given `scale` and `shape` parameters
+         * to create a book of quality `quality`.
+         *
+         * This static version of the method is used by the non-static method.
+         *
+         * \sa creation_shape
+         * \sa creation_scale
+         * \sa creationEffort
+         */
+        static double creationEffort(double shape, double scale, double effort);
+
         /** Called at the end of a period (from BookMarket::intraFinish) to transfer book revenue
          * earned during a period back to the author.  The author subtracts variable cost (if any)
          * and keeps the remaining revenue.  Note that fixed costs are incurred at the beginning of

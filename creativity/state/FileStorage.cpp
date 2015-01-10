@@ -629,6 +629,8 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
     r.cost_unit = read_dbl();
     r.cost_piracy = read_dbl();
     r.income = read_dbl();
+    r.creation_shape = read_dbl();
+    r.creation_scale = read_dbl();
 
     // Beliefs
     belief_data belief = readBelief();
@@ -760,6 +762,9 @@ void FileStorage::writeReader(const ReaderState &r) {
     write_value(r.cost_unit);
     write_value(r.cost_piracy);
     write_value(r.income);
+    // Creation parameters
+    write_value(r.creation_shape);
+    write_value(r.creation_scale);
 
 #ifdef ERIS_DEBUG
     int64_t debug_length = f_.tellp() - debug_start_location;

@@ -18,6 +18,8 @@ ReaderState::ReaderState(const Reader &r) :
     cost_unit{r.cost_unit},
     cost_piracy{r.cost_piracy},
     income{r.income},
+    creation_shape{r.creation_shape},
+    creation_scale{r.creation_scale},
     profit{r.profitBelief()},
     profit_extrap{r.profitExtrapBelief()},
     demand{r.demandBelief()},

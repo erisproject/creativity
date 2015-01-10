@@ -52,8 +52,8 @@ void PsqlStorage::initialConnection() {
     conn_->prepare("friend_ids", "SELECT friend_eris_id FROM friend WHERE reader = $1");
     conn_->prepare("select_library", "SELECT * FROM library WHERE simulation = $1 AND reader_eris_id = $2 WHERE acquired <= $3");
     conn_->prepare("select_beliefs", "SELECT * FROM belief WHERE reader = $1");
-    conn_->prepare("insert_reader", "INSERT INTO reader (state,eris_id,position,u,u_lifetime,cost_fixed,cost_unit,cost_piracy,income) VALUES "
-                                                       "($1" ",$2"   ",$3"    ",$4,$5"     ",$6"      ",$7"     ",$8"       ",$9)");
+    conn_->prepare("insert_reader", "INSERT INTO reader (state,eris_id,position,u,u_lifetime,cost_fixed,cost_unit,cost_piracy,income,creation_shape,creation_scale) VALUES "
+                                                       "($1" ",$2"   ",$3"    ",$4,$5"     ",$6"      ",$7"     ",$8"       ",$9"  ",$10"         ",$11)");
     conn_->prepare("insert_friend", "INSERT INTO friend (reader,friend_eris_id) VALUES ($1,$2)");
     conn_->prepare("exists_library_book", "SELECT COUNT(*) FROM library WHERE simulation = $1 AND reader_eris_id = $2 AND book_eris_id = $3");
     conn_->prepare("insert_library_book", "INSERT INTO library (simulation,reader_eris_id,book_eris_id,type,acquired,quality) VALUES ($1,$2,$3,$4,$5,$6)");
@@ -280,6 +280,8 @@ std::pair<eris::eris_id_t, ReaderState> PsqlStorage::readReader(const pqxx::tupl
     READER_READDBL(cost_unit);
     READER_READDBL(cost_piracy);
     READER_READDBL(income);
+    READER_READDBL(creation_shape);
+    READER_READDBL(creation_scale);
 #undef READER_READDBL
 
     // Friends:

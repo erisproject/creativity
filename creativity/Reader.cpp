@@ -115,47 +115,55 @@ const std::vector<double>& Reader::penaltyPolynomial() const {
 }
 
 double Reader::creationQuality(double effort) const {
+    return creationQuality(creation_shape, creation_scale, effort);
+}
+
+double Reader::creationQuality(double shape, double scale, double effort) {
     if (effort < 0)
         throw std::domain_error("Reader::creationQuality() error: effort cannot be negative");
-    if (creation_shape >= 1)
-        throw std::logic_error("Reader::creationQuality() error: creation_shape must be less than 1");
-    if (creation_scale < 0)
-        throw std::logic_error("Reader::creationQuality() error: creation_scale cannot be negative");
+    if (shape >= 1)
+        throw std::logic_error("Reader::creationQuality() error: shape must be less than 1");
+    if (scale < 0)
+        throw std::logic_error("Reader::creationQuality() error: scale cannot be negative");
 
-    if (creation_scale == 0) return 0.0; // This reader always produces 0 quality
+    if (scale == 0) return 0.0; // This reader always produces 0 quality
 
     if (effort == 0) return 0.0; // All of the functional forms of the effort yield q(0) = 0
 
-    return creation_scale * (
-            creation_shape == 0.0 ? std::log(effort + 1.0) : // Special case for log
-            creation_shape == 0.5 ? 2.0 * (std::sqrt(effort + 1.0) - 1.0) : // Slightly more efficient sqrt calculation
-            (std::pow(effort + 1.0, creation_shape) - 1.0) / creation_shape // Otherwise use the full formula
+    return scale * (
+            shape == 0.0 ? std::log(effort + 1.0) : // Special case for log
+            shape == 0.5 ? 2.0 * (std::sqrt(effort + 1.0) - 1.0) : // Slightly more efficient sqrt calculation
+            (std::pow(effort + 1.0, shape) - 1.0) / shape // Otherwise use the full formula
     );
 }
 
 double Reader::creationEffort(double quality) const {
+    return creationEffort(creation_shape, creation_scale, quality);
+}
+
+double Reader::creationEffort(double shape, double scale, double quality) {
     if (quality < 0)
         throw std::domain_error("Reader::creationEffort() error: quality cannot be negative");
-    if (creation_shape >= 1)
-        throw std::logic_error("Reader::creationEffort() error: creation_shape cannot be negative");
-    if (creation_scale < 0)
-        throw std::logic_error("Reader::creationEffort() error: creation_scale cannot be negative");
+    if (shape >= 1)
+        throw std::logic_error("Reader::creationEffort() error: shape cannot be negative");
+    if (scale < 0)
+        throw std::logic_error("Reader::creationEffort() error: scale cannot be negative");
 
     if (quality == 0) return 0.0; // All functional forms yield q(0) = 0, and so q^-1(0) = 0.
-    else if (creation_scale == 0) {
-        // If creation_scale is 0, but quality is not, the function is not invertible (because any
+    else if (scale == 0) {
+        // If scale is 0, but quality is not, the function is not invertible (because any
         // level of effort yields 0 quality), so return infinity.
         return std::numeric_limits<double>::infinity();
     }
-    else if (creation_scale < 0 and quality >= (creation_scale / -creation_shape)) {
-        // When beta (creation_scale) is below 0, there's an asymptote at alpha/-beta; no effort
+    else if (scale < 0 and quality >= (scale / -shape)) {
+        // When beta (scale) is below 0, there's an asymptote at alpha/-beta; no effort
         // level exists that can produce higher quality than that asymptote, so return infinity.
         return std::numeric_limits<double>::infinity();
     }
 
     return
-        creation_shape == 0.0 ? std::exp(quality / creation_scale) - 1.0 : // The special log case
-        std::pow(quality * creation_shape / creation_scale + 1.0, 1.0/creation_shape) - 1.0; // Non-log case
+        shape == 0.0 ? std::exp(quality / scale) - 1.0 : // The special log case
+        std::pow(quality * shape / scale + 1.0, 1.0/shape) - 1.0; // Non-log case
 }
 
 double Reader::piracyCost() const {

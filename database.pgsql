@@ -205,7 +205,9 @@ CREATE TABLE reader (
     cost_fixed double precision NOT NULL,
     cost_unit double precision NOT NULL,
     cost_piracy double precision NOT NULL,
-    income double precision NOT NULL
+    income double precision NOT NULL,
+    creation_shape double precision NOT NULL,
+    creation_scale double precision NOT NULL
 );
 
 

@@ -80,6 +80,12 @@ class ReaderState final {
         /// Per-period (external) income
         double income;
 
+        /// Creation shape coefficient
+        double creation_shape;
+
+        /// Creation scale coefficient
+        double creation_scale;
+
         // Beliefs, copied out at the time the ReaderState object is created
         belief::Profit profit; ///< Profit beliefs
         belief::Profit profit_extrap; ///< Profit beliefs using extrapolation for on-market books
