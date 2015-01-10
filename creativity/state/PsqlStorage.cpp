@@ -57,7 +57,8 @@ void PsqlStorage::initialConnection() {
     conn_->prepare("insert_friend", "INSERT INTO friend (reader,friend_eris_id) VALUES ($1,$2)");
     conn_->prepare("exists_library_book", "SELECT COUNT(*) FROM library WHERE simulation = $1 AND reader_eris_id = $2 AND book_eris_id = $3");
     conn_->prepare("insert_library_book", "INSERT INTO library (simulation,reader_eris_id,book_eris_id,type,acquired,quality) VALUES ($1,$2,$3,$4,$5,$6)");
-    conn_->prepare("insert_belief", "INSERT INTO belief (reader, type, k, noninformative, s2, n, beta, v_lower) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)");
+    conn_->prepare("insert_belief_unrestr", "INSERT INTO belief (reader, type, k, noninformative, s2, n, beta, v_lower) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)");
+    conn_->prepare("insert_belief_restr", "INSERT INTO belief (reader, type, k, noninformative, s2, n, beta, v_lower, draw_successes, draw_discards) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)");
     conn_->prepare("insert_book", "INSERT INTO book (state,eris_id,author_eris_id,created,position,quality,price,revenue,revenue_lifetime,sales,sales_lifetime,pirated,pirated_lifetime,lifetime) VALUES "
                                                    "($1" ",$2"   ",$3"  ",$4"   ",$5"    ",$6"   ",$7" ",$8"   ",$9"            ",$10"",$11"         ",$12"  ",$13"           ",$14)");
 }
@@ -240,9 +241,12 @@ void PsqlStorage::insertReader(const ReaderState &reader, int32_t state_id, pqxx
 
 
 void PsqlStorage::insertBelief(eris_id_t dbid, const std::string &type, const Linear &belief, pqxx::work &trans) {
-    auto insert = trans.prepared("insert_belief")(dbid)(type)(belief.K())(belief.noninformative());
-    if (belief.noninformative())
+    const LinearRestricted *r_belief = dynamic_cast<const LinearRestricted*>(&belief);
+    auto insert = trans.prepared(r_belief ? "insert_belief_restr" : "insert_belief_unrestr")(dbid)(type)(belief.K())(belief.noninformative());
+    if (belief.noninformative()) {
         insert()()()();
+        if (r_belief) insert()();
+    }
     else {
         insert(belief.s2())(belief.n());
         std::vector<double> coef;
@@ -257,6 +261,11 @@ void PsqlStorage::insertBelief(eris_id_t dbid, const std::string &type, const Li
         for (unsigned int r = 0, i = 0; r < K; r++) for (unsigned int c = 0; c <= r; c++, i++)
             coef[i] = belief.V()(r,c);
         insert(createDoubleArray(coef.cbegin(), coef.cend()));
+
+        if (r_belief) {
+            insert(r_belief->draw_success_cumulative);
+            insert(r_belief->draw_discards_cumulative);
+        }
     }
     insert.exec();
 }
@@ -326,9 +335,21 @@ std::pair<eris::eris_id_t, ReaderState> PsqlStorage::readReader(const pqxx::tupl
             double n = b["n"].as<double>();
             auto beta = parseDoubleArray(b["beta"].c_str(), k);
             auto V = parseDoubleArray(b["v_lower"].c_str(), k*(k+1)/2);
-            if (type == "profit") r.profit = Profit(dimensions_, beta, s2, V, n);
-            else if (type == "profit_extrap") r.profit_extrap = Profit(dimensions_, beta, s2, V, n);
-            else if (type == "demand") r.demand = Demand(dimensions_, beta, s2, V, n);
+            if (type == "profit") {
+                r.profit = Profit(dimensions_, beta, s2, V, n);
+                r.profit.draw_success_cumulative = b["draw_successes"].as<unsigned long>();
+                r.profit.draw_discards_cumulative = b["draw_discards"].as<unsigned long>();
+            }
+            else if (type == "profit_extrap") {
+                r.profit_extrap = Profit(dimensions_, beta, s2, V, n);
+                r.profit_extrap.draw_success_cumulative = b["draw_successes"].as<unsigned long>();
+                r.profit_extrap.draw_discards_cumulative = b["draw_discards"].as<unsigned long>();
+            }
+            else if (type == "demand") {
+                r.demand = Demand(dimensions_, beta, s2, V, n);
+                r.demand.draw_success_cumulative = b["draw_successes"].as<unsigned long>();
+                r.demand.draw_discards_cumulative = b["draw_discards"].as<unsigned long>();
+            }
             else if (type == "quality") r.quality = Quality(beta, s2, V, n);
             else if (type == "profit_stream") r.profit_stream.emplace((unsigned int) k, ProfitStream(beta, s2, V, n));
             else throw std::out_of_range("Reader with database id `" + std::to_string(id) + "' has invalid belief type `" + type + "'");

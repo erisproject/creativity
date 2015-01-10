@@ -634,22 +634,31 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
 
     // Beliefs
     belief_data belief = readBelief();
-    if (belief.K > 0)
+    if (belief.K > 0) {
         r.profit = belief.noninformative
             ? Profit(settings_.dimensions, belief.K)
             : Profit(settings_.dimensions, belief.beta, belief.s2, belief.V, belief.n);
+        r.profit.draw_success_cumulative = belief.draw_success_cumulative;
+        r.profit.draw_discards_cumulative = belief.draw_discards_cumulative;
+    }
 
     belief = readBelief();
-    if (belief.K > 0)
+    if (belief.K > 0) {
         r.profit_extrap = belief.noninformative
             ? Profit(settings_.dimensions, belief.K)
             : Profit(settings_.dimensions, belief.beta, belief.s2, belief.V, belief.n);
+        r.profit_extrap.draw_success_cumulative = belief.draw_success_cumulative;
+        r.profit_extrap.draw_discards_cumulative = belief.draw_discards_cumulative;
+    }
 
     belief = readBelief();
-    if (belief.K > 0)
+    if (belief.K > 0) {
         r.demand = belief.noninformative
             ? Demand(settings_.dimensions, belief.K)
             : Demand(settings_.dimensions, belief.beta, belief.s2, belief.V, belief.n);
+        r.demand.draw_success_cumulative = belief.draw_success_cumulative;
+        r.demand.draw_discards_cumulative = belief.draw_discards_cumulative;
+    }
 
     belief = readBelief();
     if (belief.K > 0)
@@ -697,6 +706,12 @@ FileStorage::belief_data FileStorage::readBelief() const {
     belief.K = k;
     belief.noninformative = false;
 
+    // Next up is a status field
+    uint8_t status = read_u8();
+    // Currently only the first bit is used: if set, this is a restricted belief (with draw
+    // information)
+    bool restricted_model = status & 1;
+
     // The first K elements are beta values
     belief.beta = VectorXd(k);
     for (unsigned int i = 0; i < belief.K; i++)
@@ -706,7 +721,7 @@ FileStorage::belief_data FileStorage::readBelief() const {
     belief.s2 = read_dbl();
     belief.n = read_dbl();
 
-    // The last K*(K+1)/2 are the V values (but we set them symmetrically in V)
+    // Then K*(K+1)/2 V values (but we set them symmetrically in V)
     belief.V = MatrixXd(k, k);
     for (unsigned int r = 0; r < belief.K; r++) {
         for (unsigned int c = 0; c <= r; c++) {
@@ -714,6 +729,12 @@ FileStorage::belief_data FileStorage::readBelief() const {
             belief.V(r,c) = cov;
             if (c != r) belief.V(c,r) = cov;
         }
+    }
+
+    // If this was a restricted model, we read the draw discards and success values
+    if (restricted_model) {
+        belief.draw_success_cumulative = read_u32();
+        belief.draw_discards_cumulative = read_u32();
     }
 
     return belief;
@@ -764,6 +785,7 @@ void FileStorage::writeReader(const ReaderState &r) {
     write_value(r.creation_scale);
 
     FILESTORAGE_DEBUG_WRITE_CHECK(4*(1+2*settings_.dimensions+1+r.friends.size()+2+2+2+2+2+2+2+2))
+
     // Beliefs
     writeBelief(r.profit);
     writeBelief(r.profit_extrap);
@@ -799,8 +821,19 @@ void FileStorage::writeBelief(const Linear &m) {
         return;
     }
 
-    // Otherwise we're all good, write out the record:
+    // Otherwise write out the full record:
     write_i8(k);
+
+    bool restricted_model = false;
+    // First up is the status field.  Currently we just have one status bit for a restricted model
+    const LinearRestricted *lr = dynamic_cast<const LinearRestricted*>(&m);
+    if (lr) restricted_model = true;
+
+    uint8_t status = 0;
+    if (restricted_model) status |= 1;
+
+    // Status field
+    write_u8(status);
 
     auto &beta = m.beta();
     // First K elements are the beta values
@@ -818,7 +851,13 @@ void FileStorage::writeBelief(const Linear &m) {
             write_dbl(V(r,c));
         }
     }
-    FILESTORAGE_DEBUG_WRITE_CHECK(1+8*(2+k+k*(k+1)/2))
+
+    if (restricted_model) {
+        write_u32(lr->draw_success_cumulative);
+        write_u32(lr->draw_discards_cumulative);
+    }
+
+    FILESTORAGE_DEBUG_WRITE_CHECK(2+8*(2+k+k*(k+1)/2) + (restricted_model ? 4*2 : 0))
 }
 
 std::pair<eris_id_t, BookState> FileStorage::readBook() const {

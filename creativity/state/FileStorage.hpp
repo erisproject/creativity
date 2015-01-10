@@ -496,6 +496,9 @@ class FileStorage final : public StorageBackend {
             double s2; ///< belief::Linear s2 value
             double n; ///< belief::Linear n value
             Eigen::MatrixXd V; ///< belief::Linear V matrix
+            bool draw_data = false; ///< If true, the belief came from a LinearRestricted, and so has draw stats
+            uint32_t draw_success_cumulative, ///< For a restricted belief, the number of successful draws
+                     draw_discards_cumulative; ///< For a restricted belief, the number of discarded draws
         } belief_data;
 
         /** Reads a belief structure from the current file location.  The first field read is the

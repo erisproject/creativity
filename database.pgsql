@@ -121,7 +121,9 @@ CREATE TABLE belief (
     s2 double precision,
     n double precision,
     beta double precision[],
-    v_lower double precision[]
+    v_lower double precision[],
+    draw_successes integer,
+    draw_discards integer
 );
 
 
