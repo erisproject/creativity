@@ -378,7 +378,9 @@ int main(int argc, char *argv[]) {
         now = std::chrono::high_resolution_clock::now();
         double speed = 1.0 / std::chrono::duration<double>(now - last).count();
         std::swap(last, now);
-        std::cout << "\rRunning simulation [t=" << sim->t() << "; R=" << sim->countAgents<Reader>() << "; B=" << sim->countGoods<Book>() << ", newB=" <<
+        std::cout << "\rRunning simulation [t=" << sim->t() << "; " <<
+            (sim->t() >= creativity->parameters.piracy_begins ? u8"P✔" : u8"P✘") <<
+            "; R=" << sim->countAgents<Reader>() << "; B=" << sim->countGoods<Book>() << "; Bnew=" <<
             sim->countGoods<Book>([](const Book &b) -> bool { return b.age() == 0; }) << "] " << speed << " Hz";
         std::cout << " (output pending: " << creativity->storage().first->backend().pending() << ")              " << std::flush;
     }
