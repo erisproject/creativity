@@ -25,7 +25,9 @@ class LinearDerived : public B {
          */
         [[gnu::warn_unused_result]]
         D update(const Eigen::Ref<const Eigen::VectorXd> &y, const Eigen::Ref<const Eigen::MatrixXd> &X) const & {
-            return newDerived(B::update(y, X));
+            D updated(static_cast<const D&>(*this));
+            updated.updateInPlace(y, X);
+            return updated;
         }
 
         /** Updates the current object, using its current values as a prior, incorporating the
@@ -40,7 +42,8 @@ class LinearDerived : public B {
          */
         [[gnu::warn_unused_result]]
         D update(const Eigen::Ref<const Eigen::VectorXd> &y, const Eigen::Ref<const Eigen::MatrixXd> &X) && {
-            return newDerived(std::move(*this).B::update(y, X));
+            B::updateInPlace(y, X);
+            return std::move(static_cast<D&>(*this));
         }
 
         /** Weakens a Derived belief, returning a new, weakened Derived object.
@@ -49,7 +52,9 @@ class LinearDerived : public B {
          */
         [[gnu::warn_unused_result]]
         D weaken(double prior_weight) const & {
-            return newDerived(B::weaken(prior_weight));
+            D weakened(static_cast<const D&>(*this));
+            weakened.weakenInPlace(prior_weight);
+            return weakened;
         }
 
         /** Weakens a Derived belief, updating the current rvalue-reference then returning it.
@@ -58,7 +63,8 @@ class LinearDerived : public B {
          */
         [[gnu::warn_unused_result]]
         D weaken(double prior_weight) && {
-            return newDerived(std::move(*this).B::weaken(prior_weight));
+            B::weakenInPlace(prior_weight);
+            return std::move(static_cast<D&>(*this));
         }
 
     protected:
@@ -73,7 +79,7 @@ class LinearDerived : public B {
         using Parent = LinearDerived<D, B>;
 
         /** Constructor using Linear r-value */
-        LinearDerived(Linear &&move) : B(std::move(move)) {}
+        explicit LinearDerived(Linear &&move) : B(std::move(move)) {}
 
         /** Default constructor */
         LinearDerived() = default;

@@ -152,18 +152,25 @@ void Linear::verifyParameters() const { NO_EMPTY_MODEL; }
 
 // Called on an lvalue object, creates a new object with *this as prior
 Linear Linear::update(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X) const & {
-    return Linear(*this).update(y, X);
+    Linear updated(*this);
+    updated.updateInPlace(y, X);
+    return updated;
 }
 
 // Called on rvalue, so just update *this as needed, using itself as the prior, then return std::move(*this)
 Linear Linear::update(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X) && {
+    updateInPlace(y, X);
+    return std::move(*this);
+}
+
+void Linear::updateInPlace(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X) {
     NO_EMPTY_MODEL;
     if (X.cols() != K())
         throw std::logic_error("update(y, X) failed: X has wrong number of columns");
     if (y.rows() != X.rows())
         throw std::logic_error("update(y, X) failed: y and X are non-conformable");
     if (y.rows() == 0) // Nothing to update!
-        return std::move(*this);
+        return;
 
     MatrixXd Xt = X.transpose();
     MatrixXd XtX = Xt * X;
@@ -190,20 +197,25 @@ Linear Linear::update(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X
     if (V_chol_L_) V_chol_L_.reset(); // This will have to be recalculated
     if (noninformative_) noninformative_ = false; // If we just updated a noninformative model, we aren't noninformative anymore
     if (last_draw_.size() > 0) last_draw_.resize(0);
-
-    return std::move(*this);
 }
 
 Linear Linear::weaken(const double precision_scale) const & {
-    return Linear(*this).weaken(precision_scale);
+    Linear weakened(*this);
+    weakened.weakenInPlace(precision_scale);
+    return weakened;
 }
 
 Linear Linear::weaken(const double precision_scale) && {
+    weakenInPlace(precision_scale);
+    return std::move(*this);
+}
+
+void Linear::weakenInPlace(const double precision_scale) {
     if (precision_scale <= 0 or precision_scale > 1)
         throw std::logic_error("weaken() called with invalid precision multiplier (not in (0,1])");
 
     if (noninformative() or precision_scale == 1.0) // Nothing to do here
-        return std::move(*this);
+        return;
 
     // If V_inv_ is set, scale it (because this is much cheaper than inverting the scaled V_ later)
     if (V_inv_) {
@@ -225,7 +237,7 @@ Linear Linear::weaken(const double precision_scale) && {
 
     V_ /= precision_scale;
 
-    return std::move(*this);
+    return;
 }
 
 }}

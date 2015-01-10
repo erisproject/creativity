@@ -50,7 +50,7 @@ class Demand : public LinearDerived<Demand, LinearRestricted> {
          *
          * \sa Linear::Linear
          */
-        Demand(unsigned int D) : Demand(D, parameters()) {}
+        explicit Demand(unsigned int D) : Demand(D, parameters()) {}
 
         /** Constructs a demand model with the given prior information.
          *
@@ -60,7 +60,7 @@ class Demand : public LinearDerived<Demand, LinearRestricted> {
          * \sa Linear::Linear
          */
         template <typename ...Args>
-        Demand(unsigned int D, Args &&...args)
+        explicit Demand(unsigned int D, Args &&...args)
         : Parent(std::forward<Args>(args)...), D_{D}
         {
             // Add restrictions:
