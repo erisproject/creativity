@@ -62,6 +62,7 @@ int main(int argc, char *argv[]) {
 #define PRINT_SETTING(S) do { printf("%-30s", #S); std::cout << creativity->parameters.S << "\n"; } while (0)
     PRINT_SETTING(readers);
     PRINT_SETTING(dimensions);
+    printf("%-30s", "densityFromBoundary()"); std::cout << creativity->densityFromBoundary() << "\n";
     PRINT_SETTING(boundary);
     PRINT_SETTING(book_distance_sd);
     PRINT_SETTING(book_quality_sd);
