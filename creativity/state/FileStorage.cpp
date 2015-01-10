@@ -763,7 +763,7 @@ void FileStorage::writeReader(const ReaderState &r) {
     write_value(r.creation_shape);
     write_value(r.creation_scale);
 
-    FILESTORAGE_DEBUG_WRITE_CHECK(4*(1+2*settings_.dimensions+1+r.friends.size()+2+2+2+2+2+2))
+    FILESTORAGE_DEBUG_WRITE_CHECK(4*(1+2*settings_.dimensions+1+r.friends.size()+2+2+2+2+2+2+2+2))
     // Beliefs
     writeBelief(r.profit);
     writeBelief(r.profit_extrap);
