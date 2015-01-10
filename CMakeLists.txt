@@ -113,11 +113,14 @@ endforeach()
 add_executable(creativity-cli cli.cpp)
 target_link_libraries(creativity-cli creativity)
 
+add_executable(creativity-random random.cpp)
+target_link_libraries(creativity-random ${ERIS_LIBRARIES})
+
 add_executable(creativity-info info.cpp)
 target_link_libraries(creativity-info creativity)
 
-add_executable(creativity-random random.cpp)
-target_link_libraries(creativity-random ${ERIS_LIBRARIES})
+add_executable(creativity-data data.cpp)
+target_link_libraries(creativity-data creativity)
 
 if (GUI)
     add_library(creativitygui SHARED ${cr_gui_libsrc})
