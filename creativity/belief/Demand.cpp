@@ -26,6 +26,8 @@ std::pair<double, double> Demand::argmaxP(double q, unsigned long S, unsigned lo
     // Add up all the fixed parts by setting P = 0:
     const double Xg = predict(0, q, S, otherBooks, marketBooks);
 
+    ERIS_DBGVAR(Xg);
+
     if (Xg <= 0)
         // Our prediction with a price of 0 is 0 (or negative) quantity, and any positive price is
         // just going to make that more negative, so just give back c
