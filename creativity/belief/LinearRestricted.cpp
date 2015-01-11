@@ -3,6 +3,8 @@
 #include "creativity/belief/LinearRestricted.hpp"
 #include <cmath>
 
+#include <eris/debug.hpp>
+
 using namespace Eigen;
 
 namespace creativity { namespace belief {
@@ -94,6 +96,15 @@ const VectorXd& LinearRestricted::draw() {
     while (redraw) {
         redraw = false;
         auto &theta = Linear::draw();
+        /*
+        ERIS_DBGVAR(restrict_size_);
+        if (restrict_size_ > 0) {
+            ERIS_DBGVAR(theta.head(K_).transpose());
+            ERIS_DBGVAR(restrict_select_);
+            ERIS_DBGVAR((restrict_select_.topRows(restrict_size_) * theta.head(K_)).array());
+            ERIS_DBGVAR(restrict_values_.head(restrict_size_));
+        }
+        */
         if (restrict_size_ > 0 and not (
                 (
                     (restrict_select_.topRows(restrict_size_) * theta.head(K_)).array()
@@ -125,6 +136,8 @@ double LinearRestricted::predict(const Eigen::Ref<const Eigen::RowVectorXd> &Xi,
     if (noninformative_)
         throw std::logic_error("Cannot call predict() on noninformative model");
 
+    ERIS_DBGVAR(min_draws);
+    ERIS_DBGVAR(mean_beta_draws_);
     if (min_draws > mean_beta_draws_) {
         // First sum up new draws to make up the difference:
         VectorXd new_beta = VectorXd::Zero(K_);
@@ -239,7 +252,9 @@ double LinearRestricted::RestrictionIneqProxy::lowerBound() const {
 LinearRestricted::RestrictionIneqProxy& LinearRestricted::RestrictionIneqProxy::operator<=(double r) {
     RowVectorXd R = RowVectorXd::Zero(lr_.K());
     R[k_] = 1.0;
+    ERIS_DBG("Adding restricting beta[" << k_ << "] <= " << r);
     lr_.addRestriction(R, r);
+    ERIS_DBGVAR(lr_.restrict_size_);
     return *this;
 }
 

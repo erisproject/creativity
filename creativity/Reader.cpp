@@ -214,6 +214,36 @@ void Reader::interOptimize() {
             auto max = demand_belief_.argmaxP(book->quality(), book->lifeSales(), previous_books - 1, market_books, cost_unit);
             const double &p = max.first;
             const double &q = max.second;
+            if (p > 1000) {
+                ERIS_DBG("Found p=" << p << " > 1000");
+                ERIS_DBGVAR(id());
+                ERIS_DBGVAR(book->id());
+                ERIS_DBGVAR(p);
+                ERIS_DBGVAR(q);
+                ERIS_DBGVAR(demand_belief_.draw_discards);
+                ERIS_DBGVAR(demand_belief_.draw_success_cumulative);
+                ERIS_DBGVAR(demand_belief_.draw_discards_cumulative);
+                std::cerr << "\n    VectorXd beta(10); beta << ";
+                for (int i = 0; i < demand_belief_.beta().size(); i++) {
+                    if (i > 0) std::cerr << ", ";
+                    std::cerr << demand_belief_.beta()[i];
+                }
+                std::cerr << ";\n";
+                std::cerr << "    MatrixXd V(10,10); V <<\n    ";
+                for (int r = 0; r < demand_belief_.V().rows(); r++) {
+                    if (r > 0) std::cerr << ",\n    ";
+                    for (int c = 0; c < demand_belief_.V().cols(); c++) {
+                        if (c > 0) std::cerr << ", ";
+                        std::cerr << demand_belief_.V()(r, c);
+                    }
+                }
+                std::cerr << ";\n";
+                std::cerr << "    double n = " << demand_belief_.n() << ";\n";
+                std::cerr << "    double s2 = " << demand_belief_.s2() << ";\n";
+                std::cerr << "    struct { double q = " << book->quality() << ", c = " << cost_unit << "; unsigned long lifesales = " << book->lifeSales()
+                    << ", otherbooks = " << previous_books - 1 << ", marketbooks = " << market_books << "; } book;\n";
+
+            }
             const double profit = (p - cost_unit) * q - cost_fixed;
 
             if (profit > 0) {

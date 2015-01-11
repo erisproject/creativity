@@ -1,4 +1,5 @@
 #pragma once
+#include <eris/debug.hpp>
 #include <Eigen/Core>
 #include <memory>
 #include <ostream>

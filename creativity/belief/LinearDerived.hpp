@@ -1,4 +1,5 @@
 #pragma once
+#include <eris/debug.hpp>
 #include "creativity/belief/Linear.hpp"
 
 namespace creativity { namespace belief {
