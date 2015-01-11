@@ -186,6 +186,8 @@ InfoWindow::InfoWindow(std::shared_ptr<const State> state, std::shared_ptr<Gtk::
     data_append(grid_pextrap, "pe_s2", "s<sup>2</sup>");
     for (size_t i = 0; i < p_vars.size(); i++)
         data_append(grid_pextrap, "pe_" + std::to_string(i), BETA "[" + p_vars[i] + "]");
+    data_append(grid_pextrap, "_pe_draws", "# successful draws");
+    data_append(grid_pextrap, "_pe_discards", "# discarded draws");
     matrix_at(grid_pextrap, "pe_V", "<b>V</b>", 2, 2, p_vars.size(), p_vars.size());
     comment_append(grid_pextrap, "<i>NB: This is the same model as the Profit belief, but its data also includes extrapolated values for "
             "still-on-market books using ProfitStream beliefs, while Profit beliefs only include books once they leave the market.</i>",
@@ -311,6 +313,8 @@ void InfoWindow::refresh(std::shared_ptr<const State> state) {
 
         updateValue("_p_draws", r.profit.draw_success_cumulative);
         updateValue("_p_discards", r.profit.draw_discards_cumulative);
+        updateValue("_pe_draws", r.profit_extrap.draw_success_cumulative);
+        updateValue("_pe_discards", r.profit_extrap.draw_discards_cumulative);
         updateValue("_d_draws", r.demand.draw_success_cumulative);
         updateValue("_d_discards", r.demand.draw_discards_cumulative);
 
