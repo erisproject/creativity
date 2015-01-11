@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include <algorithm>
 #include <gtkmm/treemodel.h>
 #include <gtkmm/treesortable.h>
 #include <gtkmm/treeview.h>
@@ -230,7 +231,7 @@ template <class M> Gtk::TreeModel::Path MemberStore<M>::find(eris::eris_id_t id,
     // Loop through members_ starting at hint with two counters: one starting at hint and going down
     // to 0, the other starting at hint+1 and going up to max.  This makes us search positions
     // closer to hint first.
-    long a = hint, b = hint + 1;
+    long a = std::min<long>(hint, max-1), b = hint + 1;
     while (b < max or a >= 0) {
         if (a >= 0) {
             if (members_[a].get().id == id) {
