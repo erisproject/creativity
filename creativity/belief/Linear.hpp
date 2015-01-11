@@ -7,6 +7,9 @@
 namespace creativity { namespace belief {
 
 /** Base class for a linear model with a natural conjugate, normal-gamma prior. 
+ *
+ * FIXME: change (where appropriate) to use selfadjointView (esp. for Cholesky decomp, and possibly
+ * for inverse).
  */
 class Linear {
     public:
