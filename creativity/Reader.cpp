@@ -5,6 +5,7 @@
 #include <eris/Random.hpp>
 #include <algorithm>
 #include <map>
+#include <list>
 #include <random>
 #include <cmath>
 
@@ -205,20 +206,28 @@ void Reader::interOptimize() {
 
     auto &rng = Random::rng();
 
+    std::list<eris::SharedMember<Book>> bypass_beliefs;
     if (usableBelief(demand_belief_)) {
         // Figure out the expected profitability of each book; positive ones will be kept on the market
         std::map<double, std::vector<std::pair<SharedMember<Book>, double>>, std::greater<double>> profitability;
         for (auto &book : wrote_market_) {
             auto book_mkt = book->market();
 
-            auto max = demand_belief_.argmaxP(book->quality(), book->lifeSales(), previous_books - 1, market_books, cost_unit);
-            const double &p = max.first;
-            const double &q = max.second;
-            const double profit = (p - cost_unit) * q - cost_fixed;
+            try {
+                auto max = demand_belief_.argmaxP(book->quality(), book->lifeSales(), previous_books - 1, market_books, cost_unit);
 
-            if (profit > 0) {
-                // Profitable to keep this book on the market, so do so
-                profitability[profit].push_back(std::make_pair(book, p));
+                const double &p = max.first;
+                const double &q = max.second;
+                const double profit = (p - cost_unit) * q - cost_fixed;
+
+                if (profit > 0) {
+                    // Profitable to keep this book on the market, so do so
+                    profitability[profit].push_back(std::make_pair(book, p));
+                }
+            }
+            catch (belief::LinearRestricted::draw_failure &fail) {
+                // If we fail to get an admissable draw, fall back to default behaviour.
+                bypass_beliefs.push_back(book);
             }
         }
 
@@ -241,17 +250,21 @@ void Reader::interOptimize() {
         }
     }
     else {
-        // Bypass market predictions if our market demand belief is noninformative, or not
-        // sufficiently informed, and use initial model action parameters instead.
-        if (creativity_->parameters.initial.prob_keep > 0) {
-            std::bernoulli_distribution keep(creativity_->parameters.initial.prob_keep);
-            for (auto on_market = wrote_market_.cbegin(); income_available >= cost_fixed and on_market != wrote_market_.cend(); on_market++) {
-                auto &book = *on_market;
-                if (keep(rng)) {
-                    income_available -= cost_fixed;
-                    double new_price = (book->price() - cost_unit) * creativity_->parameters.initial.keep_price + cost_unit;
-                    new_prices_.emplace(book, new_price);
-                }
+        bypass_beliefs.insert(bypass_beliefs.end(), wrote_market_.begin(), wrote_market_.end());
+    }
+
+    // Bypass market predictions if our market demand belief is noninformative, not sufficiently
+    // informed, or can't produce usable draws.  In these cases, use initial model action
+    // parameters instead.
+    if (creativity_->parameters.initial.prob_keep > 0) {
+        std::bernoulli_distribution keep(creativity_->parameters.initial.prob_keep);
+        for (auto on_market = bypass_beliefs.cbegin();
+                income_available >= cost_fixed and on_market != bypass_beliefs.cend(); on_market++) {
+            auto &book = *on_market;
+            if (keep(rng)) {
+                income_available -= cost_fixed;
+                double new_price = (book->price() - cost_unit) * creativity_->parameters.initial.keep_price + cost_unit;
+                new_prices_.emplace(book, new_price);
             }
         }
     }
@@ -268,26 +281,31 @@ void Reader::interOptimize() {
             // past sales, if non-zero) plus the fixed income we're about to receive, minus whatever we
             // decided to spend above to keep books on the market.
 
-            // FIXME: is this right, w.r.t. Bayesian MC prediction?  (Is averaging being done too
-            // early?)
-            double effort = profit_belief_extrap_.argmaxL(
-                    [this] (double l) -> double { return creationQuality(l); },
-                    previous_books, market_books, income_available - cost_fixed
-                    );
-            double quality = creationQuality(effort);
+            try {
+                // FIXME: is this right, w.r.t. Bayesian MC prediction?  (Is averaging being done too
+                // early?)
+                double effort = profit_belief_extrap_.argmaxL(
+                        [this] (double l) -> double { return creationQuality(l); },
+                        previous_books, market_books, income_available - cost_fixed
+                        );
+                double quality = creationQuality(effort);
 
-            double exp_profit = profit_belief_extrap_.predict(quality, previous_books, market_books);
+                double exp_profit = profit_belief_extrap_.predict(quality, previous_books, market_books);
 
-            // If the optimal effort level gives a book with positive expected profits, do it:
-            if (exp_profit > effort) {
-                // We're going to create, so calculate the optimal first-period price.  It's possible that
-                // we get back cost_unit (and so predicted profit is non-positive); write the book anyway:
-                // perhaps profits are expected to come in later periods?
-                auto max = demand_belief_.argmaxP(quality, 0, previous_books, market_books, cost_unit);
-                create_price_ = max.first;
-                create_quality_ = quality;
-                create_effort_ = effort;
-                create_ = true;
+                // If the optimal effort level gives a book with positive expected profits, do it:
+                if (exp_profit > effort) {
+                    // We're going to create, so calculate the optimal first-period price.  It's possible that
+                    // we get back cost_unit (and so predicted profit is non-positive); write the book anyway:
+                    // perhaps profits are expected to come in later periods?
+                    auto max = demand_belief_.argmaxP(quality, 0, previous_books, market_books, cost_unit);
+                    create_price_ = max.first;
+                    create_quality_ = quality;
+                    create_effort_ = effort;
+                    create_ = true;
+                }
+            }
+            catch (belief::LinearRestricted::draw_failure &e) {
+                ERIS_DBG("draw failure!");
             }
         }
         else {
