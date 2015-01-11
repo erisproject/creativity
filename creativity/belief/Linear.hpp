@@ -262,15 +262,23 @@ class Linear {
          * by subclasses as required for move and copy update methods; weakening should be
          * considered (externally) as a type of construction of a new object.
          */
-        void weakenInPlace(double precision_scale);
+        virtual void weakenInPlace(double precision_scale);
 
         /** Updates the current linear model in place.  This functionality should only be used
          * internally and by subclasses are required for move and copy update methods; updating
          * should be considered (externally) as a type of construction of a new object.
          */
-        void updateInPlace(
+        virtual void updateInPlace(
                 const Eigen::Ref<const Eigen::VectorXd> &y,
                 const Eigen::Ref<const Eigen::MatrixXd> &X);
+
+        /** Called to reset any internal object state when creating a new derived object.  This is
+         * called automatically by weakenInPlace() and updateInPlace() (themselves called when
+         * creating a new updated or weakened object).
+         *
+         * The default base implementation does nothing.
+         */
+        virtual void reset();
 
         /** Called during construction to verify that the given parameters are valid.  Subclasses
          * should override to throw an exception if there are problems.  The default implementation

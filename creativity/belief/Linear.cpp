@@ -169,6 +169,9 @@ void Linear::updateInPlace(const Ref<const VectorXd> &y, const Ref<const MatrixX
         throw std::logic_error("update(y, X) failed: X has wrong number of columns");
     if (y.rows() != X.rows())
         throw std::logic_error("update(y, X) failed: y and X are non-conformable");
+
+    reset();
+
     if (y.rows() == 0) // Nothing to update!
         return;
 
@@ -196,7 +199,6 @@ void Linear::updateInPlace(const Ref<const VectorXd> &y, const Ref<const MatrixX
     beta_ = std::move(beta_post);
     if (V_chol_L_) V_chol_L_.reset(); // This will have to be recalculated
     if (noninformative_) noninformative_ = false; // If we just updated a noninformative model, we aren't noninformative anymore
-    if (last_draw_.size() > 0) last_draw_.resize(0);
 }
 
 Linear Linear::weaken(const double precision_scale) const & {
@@ -213,6 +215,8 @@ Linear Linear::weaken(const double precision_scale) && {
 void Linear::weakenInPlace(const double precision_scale) {
     if (precision_scale <= 0 or precision_scale > 1)
         throw std::logic_error("weaken() called with invalid precision multiplier (not in (0,1])");
+
+    reset();
 
     if (noninformative() or precision_scale == 1.0) // Nothing to do here
         return;
@@ -238,6 +242,10 @@ void Linear::weakenInPlace(const double precision_scale) {
     V_ /= precision_scale;
 
     return;
+}
+
+void Linear::reset() {
+    if (last_draw_.size() > 0) last_draw_.resize(0);
 }
 
 }}

@@ -232,6 +232,9 @@ class LinearRestricted : public Linear {
         /// Creates a LinearRestricted from a Linear rvalue
         LinearRestricted(Linear &&move) : Linear(std::move(move)) {}
 
+        /// Resets any drawn values
+        virtual void reset() override;
+
         /** Overridden to also reset mean_beta_draws_ to 0 (to force predict() value redrawing). */
         virtual void discardForce(unsigned int burn) override;
 
@@ -364,7 +367,9 @@ class LinearRestricted : public Linear {
          * (beginning at row `restrict_linear_size_`). */
         void allocateRestrictions(size_t more);
 
-        /// The cache of drawn beta vectors used for prediction.
+        /** The cache of drawn beta vectors used for prediction.  Must not be used if
+         * mean_beta_draws_ is 0.
+         */
         Eigen::VectorXd mean_beta_;
 
         /// The number of beta draws used to calculate mean_beta_

@@ -80,6 +80,14 @@ void LinearRestricted::discardForce(unsigned int burn) {
     mean_beta_draws_ = 0;
 }
 
+void LinearRestricted::reset() {
+    Linear::reset();
+    mean_beta_draws_ = 0;
+    draw_discards = 0;
+    draw_discards_cumulative = 0;
+    draw_success_cumulative = 0;
+}
+
 const Ref<const MatrixXd> LinearRestricted::R() const {
     return restrict_select_.topRows(restrict_size_);
 }
