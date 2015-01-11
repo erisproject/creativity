@@ -211,7 +211,7 @@ void Reader::interOptimize() {
         for (auto &book : wrote_market_) {
             auto book_mkt = book->market();
 
-            auto max = demand_belief_.argmaxP(book->quality(), book->lifeSales(), previous_books, market_books, cost_unit);
+            auto max = demand_belief_.argmaxP(book->quality(), book->lifeSales(), previous_books - 1, market_books, cost_unit);
             const double &p = max.first;
             const double &q = max.second;
             const double profit = (p - cost_unit) * q - cost_fixed;
