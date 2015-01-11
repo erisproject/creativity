@@ -183,12 +183,23 @@ class LinearRestricted : public Linear {
          */
         virtual void discard(unsigned int burn) override;
 
+        /** Exception class thrown when draw() is unable to produce an admissable draw.
+         */
+        class draw_failure : public std::runtime_error {
+            public:
+                /** Constructor.
+                 * \param what the exception message.
+                 */
+                draw_failure(const std::string &what) : std::runtime_error(what) {}
+        };
+
         /** Draws a set of parameter values.  initialize() must have been called before calling this
          * method.  Returns a const reference to the `k+1` length vector where elements `0` through
          * `k-1` are the \f$\beta\f$ values and element `k` is the \f$s^2\f$ value.
          *
-         * \throws std::runtime_error if, due to the imposed restrictions, at least
-         * `draw_max_discards` sequential draws are discarded without finding an admissible draw.
+         * \throws std::draw_failure if, due to the imposed restrictions, at least
+         * `draw_max_discards` sequential draws are discarded without finding a single admissible
+         * draw.
          */
         virtual const Eigen::VectorXd& draw() override;
 
@@ -218,7 +229,7 @@ class LinearRestricted : public Linear {
         virtual double predict(const Eigen::Ref<const Eigen::RowVectorXd> &Xi, long min_draws);
 
         unsigned long draw_discards = 0, ///< Tracks the number of draws discarded by the most recent call to draw()
-                      draw_discards_max = 1000, ///< The maximum number of discards in a single draw before raising an exception
+                      draw_discards_max = 100, ///< The maximum number of discards in a single draw before raising an exception
                       draw_discards_cumulative = 0, ///< Tracks cumulative draw discards over the life of this object
                       draw_success_cumulative = 0; ///< Tracks the number of successful draws over the life of this object
 

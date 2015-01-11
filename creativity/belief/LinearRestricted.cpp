@@ -115,7 +115,7 @@ const VectorXd& LinearRestricted::draw() {
             ++draw_discards;
             ++draw_discards_cumulative;
             if (draw_discards > draw_discards_max) {
-                throw std::runtime_error("draw() failed: maximum number of inadmissible draws reached.");
+                throw draw_failure("draw() failed: maximum number of inadmissible draws reached.");
             }
         }
     }
