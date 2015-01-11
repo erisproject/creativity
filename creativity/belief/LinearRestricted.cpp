@@ -89,9 +89,9 @@ const Ref<const VectorXd> LinearRestricted::r() const {
 }
 
 const VectorXd& LinearRestricted::draw() {
-    bool redraw;
+    bool redraw = true;
     draw_discards = 0;
-    do {
+    while (redraw) {
         redraw = false;
         auto &theta = Linear::draw();
         if (restrict_size_ > 0 and not (
@@ -110,7 +110,7 @@ const VectorXd& LinearRestricted::draw() {
                 throw std::runtime_error("draw() failed: maximum number of inadmissible draws reached.");
             }
         }
-    } while (redraw);
+    }
 
     ++draw_success_cumulative;
 
