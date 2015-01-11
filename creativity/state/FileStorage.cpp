@@ -89,43 +89,48 @@ inline bool file_exists(const std::string &name) {
 }
 
 FileStorage::FileStorage(const std::string &filename, MODE mode) {
-    f_.exceptions(f_.failbit | f_.badbit);
+    try {
+        f_.exceptions(f_.failbit | f_.badbit);
 
-    bool parse = true;
-    switch (mode) {
-        case MODE::READONLY:
-            f_.open(filename, open_readonly);
-            parse = true;
-            break;
-        case MODE::READ:
-            f_.open(filename, open_readwrite);
-            parse = true;
-            break;
-        case MODE::OVERWRITE:
-            f_.open(filename, open_overwrite);
-            parse = false;
-            break;
-        case MODE::APPEND:
-            if (file_exists(filename)) {
+        bool parse = true;
+        switch (mode) {
+            case MODE::READONLY:
+                f_.open(filename, open_readonly);
+                parse = true;
+                break;
+            case MODE::READ:
                 f_.open(filename, open_readwrite);
-                f_.seekg(0, f_.end);
-                parse = f_.tellp() > 0; // Parse if the file is non-empty, write otherwise
-            }
-            else {
-                // Open if overwrite mode if the file doesn't exist (open in read-write mode
-                // fails if the file doesn't exist (unless also truncating)).
+                parse = true;
+                break;
+            case MODE::OVERWRITE:
                 f_.open(filename, open_overwrite);
                 parse = false;
-            }
-            break;
-    }
+                break;
+            case MODE::APPEND:
+                if (file_exists(filename)) {
+                    f_.open(filename, open_readwrite);
+                    f_.seekg(0, f_.end);
+                    parse = f_.tellp() > 0; // Parse if the file is non-empty, write otherwise
+                }
+                else {
+                    // Open if overwrite mode if the file doesn't exist (open in read-write mode
+                    // fails if the file doesn't exist (unless also truncating)).
+                    f_.open(filename, open_overwrite);
+                    parse = false;
+                }
+                break;
+        }
 
-    if (parse) {
-        parseMetadata();
-        have_settings = true;
+        if (parse) {
+            parseMetadata();
+            have_settings = true;
+        }
+        else {
+            writeEmptyHeader();
+        }
     }
-    else {
-        writeEmptyHeader();
+    catch (std::ios_base::failure &c) {
+        throw std::ios_base::failure("Unable to open " + filename + ": " + strerror(errno));
     }
 }
 
