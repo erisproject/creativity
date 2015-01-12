@@ -244,6 +244,9 @@ class GUI : eris::noncopyable {
         /// Will be true once the thread has finished setting itself up and started its mainloop.
         bool thread_running_{false};
 
+        /// Whether the piracy tick has been added to the period slider
+        bool piracy_tick_added_ = false;
+
         /// Command-line parameters can override the gui.glade default values for settings
         std::unordered_map<std::string, double> default_override_;
 

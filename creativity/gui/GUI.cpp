@@ -699,11 +699,6 @@ void GUI::thr_signal() {
     if (init) {
         widget<Gtk::Notebook>("nb_tabs")->set_current_page(1);
 
-        // FIXME: This really doesn't look good, and doesn't work properly until the scale has a
-        // range of at least piracy_begins (until then it appears at the beginning).  For now,
-        // leave it off, but it might be worthwhile adding in later.
-        //widget<Gtk::Scale>("scale_state")->add_mark(creativity_->parameters.piracy_begins, Gtk::POS_BOTTOM, "Piracy");
-
         // Disable spin buttons:
         for (auto &widg : {"set_readers", "set_density", "set_piracy_link_proportion",
                 "set_book_distance_sd", "set_book_quality_sd", "set_piracy_begins", "set_income",
@@ -750,12 +745,14 @@ void GUI::thr_signal() {
         // .doubles has: speed
         auto scale = widget<Gtk::Scale>("scale_state");
         scale->set_range(0, last_progress.uls[1]);
+        if (not piracy_tick_added_ and last_progress.uls[1] >= creativity_->parameters.piracy_begins) {
+            widget<Gtk::Scale>("scale_state")->add_mark(creativity_->parameters.piracy_begins, Gtk::POS_BOTTOM, "");
+            piracy_tick_added_ = true;
+        }
+
         widget<Gtk::Label>("lbl_total")->set_text(std::to_string(last_progress.uls[1]));
         scale->set_fill_level(last_progress.uls[0]);
         scale->set_value(state_curr_);
-/*        auto progress = widget<Gtk::ProgressBar>("progress_stage");
-        progress->set_text(std::to_string(last_progress.uls[0]) + " / " + std::to_string(last_progress.uls[1]));
-        progress->set_fraction((double) last_progress.uls[0] / (double) last_progress.uls[1]);*/
         std::ostringstream speed;
         speed << std::setw(7) << std::showpoint << last_progress.doubles[0];
 
@@ -765,7 +762,7 @@ void GUI::thr_signal() {
     std::string errstr = errors.str();
     if (not errstr.empty()) {
         Gtk::MessageDialog dlg_error(*main_window_, "An error has occured!", false, Gtk::MESSAGE_ERROR, Gtk::BUTTONS_CLOSE, true);
-        dlg_error.set_secondary_text(errors.str());
+        dlg_error.set_secondary_text(errstr);
         dlg_error.run();
         dlg_error.hide();
     }
