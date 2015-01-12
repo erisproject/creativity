@@ -7,7 +7,7 @@ namespace creativity { namespace belief {
 
 using namespace Eigen;
 
-constexpr double Linear::NONINFORMATIVE_N, Linear::NONINFORMATIVE_S2;
+constexpr double Linear::NONINFORMATIVE_N, Linear::NONINFORMATIVE_S2, Linear::NONINFORMATIVE_Vc;
 
 Linear::Linear(
         const Ref<const VectorXd> beta,
@@ -45,7 +45,7 @@ Linear::Linear(
 }
 
 Linear::Linear(unsigned int K) :
-    beta_{VectorXd::Zero(K)}, s2_{NONINFORMATIVE_S2}, V_{MatrixXd::Identity(K, K)},
+    beta_{VectorXd::Zero(K)}, s2_{NONINFORMATIVE_S2}, V_{NONINFORMATIVE_Vc * MatrixXd::Identity(K, K)},
     n_{NONINFORMATIVE_N}, noninformative_{true}, K_{K}
 {
     if (K < 1) throw std::logic_error("Linear model requires at least one parameter");

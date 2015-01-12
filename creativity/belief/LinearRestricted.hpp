@@ -193,12 +193,12 @@ class LinearRestricted : public Linear {
                 draw_failure(const std::string &what) : std::runtime_error(what) {}
         };
 
-        /** Draws a set of parameter values.  initialize() must have been called before calling this
-         * method.  Returns a const reference to the `k+1` length vector where elements `0` through
-         * `k-1` are the \f$\beta\f$ values and element `k` is the \f$s^2\f$ value.
+        /** Draws a set of parameter values.  Returns a const reference to the `k+1` length vector
+         * where elements `0` through `k-1` are the \f$\beta\f$ values and element `k` is the
+         * \f$s^2\f$ value.
          *
          * \throws std::draw_failure if, due to the imposed restrictions, at least
-         * `draw_max_discards` sequential draws are discarded without finding a single admissible
+         * `draw_discards_max` sequential draws are discarded without finding a single admissible
          * draw.
          */
         virtual const Eigen::VectorXd& draw() override;
