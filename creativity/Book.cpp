@@ -88,6 +88,14 @@ unsigned int Book::sales(eris_time_t t) const {
     return it->second;
 }
 
+eris_time_t Book::lastSale() const {
+    for (auto it = copies_sold_.rbegin(); it != copies_sold_.rend(); it++) {
+        if (it->second > 0) return it->first;
+    }
+    // No sales ever
+    return 0;
+}
+
 unsigned int Book::lifePirated() const {
     auto lock = readLock();
     return copies_pirated_total_;

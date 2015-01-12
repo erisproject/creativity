@@ -191,12 +191,16 @@ bool Reader::removeFriend(const SharedMember<Reader> &old_pal, bool recurse) {
 }
 
 void Reader::interOptimize() {
+#   ifdef ERIS_DEBUG
+    try {
+#   endif
     // Update the various profit, demand, and quality beliefs
     updateBeliefs();
 
     double income_available = assets()[creativity_->money] + income;
 
     auto sim = simulation();
+    auto t = sim->t();
     const double market_books = sim->countMarkets<BookMarket>();
     const double previous_books = wrote().size();
 
@@ -214,7 +218,11 @@ void Reader::interOptimize() {
             auto book_mkt = book->market();
 
             try {
-                auto max = demand_belief_.argmaxP(book->quality(), book->lifeSales(), previous_books - 1, market_books, cost_unit);
+                // Figure out how many periods this book has gone without sales:
+                eris_time_t last_sale = book->lastSale();
+                unsigned long dry = (last_sale >= t-1 ? 0 : last_sale > 0 ? t - last_sale - 1 : book->age());
+
+                auto max = demand_belief_.argmaxP(book->quality(), book->lifeSales(), dry, book->age(), previous_books - 1, market_books, cost_unit);
                 const double &p = max.first;
                 const double &q = max.second;
                 if (p > 1000) {
@@ -256,7 +264,7 @@ void Reader::interOptimize() {
             }
             catch (belief::LinearRestricted::draw_failure &fail) {
                 // If we fail to get an admissable draw, fall back to default behaviour.
-                bypass_beliefs.push_back(book);
+                //bypass_beliefs.push_back(book);
             }
         }
 
@@ -313,20 +321,52 @@ void Reader::interOptimize() {
             try {
                 // FIXME: is this right, w.r.t. Bayesian MC prediction?  (Is averaging being done too
                 // early?)
-                double effort = profit_belief_extrap_.argmaxL(
+                double effort;
+#               ifdef ERIS_DEBUG
+                try {
+#               endif
+                effort = profit_belief_extrap_.argmaxL(
                         [this] (double l) -> double { return creationQuality(l); },
                         previous_books, market_books, income_available - cost_fixed
                         );
+#               ifdef ERIS_DEBUG
+                } catch (belief::LinearRestricted::draw_failure &e) {
+                    ERIS_DBG("draw failure in profit_extrap argmaxL for reader=" << id() << ", t=" << simulation()->t());
+                    throw;
+                }
+#               endif
                 double quality = creationQuality(effort);
 
-                double exp_profit = profit_belief_extrap_.predict(quality, previous_books, market_books);
+                double exp_profit;
+#               ifdef ERIS_DEBUG
+                try {
+#               endif
+                exp_profit = profit_belief_extrap_.predict(quality, previous_books, market_books);
+#               ifdef ERIS_DEBUG
+                }
+                catch (belief::LinearRestricted::draw_failure &e) {
+                    ERIS_DBG("draw failure in profit_extrap belief prediction; reader="<<id() << ", t=" << simulation()->t());
+                    throw;
+                }
+#               endif
 
                 // If the optimal effort level gives a book with positive expected profits, do it:
                 if (exp_profit > effort) {
                     // We're going to create, so calculate the optimal first-period price.  It's possible that
                     // we get back cost_unit (and so predicted profit is non-positive); write the book anyway:
                     // perhaps profits are expected to come in later periods?
-                    auto max = demand_belief_.argmaxP(quality, 0, previous_books, market_books, cost_unit);
+                    std::pair<double, double> max;
+#                   ifdef ERIS_DEBUG
+                    try {
+#                   endif
+                    max = demand_belief_.argmaxP(quality, 0, 0, 0, previous_books, market_books, cost_unit);
+#                   ifdef ERIS_DEBUG
+                    }
+                    catch (belief::LinearRestricted::draw_failure &e) {
+                        ERIS_DBG("draw failure in demand argmaxP calculation; reader="<<id() << ", t=" << simulation()->t());
+                        throw;
+                    }
+#                   endif
                     create_price_ = max.first;
                     create_quality_ = quality;
                     create_effort_ = effort;
@@ -352,6 +392,12 @@ void Reader::interOptimize() {
             }
         }
     }
+#   ifdef ERIS_DEBUG
+    } catch (std::exception &e) {
+        std::cerr << "\nCaught exception in reader interOptimize: " << e.what() << "\n";
+        throw;
+    }
+#   endif
 }
 
 void Reader::interApply() {
@@ -532,12 +578,16 @@ void Reader::updateDemandBelief() {
         auto last_t = simulation()->t() - 1;
         size_t i = 0;
         for (auto &b : newBooks()) {
-            y[i] = b.first->sales(last_t);
-            X.row(i) = demand_belief_.bookRow(b.first, b.second.get().quality);
-            i++;
+            if (b.first->hasMarket()) {
+                y[i] = b.first->sales(last_t);
+                X.row(i) = demand_belief_.bookRow(b.first, b.second.get().quality);
+                i++;
+            }
         }
 
-        demand_belief_ = std::move(demand_belief_).update(y, X);
+        if (i > 0) {
+            demand_belief_ = std::move(demand_belief_).update(y.head(i), X.topRows(i));
+        }
     }
 }
 void Reader::updateProfitStreamBelief() {
@@ -802,6 +852,9 @@ void Reader::intraOptimize() {
     double u_curr = u(money, new_books); // the "no-books" utility
     // Keep looking at books as long as the net utility from buying the next best book exceeds the
     // penalty that will be incurred.
+#   ifdef ERIS_DEBUG
+    try {
+#   endif
     while (not book_net_u.empty() and money > 0) {
         // Pull off the best remaining book:
         auto &s = book_net_u.begin()->second;
@@ -864,6 +917,12 @@ void Reader::intraOptimize() {
             }
         }
     }
+#   ifdef ERIS_DEBUG
+    } catch (std::exception &e) {
+        std::cerr << "Caught exception in reader intraOptimize buy loop: " << e.what();
+        throw e;
+    }
+#   endif
 }
 void Reader::intraApply() {
     auto lock = writeLock();
