@@ -137,7 +137,7 @@ InfoWindow::InfoWindow(std::shared_ptr<const State> state, std::shared_ptr<Gtk::
     std::vector<std::string> q_vars{{"constant", "I(firstBook)", "prevBooks", "age", "price", "price×age", "copiesSold"}};
     for (size_t i = 0; i < q_vars.size(); i++)
         data_append(grid_quality, "q_" + std::to_string(i), BETA "[" + q_vars[i] + "]", 1, 1);
-    matrix_at(grid_quality, "q_V", "<b>V</b>", 2, 2, q_vars.size(), q_vars.size());
+    matrix_at(grid_quality, "q_V", "s<sup>2</sup><b>V</b>", 2, 2, q_vars.size(), q_vars.size());
 
     auto &grid_profit = new_tab_grid(beliefs, "Profit");
     labels_append(grid_profit, "Dependent variable", "<i>lifetimeProfit</i>");
@@ -148,18 +148,18 @@ InfoWindow::InfoWindow(std::shared_ptr<const State> state, std::shared_ptr<Gtk::
         data_append(grid_profit, "p_" + std::to_string(i), BETA "[" + p_vars[i] + "]");
     data_append(grid_profit, "_p_draws", "# successful draws");
     data_append(grid_profit, "_p_discards", "# discarded draws");
-    matrix_at(grid_profit, "p_V", "<b>V</b>", 2, 2, p_vars.size(), p_vars.size());
+    matrix_at(grid_profit, "p_V", "s<sup>2</sup><b>V</b>", 2, 2, p_vars.size(), p_vars.size());
 
     auto &grid_demand = new_tab_grid(beliefs, "Demand");
     labels_append(grid_demand, "Dependent variable", "<i>quantityDemanded</i>");
     data_append(grid_demand, "d_n", "n");
     data_append(grid_demand, "d_s2", "s<sup>2</sup>");
-    std::vector<std::string> d_vars{{"constant", "price", "price<sup>2</sup>", "quality", "quality<sup>2</sup>", "prevSales", "age", "I(onlyBook)", "otherBooks", "marketBooks"}};
+    std::vector<std::string> d_vars{{"constant", "price", "quality", "quality<sup>2</sup>", "prevSales", "noSales", "age", "I(onlyBook)", "otherBooks", "marketBooks"}};
     for (size_t i = 0; i < d_vars.size(); i++)
         data_append(grid_demand, "d_" + std::to_string(i), BETA "[" + d_vars[i] + "]");
     data_append(grid_demand, "_d_draws", "# successful draws");
     data_append(grid_demand, "_d_discards", "# discarded draws");
-    matrix_at(grid_demand, "d_V", "<b>V</b>", 2, 2, d_vars.size(), d_vars.size());
+    matrix_at(grid_demand, "d_V", "s<sup>2</sup><b>V</b>", 2, 2, d_vars.size(), d_vars.size());
     comment_append(grid_demand, "<i>NB: This regression is for single-period demand.</i>", p_vars.size() + 3);
 
     nbs_.emplace_back();
@@ -177,7 +177,7 @@ InfoWindow::InfoWindow(std::shared_ptr<const State> state, std::shared_ptr<Gtk::
         for (unsigned long j = 0; j < a; j++) {
             data_append(grid_pstream, code_prefix + std::to_string(j), BETA "[π<sub>" + std::to_string(j) + "</sub>]");
         }
-        matrix_at(grid_pstream, code_prefix + "V", "<b>V</b>", 2, 2, a, a);
+        matrix_at(grid_pstream, code_prefix + "V", "s<sup>2</sup><b>V</b>", 2, 2, a, a);
     }
 
     auto &grid_pextrap = new_tab_grid(beliefs, "Profit (extrap.)");
@@ -188,7 +188,7 @@ InfoWindow::InfoWindow(std::shared_ptr<const State> state, std::shared_ptr<Gtk::
         data_append(grid_pextrap, "pe_" + std::to_string(i), BETA "[" + p_vars[i] + "]");
     data_append(grid_pextrap, "_pe_draws", "# successful draws");
     data_append(grid_pextrap, "_pe_discards", "# discarded draws");
-    matrix_at(grid_pextrap, "pe_V", "<b>V</b>", 2, 2, p_vars.size(), p_vars.size());
+    matrix_at(grid_pextrap, "pe_V", "s<sup>2</sup><b>V</b>", 2, 2, p_vars.size(), p_vars.size());
     comment_append(grid_pextrap, "<i>NB: This is the same model as the Profit belief, but its data also includes extrapolated values for "
             "still-on-market books using ProfitStream beliefs, while Profit beliefs only include books once they leave the market.</i>",
             p_vars.size() + 3);
@@ -301,7 +301,7 @@ void InfoWindow::refresh(std::shared_ptr<const State> state) {
 #define UPDATE_LIN(PREFIX, VAR) \
         updateValue(PREFIX + std::string("n"), VAR.n()); \
         updateValue(PREFIX + std::string("s2"), VAR.s2()); \
-        updateMatrix(PREFIX + std::string("V"), VAR.V(), true); \
+        updateMatrix(PREFIX + std::string("V"), VAR.s2() * VAR.V(), true); \
         for (size_t i = 0; i < VAR.K(); i++) \
             updateValue(PREFIX + std::to_string(i), VAR.beta()[i]);
 #define UPDATE_LIN_RB(PREFIX, BELIEF) UPDATE_LIN(PREFIX, r.BELIEF)
