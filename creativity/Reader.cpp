@@ -200,9 +200,8 @@ void Reader::interOptimize() {
     double income_available = assets()[creativity_->money] + income;
 
     auto sim = simulation();
-    auto t = sim->t();
     const double market_books = sim->countMarkets<BookMarket>();
-    const double previous_books = wrote().size();
+    const double authored_books = wrote().size();
 
     // Any books not in new_prices_ but that were on the market last period will be removed from the
     // market
@@ -218,11 +217,7 @@ void Reader::interOptimize() {
             auto book_mkt = book->market();
 
             try {
-                // Figure out how many periods this book has gone without sales:
-                eris_time_t last_sale = book->lastSale();
-                unsigned long dry = (last_sale >= t-1 ? 0 : last_sale > 0 ? t - last_sale - 1 : book->age());
-
-                auto max = demand_belief_.argmaxP(book->quality(), book->lifeSales(), dry, book->age(), previous_books - 1, market_books, cost_unit);
+                auto max = demand_belief_.argmaxP(book->quality(), book->lifeSales(), book->age(), authored_books - 1, market_books, cost_unit);
                 const double &p = max.first;
                 const double &q = max.second;
                 if (p > 1000) {
@@ -252,7 +247,7 @@ void Reader::interOptimize() {
                     std::cerr << "    double n = " << demand_belief_.n() << ";\n";
                     std::cerr << "    double s2 = " << demand_belief_.s2() << ";\n";
                     std::cerr << "    struct { double q = " << book->quality() << ", c = " << cost_unit << "; unsigned long lifesales = " << book->lifeSales()
-                        << ", otherbooks = " << previous_books - 1 << ", marketbooks = " << market_books << "; } book;\n";
+                        << ", otherbooks = " << authored_books - 1 << ", marketbooks = " << market_books << "; } book;\n";
 
                 }
                 const double profit = (p - cost_unit) * q - cost_fixed;
@@ -327,7 +322,7 @@ void Reader::interOptimize() {
 #               endif
                 effort = profit_belief_extrap_.argmaxL(
                         [this] (double l) -> double { return creationQuality(l); },
-                        previous_books, market_books, income_available - cost_fixed
+                        authored_books, market_books, income_available - cost_fixed
                         );
 #               ifdef ERIS_DEBUG
                 } catch (belief::LinearRestricted::draw_failure &e) {
@@ -341,7 +336,7 @@ void Reader::interOptimize() {
 #               ifdef ERIS_DEBUG
                 try {
 #               endif
-                exp_profit = profit_belief_extrap_.predict(quality, previous_books, market_books);
+                exp_profit = profit_belief_extrap_.predict(quality, authored_books, market_books);
 #               ifdef ERIS_DEBUG
                 }
                 catch (belief::LinearRestricted::draw_failure &e) {
@@ -359,7 +354,7 @@ void Reader::interOptimize() {
 #                   ifdef ERIS_DEBUG
                     try {
 #                   endif
-                    max = demand_belief_.argmaxP(quality, 0, 0, 0, previous_books, market_books, cost_unit);
+                    max = demand_belief_.argmaxP(quality, 0, 0, authored_books, market_books, cost_unit);
 #                   ifdef ERIS_DEBUG
                     }
                     catch (belief::LinearRestricted::draw_failure &e) {
