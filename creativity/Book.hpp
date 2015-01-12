@@ -126,6 +126,11 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         /// Returns the number of sales in simulation period `t`
         unsigned int sales(eris::eris_time_t t) const;
 
+        /** Returns the last simulation period `t` in which this book had at least one sale, or 0 if
+         * this book has never had any sales.
+         */
+        eris::eris_time_t lastSale() const;
+
         /// Returns the lifelong number of pirated copies of this book
         unsigned int lifePirated() const;
 
