@@ -25,9 +25,9 @@ count <- 0
 fixsample <- function(x, ...) x[sample.int(length(x), ...)]
 while (any(restrs > 0)) {
   count <<- count + 1
-  d <- (R %*% pnext - r) / rowSums(R^2)
   next_i <- fixsample(which(restrs > 0), 1)
-  vec <- 1.5 * -d[next_i] * R[next_i,]
+  d <- (R[next_i,] %*% pnext - r[next_i]) / sum(R[next_i,]^2)
+  vec <- 1.5 * -d * R[next_i,]
   arrows(pnext[1], pnext[2], pnext[1]+vec[1], pnext[2]+vec[2], col="red")
   pnext <<- pnext + vec
   restrs <<- R %*% pnext - r
