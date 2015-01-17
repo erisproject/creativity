@@ -1,11 +1,11 @@
 #include "creativity/belief/Linear.hpp"
-#include <eris/debug.hpp>
 #include <eris/Random.hpp>
 #include <Eigen/QR>
 
 namespace creativity { namespace belief {
 
 using namespace Eigen;
+using eris::Random;
 
 constexpr double Linear::NONINFORMATIVE_N, Linear::NONINFORMATIVE_S2, Linear::NONINFORMATIVE_Vc;
 
@@ -13,11 +13,9 @@ Linear::Linear(
         const Ref<const VectorXd> beta,
         double s2,
         const Ref<const MatrixXd> V,
-        double n,
-        std::shared_ptr<MatrixXd> V_inv,
-        std::shared_ptr<MatrixXd> V_chol_L
+        double n
         )
-    : beta_(beta), s2_{s2}, V_(V), V_inv_{std::move(V_inv)}, V_chol_L_{std::move(V_chol_L)}, n_{n}, K_(beta_.rows())
+    : beta_(beta), s2_{s2}, V_(V.selfadjointView<Lower>()), n_{n}, K_(beta_.rows())
 {
     // Check that the given matrices conform
     checkLogic();
@@ -78,14 +76,20 @@ const MatrixXd& Linear::V() const { NO_EMPTY_MODEL; return V_; }
 const MatrixXd& Linear::Vinv() const {
     NO_EMPTY_MODEL;
     if (not V_inv_)
-        V_inv_ = std::make_shared<MatrixXd>(V_.colPivHouseholderQr().inverse());
+        V_inv_ = std::make_shared<MatrixXd>(V_.colPivHouseholderQr().inverse().selfadjointView<Lower>());
     return *V_inv_;
 }
 const MatrixXd& Linear::VcholL() const {
     NO_EMPTY_MODEL;
     if (not V_chol_L_)
-        V_chol_L_ = std::make_shared<MatrixXd>(V_.llt().matrixL());
+        V_chol_L_ = std::make_shared<MatrixXd>(V_.selfadjointView<Lower>().llt().matrixL());
     return *V_chol_L_;
+}
+const MatrixXd& Linear::VcholLinv() const {
+    NO_EMPTY_MODEL;
+    if (not V_chol_L_inv_)
+        V_chol_L_inv_ = std::make_shared<MatrixXd>(VcholL().colPivHouseholderQr().inverse());
+    return *V_chol_L_inv_;
 }
 
 const bool& Linear::noninformative() const { NO_EMPTY_MODEL; return noninformative_; }
@@ -102,26 +106,52 @@ const VectorXd& Linear::draw() {
 
     if (last_draw_.size() != K_ + 1) last_draw_.resize(K_ + 1);
 
-    auto &rng = eris::Random::rng();
+    auto &rng = Random::rng();
 
-    // beta is distributed as t(beta, s^2*V, n)
-    
-    // That can be generated as beta + y*sqrt(n/q) where y ~ N(0, s^2*V), and q ~ chisq(n)
+    // (beta,h) is distributed as a normal-gamma(beta, V, s2^{-1}, n), in Koop's Gamma distribution
+    // notation, or NG(beta, V, n/2, 2*s2^{-1}/n) in the more common G(shape,scale) notation
+    // (which std::gamma_distribution wants).
+    //
+    // Proof:
+    // Let $G_{k\theta}(k,\theta)$ be the shape ($k$), scale ($\theta$) notation.  This has mean $k\theta$ and
+    // variance $k\theta^2$.
+    //
+    // Let $G_{Koop}(\mu,\nu)$ be Koop's notation, where $\mu$ is the mean and $\nu$ is the degrees of
+    // freedom, which has variance $\frac{2\mu^2}{\nu}$.  Equating means and variances:
+    //
+    // \[
+    //     k\theta = \mu
+    //     k\theta^2 = \frac{2\mu^2}{\nu}
+    //     \theta = \frac{2\mu}{\nu}
+    //     k = \frac{2}{\nu}
+    // \]
+    // where the third equation follows from the first divided by the second, and fourth follows
+    // from the first divided by the third.  Thus
+    // \[
+    //     G_{Koop}(\mu,\nu) = G_{k\theta}(\frac{2}{\nu},\frac{2\mu}{\nu})
+    // \]
 
-    // To generate y ~ N(0, SIGMA), generate N(0,1) and multiple by L from the cholesky
-    // decomposition of SIGMA, or in other words, s*L where LL'=V (so SIGMA=s^2*V)
-    VectorXd y(K_);
-    std::normal_distribution<double> stdnorm(0, 1);
-    for (unsigned int i = 0; i < K_; i++) y[i] = stdnorm(rng);
+    // To draw this, first draw a gamma-distributed "h" value (store its inverse)
+    last_draw_[K_] = 1.0 / std::gamma_distribution<double>(n_/2, 2/(s2_*n_))(rng);
 
-    std::chi_squared_distribution<double> rchisqn(n_);
-
-    last_draw_.head(K_) = beta_ + sqrt(s2_ * n_ / rchisqn(rng)) * VcholL() * y;
-
-    // h has distribution Gamma(n/2, 2/(n*s^2)), and s^2 is the inverse of h:
-    last_draw_[K_] = 1.0 / (std::gamma_distribution<double>(n_/2, 2/(s2_*n_))(rng));
+    // Now use that to draw a multivariate normal conditional on h, with mean beta and variance
+    // h^{-1} V; this is the beta portion of the draw:
+    last_draw_.head(K_) = multivariateNormal(beta_, VcholL(), std::sqrt(last_draw_[K_]));
 
     return last_draw_;
+}
+
+VectorXd Linear::multivariateNormal(const Ref<const VectorXd> &mu, const Ref<const MatrixXd> &L, double s) {
+    if (mu.rows() != L.rows() or L.rows() != L.cols())
+        throw std::logic_error("multivariateNormal() called with non-conforming mu and L");
+
+    // To draw such a normal, we need the lower-triangle Cholesky decomposition L of V, and a vector
+    // of K random \f$N(\mu=0, \sigma^2=h^{-1})\f$ values.  Then \f$beta + Lz\f$ yields a \f$beta\f$
+    // draw of the desired distribution.
+    VectorXd z(mu.size());
+    for (unsigned int i = 0; i < z.size(); i++) z[i] = Random::rstdnorm();
+
+    return mu + L * (s * z);
 }
 
 const VectorXd& Linear::lastDraw() const {
@@ -141,12 +171,22 @@ void Linear::discardForce(unsigned int burn) {
 }
 
 std::ostream& operator<<(std::ostream &os, const Linear &b) {
-    if (b.K() == 0)
-        os << "Linear model with no parameters (default constructed)";
-    else
-        os << "Linear model with " << b.K() << " parameters, beta_ =\n" << b.beta_;
+    b.print(os);
     return os;
 }
+
+void Linear::print(std::ostream &os) const {
+    os << print_name();
+    if (K_ == 0) os << " model with no parameters (default constructed)";
+    else {
+        if (noninformative()) os << " (noninformative)";
+        os << " model: K=" << K_ << ", n=" << n_ << ", s2=" << s2_ <<
+            "\n  beta = " << beta_.transpose().format(IOFormat(StreamPrecision, 0, ", ")) <<
+            "\n  V = " << V_.format(IOFormat(6, 0, " ", "\n      ")) << "\n";
+    }
+}
+
+std::string Linear::print_name() const { return "Linear"; }
 
 void Linear::verifyParameters() const { NO_EMPTY_MODEL; }
 
@@ -194,10 +234,16 @@ void Linear::updateInPlace(const Ref<const VectorXd> &y, const Ref<const MatrixX
     VectorXd beta_diff = beta_post - beta_;
     beta_ = std::move(beta_post);
     s2_ = (n_prior * s2_ + residualspost.squaredNorm() + beta_diff.transpose() * Vinv() * beta_diff) / n_;
+    //ERIS_DBG("orig nSSR: " << residualspost.squaredNorm()
+    /*ERIS_DBG("s2_ orig method: " << s2_);
+    ERIS_DBG("s2_ Koop: " << s2_alt);*/
 
     V_inv_ = std::move(V_post_inv);
     beta_ = std::move(beta_post);
-    if (V_chol_L_) V_chol_L_.reset(); // This will have to be recalculated
+    // The decompositions will have to be recalculated:
+    if (V_chol_L_) V_chol_L_.reset();
+    if (V_chol_L_inv_) V_chol_L_inv_.reset(); 
+
     if (noninformative_) noninformative_ = false; // If we just updated a noninformative model, we aren't noninformative anymore
 }
 
@@ -231,14 +277,21 @@ void Linear::weakenInPlace(const double precision_scale) {
             V_inv_ = std::make_shared<Eigen::MatrixXd>(*V_inv_ * precision_scale);
     }
 
-    // Likewise for the Cholesky decomposition
+    // Likewise for the Cholesky decomposition (and its inverse)
     if (V_chol_L_) {
         if (V_chol_L_.unique())
             *V_chol_L_ /= std::sqrt(precision_scale);
         else
             V_chol_L_ = std::make_shared<Eigen::MatrixXd>(*V_chol_L_ / std::sqrt(precision_scale));
     }
+    if (V_chol_L_inv_) {
+        if (V_chol_L_inv_.unique())
+            *V_chol_L_inv_ *= std::sqrt(precision_scale);
+        else
+            V_chol_L_inv_ = std::make_shared<Eigen::MatrixXd>(*V_chol_L_inv_ * std::sqrt(precision_scale));
+    }
 
+    // And of course V gets scaled
     V_ /= precision_scale;
 
     return;

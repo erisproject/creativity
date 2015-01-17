@@ -6,6 +6,7 @@
 
 using namespace eris;
 using namespace creativity::state;
+using namespace creativity::belief;
 
 namespace creativity { namespace gui {
 
@@ -148,17 +149,19 @@ InfoWindow::InfoWindow(std::shared_ptr<const State> state, std::shared_ptr<Gtk::
         data_append(grid_profit, "p_" + std::to_string(i), BETA "[" + p_vars[i] + "]");
     data_append(grid_profit, "_p_draws", "# successful draws");
     data_append(grid_profit, "_p_discards", "# discarded draws");
+    data_append(grid_profit, "_p_drawtype", "Draw method");
     matrix_at(grid_profit, "p_V", "s<sup>2</sup><b>V</b>", 2, 2, p_vars.size(), p_vars.size());
 
     auto &grid_demand = new_tab_grid(beliefs, "Demand");
     labels_append(grid_demand, "Dependent variable", "<i>quantityDemanded</i>");
     data_append(grid_demand, "d_n", "n");
     data_append(grid_demand, "d_s2", "s<sup>2</sup>");
-    std::vector<std::string> d_vars{{"constant", "price", "quality", "quality<sup>2</sup>", "prevSales", "noSales", "age", "I(onlyBook)", "otherBooks", "marketBooks"}};
+    std::vector<std::string> d_vars{{"constant", "price", "quality", "quality<sup>2</sup>", "prevSales", "age", "I(onlyBook)", "otherBooks", "marketBooks"}};
     for (size_t i = 0; i < d_vars.size(); i++)
         data_append(grid_demand, "d_" + std::to_string(i), BETA "[" + d_vars[i] + "]");
     data_append(grid_demand, "_d_draws", "# successful draws");
     data_append(grid_demand, "_d_discards", "# discarded draws");
+    data_append(grid_demand, "_d_drawtype", "Draw method");
     matrix_at(grid_demand, "d_V", "s<sup>2</sup><b>V</b>", 2, 2, d_vars.size(), d_vars.size());
     comment_append(grid_demand, "<i>NB: This regression is for single-period demand.</i>", p_vars.size() + 3);
 
@@ -188,6 +191,7 @@ InfoWindow::InfoWindow(std::shared_ptr<const State> state, std::shared_ptr<Gtk::
         data_append(grid_pextrap, "pe_" + std::to_string(i), BETA "[" + p_vars[i] + "]");
     data_append(grid_pextrap, "_pe_draws", "# successful draws");
     data_append(grid_pextrap, "_pe_discards", "# discarded draws");
+    data_append(grid_pextrap, "_pe_drawtype", "Draw method");
     matrix_at(grid_pextrap, "pe_V", "s<sup>2</sup><b>V</b>", 2, 2, p_vars.size(), p_vars.size());
     comment_append(grid_pextrap, "<i>NB: This is the same model as the Profit belief, but its data also includes extrapolated values for "
             "still-on-market books using ProfitStream beliefs, while Profit beliefs only include books once they leave the market.</i>",
@@ -311,12 +315,15 @@ void InfoWindow::refresh(std::shared_ptr<const State> state) {
         UPDATE_LIN_RB("d_", demand);
         UPDATE_LIN_RB("pe_", profit_extrap);
 
-        updateValue("_p_draws", r.profit.draw_success_cumulative);
-        updateValue("_p_discards", r.profit.draw_discards_cumulative);
-        updateValue("_pe_draws", r.profit_extrap.draw_success_cumulative);
-        updateValue("_pe_discards", r.profit_extrap.draw_discards_cumulative);
-        updateValue("_d_draws", r.demand.draw_success_cumulative);
-        updateValue("_d_discards", r.demand.draw_discards_cumulative);
+        updateValue("_p_draws", r.profit.draw_rejection_success);
+        updateValue("_p_discards", r.profit.draw_rejection_discards);
+        updateValue("_p_drawtype", r.profit.last_draw_mode == LinearRestricted::DrawMode::Gibbs ? "gibbs" : "rejection");
+        updateValue("_pe_draws", r.profit_extrap.draw_rejection_success);
+        updateValue("_pe_discards", r.profit_extrap.draw_rejection_discards);
+        updateValue("_pe_drawtype", r.profit_extrap.last_draw_mode == LinearRestricted::DrawMode::Gibbs ? "gibbs" : "rejection");
+        updateValue("_d_draws", r.demand.draw_rejection_success);
+        updateValue("_d_discards", r.demand.draw_rejection_discards);
+        updateValue("_d_drawtype", r.demand.last_draw_mode == LinearRestricted::DrawMode::Gibbs ? "gibbs" : "rejection");
 
         for (unsigned long a : Reader::profit_stream_ages) {
             std::string code_prefix = "ps" + std::to_string(a) + "_";

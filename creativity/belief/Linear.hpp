@@ -8,9 +8,6 @@
 namespace creativity { namespace belief {
 
 /** Base class for a linear model with a natural conjugate, normal-gamma prior. 
- *
- * FIXME: change (where appropriate) to use selfadjointView (esp. for Cholesky decomp, and possibly
- * for inverse).
  */
 class Linear {
     public:
@@ -50,33 +47,19 @@ class Linear {
          */
         explicit Linear(unsigned int K);
 
-        // NB: if changing these constants, also change the above constructor documentation
-        static constexpr double
-            /** The value of `n` for a default noninformative model constructed using
-             * `Linear(unsigned int)`.
-             */
-            //
-            NONINFORMATIVE_N = 1e-3,
-            /// The value of `s2` for a noninformative model constructed using `Linear(unsigned int)`
-            NONINFORMATIVE_S2 = 1.0,
-            /// The constant for the diagonals of the V matrix for a noninformative model
-            NONINFORMATIVE_Vc = 1e+8;
-
         /** Constructs a Linear model with the given parameters.  These parameters will be those
          * used for the prior when updating.
          *
          * \param beta the coefficient mean parameters (which, because of restrictions, might not be
          * the actual means).
+         *
          * \param s2 the \f$\sigma^2\f$ value of the error term variance.  Typically the \f$\sigma^2\f$ estimate.
+         *
          * \param V the model's V matrix (where \f$s^2 V\f$ is the variance matrix of \f$\beta\f$).
+         * Note: only the lower triangle of the matrix will be used.
+         *
          * \param n the number of data points supporting the other values (which can be a
          * non-integer value).
-         * \param V_inv A shared pointer to the inverse of `V`, if already calculated.  If the
-         * inverse has not already been calculated, it is better to omit this argument: the inverse
-         * will be calculated when needed.
-         * \param V_chol_L A shared pointer to the `L` matrix of the cholesky decomposition of `V`
-         * (where LL' = V).  If the decomposition has not already been calculated, it is better to
-         * omit this argument: the decomposition will be calculated when needed.
          *
          * \throws std::runtime_error if any of (`K >= 1`, `V.rows() == V.cols()`, `K == V.rows()`)
          * are not satisfied (where `K` is determined by the number of rows of `beta`).
@@ -85,10 +68,8 @@ class Linear {
                 const Eigen::Ref<const Eigen::VectorXd> beta,
                 double s2,
                 const Eigen::Ref<const Eigen::MatrixXd> V,
-                double n,
-                std::shared_ptr<Eigen::MatrixXd> V_inv = nullptr,
-                std::shared_ptr<Eigen::MatrixXd> V_chol_L = nullptr
-        );
+                double n
+              );
 
         /** Constructs a Linear model from std::vector<double>s containing the coefficients of beta
          * and the lower triangle of V.
@@ -125,6 +106,19 @@ class Linear {
         /// Virtual destructor
         virtual ~Linear() = default;
 
+        // NB: if changing these constants, also change the single-int, non-informative constructor documentation
+        static constexpr double
+            /** The value of `n` for a default noninformative model constructed using
+             * `Linear(unsigned int)`.
+             */
+            //
+            NONINFORMATIVE_N = 1e-3,
+            /// The value of `s2` for a noninformative model constructed using `Linear(unsigned int)`
+            NONINFORMATIVE_S2 = 1.0,
+            /// The constant for the diagonals of the V matrix for a noninformative model
+            NONINFORMATIVE_Vc = 1e+8;
+
+
         /** Virtual method called during construction to verify the model size.  If this returns a
          * non-zero value, the given parameters (beta, V for the regular constructor, K for the
          * noninformative constructor) must agree with the returned value.  If this returns 0, beta
@@ -132,7 +126,6 @@ class Linear {
          */
         virtual unsigned int fixedModelSize() const;
 
-#define NO_EMPTY_MODEL if (K_ == 0) { throw std::logic_error("Cannot use default constructed model object as a model"); }
         /** Accesses the base distribution means value of beta.  Note that this is *not* necessarily
          * the mean of beta and should not be used for prediction; rather it simply returns the
          * distribution parameter value used, which may well not be the mean if any of the beta
@@ -159,6 +152,10 @@ class Linear {
          */
         const Eigen::MatrixXd& VcholL() const;
 
+        /** Accesses (calculating if not previous calculated) the inverse of `VcholL()`.  Note that
+         * if VcholL() hasn't been calculated yet, this will calculate it. */
+        const Eigen::MatrixXd& VcholLinv() const;
+
         /** Given a row vector of values \f$X^*\f$, predicts \f$y^*\f$ using the current model
          * values.  The default implementation provided by this class simply returns the mean \f$X^*
          * \beta\f$ (the mean of the multivariate \f$t\f$ density for an unrestricted, natural
@@ -172,10 +169,14 @@ class Linear {
          */
         virtual double predict(const Eigen::Ref<const Eigen::RowVectorXd> &Xi);
 
-        /** Draws a vector of \f$\beta\f$ values and \f$s^2\f$ values distributed according to the
-         * model's structure.  The default implementation simply returns the posterior beta and s^2
-         * values, which is suitable for a natural conjugate, normal-gamma distribution without
-         * any model restrictions.
+        /** Draws a vector of \f$\beta\f$ values and \f$h^{-1} = \sigma^2\f$ values distributed
+         * according to the model's parameters.  The first `K()` values are the drawn \f$\beta\f$
+         * values, the last value is the drawn \f$h^{-1}\f$ value.
+         *
+         * In particular, this uses a gamma distribution to first draw an h value, then uses that h
+         * value to draw multivariate normal beta values.  This means the \f$\beta\f$ values will have a
+         * multivariate t distribution with mean `beta()`, covariance parameter `s2()*V()`, and
+         * degrees of freedom parameter `n()`.
          *
          * \returns a const reference to the vector of values.  This same vector is accessible by
          * calling lastDraw().  Note that this vector is reused for subsequent draw() calls and so
@@ -184,6 +185,36 @@ class Linear {
          * Subclasses overriding this method in should also consider overriding discard().
          */
         virtual const Eigen::VectorXd& draw();
+
+        /** Draws a multivariate normal with mean \f$\mu\f$ covariance \f$s^2LL^\top\f$ (i.e. takes
+         * a constant and a Cholesky decomposition).
+         *
+         * \param mu the vector means
+         * \param L the Cholesky decomposition matrix
+         * \param s a standard deviation multiplier for the Cholesky decomposition matrix.  Typically
+         * a \f$\sigma\f$ (NOT \f$\sigma^2\f$) value.  If omitted, defaults to 1 (so that you can
+         * just pass the Cholesky decomposition of the full covariance matrix).
+         *
+         * \returns the random multivariate normal vector.
+         *
+         * \throws std::logic_error if mu and L have non-conforming sizes
+         */
+        static Eigen::VectorXd multivariateNormal(
+                const Eigen::Ref<const Eigen::VectorXd> &mu,
+                const Eigen::Ref<const Eigen::MatrixXd> &L,
+                double s = 1.0);
+
+        /** Exception class thrown when draw() is unable to produce an admissable draw.  Not thrown
+         * by this class (draws never fail) but available for subclass use.
+         */
+        class draw_failure : public std::runtime_error {
+            public:
+                /** Constructor.
+                 * \param what the exception message.
+                 */
+                draw_failure(const std::string &what) : std::runtime_error(what) {}
+        };
+
 
         /** Returns a reference to the vector of \f$\beta\f$ and \f$s^2\f$ values generated by the
          * last call to draw().  If draw() has not yet been called, the vector will be empty.
@@ -211,6 +242,16 @@ class Linear {
         /** Overloaded so that a Linear model can be printed nicely with `std::cout << model`.
          */
         friend std::ostream& operator << (std::ostream &os, const Linear &b);
+
+        /** Prints the Linear model to the given output stream.  Called internally by operator<<,
+         * but subclassable.  The model_base parameter is used for the first word of the output.
+         */
+        virtual void print(std::ostream &os) const;
+
+        /** The display name of the model to use when printing it.  Defaults to "Linear" but
+         * subclasses should override.
+         */
+        virtual std::string print_name() const;
 
         /** Using the calling object as a prior, uses the provided data to create a new Linear
          * model.
@@ -261,6 +302,7 @@ class Linear {
         Linear weaken(double precision_scale) &&;
 
     protected:
+
         /** Weakens the current linear model.  This functionality should only be used internally and
          * by subclasses as required for move and copy update methods; weakening should be
          * considered (externally) as a type of construction of a new object.
@@ -305,11 +347,15 @@ class Linear {
          */
         Eigen::MatrixXd V_;
 
-        /** The cached inverse of the prior V matrix, which isn't set until/unless needed. */
-        mutable std::shared_ptr<Eigen::MatrixXd> V_inv_;
+        mutable std::shared_ptr<Eigen::MatrixXd>
+            /// The cached inverse of the prior V matrix, which isn't set until/unless needed.
+            V_inv_,
 
-        /** The cached "L" matrix of the cholesky decomposition of V, where LL' = V. */
-        mutable std::shared_ptr<Eigen::MatrixXd> V_chol_L_;
+            /// The cached "L" matrix of the cholesky decomposition of V, where LL' = V.
+            V_chol_L_,
+
+            /// The cached inverse of the "L" matrix of the cholesky decomposition of V.
+            V_chol_L_inv_;
 
         /// The number of data points supporting this model, which need not be an integer.
         double n_;
@@ -333,7 +379,5 @@ class Linear {
         // Checks that the given matrices conform; called during construction; throws on error.
         void checkLogic();
 };
-
-#undef NO_EMPTY_MODEL
 
 }}

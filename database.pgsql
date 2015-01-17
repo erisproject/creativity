@@ -93,7 +93,6 @@ CREATE TYPE belief_type AS ENUM (
     'profit_stream'
 );
 
-
 --
 -- Name: library_type; Type: TYPE; Schema: public; Owner: -
 --
@@ -102,6 +101,16 @@ CREATE TYPE library_type AS ENUM (
     'wrote',
     'bought',
     'pirated'
+);
+
+--
+-- Name: draw_type; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE draw_type AS ENUM (
+    'gibbs',
+    'rejection',
+    'none'
 );
 
 
@@ -122,6 +131,7 @@ CREATE TABLE belief (
     n double precision,
     beta double precision[],
     v_lower double precision[],
+    last_draw_type draw_type,
     draw_successes integer,
     draw_discards integer
 );

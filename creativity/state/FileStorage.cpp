@@ -643,8 +643,8 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
         r.profit = belief.noninformative
             ? Profit(settings_.dimensions, belief.K)
             : Profit(settings_.dimensions, belief.beta, belief.s2, belief.V, belief.n);
-        r.profit.draw_success_cumulative = belief.draw_success_cumulative;
-        r.profit.draw_discards_cumulative = belief.draw_discards_cumulative;
+        r.profit.draw_rejection_success = belief.draw_success_cumulative;
+        r.profit.draw_rejection_discards = belief.draw_discards_cumulative;
     }
 
     belief = readBelief();
@@ -652,8 +652,8 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
         r.profit_extrap = belief.noninformative
             ? Profit(settings_.dimensions, belief.K)
             : Profit(settings_.dimensions, belief.beta, belief.s2, belief.V, belief.n);
-        r.profit_extrap.draw_success_cumulative = belief.draw_success_cumulative;
-        r.profit_extrap.draw_discards_cumulative = belief.draw_discards_cumulative;
+        r.profit_extrap.draw_rejection_success = belief.draw_success_cumulative;
+        r.profit_extrap.draw_rejection_discards = belief.draw_discards_cumulative;
     }
 
     belief = readBelief();
@@ -661,8 +661,8 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
         r.demand = belief.noninformative
             ? Demand(settings_.dimensions, belief.K)
             : Demand(settings_.dimensions, belief.beta, belief.s2, belief.V, belief.n);
-        r.demand.draw_success_cumulative = belief.draw_success_cumulative;
-        r.demand.draw_discards_cumulative = belief.draw_discards_cumulative;
+        r.demand.draw_rejection_success = belief.draw_success_cumulative;
+        r.demand.draw_rejection_discards = belief.draw_discards_cumulative;
     }
 
     belief = readBelief();
@@ -713,9 +713,10 @@ FileStorage::belief_data FileStorage::readBelief() const {
 
     // Next up is a status field
     uint8_t status = read_u8();
-    // Currently only the first bit is used: if set, this is a restricted belief (with draw
+    // The lowest-value bit indicates this is a restricted belief
     // information)
     bool restricted_model = status & 1;
+    bool last_draw_was_gibbs = status & 2;
 
     // The first K elements are beta values
     belief.beta = VectorXd(k);
@@ -740,6 +741,7 @@ FileStorage::belief_data FileStorage::readBelief() const {
     if (restricted_model) {
         belief.draw_success_cumulative = read_u32();
         belief.draw_discards_cumulative = read_u32();
+        belief.draw_gibbs = last_draw_was_gibbs;
     }
 
     return belief;
@@ -830,12 +832,16 @@ void FileStorage::writeBelief(const Linear &m) {
     write_i8(k);
 
     bool restricted_model = false;
-    // First up is the status field.  Currently we just have one status bit for a restricted model
+    // First up is the status field.  Currently we have one status bit for a restricted model, and
+    // one for the last draw mode
     const LinearRestricted *lr = dynamic_cast<const LinearRestricted*>(&m);
     if (lr) restricted_model = true;
 
     uint8_t status = 0;
-    if (restricted_model) status |= 1;
+    if (restricted_model) {
+        status |= 1;
+        if (lr->last_draw_mode == LinearRestricted::DrawMode::Gibbs) status |= 2;
+    }
 
     // Status field
     write_u8(status);
@@ -858,8 +864,8 @@ void FileStorage::writeBelief(const Linear &m) {
     }
 
     if (restricted_model) {
-        write_u32(lr->draw_success_cumulative);
-        write_u32(lr->draw_discards_cumulative);
+        write_u32(lr->draw_rejection_success);
+        write_u32(lr->draw_rejection_discards);
     }
 
     FILESTORAGE_DEBUG_WRITE_CHECK(2+8*(2+k+k*(k+1)/2) + (restricted_model ? 4*2 : 0))
