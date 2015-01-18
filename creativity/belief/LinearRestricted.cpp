@@ -20,6 +20,8 @@ using boost::math::gamma_q_inv;
 
 namespace creativity { namespace belief {
 
+static int COUNTER = 0, COUNTER2 = 0;
+
 LinearRestricted::RestrictionProxy LinearRestricted::lowerBound(size_t k) {
     return RestrictionProxy(*this, k, false);
 }
@@ -162,13 +164,12 @@ void LinearRestricted::gibbsInitialize(const Ref<const VectorXd> &initial, unsig
 
     gibbs_draws_ = 0;
 
-    const MatrixXd &A = VcholLinv();
     auto &rng = Random::rng();
 
     if (restrict_size_ == 0) {
         // No restrictions, nothing special to do!
         if (not gibbs_last_ or gibbs_last_->size() != K_+1) gibbs_last_.reset(new VectorXd(K_+1));
-        gibbs_last_->head(K_) = A * initial.head(K_);
+        gibbs_last_->head(K_) = initial.head(K_) - beta_;
     }
     else {
         // Otherwise we'll start at the initial value and update
@@ -197,18 +198,17 @@ void LinearRestricted::gibbsInitialize(const Ref<const VectorXd> &initial, unsig
         }
 
         if (not gibbs_last_ or gibbs_last_->size() != K_+1) gibbs_last_.reset(new VectorXd(K_+1));
-        gibbs_last_->head(K_) = A * adjusted;
+        gibbs_last_->head(K_) = adjusted - beta_;
     }
 
-    // Draw an appropriate sigma^2 value from the unconditional distribution, which should be
-    // suitable as an initial value (subsequent draws will be from the conditional distribution
-    // based on drawn beta values)
-    (*gibbs_last_)[K_] = 1.0 / std::gamma_distribution<double>(n_/2, 2/(s2_*n_))(rng);
+    // Set the sigma^2 value to 0: we don't have a draw for it, but that doesn't matter because
+    // it's the first thing that gets drawn in drawGibbs (and that draw doesn't depend on this one)
+    (*gibbs_last_)[K_] = 0.0;
 }
 
 VectorXd LinearRestricted::gibbsLast() {
     return gibbs_last_ and gibbs_last_->size() == K_+1
-        ? VcholL() * gibbs_last_->head(K_)
+        ? beta_ + gibbs_last_->head(K_)
         : VectorXd();
 }
 
@@ -235,6 +235,7 @@ const VectorXd& LinearRestricted::drawGibbs() {
 
     auto &rng = Random::rng();
     if (not gibbs_last_) {
+        ERIS_DBG("no last");
         // If we don't have an initial value, draw an *untruncated* value and give it to
         // gibbsInitialize() to fix up.
         
@@ -251,50 +252,64 @@ const VectorXd& LinearRestricted::drawGibbs() {
 
     auto &Z = *gibbs_last_;
 
+    // FIXME: cache all this crap:
+    // vector of cached r - R*beta_ values:
+    VectorXd r_Rb(restrict_values_.head(restrict_size_) - restrict_select_.topRows(restrict_size_) * beta_);
+    VectorXd sd(K_);
+    std::vector<RowVectorXd> P;
+    // Q is the portion of V without the i'th row/column:
+    MatrixXd Q = V_.bottomRightCorner(K_-1, K_-1);
+    // Qi is the i'th column of V, but with the i'th element removed
+    VectorXd Qi(K_-1);
+    for (unsigned int i = 0; i < K_; i++) {
+        if (i > 0) {
+            Q.col(i-1).head(i) = V_.col(i-1).head(i);
+            if (i > 1) Q.row(i-1).head(i-1) = V_.row(i-1).head(i-1);
+            if (i < K_-1) {
+                Q.col(i-1).tail(K_ - 1 - i) = V_.col(i-1).tail(K_ - 1 - i);
+                Q.row(i-1).tail(K_ - 1 - i) = V_.row(i-1).tail(K_ - 1 - i);
+            }
+        }
+        if (i > 0) Qi.head(i-1) = V_.col(i).head(i-1);
+        if (i < K_-1) Qi.tail(K_-1-i) = V_.col(i).tail(K_-1-i);
+
+        P.emplace_back(Qi.transpose() * Q.colPivHouseholderQr().inverse());
+        sd[i] = std::sqrt(s2_ * (V_(i,i) - P.back() * Qi));
+    }
+
+//    ERIS_DBGVAR(sd.transpose());
+//    for (unsigned i = 0; i < K_; i++) {
+//        ERIS_DBGVAR(i);
+//        ERIS_DBGVAR(P[i]);
+//    }
 
     for (int t = 0; t < num_draws; t++) { // num_draws > 1 if thinning or burning in
+//        ERIS_DBGVAR(Z.transpose());
 
-        for (unsigned int j = 0; j < K_; j++) {
-            // Temporarily set the coefficient to 0, so that we don't have to maintain a bunch of
-            // D-with-one-column-removed matrices below.
-            Z[j] = 0.0;
-
-            // Figure out l_j and u_j, the most binding constraints on \beta_j
-            double lj = -INFINITY, uj = INFINITY;
-            for (size_t r = 0; r < restrict_size_; r++) {
-                // NB: not calculating the whole LHS vector and RHS vector at once, because there's
-                // a good chance of 0's in the LHS vector, in which case we don't need to bother
-                // calculting the RHS at all
-                auto &dj = D(r, j);
-                if (dj != 0) {
-                    // NB: in the paper, the last term here is D_{-j} * z_{-j}, but because z_{j} =
-                    // 0 is set up, this is equivalent (it involves multiplying and adding a zero,
-                    // but that's less computational work than screwing around with removing
-                    // elements from matrices, and much less programming work).
-                    double constraint = (restrict_values_[r] - D.row(r) * Z.head(K_)) / dj;
-                    if (dj > 0) { // <= constraint (we didn't flip the sign by dividing by dj)
-                        if (constraint < uj) uj = constraint;
-                    }
-                    else { // >= constraint
-                        if (constraint > lj) lj = constraint;
-                    }
-                }
-            }
-
-            // Now lj is the most-binding bottom constraint, uj is the most-binding upper
-            // constraint.  Make sure they aren't conflicting:
-            if (lj >= uj) throw draw_failure("drawGibbs(): found impossible-to-satisfy linear constraints");
-
-            // Our new Z is a truncated normal (truncated by the bounds we just found)
-            Z[j] = truncNorm(alpha[j], std::sqrt(Z[K_]), lj, uj);
-        }
-
-        // Now we need a sigma^2 draw.
+        // Get a sigma^2 draw based on the previous iteration's beta values
         if (restrict_size_ == 0) {
             // If no restrictions, simple, just draw it from the unconditional distribution
-            Z[K_] = 1.0 / std::gamma_distribution<double>(n_/2, 2/(s2_*n_))(rng);
+            Z[K_] = 1.0 / std::gamma_distribution<double>(n_/2, 2/(n_))(rng);
+        }
+        else if (true) { // DEBUG
+            do {
+                /*double w1 = 1.0517473, w2 = 0.6658070, w3 = 0.5624538;
+                ++COUNTER2;
+                if (COUNTER2 == 1) Z[K_] = 1/(w1*w1); else
+                if (COUNTER2 == 2) Z[K_] = 1/(w2*w2); else
+                if (COUNTER2 == 3) Z[K_] = 1/(w3*w3); else
+                Z[K_] = 1.0 / std::gamma_distribution<double>(n_/2, 2/(n_))(rng);*/
+                Z[K_] = 1.0 / (std::chi_squared_distribution<double>(n_)(rng) / n_);
+            }
+            while ((
+                        (restrict_select_.topRows(restrict_size_) * (
+                            beta_ + Z[K_] * Z.head(K_)
+                        )).array() > restrict_values_.head(restrict_size_).array()
+                   ).any());
+
         }
         else {
+            throw std::runtime_error("BROKEN!");
             // Otherwise we need to look at the Z values we drew above and draw and admissable
             // sigma^2 value from the range of values that wouldn't have caused a constraint
             // violation had we used it instead of Z[K_], then draw a new Z[K_] from that truncated
@@ -323,13 +338,118 @@ const VectorXd& LinearRestricted::drawGibbs() {
             Z[K_] = 1.0 / truncGamma(n_/2, 2/(s2_*n_), 1.0/(su*su), 1.0/(sl*sl));
         }
 
+        for (unsigned int j = 0; j < K_; j++) {
+//            ERIS_DBGVAR(Z.transpose());
+            double mu_j = 0;
+            if (j > 0) mu_j += P[j].head(j) * Z.head(j);
+            if (j < K_-1) mu_j += P[j].tail(K_-1-j) * Z.segment(j+1, K_-1-j);
+
+            // Temporarily set the coefficient to 0, so that we don't have to maintain a bunch of
+            // D-with-one-column-removed matrices below.
+            Z[j] = 0.0;
+            // Figure out l_j and u_j, the most binding constraints on Z_j
+            double lj = -INFINITY, uj = INFINITY;
+            for (size_t r = 0; r < restrict_size_; r++) {
+                // NB: not calculating the whole LHS vector and RHS vector at once, because there's
+                // a good chance of 0's in the LHS vector, in which case we don't need to bother
+                // calculting the RHS at all
+                auto &Rrj = restrict_select_(r, j);
+                if (Rrj != 0) {
+                    VectorXd beta = beta_;
+                    beta[j] = 0;
+                    double constraint = (restrict_values_[r] - restrict_select_.row(r) * beta) / Rrj;
+                    //restrict_values_[r] - D.row(r) * Z.head(K_)) / dj;
+                    if (Rrj > 0) { // <= constraint (we didn't flip the sign by dividing by Rrj)
+                        if (constraint < uj) uj = constraint;
+                    }
+                    else { // >= constraint
+                        if (constraint > lj) lj = constraint;
+                    }
+                }
+            }
+
+            // Now lj is the most-binding bottom constraint, uj is the most-binding upper
+            // constraint.  Make sure they aren't conflicting:
+            if (lj >= uj) throw draw_failure("drawGibbs(): found impossible-to-satisfy linear constraints");
+
+//            ERIS_DBGVAR(j);
+//            ERIS_DBGVAR(lj);
+//            ERIS_DBGVAR(uj);
+//            ERIS_DBGVAR(mu_j);
+//            ERIS_DBGVAR(sd[j]);
+//            Z[j] = uj+.00001;
+//            ERIS_DBG("if uj+.00001 gets drawn, beta is:");
+//            ERIS_DBGVAR((Ainv * Z.head(K_)).transpose());
+//            Z[j] = lj-.00001;
+//            ERIS_DBG("if lj-.00001 gets drawn, beta is:");
+//            ERIS_DBGVAR((Ainv * Z.head(K_)).transpose());
+//            throw std::runtime_error("debug");
+
+/*            double d = 0, dmin = INFINITY, dmax=-INFINITY;
+            for (int i = 0; i < 1000; i++) {
+                double di = truncNorm(mu_j, sd[j], lj, uj);
+                if (di < dmin) dmin = di;
+                if (di > dmax) dmax = di;
+                d += di;
+            }
+            ERIS_DBGVAR(d / 1000);
+            ERIS_DBGVAR(dmin);
+            ERIS_DBGVAR(dmax);*/
+
+#define PHI(mu, sd, x) (0.5*std::erfc(((mu)-(x)) / ((sd)*std::sqrt(2))))
+#define PHIINV(mu, sd, p) ((mu) - (sd)*std::sqrt(2) * erfc_inv(2*(p)))
+
+            double unif;
+/*            std::vector<double> hi({
+0.2875775201, 0.7883051354, 0.4089769218, 0.8830174040, 0.9404672843, 0.0455564994, 0.5281054880, 0.8924190444, 0.5514350145, 0.4566147353,
+0.9568333453, 0.4533341562, 0.6775706355, 0.5726334020, 0.1029246827, 0.8998249704, 0.2460877344, 0.0420595335, 0.3279207193, 0.9545036491,
+0.8895393161, 0.6928034062, 0.6405068138, 0.9942697766, 0.6557057991, 0.7085304682, 0.5440660247, 0.5941420204, 0.2891597373, 0.1471136473,
+0.9630242325, 0.9022990451, 0.6907052784, 0.7954674177, 0.0246136845, 0.4777959711, 0.7584595375, 0.2164079358, 0.3181810076, 0.2316257854,
+0.1428000224, 0.4145463358, 0.4137243263, 0.3688454509, 0.1524447477, 0.1388060634, 0.2330340995, 0.4659624503, 0.2659726404, 0.8578277153,
+0.0458311667, 0.4422000742, 0.7989248456, 0.1218992600, 0.5609479838, 0.2065313896, 0.1275316502, 0.7533078643, 0.8950453592, 0.3744627759,
+0.6651151946, 0.0948406609, 0.3839696378, 0.2743836446, 0.8146400389, 0.4485163414, 0.8100643530, 0.8123895095, 0.7943423211, 0.4398316876,
+0.7544751586, 0.6292211316, 0.7101824014, 0.0006247733, 0.4753165741, 0.2201188852, 0.3798165377, 0.6127710033, 0.3517979092, 0.1111354243});
+            if (COUNTER++ < hi.size()) {
+                unif = hi[COUNTER-1];
+            }
+            else {*/
+                unif = std::uniform_real_distribution<double>(0, 1)(rng);
+//            }
+            double fa = PHI(mu_j, sd[j], (lj-beta_[j])/std::sqrt(Z[K_]));
+            double fb = PHI(mu_j, sd[j], (uj-beta_[j])/std::sqrt(Z[K_]));
+            Z[j] = mu_j + sd[j] * PHIINV(0, 1, unif * (fb-fa) + fa);
+//            std::cerr << "\n";
+//            ERIS_DBGVAR(j);
+//            ERIS_DBGVAR(Z[K_]);
+//            ERIS_DBGVAR(Z[j]);
+//            ERIS_DBGVAR(lj);
+//            ERIS_DBGVAR(uj);
+//            ERIS_DBGVAR(mu_j);
+//            ERIS_DBGVAR(beta_[j]);
+//            ERIS_DBGVAR(sd[j]);
+//            ERIS_DBGVAR(fa);
+//            ERIS_DBGVAR(fb);
+//            ERIS_DBGVAR(unif);
+//            if (COUNTER++ > 10)
+//            throw std::runtime_error("ASDF");
+            // Our new Z is a truncated normal (truncated by the bounds we just found)
+            //Z[j] = truncNorm(mu_j, sd[j], lj, uj);
+
+/*            [&mean,&sd](double x) { return 0.5*std::erfc((mean-x) / (sd*sqrt2)); }, // cdf
+            [&mean,&sd](double x) { return 0.5*std::erfc((x-mean) / (sd*sqrt2)); }, // cdf complement
+            [&mean,&sd](double p) { return mean - sd*sqrt2 * erfc_inv(2*p); }, // cdf inverse
+            [&mean,&sd](double q) { return mean + sd*sqrt2 * erfc_inv(2*q); }, // cdf complement inverse*/
+
+        }
+
+
         gibbs_draws_++;
     }
 
     if (last_draw_.size() != K_ + 1) last_draw_.resize(K_ + 1);
 
     last_draw_[K_] = Z[K_];
-    last_draw_.head(K_) = Ainv * Z.head(K_);
+    last_draw_.head(K_) = beta_ + Z.head(K_) * std::sqrt(Z[K_]);
 
     return last_draw_;
 }
