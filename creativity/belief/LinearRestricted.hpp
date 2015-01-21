@@ -526,14 +526,14 @@ class LinearRestricted : public Linear {
         /// Accesses the restriction value vector (the \f$r\f$ in \f$R\beta <= r\f$).
         Eigen::Ref<const Eigen::VectorXd> r() const;
 
-        /** Overloaded so print the regular Linear details, followed by the restrictions.
+        /** Overloaded to append the restrictions after the regular Linear details.
          */
-        virtual void print(std::ostream &os) const override;
+        virtual operator std::string() const override;
 
         /** The display name of the model to use when printing it.  Defaults to "Linear" but
          * subclasses should override.
          */
-        virtual std::string print_name() const;
+        virtual std::string display_name() const;
 
     protected:
         /// Creates a LinearRestricted from a Linear rvalue

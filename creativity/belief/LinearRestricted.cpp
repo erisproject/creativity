@@ -677,8 +677,9 @@ LinearRestricted::RestrictionIneqProxy& LinearRestricted::RestrictionIneqProxy::
     return *this;
 }
 
-void LinearRestricted::print(std::ostream &os) const {
-    Linear::print(os);
+LinearRestricted::operator std::string() const {
+    std::ostringstream os;
+    os << Linear::operator std::string();
     if (restrict_size_ == 0) os << "  No restrictions.\n";
     else if (restrict_size_ == 1) os << "  1 restriction:\n";
     else os << "  " << restrict_size_ << " restrictions:\n";
@@ -707,8 +708,10 @@ void LinearRestricted::print(std::ostream &os) const {
 
         os << (negate ? u8" ⩾ " : u8" ⩽ ") << (negate ? -1 : 1) * restrict_values_[r] << "\n";
     }
+
+    return os.str();
 }
 
-std::string LinearRestricted::print_name() const { return "LinearRestricted"; }
+std::string LinearRestricted::display_name() const { return "LinearRestricted"; }
 
 }}

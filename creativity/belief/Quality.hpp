@@ -81,6 +81,9 @@ class Quality : public LinearDerived<Quality> {
             return X;
         }
 
+        /// Returns "Quality", the name of this model
+        virtual std::string display_name() const override { return "Quality"; }
+
     protected:
         /// Constructs a new Demand object given a Linear base object.
         virtual Quality newDerived(Linear &&model) const override;

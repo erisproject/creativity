@@ -171,22 +171,23 @@ void Linear::discardForce(unsigned int burn) {
 }
 
 std::ostream& operator<<(std::ostream &os, const Linear &b) {
-    b.print(os);
-    return os;
+    return os << (std::string) b;
 }
 
-void Linear::print(std::ostream &os) const {
-    os << print_name();
-    if (K_ == 0) os << " model with no parameters (default constructed)";
+Linear::operator std::string() const {
+    std::ostringstream summary;
+    summary << display_name();
+    if (K_ == 0) summary << " model with no parameters (default constructed)";
     else {
-        if (noninformative()) os << " (noninformative)";
-        os << " model: K=" << K_ << ", n=" << n_ << ", s2=" << s2_ <<
+        if (noninformative()) summary << " (noninformative)";
+        summary << " model: K=" << K_ << ", n=" << n_ << ", s2=" << s2_ <<
             "\n  beta = " << beta_.transpose().format(IOFormat(StreamPrecision, 0, ", ")) <<
             "\n  V = " << V_.format(IOFormat(6, 0, " ", "\n      ")) << "\n";
     }
+    return summary.str();
 }
 
-std::string Linear::print_name() const { return "Linear"; }
+std::string Linear::display_name() const { return "Linear"; }
 
 void Linear::verifyParameters() const { NO_EMPTY_MODEL; }
 

@@ -132,6 +132,10 @@ class Demand : public LinearDerived<Demand, LinearRestricted> {
         /// Constructs a new Demand object given a Linear base object.
         virtual Demand newDerived(Linear &&base) const override;
 
+
+        /// Returns "Demand", the name of this model.
+        virtual std::string display_name() const override { return "Demand"; }
+
     private:
         unsigned int D_;
 

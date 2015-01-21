@@ -55,6 +55,9 @@ class ProfitStream : public LinearDerived<ProfitStream> {
 
         using Linear::predict;
 
+        /// Returns "ProfitStream", the name of this model
+        virtual std::string display_name() const override { return "ProfitStream"; }
+
     protected:
         /// Ensures that all beta values are non-negative
         /*virtual void verifyParameters() const override;*/

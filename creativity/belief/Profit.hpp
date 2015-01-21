@@ -112,6 +112,9 @@ class Profit : public LinearDerived<Profit, LinearRestricted> {
          */
         Eigen::RowVectorXd profitRow(eris::SharedMember<Book> book, double quality) const;
 
+        /// Returns "Profit", the name of this model
+        virtual std::string display_name() const override { return "Profit"; }
+
     protected:
         /// Constructs a new Demand object given a Linear base object.
         virtual Profit newDerived(Linear &&model) const override;

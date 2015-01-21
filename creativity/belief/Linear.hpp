@@ -239,19 +239,19 @@ class Linear {
          */
         const bool& noninformative() const;
 
+        /** Converting a model to a string returns a human-readable model summary.
+         */
+        virtual operator std::string() const;
+
         /** Overloaded so that a Linear model can be printed nicely with `std::cout << model`.
          */
         friend std::ostream& operator << (std::ostream &os, const Linear &b);
 
-        /** Prints the Linear model to the given output stream.  Called internally by operator<<,
-         * but subclassable.  The model_base parameter is used for the first word of the output.
+        /** The display name of the model class to use when converting it to a summary string.
+         * Called by the std::string operator when creating a model summary string.  Defaults to
+         * "Linear" but subclasses should override.
          */
-        virtual void print(std::ostream &os) const;
-
-        /** The display name of the model to use when printing it.  Defaults to "Linear" but
-         * subclasses should override.
-         */
-        virtual std::string print_name() const;
+        virtual std::string display_name() const;
 
         /** Using the calling object as a prior, uses the provided data to create a new Linear
          * model.
