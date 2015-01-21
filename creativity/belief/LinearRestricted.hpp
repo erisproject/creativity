@@ -4,6 +4,7 @@
 #include <Eigen/Core>
 #include <Eigen/Cholesky>
 #include <eris/noncopyable.hpp>
+#include <eris/Random.hpp>
 #include "creativity/belief/Linear.hpp"
 
 namespace creativity { namespace belief {
@@ -329,8 +330,7 @@ class LinearRestricted : public Linear {
          * calling this method will cause the next drawGibbs() call to perform a burn-in.  If the
          * initial value satisfies all the restrictions, it is used as is.  Otherwise, the starting
          * point is adjusted with respect to the violated constraints repeatedly until an admissable
-         * point is found, or the maximum number of adjustments is reached.  You can access the
-         * final, possibly adjusted value by calling gibbsLast().
+         * point is found, or the maximum number of adjustments is reached.
          *
          * The specific adjustment is as follows:
          * - Let \f$v \equiv R\beta - r\f$ be the vector of violation amounts, and \f$v_+ \equiv
@@ -377,19 +377,9 @@ class LinearRestricted : public Linear {
          * parameter space.  Defaults to 100.
          * \throws constraint_failure if the constraint cannot be satisfied after `max_tries`
          * adjustments.
-         * \throws logic_error if called with a vector with size != K
+         * \throws logic_error if called with a vector with size other than `K` or `K+1`
          */
         void gibbsInitialize(const Eigen::Ref<const Eigen::VectorXd> &initial, unsigned long max_tries = 100);
-
-        /** Returns the beta values associated with the current Gibbs sampler value.  Note that this
-         * is not necessarily a draw: in particular, the current value might be an adjusted initial
-         * value.  For anything other than obtaining the initial value, calling lastDraw() is a
-         * better choice (particularly because it doesn't require any calculations or vector copy,
-         * unlike this method).
-         *
-         * If there is no last value at all, this returns an empty vector.
-         */
-        Eigen::VectorXd gibbsLast();
 
         /** Exception class used to indicate that one or more constraints couldn't be satisfied.
          */
@@ -401,10 +391,16 @@ class LinearRestricted : public Linear {
                 constraint_failure(const std::string &what) : draw_failure(what) {}
         };
 
-        /** Returns a draw from a truncated univariate distribution given the truncation points, the
-         * cdf and inverse cdf functions, cdf complement and its inverse cdf complement, and
-         * (optionally) the median.  The complements are used to ensure better numerical precision
-         * for regions of the distribution with cdf values above 0.5.
+        /** Returns a draw from a truncated univariate distribution given the truncation points.
+         * The complements are used to ensure better numerical precision for regions of the
+         * distribution with cdf values above 0.5.
+         *
+         * If the given min and max values are at the minimum and maximum limits of the
+         * distribution, a simple draw (without truncation) is returned from the distribution.
+         * Otherwise, the cdf values of min and max are calculated, then a U[cdf(min), cdf(max)] is
+         * drawn and the distribution quantile at that draw is returned.  (Note, however, that the
+         * algorithm also uses cdf complements when using a cdf would result in a loss of numerical
+         * precision).
          *
          * Note: it is recommended to check that the truncation bounds of the distribution are
          * actually within the support of the distribution; if neither is, it is more efficient and
@@ -412,56 +408,134 @@ class LinearRestricted : public Linear {
          * efficient (probabilistically) to use rejection sampling when the truncation bounds are
          * reasonably far out in opposite tails of the distribution.
          *
+         * \param dist any floating point (typically double) distribution object which supports
+         * `cdf(dist, x)`, `quantile(dist, p)`, `cdf(complement(dist, x))`, and
+         * `quantile(complement(dist, q))` calls, and has a `value_type` member indicating the type
+         * of value handled by the distribution.  The distribution objects supported by boost (such
+         * as `boost::math::normal_distribution` are intentionally suitable.
+         *
+         * \param generator a random number generator such that `generator(eris::Random::rng())`
+         * return a random draw from the untruncated distribution, and has a `result_type` member
+         * agreeing with `dist::value_type`.  This generator is only used if the given min and max
+         * don't actually truncate the distribution (for example, when attempting to draw a
+         * "truncated" normal with truncation range `[-infinity,infinity]`.  Both boost's random
+         * number generators and the C++11 random number generators are suitable.
+         *
          * \param min the truncated region lower bound
+         *
          * \param max the truncated region upper bound
-         * \param cdf returns the cdf value for a distribution value.
-         * \param quantile returns the distribution value for a cdf value (i.e. the inverse cdf)
-         * \param cdf_complement returns 1 minus the cdf, but typically with better precision.
-         * \param quantile_complement returns the quantile from a cdf complement value.
+         *
          * \param median the median of the distribution, above which cdf complements will be used
-         * instead of cdf values, for increased precision.  If omitted, quantile will be used first,
-         * and, if the result is greater than 0.5, quantile_complement called instead.  (This
-         * double-lookup is done at most once, either for min or max but not both).  If the median
-         * can be calculated without an inverse cdf lookup, passing it is recommended (and strongly
-         * recommended when inverse cdf lookups are expensive) as it often avoids an unnecessary
-         * inverse cdf (or inverse complement cdf) calculation whenever the median is not in the
-         * truncated region.
+         * and below which cdf values will be used.  When the median is not extremely simple (for
+         * example, a normal distribution with median=mean), omit this (or specify it as NaN): in
+         * the worst case (which occurs whenever both min and max are on the same side of the
+         * median), 3 cdf calls will be used (either two cdfs and one cdf complement, or one cdf and
+         * two complements).  If specified, exactly two cdf calls are used always.
+         *
+         * \returns a draw (of type `dist::value_type`) from the truncated distribution.
+         *
+         * \throws std::logic_error if called with min >= max
+         * \throws draw_failure if the truncation range is so far in the tail that both `min` and
+         * `max` cdf values (or both cdf complement values) are 0 or closer to 0 than a double value
+         * can represent without loss of numerical precision (approximately 2.2e-308 for a double,
+         * though doubles can store subnormal values as small as 4.9e-324 with reduced numerical
+         * precision).
          */
-        static double truncDist(
-                double min,
-                double max,
-                const std::function<double(double)> &cdf,
-                const std::function<double(double)> &cdf_complement,
-                const std::function<double(double)> &quantile,
-                const std::function<double(double)> &quantile_complement,
-                double median = std::numeric_limits<double>::signaling_NaN());
+#ifdef DOXYGEN_SHOULD_SEE_THIS
+        template <class DistType, class RNGType> static auto truncDist(
+                const DistType &dist,
+                RNGType &generator,
+                ResultType min,
+                ResultType max,
+                ResultType median = std::numeric_limits<ResultType>::signaling_NaN())
+#else
+        template <class DistType, class RNGType, typename ResultType = typename DistType::value_type>
+        static auto truncDist(
+                const DistType &dist,
+                RNGType &generator,
+                ResultType min,
+                ResultType max,
+                ResultType median = std::numeric_limits<ResultType>::signaling_NaN())
+                -> typename std::enable_if<
+                                  // Check that DistType and RNGType operate on the same type of floating-point variable:
+                                  std::is_same<typename DistType::value_type, typename RNGType::result_type>::value and
+                                  std::is_floating_point<typename DistType::value_type>::value and
+                                  // Check that the required cdf/quantile/complement ADL functions are callable
+                                  std::is_same<ResultType, decltype(cdf(dist, ResultType{}))>::value and
+                                  std::is_same<ResultType, decltype(cdf(complement(dist, ResultType{})))>::value and
+                                  std::is_same<ResultType, decltype(quantile(dist, ResultType{}))>::value and
+                                  std::is_same<ResultType, decltype(quantile(complement(dist, ResultType{})))>::value,
+                                  ResultType
+                                >::type
+#endif
+        {
+            if (min >= max) throw std::logic_error("Can't call truncDist() with min >= max!");
 
-        /** Draws a truncated normal with mean parameter `mean`, standard deviation `sd`, truncated
-         * to the range `[min,max]`.  This is done by drawing from a
-         * \f$U[\Phi_{mean,sd}(0),\Phi_{mean,sd}(1)]\f$ where \f$Phi_{mean,sd}\f$ is the cdf of a
-         * normal with mean $mean$ and standard deviation $sd$.  The resulting uniform value is then
-         * passed through the normal cdf inverse (using boost's erfc_inv()) to get the truncated
-         * draw.
-         *
-         * If min is negative infinity and max is positive infinity, the truncation is bypassed
-         * entirely and simply `mean + sd * eris::Random::rstdnorm()` is returned.
-         *
-         * \throws constraint_failure if `min >= max`
-         */
-        static double truncNorm(double mean, double sd, double min, double max);
+            auto dist_range = range(dist);
+            if (min <= dist_range.first and max >= dist_range.second)
+                // Truncation range isn't limiting the distribution:
+                return generator(eris::Random::rng());
+            if (max <= dist_range.first or min >= dist_range.second)
+                throw std::logic_error("Can't call truncDist() with truncatation range outside the support of the distribution");
 
-        /** Draws a truncated gamma with shape parameter `shape` and scale parameter `scale`,
-         * truncated to the range `[min,max]`.
-         *
-         * This is done just like truncNorm, but using the cdf and inverse cdf for a gamma
-         * distribution instead of normal distribution.
-         *
-         * If `min` is 0 (or negative) and `max` is infinity, this simply returns a non-truncated
-         * gamma distribution draw, bypassing the above cdf/inverse cdf calculations.
-         *
-         * \throws constraint_failure if `min >= max` or `max <= 0`
-         */
-        static double truncGamma(double shape, double scale, double min, double max);
+            ResultType alpha, omega;
+            bool alpha_comp, omega_comp;
+            if (std::isnan(median)) { // No median, so use an extra call to figure out if we need complements
+                alpha = cdf(dist, min);
+                alpha_comp = alpha > 0.5;
+                if (alpha_comp) {
+                    alpha = cdf(complement(dist, min));
+                    // min is right of median, so max will be too
+                    omega_comp = true;
+                    omega = cdf(complement(dist, max));
+                }
+                else {
+                    // min was left of median.  Let's guess that max is right of the median first, which
+                    // seems like it might be slightly more likely and so might avoid a second cdf lookup
+                    // more often.
+                    omega = cdf(complement(dist, max));
+                    omega_comp = omega < 0.5;
+                    if (not omega_comp) omega = cdf(dist, max);
+                }
+            }
+            else {
+                alpha_comp = min > median;
+                omega_comp = max > median;
+                alpha = alpha_comp ? cdf(complement(dist, min)) : cdf(dist, min);
+                omega = omega_comp ? cdf(complement(dist, max)) : cdf(dist, max);
+            }
+
+            if (not alpha_comp and omega_comp) {
+                // min is left of the median and max is right: we need either make both complements or both
+                // non-complements.  The most precision is going to be lost by whichever value is smaller,
+                // so complement the larger value (so we'll either get both complements, or both
+                // non-complements).
+                if (alpha > omega) { alpha = 1 - alpha; alpha_comp = true; }
+                else { omega = 1 - omega; omega_comp = false; }
+            }
+            // (alpha_comp and not omega_comp) is impossible, because that would mean 'min > max' and we
+            // would have thrown and exception above.
+
+            if (alpha_comp) {
+                // Check for underflow (essentially: is 1-alpha equal to or closer to 0 than a ResultType
+                // (typically a double) can represent without reduced precision)
+                if (alpha == 0 or std::fpclassify(alpha) == FP_SUBNORMAL)
+                    throw draw_failure("LinearRestricted::truncDist(): Unable to draw from truncated distribution: truncation range is too far in the upper tail");
+
+                // Both alpha and omega are complements, so take a draw from [omega,alpha], then pass it
+                // through the quantile_complement
+                return quantile(complement(dist, std::uniform_real_distribution<ResultType>(omega, alpha)(eris::Random::rng())));
+            }
+            else {
+                // Check for underflow (essentially, is omega equal to or closer to 0 than a ResultType
+                // (typically a double) can represent without reduced precision)
+                if (omega == 0 or std::fpclassify(omega) == FP_SUBNORMAL)
+                    throw draw_failure("LinearRestricted::truncDist(): Unable to draw from truncated distribution: truncation range is too far in the lower tail");
+
+                // Otherwise they are ordinary cdf values, draw from the uniform and invert:
+                return quantile(dist, std::uniform_real_distribution<ResultType>(alpha, omega)(eris::Random::rng()));
+            }
+        }
 
         /** This method attempts to draw the `K+1` \f$(\beta,h^{-1})\f$ values as if no restrictions
          * are in place (by calling Linear::draw()), then repeats the draw as long as the drawn
@@ -521,10 +595,10 @@ class LinearRestricted : public Linear {
         double draw_auto_min_success_rate = 0.2; ///< The minimum draw success rate below which we switch to Gibbs sampling
 
         /// Accesses the restriction coefficient selection matrix (the \f$R\f$ in \f$R\beta <= r\f$).
-        Eigen::Ref<const Eigen::MatrixXd> R() const;
+        Eigen::Block<const Eigen::MatrixXd> R() const;
 
         /// Accesses the restriction value vector (the \f$r\f$ in \f$R\beta <= r\f$).
-        Eigen::Ref<const Eigen::VectorXd> r() const;
+        Eigen::VectorBlock<const Eigen::VectorXd> r() const;
 
         /** Overloaded to append the restrictions after the regular Linear details.
          */
@@ -689,7 +763,9 @@ class LinearRestricted : public Linear {
     private:
         // Values used for Gibbs sampling.  These aren't set until first needed.
         std::shared_ptr<Eigen::MatrixXd> gibbs_D_; // D = R A^{-1}
-        std::shared_ptr<Eigen::VectorXd> gibbs_alpha_, gibbs_last_; // alpha = A \mu; last = Z (not X!)
+        // z ~ restricted N(0, I); sigma = sqrt of last sigma^2 draw; r_Rbeta_ = r-R*beta_
+        std::shared_ptr<Eigen::VectorXd> gibbs_last_z_, gibbs_r_Rbeta_;
+        double gibbs_last_sigma_ = std::numeric_limits<double>::signaling_NaN();
         long gibbs_draws_ = 0;
 };
 
