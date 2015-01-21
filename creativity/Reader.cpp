@@ -327,8 +327,8 @@ void Reader::interOptimize() {
                         authored_books, market_books, income_available - cost_fixed
                         );
 #               ifdef ERIS_DEBUG
-                } catch (belief::LinearRestricted::draw_failure &e) {
-                    ERIS_DBG("draw failure in profit_extrap argmaxL for reader=" << id() << ", t=" << simulation()->t());
+                } catch (belief::Linear::draw_failure &e) {
+                    ERIS_DBG("draw failure in profit_extrap argmaxL for reader=" << id() << ", t=" << simulation()->t() << ": " << e.what());
                     throw;
                 }
 #               endif
@@ -370,8 +370,8 @@ void Reader::interOptimize() {
                     create_ = true;
                 }
             }
-            catch (belief::LinearRestricted::draw_failure &e) {
-                ERIS_DBG("draw failure!");
+            catch (belief::Linear::draw_failure &e) {
+                ERIS_DBG("draw failure: " << e.what());
             }
         }
         else {
