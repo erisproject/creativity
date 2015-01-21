@@ -212,7 +212,12 @@ class Linear {
                 /** Constructor.
                  * \param what the exception message.
                  */
-                draw_failure(const std::string &what) : std::runtime_error(what) {}
+                explicit draw_failure(const std::string &what);
+                /** Constructor.
+                 * \param what the exception message.
+                 * \param model the model to append to the exception message.
+                 */
+                draw_failure(const std::string &what, const Linear &model);
         };
 
 

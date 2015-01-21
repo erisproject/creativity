@@ -302,4 +302,8 @@ void Linear::reset() {
     if (last_draw_.size() > 0) last_draw_.resize(0);
 }
 
+Linear::draw_failure::draw_failure(const std::string &what) : std::runtime_error(what) {}
+
+Linear::draw_failure::draw_failure(const std::string &what, const Linear &model) : std::runtime_error(what + "\n" + (std::string) model) {}
+
 }}
