@@ -595,7 +595,7 @@ class LinearRestricted : public Linear {
         double draw_auto_min_success_rate = 0.2; ///< The minimum draw success rate below which we switch to Gibbs sampling
 
         /// Accesses the restriction coefficient selection matrix (the \f$R\f$ in \f$R\beta <= r\f$).
-        Eigen::Block<const Eigen::MatrixXd> R() const;
+        Eigen::Block<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Dynamic, Eigen::Dynamic, true> R() const;
 
         /// Accesses the restriction value vector (the \f$r\f$ in \f$R\beta <= r\f$).
         Eigen::VectorBlock<const Eigen::VectorXd> r() const;
@@ -736,8 +736,12 @@ class LinearRestricted : public Linear {
         /** Stores the coefficient selection matrix for arbitrary linear restrictions passed to
          * addRestriction() or addRestrictions(). Note that the only the first
          * `restrict_linear_size_` rows of the matrix will be set, but other rows might exist with
-         * uninitialized values. */
-        Eigen::MatrixXd restrict_select_;
+         * uninitialized values.
+         *
+         * This matrix is stored in row-major order, because it is primarily accessed and assigned
+         * to row-by-row.
+         */
+        Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> restrict_select_;
         /** Stores the value restrictions for arbitrary linear restrictions passed to
          * addRestriction() or addRestrictions().  Note that the only the first
          * `restrict_linear_size_` values of the vector will be set, but other values might exist
@@ -762,7 +766,7 @@ class LinearRestricted : public Linear {
 
     private:
         // Values used for Gibbs sampling.  These aren't set until first needed.
-        std::shared_ptr<Eigen::MatrixXd> gibbs_D_; // D = R A^{-1}
+        std::shared_ptr<decltype(restrict_select_)> gibbs_D_; // D = R A^{-1}
         // z ~ restricted N(0, I); sigma = sqrt of last sigma^2 draw; r_Rbeta_ = r-R*beta_
         std::shared_ptr<Eigen::VectorXd> gibbs_last_z_, gibbs_r_Rbeta_;
         double gibbs_last_sigma_ = std::numeric_limits<double>::signaling_NaN();
