@@ -516,37 +516,43 @@ class LinearRestricted : public Linear {
             if (min >= max) throw std::logic_error("Can't call truncDist() with min >= max!");
 
             auto dist_range = range(dist);
-            if (min <= dist_range.first and max >= dist_range.second)
+            auto &dist_min = dist_range.first, &dist_max = dist_range.second;
+            if (min <= dist_min and max >= dist_max)
                 // Truncation range isn't limiting the distribution:
                 return generator(eris::Random::rng());
-            if (max <= dist_range.first or min >= dist_range.second)
+            if (max <= dist_min or min >= dist_max)
                 throw std::logic_error("Can't call truncDist() with truncatation range outside the support of the distribution");
 
             ResultType alpha, omega;
             bool alpha_comp, omega_comp;
             if (std::isnan(median)) { // No median, so use an extra call to figure out if we need complements
-                alpha = cdf(dist, min);
+                alpha = min <= dist_min ? 0.0 : cdf(dist, min);
                 alpha_comp = alpha > 0.5;
                 if (alpha_comp) {
+                    // We should have taken the complement but didn't, so get cdf again, but this time as cdf complement
                     alpha = cdf(complement(dist, min));
-                    // min is right of median, so max will be too
-                    omega_comp = true;
-                    omega = cdf(complement(dist, max));
                 }
-                else {
-                    // min was left of median.  Let's guess that max is right of the median first, which
-                    // seems like it might be slightly more likely and so might avoid a second cdf lookup
-                    // more often.
-                    omega = cdf(complement(dist, max));
-                    omega_comp = omega < 0.5;
-                    if (not omega_comp) omega = cdf(dist, max);
+
+                omega = max >= dist_max ? 0.0 /*==complement of 1*/ : cdf(complement(dist, max));
+                omega_comp = alpha_comp || omega < 0.5; // If alpha needed a complement, omega certainly
+                // will; otherwise we're guessing that we'll want the complement
+
+                if (not omega_comp) {
+                    // We guessed wrong: omega is actually in the left tail, so don't want the complement
+                    omega = cdf(dist, max);
                 }
             }
             else {
-                alpha_comp = min > median;
-                omega_comp = max > median;
-                alpha = alpha_comp ? cdf(complement(dist, min)) : cdf(dist, min);
-                omega = omega_comp ? cdf(complement(dist, max)) : cdf(dist, max);
+                if (min <= dist_min) { alpha_comp = false; alpha = 0.0; }
+                else {
+                    alpha_comp = min > median;
+                    alpha = alpha_comp ? cdf(complement(dist, min)) : cdf(dist, min);
+                }
+                if (max >= dist_max) { omega_comp = true; omega = 0.0; }
+                else {
+                    omega_comp = max > median;
+                    omega = omega_comp ? cdf(complement(dist, max)) : cdf(dist, max);
+                }
             }
 
             if (not alpha_comp and omega_comp) {
@@ -557,8 +563,8 @@ class LinearRestricted : public Linear {
                 if (alpha > omega) { alpha = 1 - alpha; alpha_comp = true; }
                 else { omega = 1 - omega; omega_comp = false; }
             }
-            // (alpha_comp and not omega_comp) is impossible, because that would mean 'min > max' and we
-            // would have thrown and exception above.
+            // (alpha_comp and not omega_comp) is impossible, because that would mean 'min > max'
+            // and we would have thrown an exception above.
 
             if (alpha_comp) {
                 // Check for underflow (essentially: is 1-alpha equal to or closer to 0 than a ResultType
