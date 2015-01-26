@@ -815,6 +815,8 @@ class LinearRestricted : public Linear {
         std::shared_ptr<Eigen::VectorXd> gibbs_last_z_, gibbs_r_Rbeta_;
         double gibbs_last_sigma_ = std::numeric_limits<double>::signaling_NaN();
         long gibbs_draws_ = 0;
+        double chisq_n_median_ = std::numeric_limits<double>::signaling_NaN();
+
 };
 
 }}

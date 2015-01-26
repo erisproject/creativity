@@ -99,6 +99,7 @@ void LinearRestricted::reset() {
     gibbs_last_z_.reset();
     gibbs_last_sigma_ = std::numeric_limits<double>::signaling_NaN();
     gibbs_draws_ = 0;
+    chisq_n_median_ = std::numeric_limits<double>::signaling_NaN();
 }
 
 Block<const Matrix<double, Dynamic, Dynamic, RowMajor>, Dynamic, Dynamic, true> LinearRestricted::R() const {
@@ -238,13 +239,12 @@ const VectorXd& LinearRestricted::drawGibbs() {
     else if (draw_gibbs_thinning > 1)
         num_draws = draw_gibbs_thinning;
 
-    std::normal_distribution<double> stdnorm(0, 1);
     std::chi_squared_distribution<double> chisq(n_);
-    boost::math::normal_distribution<double> stdnorm_dist(stdnorm.mean(), stdnorm.stddev());
+    boost::math::normal_distribution<double> stdnorm_dist(0, 1);
     boost::math::chi_squared_distribution<double> chisq_dist(chisq.n());
-    // Get this value now (if we're going to need it) to potentially avoid some extra cdf lookups in
-    // the truncated distribution draw:
-    const double chi_sq_median = restrict_size_ == 0 ? NAN : median(chisq_dist);
+    // Calculate the median just once, as the median call is slightly expensive for a chi-squared dist,
+    // but having the median avoids potential extra cdf calls below.
+    if (std::isnan(chisq_n_median_) and restrict_size_ > 0) chisq_n_median_ = median(chisq_dist);
 
     for (int t = 0; t < num_draws; t++) { // num_draws > 1 if thinning or burning in
 
@@ -287,7 +287,7 @@ const VectorXd& LinearRestricted::drawGibbs() {
             // multivariate t, which is sigma ~ sqrt(n_ / chisq(n_)), *but* truncated to [sigma_l,
             // sigma_u].  To accomplish that truncation for sigma, we need to truncate the chisq(n_)
             // to [n_/sigma_u^2, n/sigma_l^2].
-            sigma = std::sqrt(n_ / truncDist(chisq_dist, chisq, n_ / (sigma_u*sigma_u), n_ / (sigma_l*sigma_l), chi_sq_median));
+            sigma = std::sqrt(n_ / truncDist(chisq_dist, chisq, n_ / (sigma_u*sigma_u), n_ / (sigma_l*sigma_l), chisq_n_median_));
 
 #ifdef ERIS_DEBUG
             }
@@ -332,7 +332,7 @@ const VectorXd& LinearRestricted::drawGibbs() {
 #endif
 
             // Our new Z is a truncated standard normal (truncated by the bounds we just found)
-            z[j] = truncDist(stdnorm_dist, stdnorm, lj, uj, 0.0);
+            z[j] = truncDist(stdnorm_dist, Random::stdnorm, lj, uj, 0.0);
 
 #ifdef ERIS_DEBUG
             }
