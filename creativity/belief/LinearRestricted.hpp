@@ -231,9 +231,10 @@ class LinearRestricted : public Linear {
          * to the `k+1` length vector where elements `0` through `k-1` are the \f$\beta\f$ values
          * and element `k` is the \f$h^{-1} = sigma^2\f$ draw.
          *
-         * The Gibbs sampler draw uses truncated normal drawing as described in Rodriguez-Yam,
-         * Davis, and Scharf (2004), "Efficient Gibbs Sampling of Truncated Multivariate Normal with
-         * Application to Constrained Linear Regression," with the additional steps described below.
+         * The Gibbs sampler draw uses truncated normal drawing loosely based on the description in
+         * Rodriguez-Yam, Davis, and Scharf (2004), "Efficient Gibbs Sampling of Truncated
+         * Multivariate Normal with Application to Constrained Linear Regression," with
+         * modifications as described below to draw from a truncated multivariate t instead.
          *
          * The behaviour of drawGibbs() is affected by two parameters:
          * - `draw_gibbs_burnin` controls the number of burn-in draws to perform for the first
@@ -246,7 +247,7 @@ class LinearRestricted : public Linear {
          * \par Implementation details: initial value
          *
          * Rodriguez-Yam et al.\ do not discuss the initial draw, but this seems a large omission
-         * from the paper: unlike Geweke's earlier work (which is their main benchmark for
+         * from their algorithm: unlike Geweke's earlier work (which is their main benchmark for
          * comparison), their algorithm can fail for points outside the initial truncated region.
          * (Geweke's algorithm, in contrast, does not, though it may wander around outside the
          * truncated region for many initial draws, and may thus require a larger burn-in period).
@@ -272,56 +273,99 @@ class LinearRestricted : public Linear {
          * distribution aren't particularly relevant.  Thus, to choose an initial point (if one
          * hasn't been explicitly given by a call to gibbsInitialize()) we simply take a draw from
          * the unrestricted distribution, then pass it to gibbsInitialize() to manipulate that point
-         * into the restriction-satisfying parameter space.  If that fails (specifically, after
-         * \f$10k\f$ steps it still hasn't found a suitable point that doesn't violate
-         * restrictions), another point is drawn and passed to gibbsInitialize().  This is repeated
-         * for a total of 10 attempts, after which we give up with an error (as this most likely
-         * indicates that the model has impossible-to-satisfy restrictions).
+         * into the restriction-satisfying parameter space.  If that fails (specifically, if a point
+         * satisfying the restrictions hasn't been found after \f$10k\f$ steps) another point is
+         * drawn and passed to gibbsInitialize().  This is repeated for a total of 10 attempts,
+         * after which we give up with an error (as this likely indicates that the model has some
+         * sort of impossible-to-satisfy prior restrictions).
          *
-         * Once an acceptable initial position is found, the algoritm followed is Rodriguez-Yam et
-         * al. with one addition described below, subject to the `draw_gibbs_burnin` and
-         * `draw_gibbs_thinning` parameters.
+         * Once an acceptable initial position is found, the algorithm followed is essentially the
+         * same as that of Rodriguez-Yam et al.\ with modifications for drawing from a multivariate
+         * t instead of multivariate normal, and is described in full below.
+         *
+         * \par Implementation details: drawing beta values
+         *
+         * In general, a non-truncated multivariate \f$t(\mu, \Sigma, \nu)\f$ can easily be formed
+         * by adding the mean to \f$\sqrt{\nu / \chi^2_{\nu}}\f$ times a draw from the
+         * (non-truncated) multivariate \f$N(\mathbf{0}, \mathbf{\Sigma})\f$ distribution (which
+         * itself is easily drawn as \f$\mu + \mathbf{L} \mathbf{z}\f$, where \f$\mathbf{L}
+         * \mathbf{L}^\top = \mathbf{\Sigma}\f$ (i.e.\ the Cholesky decomposition of
+         * \f$\mathbf{\Sigma}\f$) and \f$z\f$ is a vector of \f$k\f$ independent standard normals).
+         *
+         * Rejection sampling (as performed by the drawRejection() method) can then use the above to
+         * draw from the unconditional distribution and discarding any draws that violate the prior
+         * restrictions.  This is impractical, however, when there are restrictions that eliminate a
+         * large portion of draws from the unrestricted draw space.
+         *
+         * Rodriguez-Yam et al.\ address this issue for drawing a truncated multivariate normal,
+         * \f$\mathbf{X} \sim N_T(\mathbf{\mu}, \sigma^2\mathbf{\Sigma})\f$, with truncation area
+         * \f$T\f$ being the values of \f$X\f$ satisfying \f$\mathbf{R}\mathbf{x} \leq
+         * \mathbf{r}\f$.  To do this, they use Gibbs sampling, but first reparameterize the problem
+         * to draw from the (independent) multivariate normal \f$Z \sim N_S(\mathbf{A}\mathbf{\mu},
+         * \sigma^2\mathbf{I_k})\f$.  \f$\mathbf{A}\f$ here is any matrix satisfying
+         * \f$\mathbf{A}\mathbf{\Sigma}\mathbf{A}^\top = \mathbf{I}\f$, where an obvious choice of
+         * \f$\mathbf{A}\f$ is the inverse of the Cholesky decomposition of \f$mathbf{A}\f$, that
+         * is, \f$\mathbf{L}^{-1}\f$ where \f$\mathbf{L}\mathbf{L}^\top = \mathbf{A}\f$.  The
+         * truncation region is, of course, the same, but reexpressed in terms of \f$\mathbf{z}\f$
+         * as points satisfying \f$\mathbf{D}\mathbf{z} \leq b\f$, where \f$\mathbf{D} =
+         * \mathbf{R}\mathbf{A}^{-1}\f$.
+         *
+         * The problem has thus been reformed to one in which independent normal draws can be used
+         * to draw \f$\beta_j\f$ values one-by-one, conditional on the most recent draw of \f$h
+         * \equiv sigma^{-2}\f$ (discussed below) and the other values of \f$\beta{-j}\f$.  The
+         * prior restrictions immediately imply an admissable range for \f$\beta_j\f$: it is whatever
+         * range of values will satisfy \f$\mathbf{R}\beta^* \leq \mathbf{r}\f$, where \f$\beta^*\f$
+         * is made up of the current iteration's draws for \f$\beta_{i<j}\f$ and the previous
+         * iteration's draws for \f$\beta_{i>j}\f$.  Thus each row of \f$\mathbf{R}\f$ with a
+         * non-zero value in the \f$j\f$th column defines either an upper or lower bound for
+         * \f$\beta_j\f$ (and implicitly also a bound on \f$z_j\f$); from these bounds, the most
+         * restrictive upper and lower bounds for \f$z_j\f$ are chosen (\f$\pm \infty\f$ is used for
+         * non-existant bounds).  The issue described above---where the algorithm must begin inside the
+         * unrestricted space---should be apparent: if, for example, \f$\beta_1\f$ and \f$\beta_2\f$
+         * are independent and a \f$\beta_2 > 0\f$ restriction is violated at the current position,
+         * there are no range of values for \f$z_1\f$ that can avoid violating the constraint.
+         *
+         * Once the range on \f$z_j\f$ is established, it is simply a matter of drawing from the
+         * truncated univariate normal \f$N(0,\sigma^2)\f$ with truncation region \f$\left[z_{lower},
+         * z_{upper}\right]\f$.  This implementation slightly alters the approach of Rodriguez-Yam
+         * et al.\ to let \f$Z\f$ be a vector of independent standard normals (instead of
+         * independent \f$N(0, \sigma^2)\f$), for slightly easier computation (unlike Rodriguez-Yam
+         * et al.\, the \f$\sigma^2\f$ multiple changes from Gibbs iteration to the next as new \f$h
+         * = \sigma^{-2}\f$ values are drawn conditional on the \f$beta\f$s).
          *
          * \par Implementation details: drawing h values
          *
-         * Rodriguez-Yam et al.\ is primarily concerned with sampling from a truncated normal
-         * distribution, and doesn't satisfactorily describe drawing suitable \f$\sigma^2\f$ values.
-         * The approach of Geweke (1991), which addresses drawing from a truncated multivariate
-         * \f$\f$-distribution, is essentially to use rejection sampling to take draws from the
-         * unrestricted Gamma distribution, accepting the first draw that, had we used it instead of
-         * the \f$\sigma^2\f$ from the previous iteration, would not have violated the constraints.
-         * Though that approach could be used here (though not exactly as Geweke states it, because
-         * we don't require the \f$R\f$ restriction matrix to be invertible, unlike Geweke), it
-         * seems preferable to use a deterministic procedure to obtain the next \f$\sigma^2\f$ draw.
-         * The procedure is as follows.
+         * Values of \f$h\f$ are actually drawn before the \f$\beta\f$ values in each Gibbs
+         * iteration, but it is more helpful to have described the \f$\beta\f$ draw procedure first.
          *
-         * To incorporate the notation of Rodriguez-Yam et al., let \f$A = L^{-1}\f$, where
-         * \f$LL^\top = V\f$, where \f$\overline{s}^2 V\f$ is the (non-truncated) posterior
-         * covariance matrix.  For draw \f$t\f$, the algorithm has just drawn a set of values from
-         * \f$Z \sim N_S\left(\alpha, \left(\sigma^2\right)^{(t-1)}\right)\f$, where \f$\alpha
-         * \equiv A\overline\beta\f$ and \f$S\f$ is the truncation region defined by the model's
-         * linear restrictions.  What we need is to find a range for
-         * \f$\left(\sigma^2\right)^{(t)}\f$ such that, had we taken exactly the same \f$Z\f$ draw
-         * but scaled it to have variance \f$\left(\sigma^2\right)^{(t)}I\f$ instead of
-         * \f$\left(\sigma^2\right)^{(t-1)}I\f$, we would not have violated any constraints.
+         * Rodriguez-Yam et al.\ limit their paper to drawing truncated multivariate normals, but
+         * what we actually need is to draw multivariate \f$t\f$.  As mentioned earlier, this
+         * requires drawing a \f$h = \sigma^{-2}\f$ value conditional on the beta.  The procedure
+         * used for this is fundamentally the same as the above: we determine the range of values of
+         * W such that \f$\sqrt{n/W} \overline{s} \overline{\mathbf{L}} \mathbf{Z}\f$ (which is just
+         * \f$\beta\f$, but recalculated with a new \f$W\f$ value) does not violate any
+         * restrictions.  It is then a relatively simple matter to draw \f$W ~
+         * \chi^2_{\overline{\nu}}\f$ restricted to the range of W that does not violate the prior
+         * constraints.
          *
-         * To do this, start with \f$l = 0, u=\infty\f$ (i.e. no restrictions), then consider
-         * the linear restrictions one at a time.  For restriction \f$i\f$, we have: \f$R_i A^{-1}
-         * \left(\alpha + \sigma Y\right) \leq r_i\f$, where \f$Y \equiv \frac{Z - \alpha}{\sigma}\f$, so that
-         * the value inside the brackets is just \f$Z\f$, rewritten as the mean plus a
-         * scaled draw from a multivariate \f$N(0, I_k)\f$.  Rewriting the constraint, we get:
-         * \f$\sigma R_i A^{-1} Y \leq  r_i - R_i A^{-1} \alpha\f$, which immediate leads to either
-         * \f$\sigma \leq \frac{r_i - R_i A^{-1} \alpha}{R_i A^{-1} Y}\f$ (if \f$R_i A^{-1} Y\f$ is
-         * positive) or \f$\sigma \geq \frac{r_i - R_i A^{-1} \alpha}{R_i A^{-1} Y}\f$ (if \f$R_i
-         * A^{-1} Y\f$ is negative).  If this bound is more binding that the current \f$[l, u]\f$
-         * bound, update \f$l\f$ or \f$u\f$ appropriately.
+         * \par Implementation details: drawing from truncated univariate distributions
          *
-         * Finally, convert the \f$[l, u]\f$ bounds on the \f$\sigma\f$ into bounds on \f$h\f$ of
-         * \f$[u^{-2}, l^{-2}]\f$, then convert these into the cdf values of the gamma distribution
-         * for \f$h\f$, denoting these bounds \f$\alpha\f$ and \f$\omega\f$.  Now we draw
-         * \f$\upsilon \sim U[\alpha, \omega]\f$, then pass this through the inverse cdf of the gamma
-         * distribution.  This yields \f$h\f$ of the desired distribution, from which
-         * \f$\left(\sigma^2\right)^{(t)} = h^{-1}\f$ is our desired \f$\sigma^2\f$ draw.
+         * Drawing from truncated univariate distributions (specifically, a truncated standard
+         * normal, and truncated \f$\chi^2_{\overline{nu}}\f$) is done by converting the truncation
+         * endpoints into cdf values of the relevant distribution.  A uniform random value is then
+         * drawn from `[cdf(min), cdf(max)]`; the final value is then the distribution quantile for
+         * the drawn uniform value.
+         *
+         * In implementation details, there are some other optimizations that are done: first, if
+         * the truncated range doesn't actually truncate the support of the distribution, we just
+         * return a draw from the untruncated distribution.  Second, for cdf values above 0.5, cdf
+         * complements (i.e. `1 - cdf`) are used so that values far in the right tail of the
+         * distribution have approximately the same numerical precision as values in the left tail
+         * (in particular, cdf values as small as 2.2e-308 are handled in the left tail, and by
+         * using the complement, cdf values as close to 1 as `1 - 2.2e-308` can be handled.
+         * (Without this handling, values closer to 1 than approximately `1 - 4e-17` are numerically
+         * exactly equal to 1).
+         *
          */
         virtual const Eigen::VectorXd& drawGibbs();
 
