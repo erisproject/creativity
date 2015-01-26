@@ -161,7 +161,7 @@ void LinearRestricted::gibbsInitialize(const Ref<const VectorXd> &initial, unsig
     if (restrict_size_ == 0) {
         // No restrictions, nothing special to do!
         if (not gibbs_last_z_ or gibbs_last_z_->size() != K_) gibbs_last_z_.reset(new VectorXd(K_));
-        *gibbs_last_z_ = A * (initial.head(K_) - beta_);
+        *gibbs_last_z_ = A / std::sqrt(s2_) * (initial.head(K_) - beta_);
     }
     else {
         // Otherwise we'll start at the initial value and update
@@ -190,7 +190,7 @@ void LinearRestricted::gibbsInitialize(const Ref<const VectorXd> &initial, unsig
         }
 
         if (not gibbs_last_z_ or gibbs_last_z_->size() != K_) gibbs_last_z_.reset(new VectorXd(K_));
-        *gibbs_last_z_ = A * (adjusted - beta_);
+        *gibbs_last_z_ = A / std::sqrt(s2_) * (adjusted - beta_);
     }
 
     // Don't set the last sigma draw; drawGibbs will do that.
