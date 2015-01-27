@@ -79,6 +79,15 @@ void LinearRestricted::clearRestrictions() {
     // Don't need to resize restrict_*, the values aren't used if restrict_size_ = 0
 }
 
+void LinearRestricted::removeRestriction(size_t r) {
+    if (r >= restrict_size_) throw std::logic_error("LinearRestricted::removeRestriction(): invalid restriction row `" + std::to_string(r) + "' given");
+    for (size_t row = r; row < restrict_size_; row++) {
+        restrict_select_.row(row) = restrict_select_.row(row+1);
+        restrict_values_[row] = restrict_values_[row+1];
+    }
+    --restrict_size_;
+}
+
 void LinearRestricted::discard(unsigned int burn) {
     Linear::discard(burn); // Pass it up (mainly for the no-empty-model check)
     mean_beta_draws_ = 0; // Reset the number of beta draws so that the next predict() redraws

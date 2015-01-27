@@ -181,6 +181,9 @@ class LinearRestricted : public Linear {
         /** Clears all current model restrictions. */
         void clearRestrictions();
 
+        /** Clears the restriction stored as row `r` of R(). */
+        void removeRestriction(size_t r);
+
         /** Overridden to reset the cached value of mean beta draws.  Since draws produced by this
          * class are independent, this does not actually perform any draws.
          *
