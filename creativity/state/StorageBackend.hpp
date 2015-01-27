@@ -17,7 +17,6 @@ namespace creativity { namespace state {
  *
  * \sa creativity::state::MemoryStorage
  * \sa creativity::state::FileStorage
- * \sa creativity::state::PsqlStorage
  */
 class StorageBackend : private eris::noncopyable {
     public:

@@ -61,34 +61,6 @@ class Creativity : private eris::noncopyable, public std::enable_shared_from_thi
          */
         void fileRead(const std::string &filename);
 
-        /** Store the creativity simulation results in or load them from a postgresql database, with
-         * connection string as given.  If connection cannot be established, this throws an
-         * exception.
-         *
-         * To load existing simulation results, include a 'creativity=123' option in the database URL.
-         *
-         * Examples of accepted URLs are:
-         *
-         *     postgresql://
-         *     postgresql://localhost/somedb
-         *     postgresql://user:pass@host:5432/dbname?sslmode=required&creativity=123
-         *
-         * See "Database Connection Control Functions" documentation for libpq for all supported
-         * options.
-         *
-         * \param url the database URL, beginning with 'postgresql://'
-         *
-         * \param load_only if true, only succeed if the URL indicates a simulation ID to load.
-         * Defaults to false.
-         *
-         * \param new_only if true, only succeed if the URL does not contain a simulation ID to
-         * load.  Defaults to false.
-         *
-         * This must be called before calling setup(), and is exclusive of the fileWrite/Read()
-         * methods.  After calling, storage() will contain a PsqlStorage object.
-         */
-        void pgsql(std::string url, bool load_only = false, bool new_only = false);
-
         /** Checks `.parameters` to make sure that all configured values are valid, throwing an
          * exception if any invalid values are found.
          *

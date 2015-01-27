@@ -1,8 +1,5 @@
 #include "creativity/Creativity.hpp"
 #include "creativity/state/FileStorage.hpp"
-#ifndef CREATIVITY_SKIP_PGSQL
-#include "creativity/state/PsqlStorage.hpp"
-#endif
 #include "creativity/state/MemoryStorage.hpp"
 #include "creativity/belief/Demand.hpp"
 #include "creativity/belief/Quality.hpp"
@@ -37,31 +34,6 @@ void Creativity::fileRead(const std::string &filename) {
     storage().first = Storage::create<FileStorage>(set_, filename, FileStorage::MODE::READONLY);
     setup_read_ = true;
 }
-
-#ifndef CREATIVITY_SKIP_PGSQL
-void Creativity::pgsql(std::string url, bool load_only, bool new_only) {
-    if (setup_sim_) throw std::logic_error("Cannot call Creativity::pgsql() after setup()");
-
-    // Figure out whether a "creativity=xyz" setting was provided, and if so, remove it
-    unsigned int load_id = 0;
-    std::smatch results;
-    if (std::regex_search(url, results, std::regex("([?&])creativity=(\\d+)(?=&|$)"))) {
-        load_id = std::stoi(results[2].str());
-        url = results.prefix().str() + results.suffix().str();
-    }
-
-    if (load_id == 0 and setup_read_) throw std::logic_error("Cannot call Creativity::pgsql() after loading state data");
-    else if (load_id > 0 and new_only) throw std::logic_error("Invalid postgresql URL given: creativity= option cannot be specified here");
-    else if (load_id == 0 and load_only) throw std::logic_error("Invalid postgresql URL given: creativity= option must be specified here");
-
-    storage().first = Storage::create<PsqlStorage>(set_, url, load_id);
-    setup_read_ = load_id > 0;
-}
-#else
-void Creativity::pgsql(std::string, bool, bool) {
-    throw std::runtime_error("Postgresql support disabled at build time!");
-}
-#endif
 
 void Creativity::checkParameters() {
 #define PROHIBIT(FIELD, BAD) \

@@ -75,28 +75,17 @@ int main(int argc, const char *argv[]) {
 
     for (const auto &source : a.input) {
         auto creativity = Creativity::create();
-        if (source.substr(0, 13) == "postgresql://" or source.substr(0, 11) == "postgres://") {
-            try {
-                creativity->pgsql(source, true /*read-only*/);
-            }
-            catch (std::exception &e) {
-                std::cerr << "Unable to connect to database `" << source << "': " << e.what() << "\n\n";
-                continue;
-            }
+        // Filename input
+        try {
+            creativity->fileRead(source);
         }
-        else {
-            // Filename input
-            try {
-                creativity->fileRead(source);
-            }
-            catch (std::ios_base::failure&) {
-                std::cerr << "Unable to read `" << source << "': " << std::strerror(errno) << "\n";
-                continue;
-            }
-            catch (std::exception &e) {
-                std::cerr << "Unable to read `" << source << "': " << e.what() << "\n";
-                continue;
-            }
+        catch (std::ios_base::failure&) {
+            std::cerr << "Unable to read `" << source << "': " << std::strerror(errno) << "\n";
+            continue;
+        }
+        catch (std::exception &e) {
+            std::cerr << "Unable to read `" << source << "': " << e.what() << "\n";
+            continue;
         }
 
         auto locked_storage = creativity->storage();

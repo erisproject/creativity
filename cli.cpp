@@ -1,8 +1,5 @@
 #include "creativity/Creativity.hpp"
 #include "creativity/state/Storage.hpp"
-#ifndef CREATIVITY_SKIP_PGSQL
-#include "creativity/state/PsqlStorage.hpp"
-#endif
 #include <eris/Simulation.hpp>
 #include <eris/Random.hpp>
 #include <iostream>
@@ -174,16 +171,7 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         TCLAP::ValueArg<unsigned int> periods_arg("T", "periods", "Number of simulation periods to run.  Default: 200.", false, 200, &periods_constr, cmd);
 
         std::string default_output("creativity-SEED.crstate");
-        TCLAP::ValueArg<std::string> output_file("o", "output", "Output file "
-#ifndef CREATIVITY_SKIP_PGSQL
-                "(or database URL) "
-#endif
-                "for simulation results.  If found, SEED will be replaced with the random seed value.  Default: " + default_output, false,
-                default_output, "filename"
-#ifndef CREATIVITY_SKIP_PGSQL
-                "-or-database"
-#endif
-                , cmd);
+        TCLAP::ValueArg<std::string> output_file("o", "output", "Output file for simulation results.  If found, SEED will be replaced with the random seed value.  Default: " + default_output, false, default_output, "filename", cmd);
 
         TCLAP::ValueArg<std::string> tmpdir("", "tmpdir", "Output directory in which to write the output file while running the simulation.  When "
                 "the simulation finishes, the temporary file is moved to the output location specified by -o.  If this argument is omitted, the "
@@ -275,85 +263,55 @@ int main(int argc, char *argv[]) {
     std::string results_out = args.out;
     bool need_copy = false; // Whether we need to copy from results_out to args.out (if using --tmpdir)
 
-    if (args.out.substr(0, 13) == "postgresql://" or args.out.substr(0, 11) == "postgres://") {
-        try {
-            creativity->pgsql(args.out, false /*read-only*/, true /*write-only*/);
+    // Filename output
 
-            // NB: the above throws if CREATIVITY_SKIP_PGSQL is set
+    try {
+        // If the user didn't specify --overwrite, make sure the file doesn't exist.  (It might
+        // get created before we finish the simulation, but at least we can abort now in a
+        // typical case).
+        if (not args.overwrite) {
+            if (exists(args.out)) {
+                std::cerr << "Error: `" << args.out << "' already exists; specify a different file or add `--overwrite' option to overwrite\n";
+                exit(1);
+            }
+        }
 
-#ifndef CREATIVITY_SKIP_PGSQL
-            PsqlStorage &pgsql = dynamic_cast<PsqlStorage&>(creativity->storage().first->backend());
-            auto conn_locked = pgsql.connection();
-            auto &conn = conn_locked.first;
-            // Rebuild an output URL for the postgresql database
-            std::ostringstream psqlurl("postgresql://");
-            const char *username = conn.username();
-            if (username) psqlurl << username << "@";
-            // Omit password
-            const char *hostname = conn.hostname();
-            if (hostname) psqlurl << hostname;
-            const char *port = conn.port();
-            if (port) psqlurl << ":" << port;
-            psqlurl << "/" << conn.dbname() << "?creativity=" << pgsql.id;
-            results_out = psqlurl.str();
-#endif
+        std::string basename = std::regex_replace(args.out, std::regex(".*/"), "");
+        std::string dirname = std::regex_replace(args.out, std::regex("/?[^/]+$"), "");
+        if (dirname.empty()) dirname = ".";
+
+        if (basename.empty()) throw std::runtime_error("Invalid output filename (" + args.out + ")");
+
+        // Make sure the parent of the output file exists
+        if (not exists_dir(dirname))
+            throw std::runtime_error("Directory `" + dirname + "' does not exist or is not a directory");
+
+        // We always write to an intermediate file, then move it into place at the end; by
+        // default, that file is in the same directory as the output file, but the user might
+        // want to put it somewhere else (e.g. if local storage is much faster than remote
+        // storage, but the final result should be copied to the remote storage.)
+        if (not args.tmpdir.empty()) {
+            // First check and make sure that the parent of the requested output file exists
+            if (not exists_dir(args.tmpdir))
+                throw std::runtime_error("Error: --tmpdir `" + args.tmpdir + "' does not exist or is not a directory");
+
+            dirname = args.tmpdir;
         }
-        catch (const std::exception &e) {
-            std::cerr << "Connection to PostgreSQL failed: " << e.what() << "\n";
-            exit(1);
-        }
+
+        std::string tmpfile;
+        int tries = 0;
+        do {
+            if (tries++ > 10) { std::cerr << "Error: unable to generate suitable tmpfile name (tried 10 times)\n"; exit(2); }
+            tmpfile = dirname + "/" + random_filename(basename);
+        } while (exists(tmpfile));
+
+        creativity->fileWrite(tmpfile);
+        results_out = tmpfile;
+        need_copy = true;
     }
-    else {
-        // Filename output
-
-        try {
-            // If the user didn't specify --overwrite, make sure the file doesn't exist.  (It might
-            // get created before we finish the simulation, but at least we can abort now in a
-            // typical case).
-            if (not args.overwrite) {
-                if (exists(args.out)) {
-                    std::cerr << "Error: `" << args.out << "' already exists; specify a different file or add `--overwrite' option to overwrite\n";
-                    exit(1);
-                }
-            }
-
-            std::string basename = std::regex_replace(args.out, std::regex(".*/"), "");
-            std::string dirname = std::regex_replace(args.out, std::regex("/?[^/]+$"), "");
-            if (dirname.empty()) dirname = ".";
-
-            if (basename.empty()) throw std::runtime_error("Invalid output filename (" + args.out + ")");
-
-            // Make sure the parent of the output file exists
-            if (not exists_dir(dirname))
-                throw std::runtime_error("Directory `" + dirname + "' does not exist or is not a directory");
-
-            // We always write to an intermediate file, then move it into place at the end; by
-            // default, that file is in the same directory as the output file, but the user might
-            // want to put it somewhere else (e.g. if local storage is much faster than remote
-            // storage, but the final result should be copied to the remote storage.)
-            if (not args.tmpdir.empty()) {
-                // First check and make sure that the parent of the requested output file exists
-                if (not exists_dir(args.tmpdir))
-                    throw std::runtime_error("Error: --tmpdir `" + args.tmpdir + "' does not exist or is not a directory");
-
-                dirname = args.tmpdir;
-            }
-
-            std::string tmpfile;
-            int tries = 0;
-            do {
-                if (tries++ > 10) { std::cerr << "Error: unable to generate suitable tmpfile name (tried 10 times)\n"; exit(2); }
-                tmpfile = dirname + "/" + random_filename(basename);
-            } while (exists(tmpfile));
-
-            creativity->fileWrite(tmpfile);
-            results_out = tmpfile;
-            need_copy = true;
-        }
-        catch (std::exception &e) {
-            std::cerr << "Unable to write to file: " << e.what() << "\n";
-            exit(1);
-        }
+    catch (std::exception &e) {
+        std::cerr << "Unable to write to file: " << e.what() << "\n";
+        exit(1);
     }
     std::cout << "Writing simulation results to ";
     if (need_copy) std::cout << "temp file: ";

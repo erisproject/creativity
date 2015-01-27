@@ -13,7 +13,6 @@ namespace creativity { namespace state {
  *
  * \sa creativity::state::MemoryStorage
  * \sa creativity::state::FileStorage
- * \sa creativity::state::PsqlStorage
  */
 class Storage final {
     public:
