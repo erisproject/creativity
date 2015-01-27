@@ -1,5 +1,5 @@
 #pragma once
-#include "creativity/belief/LinearDerived.hpp"
+#include "creativity/belief/Linear.hpp"
 #include "creativity/Book.hpp"
 #include "creativity/BookMarket.hpp"
 #include <eris/algorithms.hpp>
@@ -28,7 +28,7 @@ namespace belief {
  * The model is updated using Bayesian econometrics as new books (and realized quality values of
  * those books) are obtained.
  */
-class Quality : public LinearDerived<Quality> {
+class Quality : public Linear {
     public:
         /** Default constructor: note that default constructed objects are not valid models.
          * \sa belief::Linear::Linear()
@@ -44,7 +44,7 @@ class Quality : public LinearDerived<Quality> {
          * \sa Linear::Linear
          */
         template <typename ...Args>
-        Quality(Args &&...args) : Parent(std::forward<Args>(args)...)
+        Quality(Args &&...args) : Linear(std::forward<Args>(args)...)
         {}
 
         /// Returns the number of parameters of this model (7)
@@ -84,13 +84,7 @@ class Quality : public LinearDerived<Quality> {
         /// Returns "Quality", the name of this model
         virtual std::string display_name() const override { return "Quality"; }
 
-    protected:
-        /// Constructs a new Demand object given a Linear base object.
-        virtual Quality newDerived(Linear &&model) const override;
-
-    private:
-        // Initialize a Quality from a Linear<7>
-        explicit Quality(Linear &&base) : Parent(std::move(base)) {}
+        CREATIVITY_LINEAR_DERIVED_COMMON_METHODS(Quality)
 };
 
 }}

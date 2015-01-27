@@ -5,9 +5,27 @@
 #include <ostream>
 #include <vector>
 
+/** This macro is provided to easily provide versions of update() and weaken() that return a proper
+ * Derived type (instead of the base class Linear type), so that expressions such as `derived = devired.update(...)`
+ * work as expected.  Without this, the above will fail due to there being no conversion from Linear
+ * to Derived.
+ *
+ * This macro will put the methods in "public:" scope, which means "public:" scope will still be in
+ * effect after the macro, so either put it in the public: scope, or at the end of some existing
+ * scope.
+ */
+#define CREATIVITY_LINEAR_DERIVED_COMMON_METHODS(Derived) \
+    public: \
+        [[gnu::warn_unused_result]] Derived update(const Eigen::Ref<const Eigen::VectorXd> &y, const Eigen::Ref<const Eigen::MatrixXd> &X) const & { Derived u(*this); u.updateInPlace(y, X); return u; } \
+        [[gnu::warn_unused_result]] Derived update(const Eigen::Ref<const Eigen::VectorXd> &y, const Eigen::Ref<const Eigen::MatrixXd> &X)      && { updateInPlace(y, X); return std::move(*this); } \
+        [[gnu::warn_unused_result]] Derived weaken(double s) const & { Derived w(*this); w.weakenInPlace(s); return w; } \
+        [[gnu::warn_unused_result]] Derived weaken(double s)      && { weakenInPlace(s); return std::move(*this); }
+
 namespace creativity { namespace belief {
 
-/** Base class for a linear model with a natural conjugate, normal-gamma prior. 
+/** Base class for a linear model with a natural conjugate, normal-gamma prior.  If deriving from
+ * this class, you almost certainly want to use the
+ * CREATIVITY_LINEAR_DERIVED_COMMON_METHODS(DerivationName) macro in your class definition.
  */
 class Linear {
     public:

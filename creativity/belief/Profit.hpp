@@ -1,6 +1,5 @@
 #pragma once
 #include "creativity/belief/LinearRestricted.hpp"
-#include "creativity/belief/LinearDerived.hpp"
 #include "creativity/Book.hpp"
 
 namespace creativity { namespace belief {
@@ -27,7 +26,7 @@ namespace creativity { namespace belief {
  * These constraints are combined with a natural conjugate prior for the purposes of updating the
  * beliefs via Bayesian econometrics.
  */
-class Profit : public LinearDerived<Profit, LinearRestricted> {
+class Profit : public LinearRestricted {
     public:
         /** Default constructor: note that default constructed objects are not valid models.
          * \sa belief::Linear::Linear()
@@ -49,7 +48,7 @@ class Profit : public LinearDerived<Profit, LinearRestricted> {
          */
         template <typename ...Args>
         Profit(unsigned int D, Args &&...args)
-        : Parent(std::forward<Args>(args)...), D_{D}
+        : LinearRestricted(std::forward<Args>(args)...), D_{D}
         {
             // Add restrictions:
             restrict(1) >= 0; // beta_q >= 0 (higher quality <-> higher profits, at least for low quality)
@@ -115,14 +114,9 @@ class Profit : public LinearDerived<Profit, LinearRestricted> {
         /// Returns "Profit", the name of this model
         virtual std::string display_name() const override { return "Profit"; }
 
-    protected:
-        /// Constructs a new Demand object given a Linear base object.
-        virtual Profit newDerived(Linear &&model) const override;
+        CREATIVITY_LINEAR_DERIVED_COMMON_METHODS(Profit)
 
     private:
-        // Initialize a Profit from a Linear<>
-        Profit(unsigned int D, Linear &&base) : Parent(std::move(base)), D_{D} {}
-
         unsigned int D_;
 
 };

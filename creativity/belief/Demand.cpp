@@ -60,8 +60,4 @@ RowVectorXd Demand::bookRow(SharedMember<Book> book, double quality) const {
     return row;
 }
 
-Demand Demand::newDerived(Linear &&base) const {
-    return Demand(D_, std::move(base));
-}
-
 }}

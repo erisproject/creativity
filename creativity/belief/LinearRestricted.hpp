@@ -814,6 +814,8 @@ class LinearRestricted : public Linear {
         /// The number of beta draws used to calculate mean_beta_
         long mean_beta_draws_ = 0;
 
+        CREATIVITY_LINEAR_DERIVED_COMMON_METHODS(LinearRestricted)
+
     private:
         // Values used for Gibbs sampling.  These aren't set until first needed.
         std::shared_ptr<decltype(restrict_select_)> gibbs_D_; // D = R A^{-1}

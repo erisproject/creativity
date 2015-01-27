@@ -1,5 +1,5 @@
 #pragma once
-#include "creativity/belief/LinearDerived.hpp"
+#include "creativity/belief/Linear.hpp"
 #include "creativity/Book.hpp"
 #include <eris/algorithms.hpp>
 #include <unordered_set>
@@ -27,7 +27,7 @@ namespace creativity { namespace belief {
  *
  * \f$\beta\f$ values are not restricted.
  */
-class ProfitStream : public LinearDerived<ProfitStream> {
+class ProfitStream : public Linear {
     public:
         /** Default constructor: note that default constructed objects are not valid models.
          * \sa belief::Linear::Linear()
@@ -41,7 +41,7 @@ class ProfitStream : public LinearDerived<ProfitStream> {
          * \sa Linear::Linear
          */
         template <typename ...Args>
-        ProfitStream(Args &&...args) : Parent(std::forward<Args>(args)...)
+        ProfitStream(Args &&...args) : Linear(std::forward<Args>(args)...)
         {}
 
         /** Given a book, this uses the profit of the first \f$K\f$ periods the book has been on the
@@ -58,16 +58,7 @@ class ProfitStream : public LinearDerived<ProfitStream> {
         /// Returns "ProfitStream", the name of this model
         virtual std::string display_name() const override { return "ProfitStream"; }
 
-    protected:
-        /// Ensures that all beta values are non-negative
-        /*virtual void verifyParameters() const override;*/
-
-        /// Constructs a new Demand object given a Linear base object.
-        virtual ProfitStream newDerived(Linear &&base) const override;
-
-    private:
-        // Initialize a ProfitStream from a Linear<K>
-        explicit ProfitStream(Linear &&base) : Parent(std::move(base)) {}
+        CREATIVITY_LINEAR_DERIVED_COMMON_METHODS(ProfitStream)
 };
 
 }}

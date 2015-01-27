@@ -1,6 +1,5 @@
 #pragma once
 #include "creativity/belief/LinearRestricted.hpp"
-#include "creativity/belief/LinearDerived.hpp"
 #include <eris/algorithms.hpp>
 #include <eris/SharedMember.hpp>
 
@@ -37,7 +36,7 @@ namespace belief {
  * These constraints are combined with a natural conjugate prior for the purposes of updating the
  * beliefs via Bayesian econometrics.
  */
-class Demand : public LinearDerived<Demand, LinearRestricted> {
+class Demand : public LinearRestricted {
     public:
         /** Default constructor: note that default constructed objects are not valid models.
          * \sa belief::Linear::Linear()
@@ -61,7 +60,7 @@ class Demand : public LinearDerived<Demand, LinearRestricted> {
          */
         template <typename ...Args>
         explicit Demand(unsigned int D, Args &&...args)
-        : Parent(std::forward<Args>(args)...), D_{D}
+        : LinearRestricted(std::forward<Args>(args)...), D_{D}
         {
             // Add restrictions:
             restrict(1) <= 0.0; // beta_price <= 0 (higher price <-> lower quantity)
@@ -129,18 +128,13 @@ class Demand : public LinearDerived<Demand, LinearRestricted> {
          */
         Eigen::RowVectorXd bookRow(eris::SharedMember<Book> book, double quality) const;
 
-        /// Constructs a new Demand object given a Linear base object.
-        virtual Demand newDerived(Linear &&base) const override;
-
-
         /// Returns "Demand", the name of this model.
         virtual std::string display_name() const override { return "Demand"; }
 
+        CREATIVITY_LINEAR_DERIVED_COMMON_METHODS(Demand)
+
     private:
         unsigned int D_;
-
-        // Initialize a Demand from a Linear object of the correct size
-        Demand(unsigned int D, Linear &&base) : Parent(std::move(base)), D_{D} {}
 };
 
 }}

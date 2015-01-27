@@ -19,10 +19,4 @@ double Quality::predict(const Book &book) {
     return predict(X);
 }
 
-
-Quality Quality::newDerived(Linear &&model) const {
-    return Quality(std::move(model));
-}
-
-
 }}

@@ -16,10 +16,4 @@ double ProfitStream::predict(SharedMember<Book> book) {
     return Linear::predict(X);
 }
 
-ProfitStream ProfitStream::newDerived(Linear &&model) const {
-    return ProfitStream(std::move(model));
-}
-
-
-
 } }

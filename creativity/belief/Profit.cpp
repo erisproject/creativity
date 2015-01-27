@@ -44,8 +44,4 @@ RowVectorXd Profit::profitRow(eris::SharedMember<Book> book, double quality) con
     return Xi;
 }
 
-Profit Profit::newDerived(Linear &&model) const {
-    return Profit(D_, std::move(model));
-}
-
 }}
