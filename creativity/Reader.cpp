@@ -526,7 +526,7 @@ const std::map<unsigned int, belief::ProfitStream>& Reader::profitStreamBeliefs(
 }
 
 bool Reader::usableBelief(const belief::Linear &model) const {
-    return not(model.noninformative()) and model.n() - model.K() >= creativity_->parameters.initial.belief_threshold;
+    return model.fullyInformative() and model.n() - model.K() >= creativity_->parameters.initial.belief_threshold;
 }
 
 void Reader::updateBeliefs() {
@@ -762,7 +762,7 @@ void Reader::updateProfitBelief() {
             // Look for the largest model that doesn't exceed the book's age, then use it for
             // prediction
             for (auto it = profit_stream_beliefs_.rbegin(); it != profit_stream_beliefs_.rend(); it++) {
-                if (it->first <= bc.first->age() and it->second.n() >= 1) {
+                if (it->first <= bc.first->age() and usableBelief(it->second)) {
                     // We have a winner:
                     y[i] = it->second.predict(bc.first);
                     X.row(i) = profit_belief_.profitRow(bc.first, bc.second.get().quality);

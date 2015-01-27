@@ -156,10 +156,10 @@ struct CreativitySettings {
          * 1-, 2-, and 4-period old books, with 15, 7, and 5 observations, only the 1- and 2-period
          * models will be used.)
          *
-         * Noninformative beliefs will never be used, so you can set this to a large negative number to
-         * use beliefs when backed by 1 or more observations (even when k > 1).
+         * Note that partially informative models (i.e. those with fewer than K linearly-independent
+         * rows) are never used, so setting this to a value smaller than 0 has no effect.
          */
-        int32_t belief_threshold = 2;
+        int32_t belief_threshold = 5;
     } initial;
 
 };

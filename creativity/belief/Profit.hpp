@@ -5,10 +5,11 @@
 namespace creativity { namespace belief {
 
 /** This class represents an author's belief about the lifetime profitability of a work.  The model
- * is of the form:
+ * is:
  *
  * \f$\Pi_b = \beta_0 + \beta_1 q_b + \beta_2 q_b^2 + \beta_3 firstBook + \beta_4 previousBooks + \beta_5 marketBooks + u\f$
- * where:
+ *
+ * Specifically, the fields above are:
  * - \f$Pi_b\f$ is the lifetime profits of the book
  * - \f$q_b\f$ is the (non-negative) quality of the book.
  *   \f$q_b\f$ is raised to the dimensionality because changes in it affect the radius of potential
@@ -118,7 +119,6 @@ class Profit : public LinearRestricted {
 
     private:
         unsigned int D_;
-
 };
 
 }}

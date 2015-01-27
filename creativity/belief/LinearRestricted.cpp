@@ -97,6 +97,7 @@ void LinearRestricted::reset() {
     draw_rejection_success = 0;
     gibbs_D_.reset();
     gibbs_last_z_.reset();
+    gibbs_r_Rbeta_.reset();
     gibbs_last_sigma_ = std::numeric_limits<double>::signaling_NaN();
     gibbs_draws_ = 0;
     chisq_n_median_ = std::numeric_limits<double>::signaling_NaN();
@@ -172,7 +173,7 @@ void LinearRestricted::gibbsInitialize(const Ref<const VectorXd> &initial, unsig
 
         for (unsigned long trial = 1; ; trial++) {
             violations.clear();
-            VectorXd v = restrict_select_.topRows(restrict_size_) * adjusted - restrict_values_.head(restrict_size_);
+            VectorXd v = R() * adjusted - r();
             for (size_t i = 0; i < restrict_size_; i++) {
                 if (v[i] > 0) violations.push_back(i);
             }
@@ -217,7 +218,6 @@ const VectorXd& LinearRestricted::drawGibbs() {
     if (not gibbs_last_z_) {
         // If we don't have an initial value, draw an *untruncated* value and give it to
         // gibbsInitialize() to fix up.
-
         for (int trial = 1; ; trial++) {
             try { gibbsInitialize(Linear::draw(), 10*restrict_size_); break; }
             catch (constraint_failure&) {
@@ -255,10 +255,10 @@ const VectorXd& LinearRestricted::drawGibbs() {
             sigma = std::sqrt(n_ / chisq(rng));
         }
         else {
-            // Otherwise we need to look at the z values we drew above and draw and admissable
-            // sigma^2 value from the range of values that wouldn't have caused a constraint
-            // violation had we used it to form beta = beta_ + sigma*s*Ainv*z.  (See the method
-            // documentation for the thorough details)
+            // Otherwise we need to look at the z values we drew in the previous round (or in
+            // gibbsInitialize() and draw an admissable sigma^2 value from the range of values that
+            // wouldn't have caused a constraint violation had we used it to form beta = beta_ +
+            // sigma*s*Ainv*z.  (See the method documentation for thorough details)
             double sigma_l = 0, sigma_u = INFINITY;
             for (size_t i = 0; i < restrict_size_; i++) {
                 double denom = D.row(i) * z;

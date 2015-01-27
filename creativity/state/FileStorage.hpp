@@ -492,41 +492,53 @@ class FileStorage final : public StorageBackend {
         typedef struct {
             uint32_t K; ///< Number of parameters; K=0 for a default constructed (invalid) model (the remaining values will be uninitialized)
             bool noninformative; ///< True if this is a noninformative model (in which case the remaining values will be uninitialized)
+            bool fullyinformative; ///< True if this is a fully informative model (in which case indep_data will be a null matrix)
             Eigen::VectorXd beta; ///< belief::Linear beta vector
             double s2; ///< belief::Linear s2 value
             double n; ///< belief::Linear n value
             Eigen::MatrixXd V; ///< belief::Linear V matrix
+            Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> indep_data; ///< belief::Linear indepDataRows() matrix
             bool draw_gibbs; ///< If true, the last draw from this belief used Gibbs sampling (false = no draws, or rejection sampling)
             uint32_t draw_success_cumulative, ///< For a restricted belief, the number of successful draws
                      draw_discards_cumulative; ///< For a restricted belief, the number of discarded draws
         } belief_data;
 
-        /** Reads a belief structure from the current file location.  The first field read is the
-         * location value which has the following interpretations:
-         *     - 0 indicates a default-constructed model (i.e. a placeholder object, not a real model)
-         *     - a negative value in [-100,-1], indicates a noninformative model with `-val`
-         *       parameters (e.g. -6 indicates a noninformative, 6-parameter model)
-         *     - the value -512 indicates that the belief record immediately follows the current
-         *       position
-         *     - otherwise the value indicates the file position containing the belief record
-         *       (identical belief records may be multiply referenced to save file space).  If the
-         *       location is invalid (negative below -100, inside the file header, or past the end
-         *       of the file) will raise an exception.
+        /** Reads a belief structure from the current file location.  The structure is as follows:
          *
          * In the case of a default-constructed model or a noninformative model, no further reading
          * is required.  When a file location (or the "immediately following" -512 value) is
          * recognized, that indicated location contains a belief record structured as follows:
          *
-         *     u32      K, the number of model parameters
+         *     i8       K, the number of model parameters, with special values described below
+         *     u8       status bits (described below)
          *     dbl*K    beta vector (K values)
          *     dbl      s2
          *     dbl      n
          *     dbl*Z    the `Z=K(K+1)/2` elements of the lower triangle of the V matrix, in column-major
          *              order (that is, [0,0], [1,0], [2,0], ..., [K,0], [1,1], [2,1], ..., [K,1], ..., [K,K])
+         *     u8       r, the number of independent row data (for partially-informed models)
+         *     dbl*r*K  the independent row data (for partially-informed models)
+         *     u32      the cumulative successful LinearRestricted draws (only for LinearRestricted
+         *              models)
+         *     u32      the cumulative discarded LinearRestricted draws (only for LinearRestricted
+         *              models)
          *
-         * The file's current position when this method returns will be the position of the next field.
-         * the may be moved by this method and is not restored; if you
-         * require restoration of the current position, handle it in the code calling this method.
+         * The K value has the following interpretations: if in [1,120], the model has this number of
+         * parameters, and is not a completely noninformative model.  If in [-120,-1], the model has
+         * -(this number) parameters, but is a completely noninformative model (and so no other data
+         * follows).  If -128, the model object is default-constructed (and thus has no useful
+         * data).  Anything else is invalid.
+         *
+         * The second byte is a bit field, which currently has the following interpretations:
+         * - lowest bit (& 1): the model is a LinearRestricted model, and thus carries extra
+         *   LinearRestricted data (the two u32's above).  If not set, the u32s are not present in
+         *   the record.
+         * - bit 2 (& 2): the last draw from this model used Gibbs sampling (only applicable to
+         *   restricted models)
+         * - bit 3 (& 4): the model is fully informative.  If this bit is *not* set, then the values
+         *   following the V matrix data are present: the number of independent rows, and the data
+         *   for those rows (unless number of rows is 0).
+         * - other bits are currently unused.
          */
         belief_data readBelief() const;
 

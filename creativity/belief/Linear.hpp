@@ -79,6 +79,11 @@ class Linear {
          * \param n the number of data points supporting the other values (which can be a
          * non-integer value).
          *
+         * \param indep_data a matrix of size r-by-K (with r < K) that contains a set of linearly
+         * independent data rows that this model has been updated with.  If omitted, or given as an
+         * empty (0-by-0) matrix, the model will be assumed to be based on at least K linearly
+         * independent data rows.
+         *
          * \throws std::runtime_error if any of (`K >= 1`, `V.rows() == V.cols()`, `K == V.rows()`)
          * are not satisfied (where `K` is determined by the number of rows of `beta`).
          */
@@ -86,26 +91,9 @@ class Linear {
                 const Eigen::Ref<const Eigen::VectorXd> beta,
                 double s2,
                 const Eigen::Ref<const Eigen::MatrixXd> V,
-                double n
+                double n,
+                const Eigen::Ref<const Eigen::MatrixXd> indep_data = Eigen::MatrixXd()
               );
-
-        /** Constructs a Linear model from std::vector<double>s containing the coefficients of beta
-         * and the lower triangle of V.
-         *
-         * \param beta a vector of coefficients, which determines k, the number of model parameters.
-         * \param s2 the \f$\sigma^2\f$ value of the error term variance.  Typically the \f$\sigma^2\f$ estimate.
-         * \param V a K*(K+1)/2-length vector of V values which are the lower triangle values of V
-         * in row-major order; upper-triangle values are copied from the (symmetric) lower triangle
-         * values.
-         * \param n the number of data points supporting the other values (which can be a
-         * non-integer value).
-         */
-        Linear(
-                const std::vector<double> &beta,
-                double s2,
-                const std::vector<double> &V,
-                double n
-        );
 
         /** Default constructor: this constructor exists only to allow Linear objects to be default
          * constructed: default constructed objects are models of 0 parameters; such models will
@@ -174,6 +162,21 @@ class Linear {
          * if VcholL() hasn't been calculated yet, this will calculate it. */
         const Eigen::MatrixXd& VcholLinv() const;
 
+        /** Returns true if the data fed into this model makes the model fully informed.  This works
+         * by storing up to K linearly independent data rows, and adding new rows only if they
+         * increase the rank of the stored data.  For models with linearly dependent data, some
+         * entries of V_ will be determined entirely or mostly by the large noninformative V value,
+         * and so are not suitable for prediction.
+         */
+        bool fullyInformative() const;
+
+        /** Returns a set of linearly-independent rows that have been fed into this model for a
+         * non-fully-informative model.  The returned matrix block is in row-major order.
+         *
+         * \throws std::logic_error if fullyInformative() would return true.
+         */
+        Eigen::Block<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Dynamic, Eigen::Dynamic, true> indepDataRows() const;
+
         /** Given a row vector of values \f$X^*\f$, predicts \f$y^*\f$ using the current model
          * values.  The default implementation provided by this class simply returns the mean \f$X^*
          * \beta\f$ (the mean of the multivariate \f$t\f$ density for an unrestricted, natural
@@ -181,9 +184,8 @@ class Linear {
          * other model parameter distribution assumptions where the parameter means may have
          * differences from the restricted distribution means due to the restrictions.
          *
-         * \throws std::logic_error if attempting to call predict() on an empty or noninformative
-         * model.  (The default implementation would always simply return 0 for noninformative
-         * models, which is not a useful prediction).
+         * \throws std::logic_error if attempting to call predict() on an empty, noninformative, or
+         * not-fully-informative model.
          */
         virtual double predict(const Eigen::Ref<const Eigen::RowVectorXd> &Xi);
 
@@ -333,7 +335,7 @@ class Linear {
         virtual void weakenInPlace(double precision_scale);
 
         /** Updates the current linear model in place.  This functionality should only be used
-         * internally and by subclasses are required for move and copy update methods; updating
+         * internally and by subclasses as required for move and copy update methods; updating
          * should be considered (externally) as a type of construction of a new object.
          */
         virtual void updateInPlace(
@@ -341,10 +343,11 @@ class Linear {
                 const Eigen::Ref<const Eigen::MatrixXd> &X);
 
         /** Called to reset any internal object state when creating a new derived object.  This is
-         * called automatically by weakenInPlace() and updateInPlace() (themselves called when
-         * creating a new updated or weakened object).
+         * called automatically at the end of weakenInPlace() and updateInPlace() (themselves called
+         * when creating a new updated or weakened object), after the new object's various
+         * parameters (beta_, n_, etc.) have been updated.
          *
-         * The default base implementation does nothing.
+         * The default base implementation clears the last draw value (as returned by draw() and lastDraw()).
          */
         virtual void reset();
 
@@ -401,6 +404,28 @@ class Linear {
     private:
         // Checks that the given matrices conform; called during construction; throws on error.
         void checkLogic();
+
+        /** The matrix of a set of linearly independent rows that have been added to this data.
+         * Used to determine when the model becomes fully informed.  If indep_rows_ equals K, this
+         * pointer will generally be empty; when less than K, this will point at a K-by-K matrix
+         * whose first `indep_rows_` rows are the linearly-independent rows seen thus far.  The
+         * values of later rows are used internally or are uninitialized, and should not be
+         * referenced.
+         *
+         * New rows are added to this matrix (and indep_rows_ incremented) only if they increase the
+         * rank; that is, the first `indep_rows_` rows of this matrix will always have rank
+         * `indep_rows_`.  Once the matrix reaches full rank (K), the pointer is cleared and the
+         * matrix is not used again.  The actual rows stored are irrelevant: the values are only
+         * used to determine whether new rows add to the rank of X.
+         */
+        std::shared_ptr<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> indep_data_;
+
+        /** The number of linearly independent data rows that have been fed into this model.  When
+         * this value is less than K(), this also indicates the number of rows of indep_data_ that
+         * contain an arbitrary set of linearly-independent rows.
+         */
+        size_t indep_rows_ = 0;
+
 };
 
 }}

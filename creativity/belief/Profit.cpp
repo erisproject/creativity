@@ -14,6 +14,7 @@ double Profit::predict(double q, unsigned long previousBooks, unsigned long mark
     if (q < 0) throw std::domain_error("Profit::predict(): illegal negative quality value");
     RowVectorXd X(K_);
     X << 1.0, q, q*q, previousBooks == 0 ? 1.0 : 0.0, previousBooks, marketBooks;
+
     return predict(X);
 }
 

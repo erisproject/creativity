@@ -717,6 +717,7 @@ FileStorage::belief_data FileStorage::readBelief() const {
     // information)
     bool restricted_model = status & 1;
     bool last_draw_was_gibbs = status & 2;
+    belief.fullyinformative = status & 4;
 
     // The first K elements are beta values
     belief.beta = VectorXd(k);
@@ -734,6 +735,16 @@ FileStorage::belief_data FileStorage::readBelief() const {
             double cov = read_dbl();
             belief.V(r,c) = cov;
             if (c != r) belief.V(c,r) = cov;
+        }
+    }
+
+    // If the model was not fully informative, we immediately get a value r < K telling us how many
+    // rows worth of independent data follow (i.e. r*K values follow).
+    if (not belief.fullyinformative) {
+        uint8_t indep_rows = read_u8();
+        belief.indep_data = Matrix<double, Dynamic, Dynamic, RowMajor>(indep_rows, k);
+        for (uint8_t i = 0; i < indep_rows; i++) for (unsigned int j = 0; j < belief.K; j++) {
+            belief.indep_data(i, j) = read_dbl();
         }
     }
 
@@ -828,7 +839,7 @@ void FileStorage::writeBelief(const Linear &m) {
         return;
     }
 
-    // Otherwise write out the full record:
+    // Otherwise write out the full record, starting with the positive size:
     write_i8(k);
 
     bool restricted_model = false;
@@ -841,6 +852,9 @@ void FileStorage::writeBelief(const Linear &m) {
     if (restricted_model) {
         status |= 1;
         if (lr->last_draw_mode == LinearRestricted::DrawMode::Gibbs) status |= 2;
+    }
+    if (m.fullyInformative()) {
+        status |= 4;
     }
 
     // Status field
@@ -863,12 +877,21 @@ void FileStorage::writeBelief(const Linear &m) {
         }
     }
 
+    if (not m.fullyInformative()) {
+        auto indep_data = m.indepDataRows();
+        write_u8(indep_data.rows());
+        for (int i = 0; i < indep_data.rows(); i++) for (unsigned j = 0; j < k; j++) {
+            write_dbl(indep_data(i,j));
+        }
+    }
+
     if (restricted_model) {
         write_u32(lr->draw_rejection_success);
         write_u32(lr->draw_rejection_discards);
     }
 
-    FILESTORAGE_DEBUG_WRITE_CHECK(2+8*(2+k+k*(k+1)/2) + (restricted_model ? 4*2 : 0))
+    FILESTORAGE_DEBUG_WRITE_CHECK(2+8*(2+k+k*(k+1)/2) + (restricted_model ? 4*2 : 0) +
+            (m.fullyInformative() ? 0 : 1 + 8*m.indepDataRows().rows()*k))
 }
 
 std::pair<eris_id_t, BookState> FileStorage::readBook() const {

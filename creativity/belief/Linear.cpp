@@ -13,19 +13,33 @@ Linear::Linear(
         const Ref<const VectorXd> beta,
         double s2,
         const Ref<const MatrixXd> V,
-        double n
+        double n,
+        const Ref<const MatrixXd> indep_data
         )
     : beta_(beta), s2_{s2}, V_(V.selfadjointView<Lower>()), n_{n}, K_(beta_.rows())
 {
     // Check that the given matrices conform
     checkLogic();
+
+    // Copy any given independent rows
+    if (indep_data.rows() < K_ and indep_data.cols() == K_) {
+        indep_rows_ = indep_data.rows();
+        indep_data_.reset(new Matrix<double, Dynamic, Dynamic, RowMajor>(K(), K()));
+        indep_data_->topRows(indep_rows_) = indep_data; 
+    }
+    else if (indep_data.rows() == 0 and indep_data.cols() == 0)
+        indep_rows_ = K();
+    else
+        throw std::logic_error("Linear() called with invalid-sized indep_data argument");
 }
 
+/*
 Linear::Linear(
         const std::vector<double> &beta,
         double s2,
         const std::vector<double> &V,
-        double n
+        double n,
+        const std::vector<double> &indep_data
         )
     : beta_(beta.size()), s2_(s2), V_(beta.size(), beta.size()), n_(n), K_(beta.size())
 {
@@ -40,7 +54,7 @@ Linear::Linear(
         V_(r,c) = vij;
         if (r != c) V_(c,r) = vij;
     }
-}
+}*/
 
 Linear::Linear(unsigned int K) :
     beta_{VectorXd::Zero(K)}, s2_{NONINFORMATIVE_S2}, V_{NONINFORMATIVE_Vc * MatrixXd::Identity(K, K)},
@@ -98,6 +112,8 @@ double Linear::predict(const Ref<const RowVectorXd> &Xi) {
     NO_EMPTY_MODEL;
     if (noninformative_)
         throw std::logic_error("Cannot call predict() on noninformative model");
+    if (not fullyInformative())
+        throw std::logic_error("Cannot call predict() on partially-noninformative models");
     return Xi * beta_;
 }
 
@@ -207,7 +223,7 @@ Linear Linear::update(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X
 void Linear::updateInPlace(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X) {
     NO_EMPTY_MODEL;
     if (X.cols() != K())
-        throw std::logic_error("update(y, X) failed: X has wrong number of columns");
+        throw std::logic_error("update(y, X) failed: X has wrong number of columns (expected " + std::to_string(K()) + ", got " + std::to_string(X.cols()) + ")");
     if (y.rows() != X.rows())
         throw std::logic_error("update(y, X) failed: y and X are non-conformable");
 
@@ -215,6 +231,28 @@ void Linear::updateInPlace(const Ref<const VectorXd> &y, const Ref<const MatrixX
 
     if (y.rows() == 0) // Nothing to update!
         return;
+
+    if (indep_rows_ < K()) {
+        if (not indep_data_ or indep_data_->rows() != K() or indep_data_->cols() != K()) {
+            indep_data_.reset(new Matrix<double, Dynamic, Dynamic, RowMajor>(K(), K()));
+            indep_rows_ = 0; // Reset to 0, just in case it was something else but the matrix had a wonky size
+        }
+        else if (indep_data_ and not indep_data_.unique()) {
+            // Something else has a reference to the data, so copy it first
+            indep_data_.reset(new Matrix<double, Dynamic, Dynamic, RowMajor>(*indep_data_));
+        }
+
+        // Try adding X rows one-by-one to see if doing so increases the rank
+        for (int i = 0; indep_rows_ < K() and i < X.rows(); i++) {
+            indep_data_->row(indep_rows_) = X.row(i);
+            unsigned int rank = indep_data_->topRows(indep_rows_+1).colPivHouseholderQr().rank();
+            if (rank > indep_rows_) indep_rows_++; // The row increased rank, so keep it
+            // else ignore it (leave it there: it won't be used and will get overwritten by the next row)
+        }
+        if (indep_rows_ == K())
+            // Achieved linear independence: don't need to store the rows anymore
+            indep_data_.reset();
+    }
 
     MatrixXd Xt = X.transpose();
     MatrixXd XtX = Xt * X;
@@ -235,9 +273,6 @@ void Linear::updateInPlace(const Ref<const VectorXd> &y, const Ref<const MatrixX
     VectorXd beta_diff = beta_post - beta_;
     beta_ = std::move(beta_post);
     s2_ = (n_prior * s2_ + residualspost.squaredNorm() + beta_diff.transpose() * Vinv() * beta_diff) / n_;
-    //ERIS_DBG("orig nSSR: " << residualspost.squaredNorm()
-    /*ERIS_DBG("s2_ orig method: " << s2_);
-    ERIS_DBG("s2_ Koop: " << s2_alt);*/
 
     V_inv_ = std::move(V_post_inv);
     beta_ = std::move(beta_post);
@@ -283,13 +318,13 @@ void Linear::weakenInPlace(const double precision_scale) {
         if (V_chol_L_.unique())
             *V_chol_L_ /= std::sqrt(precision_scale);
         else
-            V_chol_L_ = std::make_shared<Eigen::MatrixXd>(*V_chol_L_ / std::sqrt(precision_scale));
+            V_chol_L_.reset(new Eigen::MatrixXd(*V_chol_L_ / std::sqrt(precision_scale)));
     }
     if (V_chol_L_inv_) {
         if (V_chol_L_inv_.unique())
             *V_chol_L_inv_ *= std::sqrt(precision_scale);
         else
-            V_chol_L_inv_ = std::make_shared<Eigen::MatrixXd>(*V_chol_L_inv_ * std::sqrt(precision_scale));
+            V_chol_L_inv_.reset(new Eigen::MatrixXd(*V_chol_L_inv_ * std::sqrt(precision_scale)));
     }
 
     // And of course V gets scaled
@@ -297,6 +332,17 @@ void Linear::weakenInPlace(const double precision_scale) {
 
     return;
 }
+
+bool Linear::fullyInformative() const {
+    return indep_rows_ >= K();
+}
+
+Block<const Matrix<double, Dynamic, Dynamic, RowMajor>, Dynamic, Dynamic, true> Linear::indepDataRows() const {
+    if (indep_rows_ >= K()) throw std::logic_error("indepDataRows() cannot be called on a fully-informed model");
+    // Muck around with const casting because we want to get at the const version of topRows():
+    return const_cast<const typename decltype(indep_data_)::element_type&>(*indep_data_).topRows(indep_rows_);
+}
+
 
 void Linear::reset() {
     if (last_draw_.size() > 0) last_draw_.resize(0);
