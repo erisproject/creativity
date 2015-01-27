@@ -698,7 +698,7 @@ FileStorage::belief_data FileStorage::readBelief() const {
         belief.K = 0;
         return belief;
     }
-    else if (k >= -100 and k < 0) {
+    else if (k >= -120 and k < 0) {
         belief.K = (uint32_t) -k;
         belief.noninformative = true;
         return belief;
