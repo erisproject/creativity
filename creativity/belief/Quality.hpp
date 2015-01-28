@@ -30,12 +30,11 @@ namespace belief {
  */
 class Quality : public Linear {
     public:
-        /** Default constructor: note that default constructed objects are not valid models.
-         * \sa belief::Linear::Linear()
+        /** Default constructor: note that unlike default constructed Linear objects, this creates a noninformative model.
          *
-         * To construct a noninformative Quality model, use: `Quality(Quality::parameters())`
+         * \sa belief::Linear::Linear()
          */
-        Quality() = default;
+        Quality() : Quality(parameters()) {}
 
         /** Constructs a Quality object with the given parameter information.
          *
@@ -44,7 +43,7 @@ class Quality : public Linear {
          * \sa Linear::Linear
          */
         template <typename ...Args>
-        Quality(Args &&...args) : Linear(std::forward<Args>(args)...)
+        explicit Quality(Args &&...args) : Linear(std::forward<Args>(args)...)
         {}
 
         /// Returns the number of parameters of this model (7)

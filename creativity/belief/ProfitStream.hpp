@@ -29,20 +29,8 @@ namespace creativity { namespace belief {
  */
 class ProfitStream : public Linear {
     public:
-        /** Default constructor: note that default constructed objects are not valid models.
-         * \sa belief::Linear::Linear()
-         */
-        ProfitStream() = default;
-
-        /** Constructs a ProfitStream object with the given parameter information.
-         *
-         * \param args a parameter pack to forward to the base Linear constructor.
-         *
-         * \sa Linear::Linear
-         */
-        template <typename ...Args>
-        ProfitStream(Args &&...args) : Linear(std::forward<Args>(args)...)
-        {}
+        /// Inherit constructors from Linear
+        using Linear::Linear;
 
         /** Given a book, this uses the profit of the first \f$K\f$ periods the book has been on the
          * market to predict the remaining cumulative lifetime profit,

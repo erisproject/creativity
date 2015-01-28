@@ -647,8 +647,8 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
     belief_data belief = readBelief();
     if (belief.K > 0) {
         r.profit = belief.noninformative
-            ? Profit(settings_.dimensions, belief.K)
-            : Profit(settings_.dimensions, belief.beta, belief.s2, belief.V, belief.n);
+            ? Profit(belief.K)
+            : Profit(belief.beta, belief.s2, belief.V, belief.n);
         r.profit.draw_rejection_success = belief.draw_success_cumulative;
         r.profit.draw_rejection_discards = belief.draw_discards_cumulative;
     }
@@ -656,8 +656,8 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
     belief = readBelief();
     if (belief.K > 0) {
         r.profit_extrap = belief.noninformative
-            ? Profit(settings_.dimensions, belief.K)
-            : Profit(settings_.dimensions, belief.beta, belief.s2, belief.V, belief.n);
+            ? Profit(belief.K)
+            : Profit(belief.beta, belief.s2, belief.V, belief.n);
         r.profit_extrap.draw_rejection_success = belief.draw_success_cumulative;
         r.profit_extrap.draw_rejection_discards = belief.draw_discards_cumulative;
     }
@@ -665,8 +665,8 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
     belief = readBelief();
     if (belief.K > 0) {
         r.demand = belief.noninformative
-            ? Demand(settings_.dimensions, belief.K)
-            : Demand(settings_.dimensions, belief.beta, belief.s2, belief.V, belief.n);
+            ? Demand(belief.K)
+            : Demand(belief.beta, belief.s2, belief.V, belief.n);
         r.demand.draw_rejection_success = belief.draw_success_cumulative;
         r.demand.draw_rejection_discards = belief.draw_discards_cumulative;
     }

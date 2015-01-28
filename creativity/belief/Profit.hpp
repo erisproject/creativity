@@ -12,8 +12,6 @@ namespace creativity { namespace belief {
  * Specifically, the fields above are:
  * - \f$Pi_b\f$ is the lifetime profits of the book
  * - \f$q_b\f$ is the (non-negative) quality of the book.
- *   \f$q_b\f$ is raised to the dimensionality because changes in it affect the radius of potential
- *   customers, with total customers being proportional to the radius raised to \f$D\f$.
  * - \f$firstBook\f$ is a dummy: 1 if this is the creator's first work, 0 if the creator has other
  *   works.
  * - \f$previousBooks\f$ is the number of previous books the author has created.
@@ -29,27 +27,20 @@ namespace creativity { namespace belief {
  */
 class Profit : public LinearRestricted {
     public:
-        /** Default constructor: note that default constructed objects are not valid models.
-         * \sa belief::Linear::Linear()
-         */
-        Profit() = default;
-
         /** Construct a noninformative profit model.
          *
          * \sa Linear::Linear
          */
-        Profit(unsigned int D) : Profit(D, parameters()) {}
+        Profit() : Profit(parameters()) {}
 
         /** Constructs a profit model with the given parameter information.
          *
-         * \param D the dimensionality of the world.
          * \param args prior arguments to forward to the base Linear constructor.
          *
          * \sa Linear::Linear
          */
         template <typename ...Args>
-        Profit(unsigned int D, Args &&...args)
-        : LinearRestricted(std::forward<Args>(args)...), D_{D}
+        explicit Profit(Args &&...args) : LinearRestricted(std::forward<Args>(args)...)
         {
             // Add restrictions:
             restrict(1) >= 0; // beta_q >= 0 (higher quality <-> higher profits, at least for low quality)
@@ -116,9 +107,6 @@ class Profit : public LinearRestricted {
         virtual std::string display_name() const override { return "Profit"; }
 
         CREATIVITY_LINEAR_DERIVED_COMMON_METHODS(Profit)
-
-    private:
-        unsigned int D_;
 };
 
 }}

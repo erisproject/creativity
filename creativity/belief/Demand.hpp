@@ -38,29 +38,22 @@ namespace belief {
  */
 class Demand : public LinearRestricted {
     public:
-        /** Default constructor: note that default constructed objects are not valid models.
+        /** Default constructor: note that unlike a default-constructed Linear model, this default
+         * constructed object is a usable (but noninformative) model.
+         *
          * \sa belief::Linear::Linear()
          */
-        Demand() = default;
+        Demand() : Demand(parameters()) {}
 
-        /** Constructs a noninformative demand model.
+        /** Constructs a demand model with the given prior information.  This forwards arguments to
+         * the LinearRestricted constructor, but also adds the model's restrictions.
          *
-         * \param D the dimensionality of the world.
-         *
-         * \sa Linear::Linear
-         */
-        explicit Demand(unsigned int D) : Demand(D, parameters()) {}
-
-        /** Constructs a demand model with the given prior information.
-         *
-         * \param D the dimensionality of the world.
-         * \param args prior arguments to forward to the base Linear constructor.
+         * \param args prior arguments to forward to the base LinearRestricted constructor.
          *
          * \sa Linear::Linear
          */
         template <typename ...Args>
-        explicit Demand(unsigned int D, Args &&...args)
-        : LinearRestricted(std::forward<Args>(args)...), D_{D}
+        explicit Demand(Args &&...args) : LinearRestricted(std::forward<Args>(args)...)
         {
             // Add restrictions:
             restrict(1) <= 0.0; // beta_price <= 0 (higher price <-> lower quantity)
@@ -132,9 +125,6 @@ class Demand : public LinearRestricted {
         virtual std::string display_name() const override { return "Demand"; }
 
         CREATIVITY_LINEAR_DERIVED_COMMON_METHODS(Demand)
-
-    private:
-        unsigned int D_;
 };
 
 }}
