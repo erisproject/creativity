@@ -41,6 +41,7 @@ std::shared_ptr<const State> Storage::operator[](eris_time_t t) const {
         // Cache the value before returning it
         if (cache_.size() <= t) cache_.resize(t+1);
         cache_[t] = st;
+        cache_last_ = st;
     }
 
     return st;
@@ -57,7 +58,8 @@ void Storage::push_back(std::shared_ptr<const State> state) {
         updateSettings();
     }
 
-    cache_.emplace_back(state);
+    cache_.push_back(state);
+    cache_last_ = state;
     backend_->enqueue(std::move(state));
 }
 

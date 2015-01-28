@@ -143,6 +143,14 @@ class Storage final {
          */
         mutable std::vector<std::weak_ptr<const State>> cache_;
 
+        /** Strong pointer to the last-accessed or last-stored state.  This is stored so that
+         * accessing a just-stored state, or repeatedly accessing the same state, avoids repeated
+         * storage lookups.  This is never actually accessed directly: the state is always accessed
+         * through the weak pointer in cache_, this simply serves to ensure that the weak pointer
+         * stays around.
+         */
+        mutable std::shared_ptr<const State> cache_last_;
+
         /** The storage backend, providing the actual low-level storage access. */
         std::unique_ptr<StorageBackend> backend_;
 
