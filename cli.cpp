@@ -153,8 +153,8 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         OPTION_LBOUND(cost_unit, "c", "cost-unit", "Unit cost of making a copy of a book", 0);
         OPTION_LBOUND(cost_piracy, "y", "cost-piracy", "Cost of receiving a pirated copy of a book", 0);
         OPTION_LBOUND_STRICT(income, "i", "income", "Per-period external reader income", 0);
-        OPTION_BOUND(prior_weight, "w", "prior-weight", "The per-period precision matrix multiplier when using a belief as the next period's prior", 0, 1);
-        OPTION_BOUND(prior_weight_piracy, "W", "prior-weight-piracy", "The per-period precision matrix multiplier for the first piracy period", 0, 1);
+        OPTION_LBOUND(prior_weight, "w", "prior-weight", "The per-period standard deviation scaling factor applied when a previous belief is used as the next period's prior", 1);
+        OPTION_LBOUND(prior_weight_piracy, "W", "prior-weight-piracy", "The same as --prior-weight, but applied in the first piracy period", 1);
 
         OPTION_UNBOUNDED_INIT(belief_threshold, "b", "belief-threshold", "The minimum n-k value at which a readers bases decision on beliefs instead of initial parameters");
         OPTION_BOUND_INIT(prob_write, "x", "initial-prob-write", "The probability of writing in initial periods", 0, 1);

@@ -39,14 +39,16 @@
     <property name="page_increment">1</property>
   </object>
   <object class="GtkAdjustment" id="adj_prior_piracy">
-    <property name="upper">1</property>
-    <property name="value">0.5</property>
-    <property name="step_increment">0.01</property>
-    <property name="page_increment">0.10000000000000001</property>
+    <property name="lower">1</property>
+    <property name="upper">100</property>
+    <property name="value">2</property>
+    <property name="step_increment">0.10000000000000001</property>
+    <property name="page_increment">1</property>
   </object>
   <object class="GtkAdjustment" id="adj_prior_weight">
-    <property name="upper">1</property>
-    <property name="value">0.94999999999999996</property>
+    <property name="lower">1</property>
+    <property name="upper">100</property>
+    <property name="value">1.1000000000000001</property>
     <property name="step_increment">0.01</property>
     <property name="page_increment">0.10000000000000001</property>
   </object>
@@ -1492,16 +1494,17 @@ If 0, piracy never becomes available.</property>
                                                 <property name="can_focus">True</property>
                                                 <property name="tooltip_markup" translatable="yes">The weight factor applied to current period beliefs when used as a prior for the next period.  Must be a value between 0 (no prior weight at all) and 1 (full prior weight).
 
-More specifically, this scales the &lt;tt&gt;n&lt;/tt&gt; of a belief when using that belief as a prior.</property>
+More specifically, this scales the prior's &lt;tt&gt;V&lt;/tt&gt; matrix such that the standard deviation of the parameters is scaled by the given value.</property>
                                                 <property name="margin_right">15</property>
                                                 <property name="margin_bottom">1</property>
                                                 <property name="invisible_char">●</property>
-                                                <property name="text" translatable="yes">0.50</property>
+                                                <property name="text" translatable="yes">1.1</property>
                                                 <property name="input_purpose">number</property>
                                                 <property name="adjustment">adj_prior_weight</property>
                                                 <property name="digits">3</property>
                                                 <property name="numeric">True</property>
                                                 <property name="update_policy">if-valid</property>
+                                                <property name="value">1.1000000000000001</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">3</property>
@@ -1530,12 +1533,13 @@ This value overrides the "Prior weighting" setting in just the "Sharing begins" 
                                                 <property name="margin_right">15</property>
                                                 <property name="margin_bottom">1</property>
                                                 <property name="invisible_char">●</property>
-                                                <property name="text" translatable="yes">0.50</property>
+                                                <property name="text" translatable="yes">2.0</property>
                                                 <property name="input_purpose">number</property>
                                                 <property name="adjustment">adj_prior_piracy</property>
                                                 <property name="digits">3</property>
                                                 <property name="numeric">True</property>
                                                 <property name="update_policy">if-valid</property>
+                                                <property name="value">2</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">3</property>

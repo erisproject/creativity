@@ -110,15 +110,15 @@ struct CreativitySettings {
      */
     double piracy_link_proportion = 0.1;
 
-    /** The factor to multiple a belief's \f$V^{-1}\f$ value when using it as a prior in a subsequent
-     * period.
+    /** The factor by which parameter standard deviations should be multiplied when using it as a
+     * prior for a subsequent period.
      */
-    double prior_weight = 0.95;
+    double prior_weight = 1.1;
 
-    /** The factor to multiple a belief's \f$V^{-1}\f$ value when using it as a prior in the first
-     * piracy period.  This value overrides `prior_weight` in the `piracy_begins` period.
+    /** The factor by which to multiply standard deviations in the first piracy period.  This value
+     * overrides `prior_weight` in the `piracy_begins` period.
      */
-    double prior_weight_piracy = 0.5;
+    double prior_weight_piracy = 2;
 
     /** The values in this struct define fixed probabilities and distributions of simulation
      * actions.  This is needed because, in the initial simulation periods, readers only have
@@ -157,7 +157,9 @@ struct CreativitySettings {
          * models will be used.)
          *
          * Note that partially informative models (i.e. those with fewer than K linearly-independent
-         * rows) are never used, so setting this to a value smaller than 0 has no effect.
+         * observations) are never used, so setting this to a value smaller than 0 has no effect,
+         * and often the effective minimum threshold is noticeably higher than 0 (particularly when
+         * the model contains dummy or other small integer values).
          */
         int32_t belief_threshold = 5;
     } initial;

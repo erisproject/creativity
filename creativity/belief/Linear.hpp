@@ -305,7 +305,10 @@ class Linear {
         /** Exactly like the above update() method, but optimized for the case where the caller is
          * an rvalue, typically the result of something like:
          *
-         *     new = linearmodel->weaken(0.9)->update(y, X);
+         *     new = linearmodel->weaken(1.1)->update(y, X);
+         *
+         * The new object is created by moving the current object rather than copying the current
+         * object.
          */
         [[gnu::warn_unused_result]]
         Linear update(
@@ -313,18 +316,23 @@ class Linear {
                 const Eigen::Ref<const Eigen::MatrixXd> &X) &&;
 
         /** Returns a new Linear object with exactly the same beta, n, and s2 as the caller, but
-         * with its `Vinv()` matrix (and thus the precision matrix) scaled by the given value.  This
-         * is designed to allow using this belief as a prior (via update()), but with a deliberately
-         * weakened weight on the prior.
+         * with its `V()` (and related) matrices scaled so that the standard deviation of the
+         * parameters is multiplied by given value.  Thus a value of 2 results in a parameter
+         * distribution with the same mean, but with double the standard deviation (and 4 times the
+         * variance).
+         *
+         * This is designed to allow using this belief as a prior (via update()), but with a
+         * deliberately weakened weight on the prior.
          */
         [[gnu::warn_unused_result]]
-        Linear weaken(double precision_scale) const &;
+        Linear weaken(double stdev_scale) const &;
 
-        /** Just like weaken(), but updates the existing Vinv() value of an existing belief.  This
-         * method is externally invoked only when the caller is an rvalue reference.
+        /** Just like the above weaken(), but operates on an rvalue reference: the new object that
+         * is returned is the result of moving the current object instead of copying the current
+         * object into a new object.
          */
         [[gnu::warn_unused_result]]
-        Linear weaken(double precision_scale) &&;
+        Linear weaken(double stdev_scale) &&;
 
     protected:
 
@@ -332,7 +340,7 @@ class Linear {
          * by subclasses as required for move and copy update methods; weakening should be
          * considered (externally) as a type of construction of a new object.
          */
-        virtual void weakenInPlace(double precision_scale);
+        virtual void weakenInPlace(double stdev_scale);
 
         /** Updates the current linear model in place.  This functionality should only be used
          * internally and by subclasses as required for move and copy update methods; updating

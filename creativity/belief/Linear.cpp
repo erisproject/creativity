@@ -283,52 +283,54 @@ void Linear::updateInPlace(const Ref<const VectorXd> &y, const Ref<const MatrixX
     if (noninformative_) noninformative_ = false; // If we just updated a noninformative model, we aren't noninformative anymore
 }
 
-Linear Linear::weaken(const double precision_scale) const & {
+Linear Linear::weaken(const double stdev_scale) const & {
     Linear weakened(*this);
-    weakened.weakenInPlace(precision_scale);
+    weakened.weakenInPlace(stdev_scale);
     return weakened;
 }
 
-Linear Linear::weaken(const double precision_scale) && {
-    weakenInPlace(precision_scale);
+Linear Linear::weaken(const double stdev_scale) && {
+    weakenInPlace(stdev_scale);
     return std::move(*this);
 }
 
-void Linear::weakenInPlace(const double precision_scale) {
-    if (precision_scale <= 0 or precision_scale > 1)
-        throw std::logic_error("weaken() called with invalid precision multiplier (not in (0,1])");
+void Linear::weakenInPlace(const double stdev_scale) {
+    if (stdev_scale < 1)
+        throw std::logic_error("weaken() called with invalid stdev multiplier " + std::to_string(stdev_scale) + " < 1");
 
     reset();
 
-    if (noninformative() or precision_scale == 1.0) // Nothing to do here
+    if (noninformative() or stdev_scale == 1.0) // Nothing to do here
         return;
+
+    const double var_scale = stdev_scale*stdev_scale;
 
     // If V_inv_ is set, scale it (because this is much cheaper than inverting the scaled V_ later)
     if (V_inv_) {
         // If we're the unique owner of the inverse matrix, scale it directly
         if (V_inv_.unique())
-            *V_inv_ *= precision_scale;
+            *V_inv_ /= var_scale;
         // Otherwise we have to make a copy (because we don't want to change the original!)
         else
-            V_inv_ = std::make_shared<Eigen::MatrixXd>(*V_inv_ * precision_scale);
+            V_inv_ = std::make_shared<Eigen::MatrixXd>(*V_inv_ / var_scale);
     }
 
     // Likewise for the Cholesky decomposition (and its inverse)
     if (V_chol_L_) {
         if (V_chol_L_.unique())
-            *V_chol_L_ /= std::sqrt(precision_scale);
+            *V_chol_L_ *= stdev_scale;
         else
-            V_chol_L_.reset(new Eigen::MatrixXd(*V_chol_L_ / std::sqrt(precision_scale)));
+            V_chol_L_.reset(new Eigen::MatrixXd(*V_chol_L_ * stdev_scale));
     }
     if (V_chol_L_inv_) {
         if (V_chol_L_inv_.unique())
-            *V_chol_L_inv_ *= std::sqrt(precision_scale);
+            *V_chol_L_inv_ /= stdev_scale;
         else
-            V_chol_L_inv_.reset(new Eigen::MatrixXd(*V_chol_L_inv_ * std::sqrt(precision_scale)));
+            V_chol_L_inv_.reset(new Eigen::MatrixXd(*V_chol_L_inv_ / stdev_scale));
     }
 
     // And of course V gets scaled
-    V_ /= precision_scale;
+    V_ *= var_scale;
 
     return;
 }
