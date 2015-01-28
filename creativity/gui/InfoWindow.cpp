@@ -400,7 +400,9 @@ void InfoWindow::updateMatrix(const std::string &code, const Ref<const MatrixXd>
     auto &labels = matrix_[code];
     for (int i = 0; i < m.rows(); i++) for (int j = 0; j < m.cols(); j++) {
         if (pos >= labels.size()) return;
-        labels[pos]->set_markup((lower_triangle and j > i) ? "" : std::to_string(m(i,j)));
+        std::ostringstream sstr;
+        if (not lower_triangle or j <= i) sstr << m(i,j);
+        labels[pos]->set_markup(sstr.str());
         pos++;
     }
 }
