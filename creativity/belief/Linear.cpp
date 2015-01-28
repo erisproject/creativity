@@ -275,7 +275,6 @@ void Linear::updateInPlace(const Ref<const VectorXd> &y, const Ref<const MatrixX
     s2_ = (n_prior * s2_ + residualspost.squaredNorm() + beta_diff.transpose() * Vinv() * beta_diff) / n_;
 
     V_inv_ = std::move(V_post_inv);
-    beta_ = std::move(beta_post);
     // The decompositions will have to be recalculated:
     if (V_chol_L_) V_chol_L_.reset();
     if (V_chol_L_inv_) V_chol_L_inv_.reset(); 
