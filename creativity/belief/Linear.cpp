@@ -24,7 +24,7 @@ Linear::Linear(
     // Copy any given independent rows
     if (indep_data.rows() < K_ and indep_data.cols() == K_) {
         indep_rows_ = indep_data.rows();
-        indep_data_.reset(new Matrix<double, Dynamic, Dynamic, RowMajor>(K(), K()));
+        indep_data_.reset(new MatrixXdR(K(), K()));
         indep_data_->topRows(indep_rows_) = indep_data; 
     }
     else if (indep_data.rows() == 0 and indep_data.cols() == 0)
@@ -234,12 +234,12 @@ void Linear::updateInPlace(const Ref<const VectorXd> &y, const Ref<const MatrixX
 
     if (indep_rows_ < K()) {
         if (not indep_data_ or indep_data_->rows() != K() or indep_data_->cols() != K()) {
-            indep_data_.reset(new Matrix<double, Dynamic, Dynamic, RowMajor>(K(), K()));
+            indep_data_.reset(new MatrixXdR(K(), K()));
             indep_rows_ = 0; // Reset to 0, just in case it was something else but the matrix had a wonky size
         }
         else if (indep_data_ and not indep_data_.unique()) {
             // Something else has a reference to the data, so copy it first
-            indep_data_.reset(new Matrix<double, Dynamic, Dynamic, RowMajor>(*indep_data_));
+            indep_data_.reset(new MatrixXdR(*indep_data_));
         }
 
         // Try adding X rows one-by-one to see if doing so increases the rank
@@ -338,7 +338,7 @@ bool Linear::fullyInformative() const {
     return indep_rows_ >= K();
 }
 
-Block<const Matrix<double, Dynamic, Dynamic, RowMajor>, Dynamic, Dynamic, true> Linear::indepDataRows() const {
+Block<const MatrixXdR, Dynamic, Dynamic, true> Linear::indepDataRows() const {
     if (indep_rows_ >= K()) throw std::logic_error("indepDataRows() cannot be called on a fully-informed model");
     // Muck around with const casting because we want to get at the const version of topRows():
     return const_cast<const typename decltype(indep_data_)::element_type&>(*indep_data_).topRows(indep_rows_);

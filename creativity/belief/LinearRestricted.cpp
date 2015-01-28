@@ -112,7 +112,7 @@ void LinearRestricted::reset() {
     chisq_n_median_ = std::numeric_limits<double>::signaling_NaN();
 }
 
-Block<const Matrix<double, Dynamic, Dynamic, RowMajor>, Dynamic, Dynamic, true> LinearRestricted::R() const {
+Block<const MatrixXdR, Dynamic, Dynamic, true> LinearRestricted::R() const {
     return restrict_select_.topRows(restrict_size_);
 }
 
@@ -215,8 +215,8 @@ const VectorXd& LinearRestricted::drawGibbs() {
 
     if (not gibbs_D_) gibbs_D_.reset(
             restrict_size_ == 0
-            ? new Matrix<double, Dynamic, Dynamic, RowMajor>(0, K_) // It's rather pointless to use drawGibbs() with no restrictions, but allow it for debugging purposes
-            : new Matrix<double, Dynamic, Dynamic, RowMajor>(R() * Ainv));
+            ? new MatrixXdR(0, K_) // It's rather pointless to use drawGibbs() with no restrictions, but allow it for debugging purposes
+            : new MatrixXdR(R() * Ainv));
     auto &D = *gibbs_D_;
 
     if (not gibbs_r_Rbeta_) gibbs_r_Rbeta_.reset(new VectorXd(r() - R() * beta_));

@@ -27,6 +27,9 @@
 
 namespace creativity { namespace belief {
 
+/// Add a MatrixXdR typedef for a row-major MatrixXd
+using MatrixXdR = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+
 /** Base class for a linear model with a natural conjugate, normal-gamma prior.  If deriving from
  * this class, you almost certainly want to use the
  * CREATIVITY_LINEAR_DERIVED_COMMON_METHODS(DerivationName) macro in your class definition.
@@ -188,7 +191,7 @@ class Linear {
          *
          * \throws std::logic_error if fullyInformative() would return true.
          */
-        Eigen::Block<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>, Eigen::Dynamic, Eigen::Dynamic, true> indepDataRows() const;
+        Eigen::Block<const MatrixXdR, Eigen::Dynamic, Eigen::Dynamic, true> indepDataRows() const;
 
         /** Given a row vector of values \f$X^*\f$, predicts \f$y^*\f$ using the current model
          * values.  The default implementation provided by this class simply returns the mean \f$X^*
@@ -439,7 +442,7 @@ class Linear {
          * matrix is not used again.  The actual rows stored are irrelevant: the values are only
          * used to determine whether new rows add to the rank of X.
          */
-        std::shared_ptr<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> indep_data_;
+        std::shared_ptr<MatrixXdR> indep_data_;
 
         /** The number of linearly independent data rows that have been fed into this model.  When
          * this value is less than K(), this also indicates the number of rows of indep_data_ that
