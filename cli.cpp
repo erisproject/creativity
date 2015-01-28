@@ -134,7 +134,7 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
 #define OPTION_UNBOUNDED_INIT(PARAM, SHORT, LONG, DESC) OPTION_UNBOUNDED_NAME(initial_##PARAM, initial.PARAM, SHORT, LONG, DESC)
 
 // Single-letter options used:
-// b B c C d D f i j k K m M n N o O P Q r R s T w W x y z Z
+// b B c C d D f i j k K m M n N o O P Q r R s T u U w W x y z Z
 
         OPTION_LBOUND(readers, "r", "readers", "Number of reader/author agents in the simulation", 1);
         OPTION_LBOUND(dimensions, "D", "dimensions", "Number of dimensions of the simulation", 1);
@@ -153,8 +153,10 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         OPTION_LBOUND(cost_unit, "c", "cost-unit", "Unit cost of making a copy of a book", 0);
         OPTION_LBOUND(cost_piracy, "y", "cost-piracy", "Cost of receiving a pirated copy of a book", 0);
         OPTION_LBOUND_STRICT(income, "i", "income", "Per-period external reader income", 0);
-        OPTION_LBOUND(prior_weight, "w", "prior-weight", "The per-period standard deviation scaling factor applied when a previous belief is used as the next period's prior", 1);
-        OPTION_LBOUND(prior_weight_piracy, "W", "prior-weight-piracy", "The same as --prior-weight, but applied in the first piracy period", 1);
+        OPTION_LBOUND(prior_scale, "w", "prior-scale", "The per-period standard deviation scaling factor applied when a previous belief is used as the next period's prior", 1);
+        OPTION_LBOUND(prior_scale_piracy, "W", "prior-scale-piracy", "The same as --prior-weight, but applied in the first piracy period", 1);
+        OPTION_LBOUND(prior_scale_burnin, "U", "prior-scale-burnin", "The same as --prior-weight, but applied in the first `--burnin-periods' periods", 1);
+        OPTION_LBOUND(burnin_periods, "u", "burnin-periods", "The number of initial periods during which `--prior-scale-burnin' should be used instead of `--prior-scale'", 0);
 
         OPTION_UNBOUNDED_INIT(belief_threshold, "b", "belief-threshold", "The minimum n-k value at which a readers bases decision on beliefs instead of initial parameters");
         OPTION_BOUND_INIT(prob_write, "x", "initial-prob-write", "The probability of writing in initial periods", 0, 1);
@@ -203,8 +205,10 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         COPY_PARAM_SETTING(income);
         COPY_PARAM_SETTING(piracy_begins);
         COPY_PARAM_SETTING(piracy_link_proportion);
-        COPY_PARAM_SETTING(prior_weight);
-        COPY_PARAM_SETTING(prior_weight_piracy);
+        COPY_PARAM_SETTING(prior_scale);
+        COPY_PARAM_SETTING(prior_scale_piracy);
+        COPY_PARAM_SETTING(prior_scale_burnin);
+        COPY_PARAM_SETTING(burnin_periods);
         COPY_INIT_PARAM_SETTING(prob_write);
         COPY_INIT_PARAM_SETTING(q_min);
         COPY_INIT_PARAM_SETTING(q_max);

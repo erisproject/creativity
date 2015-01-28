@@ -43,8 +43,10 @@ int main(int argc, char *argv[]) {
     PRINT_SETTING(income);
     PRINT_SETTING(piracy_begins);
     PRINT_SETTING(piracy_link_proportion);
-    PRINT_SETTING(prior_weight);
-    PRINT_SETTING(prior_weight_piracy);
+    PRINT_SETTING(prior_scale);
+    PRINT_SETTING(prior_scale_piracy);
+    PRINT_SETTING(prior_scale_burnin);
+    PRINT_SETTING(burnin_periods);
     PRINT_SETTING(initial.prob_write);
     PRINT_SETTING(initial.q_min);
     PRINT_SETTING(initial.q_max);

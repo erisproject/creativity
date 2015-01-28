@@ -111,14 +111,23 @@ struct CreativitySettings {
     double piracy_link_proportion = 0.1;
 
     /** The factor by which parameter standard deviations should be multiplied when using it as a
-     * prior for a subsequent period.
+     * prior for a subsequent period, after the initial burn-in period.
      */
-    double prior_weight = 1.1;
+    double prior_scale = 1.1;
 
     /** The factor by which to multiply standard deviations in the first piracy period.  This value
-     * overrides `prior_weight` in the `piracy_begins` period.
+     * overrides `prior_scale` in the `piracy_begins` period.
      */
-    double prior_weight_piracy = 2;
+    double prior_scale_piracy = 2;
+
+    /** The prior weight to use during the burn-in period; typically much larger than prior_scale
+     * so that the simulation results of pre-belief initial parameters have significantly less
+     * weight in readers' beliefs.
+     */
+    double prior_scale_burnin = 2;
+
+    /** The number of "burn-in" periods, during which priors are discounted at a higher rate. */
+    uint32_t burnin_periods = 20;
 
     /** The values in this struct define fixed probabilities and distributions of simulation
      * actions.  This is needed because, in the initial simulation periods, readers only have

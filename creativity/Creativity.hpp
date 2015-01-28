@@ -108,8 +108,9 @@ class Creativity : private eris::noncopyable, public std::enable_shared_from_thi
         bool sharing() const;
 
         /** Returns the prior multiplier currently in effect.  This is
-         * CreativitySettings.prior_weight except in the first piracy period, during which it is
-         * CreativitySettings.prior_weight_piracy.
+         * CreativitySettings.prior_scale except in the first piracy period, during which it is
+         * CreativitySettings.prior_scale_piracy, and in the initial burnin periods, during which it
+         * is CreativitySettings.prior_scale_burnin.
          */
         double priorWeight() const;
 

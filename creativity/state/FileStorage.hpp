@@ -274,21 +274,23 @@ class FileStorage final : public StorageBackend {
                     income = 108, ///< Per-period reader external income (before incurring authorship costs or receiving book profits) (dbl)
                     piracy_begins = 116, ///< the sharing start period (eris_time_t = u32)
                     piracy_link_proportion = 120, ///< The proportion of potential friendship links that exist
-                    prior_weight = 128, ///< The prior 'n' multiplier (usually 0-1)
-                    prior_weight_piracy = 136, ///< The prior 'n' multiplier in the first piracy period
-                    init_prob_write = 144, ///< The probability of writing (while beliefs noninformative)
-                    init_q_min = 152, ///< `a` in U[a,b], the noninformative belief authorship quality level
-                    init_q_max = 160, ///< `b` in U[a,b], the noninformative belief authorship quality level
-                    init_p_min = 168, ///< `a` in U[a,b], the noninformative belief book price
-                    init_p_max = 176, ///< `b` in U[a,b], the noninformative belief book price
-                    init_prob_keep = 184, ///< The probability of keeping a book on the market (uninformed beliefs)
-                    init_keep_price = 192, ///< If keeping a book on the market, the new price is (p-c)*s+c, where this is s
-                    init_belief_threshold = 200, ///< The required n-k value for readers to use beliefs instead of initial behaviour (i32)
+                    prior_scale = 128, ///< The prior 'n' multiplier (usually 0-1)
+                    prior_scale_piracy = 136, ///< The prior 'n' multiplier in the first piracy period
+                    prior_scale_burnin = 144, ///< The prior 'n' multiplier (usually 0-1)
+                    burnin_periods = 152, ///< The burnin-periods during which beliefs are more heavily discounted (u32)
+                    init_prob_write = 156, ///< The probability of writing (while beliefs noninformative)
+                    init_q_min = 164, ///< `a` in U[a,b], the noninformative belief authorship quality level
+                    init_q_max = 172, ///< `b` in U[a,b], the noninformative belief authorship quality level
+                    init_p_min = 180, ///< `a` in U[a,b], the noninformative belief book price
+                    init_p_max = 188, ///< `b` in U[a,b], the noninformative belief book price
+                    init_prob_keep = 196, ///< The probability of keeping a book on the market (uninformed beliefs)
+                    init_keep_price = 204, ///< If keeping a book on the market, the new price is (p-c)*s+c, where this is s
+                    init_belief_threshold = 212, ///< The required n-k value for readers to use beliefs instead of initial behaviour (i32)
                     // NB: this next one should be an integer multiple of 8 (so that states+cont
                     // location go to the end, and so the `states` division below has no remainder)
                     //
-                    // 4 bytes padding
-                    state_first = 208, ///< the first state record
+                    // padding, if needed, here.
+                    state_first = 216, ///< the first state record
                     state_last = size - 16, ///< the last state record
                     continuation = size - 8; ///< the header continuation block pointer (used once header state blocks fill up)
             };

@@ -172,7 +172,10 @@ bool Creativity::sharing() const {
 
 double Creativity::priorWeight() const {
     if (!setup_sim_) throw std::logic_error("Cannot call priorWeight() on a non-live or unconfigured simulation");
-    return sim->t() == parameters.piracy_begins ? parameters.prior_weight_piracy : parameters.prior_weight;
+    auto t = sim->t();
+    return t == parameters.piracy_begins ? parameters.prior_scale_piracy :
+        t <= parameters.burnin_periods ? parameters.prior_scale_burnin :
+        parameters.prior_scale;
 }
 
 std::pair<std::vector<SharedMember<Book>>&, std::unique_lock<std::mutex>> Creativity::newBooks() {

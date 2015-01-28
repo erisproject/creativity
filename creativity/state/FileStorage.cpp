@@ -56,8 +56,10 @@ constexpr int64_t
         FileStorage::HEADER::pos::income,
         FileStorage::HEADER::pos::piracy_begins,
         FileStorage::HEADER::pos::piracy_link_proportion,
-        FileStorage::HEADER::pos::prior_weight,
-        FileStorage::HEADER::pos::prior_weight_piracy,
+        FileStorage::HEADER::pos::prior_scale,
+        FileStorage::HEADER::pos::prior_scale_piracy,
+        FileStorage::HEADER::pos::prior_scale_burnin,
+        FileStorage::HEADER::pos::burnin_periods,
         FileStorage::HEADER::pos::init_prob_write,
         FileStorage::HEADER::pos::init_q_min,
         FileStorage::HEADER::pos::init_q_max,
@@ -251,8 +253,10 @@ void FileStorage::writeSettings(const CreativitySettings &settings) {
     write_value(settings.income);
     write_value(settings.piracy_begins);
     write_value(settings.piracy_link_proportion);
-    write_value(settings.prior_weight);
-    write_value(settings.prior_weight_piracy);
+    write_value(settings.prior_scale);
+    write_value(settings.prior_scale_piracy);
+    write_value(settings.prior_scale_burnin);
+    write_value(settings.burnin_periods);
     write_value(settings.initial.prob_write);
     write_value(settings.initial.q_min);
     write_value(settings.initial.q_max);
@@ -262,8 +266,8 @@ void FileStorage::writeSettings(const CreativitySettings &settings) {
     write_value(settings.initial.keep_price);
     write_value(settings.initial.belief_threshold);
 
-    // 4 bytes padding:
-    write_u32(0); // Unused padding value
+    // No padding currently needed
+    //write_u32(0); // Unused padding value
 
     if (f_.tellp() != HEADER::pos::state_first) {
         // If this exception occurs, something in the above sequence is wrong.
@@ -506,9 +510,11 @@ void FileStorage::parseMetadata() {
     parse_value(block[HEADER::pos::cost_piracy], settings_.cost_piracy);
     parse_value(block[HEADER::pos::income], settings_.income);
     parse_value(block[HEADER::pos::piracy_begins], settings_.piracy_begins);
-    parse_value(block[HEADER::pos::prior_weight], settings_.prior_weight);
-    parse_value(block[HEADER::pos::prior_weight_piracy], settings_.prior_weight_piracy);
     parse_value(block[HEADER::pos::piracy_link_proportion], settings_.piracy_link_proportion);
+    parse_value(block[HEADER::pos::prior_scale], settings_.prior_scale);
+    parse_value(block[HEADER::pos::prior_scale_piracy], settings_.prior_scale_piracy);
+    parse_value(block[HEADER::pos::prior_scale_burnin], settings_.prior_scale_burnin);
+    parse_value(block[HEADER::pos::burnin_periods], settings_.burnin_periods);
     parse_value(block[HEADER::pos::init_prob_write], settings_.initial.prob_write);
     parse_value(block[HEADER::pos::init_q_min], settings_.initial.q_min);
     parse_value(block[HEADER::pos::init_q_max], settings_.initial.q_max);

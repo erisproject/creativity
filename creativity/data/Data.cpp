@@ -310,8 +310,10 @@ std::vector<initial_datum> initial_data_fields() {
     ADD_SETTING(income);
     ADD_SETTING(piracy_begins);
     ADD_SETTING(piracy_link_proportion);
-    ADD_SETTING(prior_weight);
-    ADD_SETTING(prior_weight_piracy);
+    ADD_SETTING(prior_scale);
+    ADD_SETTING(prior_scale_piracy);
+    ADD_SETTING(prior_scale_burnin);
+    ADD_SETTING(burnin_periods);
     ADD_SETTING(initial.prob_write);
     ADD_SETTING(initial.q_min);
     ADD_SETTING(initial.q_max);
