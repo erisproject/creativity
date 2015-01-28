@@ -15,12 +15,18 @@ namespace creativity { namespace belief {
  * - \f$firstBook\f$ is a dummy: 1 if this is the creator's first work, 0 if the creator has other
  *   works.
  * - \f$previousBooks\f$ is the number of previous books the author has created.
- * - \f$marketBooks\f$ is the number of books on the market in the previous period.
+ * - \f$marketBooks\f$ is the number of books on the market in the previous period (books in the
+ *   current period can't be used because it is unknown at the time the reader is making the
+ *   decision of whether or not to create).
  *
  * The following restrictions are imposed on beliefs:
  * - \f$\beta_1 \geq 0\f$ (profit increases with quality, at least for low quality values)
  * - \f$\beta_2 \leq 0\f$ (the effect of profit is concave)
- * - \f$\beta_5 \leq 0\f$ (more competition means lower profit)
+ *
+ * Although a \f$\beta_5 \leq 0\f$ restriction would make some intuitive sense (more competition
+ * means lower profit), it isn't imposed because readers can only use the previous period's number
+ * of market books when deciding on an action for the next period, and it seems entirely reasonable
+ * that this value is positive, to allow for cyclical behaviour.
  *
  * These constraints are combined with a natural conjugate prior for the purposes of updating the
  * beliefs via Bayesian econometrics.
@@ -45,7 +51,7 @@ class Profit : public LinearRestricted {
             // Add restrictions:
             restrict(1) >= 0; // beta_q >= 0 (higher quality <-> higher profits, at least for low quality)
             restrict(2) <= 0; // beta_{q^2} <= 0 (quality effect is concave)
-            restrict(5) <= 0; // beta_{marketbooks} <= 0 (more competition <-> lower profit)
+            //restrict(5) <= 0; // beta_{marketbooks} <= 0 (more competition <-> lower profit)
         }
 
         /// Returns the number of parameters of this model (6)
@@ -97,11 +103,22 @@ class Profit : public LinearRestricted {
                 double l_max
                 );
 
-        /** Given a book and perceived quality, this builds an X matrix row of profit data for that
-         * book.  This needs to be called after the period has advanced: typically in the
-         * inter-period optimization stage.
+        /** Builds an X matrix row of profit data for a book.  This needs to be called after the
+         * period has advanced: typically in the inter-period optimization stage.
+         *
+         * This method should only be called in periods \f$t=3\f$ and later (because otherwise the
+         * lagged value is not useful: the first books are created in \f$t=1\f$, and so the lagged
+         * value will be 0 at the beginning of \f$t=2\f$, thus need to wait until the beginning of
+         * \f$t=3\f$).
+         *
+         * \param book the book itself
+         * \param quality the quality of the book as perceived by the reader this belief is for
+         * \param lag_market_books the number of books that was in the market in the period just
+         * before the just-ended period.
+         *
+         * \returns a row containing the book's information as used for this model
          */
-        Eigen::RowVectorXd profitRow(eris::SharedMember<Book> book, double quality) const;
+        Eigen::RowVectorXd profitRow(eris::SharedMember<Book> book, double quality, int lag_market_books) const;
 
         /// Returns "Profit", the name of this model
         virtual std::string display_name() const override { return "Profit"; }

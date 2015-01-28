@@ -5,6 +5,7 @@
 #include "creativity/belief/Quality.hpp"
 #include "creativity/belief/Profit.hpp"
 #include <eris/Random.hpp>
+#include <eris/interopt/Callback.hpp>
 #include <eris/intraopt/Callback.hpp>
 #include <Eigen/Core>
 #include <cmath>
@@ -129,6 +130,13 @@ void Creativity::setup() {
     }
 
     sim->spawn<intraopt::FinishCallback>([this] { new_books_.clear(); });
+
+    // Count the number of on-market books, store it, and update the lagged number of on-market
+    // books to the previous number of on-market books.
+    sim->spawn<interopt::BeginCallback>([this] {
+        market_books_lagged = market_books;
+        market_books = sim->countMarkets<BookMarket>();
+    });
 
     setup_sim_ = true;
     storage().first->updateSettings();

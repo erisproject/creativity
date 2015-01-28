@@ -132,6 +132,17 @@ class Creativity : private eris::noncopyable, public std::enable_shared_from_thi
          */
         std::pair<std::shared_ptr<state::Storage>&, std::unique_lock<std::mutex>> storage();
 
+        /** Stores the number of on-market books.  This is updated at the beginning of every new
+         * simulation stage with the number of on-market books in the just-ended period.
+         */
+        unsigned long market_books = 0;
+
+        /** Stores the lagged number of on-market books, that is, the number of books that were on
+         * the market in the period before the period that just ended.  This is updated at the same
+         * time as market_books.
+         */
+        unsigned long market_books_lagged = 0;
+
     protected:
         /* Default constructor is protected; construct by calling create(). */
         Creativity() = default;

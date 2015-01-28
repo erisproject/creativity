@@ -623,7 +623,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * If the CreativitySettings indicates that existing beliefs should be weakened when used as
          * a prior, that is done.
          *
-         * After updating beliefs, `library_unlearned_` is updated to remove books that are no
+         * After updating beliefs, `library_on_market_` is updated to remove books that are no
          * longer on the market (since those will have now been incorporated into the beliefs).
          *
          * \sa updateQualityBelief
@@ -690,7 +690,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
             library_new_,
             /** Set of books that haven't been used for learning yet (because they are still
              * on the market, or have just left the market). */
-            library_unlearned_;
+            library_on_market_;
 
         std::unordered_set<eris::SharedMember<Book>>
             /// Books written by this reader that are still on the market

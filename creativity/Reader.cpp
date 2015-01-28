@@ -11,6 +11,7 @@
 
 using namespace eris;
 using namespace Eigen;
+using namespace creativity::belief;
 
 namespace creativity {
 
@@ -25,13 +26,10 @@ Reader::Reader(
         )
     : WrappedPositional<agent::AssetAgent>(pos, creativity->parameters.boundary, -creativity->parameters.boundary),
     cost_fixed{cFixed}, cost_unit{cUnit}, cost_piracy{cPiracy}, income{inc},
-    creativity_{std::move(creativity)},
-    profit_belief_(creativity_->parameters.dimensions),
-    profit_belief_extrap_(profit_belief_),
-    demand_belief_(creativity_->parameters.dimensions),
-    quality_belief_(belief::Quality::parameters()),
-    profit_stream_beliefs_{{1, 1}}
-{}
+    creativity_{std::move(creativity)}
+{
+    profit_stream_beliefs_.emplace(1, ProfitStream(1));
+}
 
 void Reader::uPolynomial(std::vector<double> coef) {
     // 0th coefficient must be positive
@@ -427,7 +425,7 @@ void Reader::interApply() {
         wrote_.insert(wrote_.end(), newbook);
         wrote_market_.insert(newbook);
         auto ins = library_.emplace(SharedMember<Book>(newbook), BookCopy(create_quality_, BookCopy::Status::wrote, sim->t()));
-        library_unlearned_.emplace(newbook, std::ref(ins.first->second));
+        library_on_market_.emplace(newbook, std::ref(ins.first->second));
     }
 
     std::vector<SharedMember<Book>> remove;
@@ -538,12 +536,12 @@ void Reader::updateBeliefs() {
     // Clear any "on-market" book references that aren't on the market anymore, since they just got
     // incorporated into the beliefs above.
     std::vector<SharedMember<Book>> remove;
-    for (auto &book : library_unlearned_) {
+    for (auto &book : library_on_market_) {
         if (not book.first->hasMarket())
             remove.push_back(book.first);
     }
     for (auto &book : remove)
-        library_unlearned_.erase(book);
+        library_on_market_.erase(book);
 }
 
 void Reader::updateQualityBelief() {
@@ -567,14 +565,13 @@ void Reader::updateDemandBelief() {
     double weaken = creativity_->priorWeight();
     if (weaken != 1.0) demand_belief_ = std::move(demand_belief_).weaken(weaken);
 
-    if (not newBooks().empty()) {
-        std::vector<SharedMember<Book>> books;
-        VectorXd y(newBooks().size());
-        MatrixXd X(newBooks().size(), demand_belief_.K());
+    if (not library_on_market_.empty()) {
+        VectorXd y(library_on_market_.size());
+        MatrixXdR X(library_on_market_.size(), demand_belief_.K());
         // NB: this runs in the interoptimizer, which means t has already been incremented
         auto last_t = simulation()->t() - 1;
         size_t i = 0;
-        for (auto &b : newBooks()) {
+        for (const auto &b : library_on_market_) {
             if (b.first->hasMarket()) {
                 y[i] = b.first->sales(last_t);
                 X.row(i) = demand_belief_.bookRow(b.first, b.second.get().quality);
@@ -582,9 +579,7 @@ void Reader::updateDemandBelief() {
             }
         }
 
-        if (i > 0) {
-            demand_belief_ = std::move(demand_belief_).update(y.head(i), X.topRows(i));
-        }
+        demand_belief_ = std::move(demand_belief_).update(y.head(i), X.topRows(i));
     }
 }
 void Reader::updateProfitStreamBelief() {
@@ -592,7 +587,7 @@ void Reader::updateProfitStreamBelief() {
     // that have just left the market are considered (whether or not this reader bought or obtained
     // by piracy).
     std::map<unsigned int, std::vector<SharedMember<Book>>> to_learn;
-    for (auto &bu : library_unlearned_) {
+    for (auto &bu : library_on_market_) {
         auto &book = bu.first;
         if (not book->hasMarket()) { // The last time we checked, it had a market, so it just left
             unsigned long periods = book->marketPeriods();
@@ -689,7 +684,7 @@ void Reader::updateProfitStreamBelief() {
 
         // Create a new non-informative belief of the given size if none exists yet
         if (profit_stream_beliefs_.count(age) == 0) {
-            profit_stream_beliefs_.emplace(age, age);
+            profit_stream_beliefs_.emplace(age, ProfitStream(age));
         }
 
         // Update the belief (existing or just-created) with the new data
@@ -698,16 +693,19 @@ void Reader::updateProfitStreamBelief() {
 }
 
 void Reader::updateProfitBelief() {
+    // If we aren't starting simulation period t=3 or later, don't do anything: we can't
+    // incorporated books into the belief because we need the lagged market book count
+    if (simulation()->t() < 3) return;
+
     std::vector<std::pair<SharedMember<Book>, std::reference_wrapper<BookCopy>>> new_prof_books, extrap_books;
-    for (auto &bc : library_unlearned_) {
+    for (auto &bc : library_on_market_) {
         if (bc.first->hasMarket()) {
             // The book is still on the market, so we'll have to extrapolate using profit stream
             // beliefs
             extrap_books.push_back(bc);
         }
         else {
-            // The book either just left the market or we just obtained an off-market book via
-            // piracy; in either case, incorporate it into the profit belief.
+            // The book just left the market
             new_prof_books.push_back(bc);
         }
     }
@@ -740,7 +738,7 @@ void Reader::updateProfitBelief() {
                 }
             }
             y[i] = profit_total;
-            X.row(i) = profit_belief_.profitRow(bc.first, bc.second.get().quality);
+            X.row(i) = profit_belief_.profitRow(bc.first, bc.second.get().quality, creativity_->market_books_lagged);
             i++;
         }
 
@@ -765,7 +763,7 @@ void Reader::updateProfitBelief() {
                 if (it->first <= bc.first->age() and usableBelief(it->second)) {
                     // We have a winner:
                     y[i] = it->second.predict(bc.first);
-                    X.row(i) = profit_belief_.profitRow(bc.first, bc.second.get().quality);
+                    X.row(i) = profit_belief_.profitRow(bc.first, bc.second.get().quality, creativity_->market_books_lagged);
                     i++;
                     break;
                 }
@@ -944,10 +942,10 @@ void Reader::intraApply() {
                 BookCopy(book->qualityDraw(), pirated ? BookCopy::Status::pirated : BookCopy::Status::purchased, simulation()->t()));
 
         // If the book is still on the market (which it must be if we just bought it, and might be
-        // if we just pirated it), stash a copy in library_unlearned_ so that it will (eventually)
+        // if we just pirated it), stash a copy in library_no_market_ so that it will (eventually)
         // get incorporated into profit stream beliefs.
         if (book->hasMarket())
-            library_unlearned_.emplace(book, std::ref(inserted.first->second));
+            library_on_market_.emplace(book, std::ref(inserted.first->second));
 
         // And it's always considered a "new" (to us) book, so stash it there:
         library_new_.emplace(book, std::ref(inserted.first->second));

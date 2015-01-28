@@ -35,13 +35,12 @@ double Profit::argmaxL(
     return eris::single_peak_search(profit, 0, l_max);
 }
 
-RowVectorXd Profit::profitRow(eris::SharedMember<Book> book, double quality) const {
+RowVectorXd Profit::profitRow(eris::SharedMember<Book> book, double quality, int lag_market_books) const {
     double prev_books = book->order();
     double first_book = prev_books == 0 ? 1.0 : 0.0;
-    double market_books = book->simulation()->countMarkets<BookMarket>();
 
     RowVectorXd Xi(K());
-    Xi << 1.0, quality, quality*quality, first_book, prev_books, market_books;
+    Xi << 1.0, quality, quality*quality, first_book, prev_books, lag_market_books;
     return Xi;
 }
 
