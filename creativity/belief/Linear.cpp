@@ -248,7 +248,12 @@ void Linear::updateInPlace(const Ref<const VectorXd> &y, const Ref<const MatrixX
 
     VectorXd residualspost = y - X * beta_post;
     VectorXd beta_diff = beta_post - beta_;
-    beta_ = std::move(beta_post);
+    beta_ =
+#ifdef EIGEN_HAVE_RVALUE_REFERENCES
+        std::move(beta_post);
+#else
+        beta_post;
+#endif
     s2_ = (n_prior * s2_ + residualspost.squaredNorm() + beta_diff.transpose() * Vinv() * beta_diff) / n_;
 
     V_inv_ = std::move(V_post_inv);

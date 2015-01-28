@@ -54,7 +54,12 @@ class Linear {
         /// Default copy assignment operator
         Linear& operator=(const Linear &copy) = default;
 
-#if !EIGEN_VERSION_AT_LEAST(3,3,0) && !(EIGEN_VERSION_AT_LEAST(3,2,90) && defined EIGEN_HAVE_RVALUE_REFERENCES)
+#ifdef EIGEN_HAVE_RVALUE_REFERENCES
+        /// Default move constructor
+        Linear(Linear &&move) = default;
+        /// Default move assignment
+        Linear& operator=(Linear &&move) = default;
+#else
         /** Move constructor for Eigen versions before 3.3.  Eigen 3.2 and earlier don't have proper
          * move support, and the implicit ones break things, so we work around this by providing a
          * Move constructor that just calls the implicit copy constructor.  This, of course, means
@@ -71,11 +76,6 @@ class Linear {
          * but is provided so that subclasses still have implicit move constructors.
          */
         Linear& operator=(Linear &&move) { *this = move; return *this; }
-#else
-        /// Default move constructor
-        Linear(Linear &&move) = default;
-        /// Default move assignment
-        Linear& operator=(Linear &&move) = default;
 #endif
 
         /** Constructs a Linear model of `K` parameters and initializes the various variables (beta,
