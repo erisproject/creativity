@@ -30,7 +30,14 @@ namespace creativity { namespace belief {
  */
 class LinearRestricted : public Linear {
     public:
-#if !EIGEN_VERSION_AT_LEAST(3,3,0)
+        /// Default constructor
+        LinearRestricted() = default;
+        /// Default copy constructor
+        LinearRestricted(const LinearRestricted&) = default;
+        /// Default copy assignment operator
+        LinearRestricted& operator=(const LinearRestricted&) = default;
+
+#if !EIGEN_VERSION_AT_LEAST(3,3,0) && !(EIGEN_VERSION_AT_LEAST(3,2,90) && defined EIGEN_HAVE_RVALUE_REFERENCES)
         /** Move constructor for Eigen versions before 3.3.  Eigen 3.2 and earlier don't have proper
          * move support, and the implicit ones break things, so we work around this by providing a
          * Move constructor that just calls the implicit copy constructor.  This, of course, means
@@ -43,15 +50,18 @@ class LinearRestricted : public Linear {
          * types, can rely on their default move constructors.
          */
         LinearRestricted(LinearRestricted &&move) : LinearRestricted(move) {}
-        /// Default constructor
-        LinearRestricted() = default;
-        /// Default copy constructor
-        LinearRestricted(const LinearRestricted &copy) = default;
-        /// Default copy assignment operator
-        LinearRestricted& operator=(const LinearRestricted &copy) = default;
+        /** Move assignment for Eigen versions before 3.3: this simply invokes the copy constructor,
+         * but is provided so that subclasses still have implicit move constructors.
+         */
+        LinearRestricted& operator=(LinearRestricted &&move) { *this = move; return *this; }
+#else
+        /// Default move constructor
+        LinearRestricted(LinearRestricted&&) = default;
+        /// Default move assignment
+        LinearRestricted& operator=(LinearRestricted&&) = default;
 #endif
 
-        /// Constructor inherited from Linear
+        /// Other constructors inherited from Linear
         using Linear::Linear;
 
     protected:

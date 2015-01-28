@@ -16,9 +16,13 @@
  */
 #define CREATIVITY_LINEAR_DERIVED_COMMON_METHODS(Derived) \
     public: \
+        /** Updates the model, as done in Linear::update(), but returns an object of this derived type instead of a Linear object. */ \
         [[gnu::warn_unused_result]] Derived update(const Eigen::Ref<const Eigen::VectorXd> &y, const Eigen::Ref<const Eigen::MatrixXd> &X) const & { Derived u(*this); u.updateInPlace(y, X); return u; } \
+        /** Updates the model, as done in Linear::update(), but returns an object of this derived type instead of a Linear object. */ \
         [[gnu::warn_unused_result]] Derived update(const Eigen::Ref<const Eigen::VectorXd> &y, const Eigen::Ref<const Eigen::MatrixXd> &X)      && { updateInPlace(y, X); return std::move(*this); } \
+        /** Weakens the model, as done in Linear::weaken(), but returns an object of this derived type instead of a Linear object. */ \
         [[gnu::warn_unused_result]] Derived weaken(double s) const & { Derived w(*this); w.weakenInPlace(s); return w; } \
+        /** Weakens the model, as done in Linear::weaken(), but returns an object of this derived type instead of a Linear object. */ \
         [[gnu::warn_unused_result]] Derived weaken(double s)      && { weakenInPlace(s); return std::move(*this); }
 
 namespace creativity { namespace belief {
@@ -29,7 +33,25 @@ namespace creativity { namespace belief {
  */
 class Linear {
     public:
-#if !EIGEN_VERSION_AT_LEAST(3,3,0)
+        /** Default constructor: this constructor exists only to allow Linear objects to be default
+         * constructed: default constructed objects are models of 0 parameters; such models will
+         * throw an std::logic_error exception if any method other than copy or move assignment is
+         * attempted on the object.  This primarily exists so that the following is allowed:
+         *
+         * Linear m;
+         * ...
+         * m = properly_constructed_model;
+         *
+         * and similar constructs where the object needs to be default constructed (such as in STL
+         * containers).
+         */
+        Linear() = default;
+        /// Default copy constructor
+        Linear(const Linear &copy) = default;
+        /// Default copy assignment operator
+        Linear& operator=(const Linear &copy) = default;
+
+#if !EIGEN_VERSION_AT_LEAST(3,3,0) && !(EIGEN_VERSION_AT_LEAST(3,2,90) && defined EIGEN_HAVE_RVALUE_REFERENCES)
         /** Move constructor for Eigen versions before 3.3.  Eigen 3.2 and earlier don't have proper
          * move support, and the implicit ones break things, so we work around this by providing a
          * Move constructor that just calls the implicit copy constructor.  This, of course, means
@@ -42,10 +64,15 @@ class Linear {
          * rely on their default move constructors.
          */
         Linear(Linear &&move) : Linear(move) {}
-        /// Default copy constructor
-        Linear(const Linear &copy) = default;
-        /// Default copy assignment operator
-        Linear& operator=(const Linear &copy) = default;
+        /** Move assignment for Eigen versions before 3.3: this simply invokes the copy constructor,
+         * but is provided so that subclasses still have implicit move constructors.
+         */
+        Linear& operator=(Linear &&move) { *this = move; return *this; }
+#else
+        /// Default move constructor
+        Linear(Linear &&move) = default;
+        /// Default move assignment
+        Linear& operator=(Linear &&move) = default;
 #endif
 
         /** Constructs a Linear model of `K` parameters and initializes the various variables (beta,
@@ -94,20 +121,6 @@ class Linear {
                 double n,
                 const Eigen::Ref<const Eigen::MatrixXd> indep_data = Eigen::MatrixXd()
               );
-
-        /** Default constructor: this constructor exists only to allow Linear objects to be default
-         * constructed: default constructed objects are models of 0 parameters; such models will
-         * throw an std::logic_error exception if any method other than copy or move assignment is
-         * attempted on the object.  This primarily exists so that the following is allowed:
-         *
-         * Linear m;
-         * ...
-         * m = properly_constructed_model;
-         *
-         * and similar constructs where the object needs to be default constructed (such as in STL
-         * containers).
-         */
-        Linear() = default;
 
         /// Virtual destructor
         virtual ~Linear() = default;
