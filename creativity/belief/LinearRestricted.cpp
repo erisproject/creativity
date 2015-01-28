@@ -363,7 +363,7 @@ const VectorXd& LinearRestricted::drawGibbs() {
 }
 
 const VectorXd& LinearRestricted::drawRejection(long max_discards) {
-    last_draw_mode = DrawMode::Gibbs;
+    last_draw_mode = DrawMode::Rejection;
     if (max_discards < 0) max_discards = draw_rejection_max_discards;
     draw_rejection_discards_last = 0;
     for (bool redraw = true; redraw; ) {
