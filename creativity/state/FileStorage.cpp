@@ -646,8 +646,8 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
     // Beliefs
     belief_data belief = readBelief();
     if (belief.K > 0) {
-        r.profit = belief.noninformative
-            ? Profit(belief.K)
+        r.profit = (belief.noninformative or not belief.fullyinformative)
+            ? Profit(belief.K, belief.noninf_X, belief.noninf_y)
             : Profit(belief.beta, belief.s2, belief.V, belief.n);
         r.profit.draw_rejection_success = belief.draw_success_cumulative;
         r.profit.draw_rejection_discards = belief.draw_discards_cumulative;
@@ -655,8 +655,8 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
 
     belief = readBelief();
     if (belief.K > 0) {
-        r.profit_extrap = belief.noninformative
-            ? Profit(belief.K)
+        r.profit_extrap = (belief.noninformative or not belief.fullyinformative)
+            ? Profit(belief.K, belief.noninf_X, belief.noninf_y)
             : Profit(belief.beta, belief.s2, belief.V, belief.n);
         r.profit_extrap.draw_rejection_success = belief.draw_success_cumulative;
         r.profit_extrap.draw_rejection_discards = belief.draw_discards_cumulative;
@@ -664,8 +664,8 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
 
     belief = readBelief();
     if (belief.K > 0) {
-        r.demand = belief.noninformative
-            ? Demand(belief.K)
+        r.demand = (belief.noninformative or not belief.fullyinformative)
+            ? Demand(belief.K, belief.noninf_X, belief.noninf_y)
             : Demand(belief.beta, belief.s2, belief.V, belief.n);
         r.demand.draw_rejection_success = belief.draw_success_cumulative;
         r.demand.draw_rejection_discards = belief.draw_discards_cumulative;
@@ -673,8 +673,8 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
 
     belief = readBelief();
     if (belief.K > 0)
-        r.quality = belief.noninformative
-            ? Quality(belief.K)
+        r.quality = (belief.noninformative or not belief.fullyinformative)
+            ? Quality(belief.K, belief.noninf_X, belief.noninf_y)
             : Quality(belief.beta, belief.s2, belief.V, belief.n);
 
     auto pstream_locs = read_u32();
@@ -682,8 +682,8 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
         belief = readBelief();
         if (belief.K == 0) throwParseError("found illegal profitStream belief with K = 0 (i.e. default constructed model)");
         else if (r.profit_stream.count(belief.K)) throwParseError("found duplicate K value in profit_stream beliefs");
-        r.profit_stream.emplace((unsigned int) belief.beta.rows(), belief.noninformative
-                ? ProfitStream(belief.K)
+        r.profit_stream.emplace((unsigned int) belief.beta.rows(), (belief.noninformative or not belief.fullyinformative)
+                ? ProfitStream(belief.K, belief.noninf_X, belief.noninf_y)
                 : ProfitStream(belief.beta, belief.s2, belief.V, belief.n));
     }
 
@@ -725,40 +725,45 @@ FileStorage::belief_data FileStorage::readBelief() const {
     bool last_draw_was_gibbs = status & 2;
     belief.fullyinformative = status & 4;
 
-    // The first K elements are beta values
-    belief.beta = VectorXd(k);
-    for (unsigned int i = 0; i < belief.K; i++)
-        belief.beta[i] = read_dbl();
+    if (belief.fullyinformative) {
+        // The first K elements are beta values
+        belief.beta = VectorXd(k);
+        for (unsigned int i = 0; i < belief.K; i++)
+            belief.beta[i] = read_dbl();
 
-    // Then s2 and n:
-    belief.s2 = read_dbl();
-    belief.n = read_dbl();
+        // Then s2 and n:
+        belief.s2 = read_dbl();
+        belief.n = read_dbl();
 
-    // Then K*(K+1)/2 V values (but we set them symmetrically in V)
-    belief.V = MatrixXd(k, k);
-    for (unsigned int r = 0; r < belief.K; r++) {
-        for (unsigned int c = 0; c <= r; c++) {
-            double cov = read_dbl();
-            belief.V(r,c) = cov;
-            if (c != r) belief.V(c,r) = cov;
+        // Then K*(K+1)/2 V values (but we set them symmetrically in V)
+        belief.V = MatrixXd(k, k);
+        for (unsigned int r = 0; r < belief.K; r++) {
+            for (unsigned int c = 0; c <= r; c++) {
+                double cov = read_dbl();
+                belief.V(r,c) = cov;
+                if (c != r) belief.V(c,r) = cov;
+            }
+        }
+
+        // If this was a restricted model, we read the draw discards and success values
+        if (restricted_model) {
+            belief.draw_success_cumulative = read_u32();
+            belief.draw_discards_cumulative = read_u32();
+            belief.draw_gibbs = last_draw_was_gibbs;
         }
     }
-
-    // If the model was not fully informative, we immediately get a value r < K telling us how many
-    // rows worth of independent data follow (i.e. r*K values follow).
-    if (not belief.fullyinformative) {
-        uint8_t indep_rows = read_u8();
-        belief.indep_data = Matrix<double, Dynamic, Dynamic, RowMajor>(indep_rows, k);
-        for (uint8_t i = 0; i < indep_rows; i++) for (unsigned int j = 0; j < belief.K; j++) {
-            belief.indep_data(i, j) = read_dbl();
+    else {
+        // If the model was not fully informative, we immediately get a value r < K telling us how many
+        // rows worth of independent data follow (i.e. r*K values follow).
+        if (not belief.fullyinformative) {
+            uint32_t noninf_rows = read_u32();
+            belief.noninf_X = MatrixXdR(noninf_rows, k);
+            for (uint32_t i = 0; i < noninf_rows; i++) for (unsigned int j = 0; j < belief.K; j++) {
+                belief.noninf_X(i, j) = read_dbl();
+            }
+            for (uint32_t i = 0; i < noninf_rows; i++)
+                belief.noninf_y(i) = read_dbl();
         }
-    }
-
-    // If this was a restricted model, we read the draw discards and success values
-    if (restricted_model) {
-        belief.draw_success_cumulative = read_u32();
-        belief.draw_discards_cumulative = read_u32();
-        belief.draw_gibbs = last_draw_was_gibbs;
     }
 
     return belief;
@@ -866,38 +871,47 @@ void FileStorage::writeBelief(const Linear &m) {
     // Status field
     write_u8(status);
 
-    auto &beta = m.beta();
-    // First K elements are the beta values
-    for (unsigned int i = 0; i < k; i++)
-        write_dbl(beta[i]);
+    if (m.fullyInformative()) {
+        auto &beta = m.beta();
+        // First K elements are the beta values
+        for (unsigned int i = 0; i < k; i++)
+            write_dbl(beta[i]);
 
-    // Then s2 and n:
-    write_dbl(m.s2());
-    write_dbl(m.n());
+        // Then s2 and n:
+        write_dbl(m.s2());
+        write_dbl(m.n());
 
-    auto &V = m.V();
-    // The last k*(k+1)/2 are the lower triangle of the V matrix, in row major order
-    for (unsigned int r = 0; r < k; r++) {
-        for (unsigned int c = 0; c <= r; c++) {
-            write_dbl(V(r,c));
+        auto &V = m.V();
+        // The last k*(k+1)/2 are the lower triangle of the V matrix, in row major order
+        for (unsigned int r = 0; r < k; r++) {
+            for (unsigned int c = 0; c <= r; c++) {
+                write_dbl(V(r,c));
+            }
+        }
+
+        if (restricted_model) {
+            write_u32(lr->draw_rejection_success);
+            write_u32(lr->draw_rejection_discards);
         }
     }
-
-    if (not m.fullyInformative()) {
-        auto indep_data = m.indepDataRows();
-        write_u8(indep_data.rows());
-        for (int i = 0; i < indep_data.rows(); i++) for (unsigned j = 0; j < k; j++) {
-            write_dbl(indep_data(i,j));
+    else {
+        const auto &noninf_X = m.noninfXData();
+        const auto &noninf_y = m.noninfYData();
+        write_u32(noninf_X.rows());
+        for (int i = 0; i < noninf_X.rows(); i++) for (unsigned j = 0; j < k; j++) {
+            write_dbl(noninf_X(i,j));
         }
+        for (int i = 0; i < noninf_y.rows(); i++)
+            write_dbl(noninf_y(i));
     }
 
-    if (restricted_model) {
-        write_u32(lr->draw_rejection_success);
-        write_u32(lr->draw_rejection_discards);
-    }
-
-    FILESTORAGE_DEBUG_WRITE_CHECK(2+8*(2+k+k*(k+1)/2) + (restricted_model ? 4*2 : 0) +
-            (m.fullyInformative() ? 0 : 1 + 8*m.indepDataRows().rows()*k))
+    FILESTORAGE_DEBUG_WRITE_CHECK(
+            2 + (
+                m.fullyInformative()
+                ? 8*(2+k+k*(k+1)/2) + (restricted_model ? 4*2 : 0)
+                : 4 + 8*(m.noninfXData().rows()*(k+1))
+                )
+            );
 }
 
 std::pair<eris_id_t, BookState> FileStorage::readBook() const {

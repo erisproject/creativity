@@ -499,7 +499,8 @@ class FileStorage final : public StorageBackend {
             double s2; ///< belief::Linear s2 value
             double n; ///< belief::Linear n value
             Eigen::MatrixXd V; ///< belief::Linear V matrix
-            Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> indep_data; ///< belief::Linear indepDataRows() matrix
+            belief::MatrixXdR noninf_X; ///< belief::Linear noninfXData() matrix
+            Eigen::VectorXd noninf_y; ///< belief::Linear noninfYData() vector
             bool draw_gibbs; ///< If true, the last draw from this belief used Gibbs sampling (false = no draws, or rejection sampling)
             uint32_t draw_success_cumulative, ///< For a restricted belief, the number of successful draws
                      draw_discards_cumulative; ///< For a restricted belief, the number of discarded draws
@@ -513,17 +514,20 @@ class FileStorage final : public StorageBackend {
          *
          *     i8       K, the number of model parameters, with special values described below
          *     u8       status bits (described below)
+         * then either (if fully informed bit set):
          *     dbl*K    beta vector (K values)
          *     dbl      s2
          *     dbl      n
          *     dbl*Z    the `Z=K(K+1)/2` elements of the lower triangle of the V matrix, in column-major
          *              order (that is, [0,0], [1,0], [2,0], ..., [K,0], [1,1], [2,1], ..., [K,1], ..., [K,K])
-         *     u8       r, the number of independent row data (for partially-informed models)
-         *     dbl*r*K  the independent row data (for partially-informed models)
          *     u32      the cumulative successful LinearRestricted draws (only for LinearRestricted
          *              models)
          *     u32      the cumulative discarded LinearRestricted draws (only for LinearRestricted
          *              models)
+         * or (not fully informed):
+         *     u32      r, the number of noninformative rows (for partially-informed models)
+         *     dbl*r*K  the X data (for partially-informed models)
+         *     dbl*r    the y data (for partially-informed models)
          *
          * The K value has the following interpretations: if in [1,120], the model has this number of
          * parameters, and is not a completely noninformative model.  If in [-120,-1], the model has

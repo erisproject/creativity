@@ -86,14 +86,20 @@ class Linear {
          *     V = identity matrix times `NONINFORMATIVE_Vc` (currently 1e+8)
          *     n = `NONINFORMATIVE_N` (currently 1e-3)
          *
-         * Unlike calling the full parameter constructor with the above values, this also keeps
-         * track of the fact that the model is non-informative, which has two effects:
+         * If the optional noninf_X and noninf_y arguments are provided and are non-empty matrices,
+         * this stores the given data and the model becomes partially informative (see
+         * fullyInformative()).
          *
          * - the first update() call with return a model with `n` set to the number of rows in the
          *   updated data without adding the initial small n value.
-         * - noninformative() will return true.
+         * - noninformative() will return true (unless noninf_X/noninf_y data is given), and
+         *   fullyInformative() will return false.
          */
-        explicit Linear(unsigned int K);
+        explicit Linear(
+                const unsigned int K,
+                const Eigen::Ref<const MatrixXdR> noninf_X = MatrixXdR(),
+                const Eigen::Ref<const Eigen::VectorXd> noninf_y = Eigen::VectorXd()
+                );
 
         /** Constructs a Linear model with the given parameters.  These parameters will be those
          * used for the prior when updating.
@@ -121,8 +127,7 @@ class Linear {
                 const Eigen::Ref<const Eigen::VectorXd> beta,
                 double s2,
                 const Eigen::Ref<const Eigen::MatrixXd> V,
-                double n,
-                const Eigen::Ref<const Eigen::MatrixXd> indep_data = Eigen::MatrixXd()
+                double n
               );
 
         /// Virtual destructor
@@ -186,12 +191,21 @@ class Linear {
          */
         bool fullyInformative() const;
 
-        /** Returns a set of linearly-independent rows that have been fed into this model for a
-         * non-fully-informative model.  The returned matrix block is in row-major order.
+        /** Returns the X data that has been added into this model but hasn't yet been used due to
+         * it not being sufficiently large and different enough to achieve full column rank.  The
+         * data will be scaled appropriately if weaken() has been called, and so does not
+         * necessarily reflect the actual data added.
          *
          * \throws std::logic_error if fullyInformative() would return true.
          */
-        Eigen::Block<const MatrixXdR, Eigen::Dynamic, Eigen::Dynamic, true> indepDataRows() const;
+        const MatrixXdR& noninfXData() const;
+
+        /** Returns the y data associated with noninfXData().  Like that data, this will be scaled
+         * if the model has been weakened.
+         *
+         * \throws std::logic_error if fullyInformative() would return true.
+         */
+        const Eigen::VectorXd& noninfYData() const;
 
         /** Given a row vector of values \f$X^*\f$, predicts \f$y^*\f$ using the current model
          * values.  The default implementation provided by this class simply returns the mean \f$X^*
@@ -429,26 +443,25 @@ class Linear {
         // Checks that the given matrices conform; called during construction; throws on error.
         void checkLogic();
 
-        /** The matrix of a set of linearly independent rows that have been added to this data.
-         * Used to determine when the model becomes fully informed.  If indep_rows_ equals K, this
-         * pointer will generally be empty; when less than K, this will point at a K-by-K matrix
-         * whose first `indep_rows_` rows are the linearly-independent rows seen thus far.  The
-         * values of later rows are used internally or are uninitialized, and should not be
-         * referenced.
-         *
-         * New rows are added to this matrix (and indep_rows_ incremented) only if they increase the
-         * rank; that is, the first `indep_rows_` rows of this matrix will always have rank
-         * `indep_rows_`.  Once the matrix reaches full rank (K), the pointer is cleared and the
-         * matrix is not used again.  The actual rows stored are irrelevant: the values are only
-         * used to determine whether new rows add to the rank of X.
+        /** Do the actual in-place update using the given X data.  This is just like updateInPlace,
+         * except it is only called if enough X data has been accumulated to make \f$X\top X\f$
+         * invertible.  It also doesn't perform various checks on X and y are comforable.
          */
-        std::shared_ptr<MatrixXdR> indep_data_;
+        void updateInPlaceInformative(
+                const Eigen::Ref<const Eigen::VectorXd> &y,
+                const Eigen::Ref<const Eigen::MatrixXd> &X);
 
-        /** The number of linearly independent data rows that have been fed into this model.  When
-         * this value is less than K(), this also indicates the number of rows of indep_data_ that
-         * contain an arbitrary set of linearly-independent rows.
+        /** The X data that has been loaded into the model but before X has full column rank.  Such
+         * a model is considered partially noninformative (fullyInformative() returns false) and
+         * cannot be used for results until more data is added.
+         *
+         * If the model is weakened before becoming fully informative, this X data and the
+         * associated y data is scaled by 1/w, where w is the weakening factor, so that \f$(X\^top
+         * X)^{-1}\f$ is scaled by \f$w^2\f$, and that y data stays proportional to X.
          */
-        size_t indep_rows_ = 0;
+        std::shared_ptr<MatrixXdR> noninf_X_;
+        /// The y data for a not-fully-informed model.  \sa noninf_X_.
+        std::shared_ptr<Eigen::VectorXd> noninf_y_;
 
 };
 

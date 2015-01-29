@@ -13,33 +13,28 @@ Linear::Linear(
         const Ref<const VectorXd> beta,
         double s2,
         const Ref<const MatrixXd> V,
-        double n,
-        const Ref<const MatrixXd> indep_data
-        )
+        double n)
     : beta_(beta), s2_{s2}, V_(V.selfadjointView<Lower>()), n_{n}, K_(beta_.rows())
 {
     // Check that the given matrices conform
     checkLogic();
-
-    // Copy any given independent rows
-    if (indep_data.rows() < K_ and indep_data.cols() == K_) {
-        indep_rows_ = indep_data.rows();
-        indep_data_.reset(new MatrixXdR(K(), K()));
-        indep_data_->topRows(indep_rows_) = indep_data; 
-    }
-    else if (indep_data.rows() == 0 and indep_data.cols() == 0)
-        indep_rows_ = K();
-    else
-        throw std::logic_error("Linear() called with invalid-sized indep_data argument");
 }
 
-Linear::Linear(unsigned int K) :
+Linear::Linear(unsigned int K, const Ref<const MatrixXdR> noninf_X, const Ref<const VectorXd> noninf_y) :
     beta_{VectorXd::Zero(K)}, s2_{NONINFORMATIVE_S2}, V_{NONINFORMATIVE_Vc * MatrixXd::Identity(K, K)},
     n_{NONINFORMATIVE_N}, noninformative_{true}, K_{K}
 {
     if (K < 1) throw std::logic_error("Linear model requires at least one parameter");
     auto fixed = fixedModelSize();
     if (fixed and K != fixed) throw std::logic_error("Linear model constructed with incorrect number of model parameters");
+
+    if (noninf_X.rows() != noninf_y.rows()) throw std::logic_error("Partially informed model construction error: X.rows() != y.rows()");
+    if (noninf_X.rows() > 0) {
+        if (noninf_X.cols() != K_) throw std::logic_error("Partially informed model construction error: X.cols() != K");
+        noninf_X_.reset(new MatrixXdR(noninf_X));
+        noninf_y_.reset(new VectorXd(noninf_y));
+        noninformative_ = false;
+    }
 }
 
 
@@ -209,28 +204,29 @@ void Linear::updateInPlace(const Ref<const VectorXd> &y, const Ref<const MatrixX
     if (y.rows() == 0) // Nothing to update!
         return;
 
-    if (indep_rows_ < K()) {
-        if (not indep_data_ or indep_data_->rows() != K() or indep_data_->cols() != K()) {
-            indep_data_.reset(new MatrixXdR(K(), K()));
-            indep_rows_ = 0; // Reset to 0, just in case it was something else but the matrix had a wonky size
-        }
-        else if (indep_data_ and not indep_data_.unique()) {
-            // Something else has a reference to the data, so copy it first
-            indep_data_.reset(new MatrixXdR(*indep_data_));
-        }
+    if (not fullyInformative()) {
+        if (not noninf_X_ or noninf_X_->rows() == 0) noninf_X_.reset(new MatrixXdR(X.rows(), K()));
+        else noninf_X_->conservativeResize(noninf_X_->rows() + X.rows(), K());
+        if (not noninf_y_ or noninf_y_->rows() == 0) noninf_y_.reset(new VectorXd(y.rows()));
+        else noninf_y_->conservativeResize(noninf_y_->rows() + y.rows());
 
-        // Try adding X rows one-by-one to see if doing so increases the rank
-        for (int i = 0; indep_rows_ < K() and i < X.rows(); i++) {
-            indep_data_->row(indep_rows_) = X.row(i);
-            unsigned int rank = indep_data_->topRows(indep_rows_+1).colPivHouseholderQr().rank();
-            if (rank > indep_rows_) indep_rows_++; // The row increased rank, so keep it
-            // else ignore it (leave it there: it won't be used and will get overwritten by the next row)
+        noninf_X_->bottomRows(X.rows()) = X;
+        noninf_y_->tail(y.rows()) = y;
+
+        if (noninf_X_->rows() >= K() and noninf_X_->colPivHouseholderQr().rank() >= K()) {
+            updateInPlaceInformative(*noninf_y_, *noninf_X_);
+            noninf_X_.reset();
+            noninf_y_.reset();
         }
-        if (indep_rows_ == K())
-            // Achieved linear independence: don't need to store the rows anymore
-            indep_data_.reset();
     }
+    else {
+        // Otherwise we were already informative, so just pass the data along.
+        updateInPlaceInformative(y, X);
+    }
+    noninformative_ = false; // We aren't completely noninformative anymore!
+}
 
+void Linear::updateInPlaceInformative(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X) {
     MatrixXd Xt = X.transpose();
     MatrixXd XtX = Xt * X;
 
@@ -239,29 +235,26 @@ void Linear::updateInPlace(const Ref<const VectorXd> &y, const Ref<const MatrixX
     // inverse of the inverse, i.e. by calling its own Vinv()--so, by storing the intermediate value
     // before the inverse, we may be able to avoid inverting an inverse later: so in such a case we
     // save time *and* avoid the numerical precision loss from taking an extra inverse.
-    auto V_post_inv = std::make_shared<MatrixXd>((Vinv() + XtX).selfadjointView<Lower>());
-    V_ = V_post_inv->colPivHouseholderQr().inverse().selfadjointView<Lower>();
-    VectorXd beta_post = V_ * (Vinv() * beta_ + Xt * y);
+    bool first_data = not fullyInformative();
 
-    double n_prior = noninformative() ? 0 : n_;
+    auto V_post_inv = first_data ? std::make_shared<MatrixXd>(XtX) : std::make_shared<MatrixXd>(Vinv() + XtX);
+    V_ = V_post_inv->colPivHouseholderQr().inverse();
+    VectorXd beta_post;
+    if (first_data) beta_post = V_ * (Xt * y);
+    else beta_post = V_ * (Vinv() * beta_ + Xt * y);
+
+    double n_prior = first_data ? 0 : n_;
     n_ = n_prior + X.rows();
 
     VectorXd residualspost = y - X * beta_post;
     VectorXd beta_diff = beta_post - beta_;
-    beta_ =
-#ifdef EIGEN_HAVE_RVALUE_REFERENCES
-        std::move(beta_post);
-#else
-        beta_post;
-#endif
     s2_ = (n_prior * s2_ + residualspost.squaredNorm() + beta_diff.transpose() * Vinv() * beta_diff) / n_;
+    beta_ = beta_post;
 
     V_inv_ = std::move(V_post_inv);
     // The decompositions will have to be recalculated:
     if (V_chol_L_) V_chol_L_.reset();
     if (V_chol_L_inv_) V_chol_L_inv_.reset(); 
-
-    if (noninformative_) noninformative_ = false; // If we just updated a noninformative model, we aren't noninformative anymore
 }
 
 Linear Linear::weaken(const double stdev_scale) const & {
@@ -283,6 +276,15 @@ void Linear::weakenInPlace(const double stdev_scale) {
 
     if (noninformative() or stdev_scale == 1.0) // Nothing to do here
         return;
+
+    if (noninf_X_) {
+        // Partially informed model
+        if (not noninf_X_.unique()) noninf_X_.reset(new MatrixXdR(*noninf_X_ / stdev_scale));
+        else *noninf_X_ /= stdev_scale;
+        if (not noninf_y_.unique()) noninf_y_.reset(new VectorXd(*noninf_y_ / stdev_scale));
+        else *noninf_y_ /= stdev_scale;
+        return;
+    }
 
     const double var_scale = stdev_scale*stdev_scale;
 
@@ -317,15 +319,24 @@ void Linear::weakenInPlace(const double stdev_scale) {
 }
 
 bool Linear::fullyInformative() const {
-    return indep_rows_ >= K();
+    return not noninformative_ and not noninf_X_;
 }
 
-Block<const MatrixXdR, Dynamic, Dynamic, true> Linear::indepDataRows() const {
-    if (indep_rows_ >= K()) throw std::logic_error("indepDataRows() cannot be called on a fully-informed model");
-    // Muck around with const casting because we want to get at the const version of topRows():
-    return const_cast<const typename decltype(indep_data_)::element_type&>(*indep_data_).topRows(indep_rows_);
+const MatrixXdR& Linear::noninfXData() const {
+    if (fullyInformative()) throw std::logic_error("noninfXData() cannot be called on a fully-informed model");
+
+    if (not noninf_X_) const_cast<std::shared_ptr<MatrixXdR>&>(noninf_X_).reset(new MatrixXdR(0, K()));
+
+    return *noninf_X_;
 }
 
+const VectorXd& Linear::noninfYData() const {
+    if (fullyInformative()) throw std::logic_error("noninfYData() cannot be called on a fully-informed model");
+
+    if (not noninf_y_) const_cast<std::shared_ptr<VectorXd>&>(noninf_y_).reset(new VectorXd(0));
+
+    return *noninf_y_;
+}
 
 void Linear::reset() {
     if (last_draw_.size() > 0) last_draw_.resize(0);
