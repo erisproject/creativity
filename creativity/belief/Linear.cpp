@@ -239,8 +239,8 @@ void Linear::updateInPlace(const Ref<const VectorXd> &y, const Ref<const MatrixX
     // inverse of the inverse, i.e. by calling its own Vinv()--so, by storing the intermediate value
     // before the inverse, we may be able to avoid inverting an inverse later: so in such a case we
     // save time *and* avoid the numerical precision loss from taking an extra inverse.
-    auto V_post_inv = std::make_shared<MatrixXd>(Vinv() + XtX);
-    V_ = V_post_inv->colPivHouseholderQr().inverse();
+    auto V_post_inv = std::make_shared<MatrixXd>((Vinv() + XtX).selfadjointView<Lower>());
+    V_ = V_post_inv->colPivHouseholderQr().inverse().selfadjointView<Lower>();
     VectorXd beta_post = V_ * (Vinv() * beta_ + Xt * y);
 
     double n_prior = noninformative() ? 0 : n_;

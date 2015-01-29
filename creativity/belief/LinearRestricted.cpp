@@ -212,17 +212,16 @@ const VectorXd& LinearRestricted::drawGibbs() {
     last_draw_mode = DrawMode::Gibbs;
 
     const MatrixXd &Ainv = VcholL();
+    double s = std::sqrt(s2_);
 
     if (not gibbs_D_) gibbs_D_.reset(
             restrict_size_ == 0
             ? new MatrixXdR(0, K_) // It's rather pointless to use drawGibbs() with no restrictions, but allow it for debugging purposes
-            : new MatrixXdR(R() * Ainv));
-    auto &D = *gibbs_D_;
+            : new MatrixXdR(s * R() * Ainv));
+    const auto &D = *gibbs_D_;
 
     if (not gibbs_r_Rbeta_) gibbs_r_Rbeta_.reset(new VectorXd(r() - R() * beta_));
-    auto &r_minus_Rbeta_ = *gibbs_r_Rbeta_;
-
-    double s = std::sqrt(s2_);
+    const auto &r_minus_Rbeta_ = *gibbs_r_Rbeta_;
 
     if (not gibbs_last_z_) {
         // If we don't have an initial value, draw an *untruncated* value and give it to
@@ -237,8 +236,9 @@ const VectorXd& LinearRestricted::drawGibbs() {
 
         // gibbs_last_*_ will be set up now (or else we threw an exception)
     }
-    auto &z = *gibbs_last_z_;
-    auto &sigma = gibbs_last_sigma_;
+    // Start with z from the last z draw
+    VectorXd z(*gibbs_last_z_);
+    double sigma = 0;
     double s_sigma = 0;
     auto &rng = Random::rng();
 
@@ -278,7 +278,7 @@ const VectorXd& LinearRestricted::drawGibbs() {
                     // (This case seems extremely unlikely, but just in case).
                     continue;
                 }
-                double limit = r_minus_Rbeta_[i] / (s * denom);
+                double limit = r_minus_Rbeta_[i] / denom;
 
                 if (denom > 0) {
                     if (limit < sigma_u) sigma_u = limit;
@@ -322,7 +322,7 @@ const VectorXd& LinearRestricted::drawGibbs() {
                 auto &dj = D(r, j);
                 if (dj != 0) {
                     // Take the other z's as given, find the range for this one
-                    double constraint = (r_minus_Rbeta_[r] / s_sigma - (D.row(r) * z)) / dj;
+                    double constraint = (r_minus_Rbeta_[r] / sigma - (D.row(r) * z)) / dj;
                     if (dj > 0) { // <= constraint (we didn't flip the sign by dividing by dj)
                         if (constraint < uj) uj = constraint;
                     }
@@ -351,6 +351,8 @@ const VectorXd& LinearRestricted::drawGibbs() {
 #endif
         }
 
+        *gibbs_last_z_ = z;
+        gibbs_last_sigma_ = sigma;
         gibbs_draws_++;
     }
 
