@@ -646,7 +646,7 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
     // Beliefs
     belief_data belief = readBelief();
     if (belief.K > 0) {
-        r.profit = (belief.noninformative or not belief.fullyinformative)
+        r.profit = belief.noninformative
             ? Profit(belief.K, belief.noninf_X, belief.noninf_y)
             : Profit(belief.beta, belief.s2, belief.V, belief.n);
         r.profit.draw_rejection_success = belief.draw_success_cumulative;
@@ -655,7 +655,7 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
 
     belief = readBelief();
     if (belief.K > 0) {
-        r.profit_extrap = (belief.noninformative or not belief.fullyinformative)
+        r.profit_extrap = belief.noninformative
             ? Profit(belief.K, belief.noninf_X, belief.noninf_y)
             : Profit(belief.beta, belief.s2, belief.V, belief.n);
         r.profit_extrap.draw_rejection_success = belief.draw_success_cumulative;
@@ -664,7 +664,7 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
 
     belief = readBelief();
     if (belief.K > 0) {
-        r.demand = (belief.noninformative or not belief.fullyinformative)
+        r.demand = belief.noninformative
             ? Demand(belief.K, belief.noninf_X, belief.noninf_y)
             : Demand(belief.beta, belief.s2, belief.V, belief.n);
         r.demand.draw_rejection_success = belief.draw_success_cumulative;
@@ -673,7 +673,7 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
 
     belief = readBelief();
     if (belief.K > 0)
-        r.quality = (belief.noninformative or not belief.fullyinformative)
+        r.quality = belief.noninformative
             ? Quality(belief.K, belief.noninf_X, belief.noninf_y)
             : Quality(belief.beta, belief.s2, belief.V, belief.n);
 
@@ -682,7 +682,7 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
         belief = readBelief();
         if (belief.K == 0) throwParseError("found illegal profitStream belief with K = 0 (i.e. default constructed model)");
         else if (r.profit_stream.count(belief.K)) throwParseError("found duplicate K value in profit_stream beliefs");
-        r.profit_stream.emplace((unsigned int) belief.beta.rows(), (belief.noninformative or not belief.fullyinformative)
+        r.profit_stream.emplace((unsigned int) belief.beta.rows(), belief.noninformative
                 ? ProfitStream(belief.K, belief.noninf_X, belief.noninf_y)
                 : ProfitStream(belief.beta, belief.s2, belief.V, belief.n));
     }
@@ -704,18 +704,12 @@ FileStorage::belief_data FileStorage::readBelief() const {
         belief.K = 0;
         return belief;
     }
-    else if (k >= -120 and k < 0) {
-        belief.K = (uint32_t) -k;
-        belief.noninformative = true;
-        return belief;
-    }
     else if (k <= 0) {
         throwParseError("Found invalid belief record with k = " + std::to_string(k));
     }
     // Otherwise k is the right value.
 
     belief.K = k;
-    belief.noninformative = false;
 
     // Next up is a status field
     uint8_t status = read_u8();
@@ -723,9 +717,9 @@ FileStorage::belief_data FileStorage::readBelief() const {
     // information)
     bool restricted_model = status & 1;
     bool last_draw_was_gibbs = status & 2;
-    belief.fullyinformative = status & 4;
+    belief.noninformative = status & 4;
 
-    if (belief.fullyinformative) {
+    if (not belief.noninformative) {
         // The first K elements are beta values
         belief.beta = VectorXd(k);
         for (unsigned int i = 0; i < belief.K; i++)
@@ -755,15 +749,13 @@ FileStorage::belief_data FileStorage::readBelief() const {
     else {
         // If the model was not fully informative, we immediately get a value r < K telling us how many
         // rows worth of independent data follow (i.e. r*K values follow).
-        if (not belief.fullyinformative) {
-            uint32_t noninf_rows = read_u32();
-            belief.noninf_X = MatrixXdR(noninf_rows, k);
-            for (uint32_t i = 0; i < noninf_rows; i++) for (unsigned int j = 0; j < belief.K; j++) {
-                belief.noninf_X(i, j) = read_dbl();
-            }
-            for (uint32_t i = 0; i < noninf_rows; i++)
-                belief.noninf_y(i) = read_dbl();
+        uint32_t noninf_rows = read_u32();
+        belief.noninf_X = MatrixXdR(noninf_rows, k);
+        for (uint32_t i = 0; i < noninf_rows; i++) for (unsigned int j = 0; j < belief.K; j++) {
+            belief.noninf_X(i, j) = read_dbl();
         }
+        for (uint32_t i = 0; i < noninf_rows; i++)
+            belief.noninf_y(i) = read_dbl();
     }
 
     return belief;
@@ -844,11 +836,6 @@ void FileStorage::writeBelief(const Linear &m) {
         write_i8(-128);
         return;
     }
-    else if (m.noninformative()) {
-        // Non-informative models are easy, too: just write out -K
-        write_i8(-(int8_t) k);
-        return;
-    }
 
     // Otherwise write out the full record, starting with the positive size:
     write_i8(k);
@@ -864,14 +851,14 @@ void FileStorage::writeBelief(const Linear &m) {
         status |= 1;
         if (lr->last_draw_mode == LinearRestricted::DrawMode::Gibbs) status |= 2;
     }
-    if (m.fullyInformative()) {
+    if (m.noninformative()) {
         status |= 4;
     }
 
     // Status field
     write_u8(status);
 
-    if (m.fullyInformative()) {
+    if (not m.noninformative()) {
         auto &beta = m.beta();
         // First K elements are the beta values
         for (unsigned int i = 0; i < k; i++)
@@ -907,9 +894,9 @@ void FileStorage::writeBelief(const Linear &m) {
 
     FILESTORAGE_DEBUG_WRITE_CHECK(
             2 + (
-                m.fullyInformative()
-                ? 8*(2+k+k*(k+1)/2) + (restricted_model ? 4*2 : 0)
-                : 4 + 8*(m.noninfXData().rows()*(k+1))
+                m.noninformative()
+                ? (4 + 8*(m.noninfXData().rows()*(k+1)))
+                : (8*(2+k+k*(k+1)/2) + (restricted_model ? 4*2 : 0))
                 )
             );
 }

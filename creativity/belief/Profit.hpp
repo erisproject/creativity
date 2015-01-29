@@ -52,6 +52,9 @@ class Profit : public LinearRestricted {
             restrict(1) >= 0; // beta_q >= 0 (higher quality <-> higher profits, at least for low quality)
             restrict(2) <= 0; // beta_{q^2} <= 0 (quality effect is concave)
             //restrict(5) <= 0; // beta_{marketbooks} <= 0 (more competition <-> lower profit)
+
+            // Set beta names for nicer output
+            names({"const", "quality", u8"quality²", "I(firstBook)", "prevBooks", "marketBooks"});
         }
 
         /// Returns the number of parameters of this model (6)

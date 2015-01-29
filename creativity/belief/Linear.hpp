@@ -86,14 +86,19 @@ class Linear {
          *     V = identity matrix times `NONINFORMATIVE_Vc` (currently 1e+8)
          *     n = `NONINFORMATIVE_N` (currently 1e-3)
          *
-         * If the optional noninf_X and noninf_y arguments are provided and are non-empty matrices,
-         * this stores the given data and the model becomes partially informative (see
-         * fullyInformative()).
+         * Note, however, that these values are never used: once the model is updated with enough
+         * data, the above are determined entirely by the given data without incoporating the above
+         * values.
          *
-         * - the first update() call with return a model with `n` set to the number of rows in the
-         *   updated data without adding the initial small n value.
-         * - noninformative() will return true (unless noninf_X/noninf_y data is given), and
-         *   fullyInformative() will return false.
+         * If the optional noninf_X and noninf_y arguments are provided and are non-empty matrices,
+         * this stores the given data and the model becomes noninformative, but with initial data
+         * that will be incorporated the next time data is added.
+         *
+         * The first update() call with return a model with `n` set to the number of rows in the
+         * updated data (plus noninformative data, if any) without adding the initial small n value.
+         *
+         * noninformative() will return true, and the model cannot be used for prediction until more data
+         * is incorporated via update().
          *
          * \param K the number of model parameters
          * \param noninf_X a matrix of `K` columns of data that this model should be loaded with,
@@ -183,27 +188,19 @@ class Linear {
          * if VcholL() hasn't been calculated yet, this will calculate it. */
         const Eigen::MatrixXd& VcholLinv() const;
 
-        /** Returns true if the data fed into this model makes the model fully informed.  This works
-         * by storing up to K linearly independent data rows, and adding new rows only if they
-         * increase the rank of the stored data.  For models with linearly dependent data, some
-         * entries of V_ will be determined entirely or mostly by the large noninformative V value,
-         * and so are not suitable for prediction.
-         */
-        bool fullyInformative() const;
-
         /** Returns the X data that has been added into this model but hasn't yet been used due to
          * it not being sufficiently large and different enough to achieve full column rank.  The
          * data will be scaled appropriately if weaken() has been called, and so does not
          * necessarily reflect the actual data added.
          *
-         * \throws std::logic_error if fullyInformative() would return true.
+         * \throws std::logic_error if noninformative() would return false.
          */
         const MatrixXdR& noninfXData() const;
 
         /** Returns the y data associated with noninfXData().  Like that data, this will be scaled
          * if the model has been weakened.
          *
-         * \throws std::logic_error if fullyInformative() would return true.
+         * \throws std::logic_error if noninformative() would return false.
          */
         const Eigen::VectorXd& noninfYData() const;
 
@@ -214,8 +211,8 @@ class Linear {
          * other model parameter distribution assumptions where the parameter means may have
          * differences from the restricted distribution means due to the restrictions.
          *
-         * \throws std::logic_error if attempting to call predict() on an empty, noninformative, or
-         * not-fully-informative model.
+         * \throws std::logic_error if attempting to call predict() on an empty or noninformative
+         * model.
          */
         virtual double predict(const Eigen::Ref<const Eigen::RowVectorXd> &Xi);
 
@@ -311,21 +308,22 @@ class Linear {
         /** Using the calling object as a prior, uses the provided data to create a new Linear
          * model.
          *
-         * If the prior is a noninformative model, it will be treated as if it has a value of n of
-         * exactly 0 (instead of `NONINFORMATIVE_N`); as such the posterior \f$n\f$ will be exactly
-         * equal to the number of new data observations, and the \f$s^2\f$ value will similarly come
-         * entirely from the new data (i.e. it will not be a weighted sum of s^2 from the new data
-         * plus `NONINFORMATIVE_N * NONINFORMATIVE_S2`).
+         * If the prior is a noninformative model, and the data (plus any previously incorporated
+         * data) will be checked to see if \f$X^\top X\f$ is full-rank: if so, beta, V, s2, and n
+         * will be updated using just the data; otherwise, the data will be stored until a
+         * subsequent update provides enough (sufficiently varied) data.
          *
          * \param X the new X data
          * \param y the new y data
          *
          * X and y must have the same number of rows, but it is permitted that the number of rows be
          * less than the number of parameters.  Updating iteratively with a data set broken into
-         * small portions will yield the same posterior as updating once with the full data set.
+         * small portions will yield exactly the same posterior as updating once with the full data
+         * set.
          *
          * Calling this method with y and X having no rows at all is permitted: in such a case the
-         * returned object is simply a copy of the calling object.
+         * returned object is simply a copy of the calling object, but with various state variables
+         * (such as last draw) reset.
          */
         [[gnu::warn_unused_result]]
         Linear update(
@@ -335,7 +333,7 @@ class Linear {
         /** Exactly like the above update() method, but optimized for the case where the caller is
          * an rvalue, typically the result of something like:
          *
-         *     new = linearmodel->weaken(1.1)->update(y, X);
+         *     new = linearmodel.weaken(1.1).update(y, X);
          *
          * The new object is created by moving the current object rather than copying the current
          * object.
@@ -351,6 +349,12 @@ class Linear {
          * distribution with the same mean, but with double the standard deviation (and 4 times the
          * variance).
          *
+         * If the model is noninformative, but has stored data (i.e. the data isn't yet sufficiently
+         * large or varied for \f$X^\top X\f$ to be invertible), the stored data itself is
+         * "weakened" by scaling both X and y values by the reciprocal of the given scale value.
+         * This ensures that the results of the noninformative will be affected in the exact same
+         * way as the results had the stored data been sufficient to make the model informative.
+         *
          * This is designed to allow using this belief as a prior (via update()), but with a
          * deliberately weakened weight on the prior.
          */
@@ -363,6 +367,20 @@ class Linear {
          */
         [[gnu::warn_unused_result]]
         Linear weaken(double stdev_scale) &&;
+
+        /** Returns the parameter names.  If not set explicitly, returns a vector of {"0", "1", "2",
+         * ...}.
+         */
+        const std::vector<std::string>& names() const;
+
+        /** Sets the parameter names to the given vector of names.
+         *
+         * \param names the new names to set.  Must be either empty (to reset names to default), or
+         * of length K(), to reset the current names to the given values.
+         *
+         * \throws std::domain_error if names is of length other than 0 or K().
+         */
+        void names(const std::vector<std::string> &names);
 
     protected:
 
@@ -424,6 +442,14 @@ class Linear {
         /// The number of data points supporting this model, which need not be an integer.
         double n_;
 
+        /** Names associated with the beta parameters.  Uses primarily when printing the model.  If
+         * unset (or has length != K()), the names are simply "0", "1", "2", ...
+         */
+        mutable std::shared_ptr<std::vector<std::string>> beta_names_;
+
+        /// True if beta_names_ is simply set to the default (0 ... K-1)
+        mutable bool beta_names_default_ = true;
+
         /** True if this model was initialized as a non-informative prior.  Any subclasses changing
          * beta/s2/etc. must take care to reset this appropriately.
          *
@@ -443,26 +469,26 @@ class Linear {
         // Checks that the given matrices conform; called during construction; throws on error.
         void checkLogic();
 
-        /** Do the actual in-place update using the given X data.  This is just like updateInPlace,
-         * except it is only called if enough X data has been accumulated to make \f$X\top X\f$
-         * invertible.  It also doesn't perform various checks on X and y are comforable.
+        /** Do the in-place update using the given X data when we already have an informative model.
+         * This is just like updateInPlace, except it is only called after the parameters have been
+         * established by having enough data to make \f$X\top X\f$ invertible.  It also doesn't
+         * perform various checks on X and y are comforable.
          */
         void updateInPlaceInformative(
                 const Eigen::Ref<const Eigen::VectorXd> &y,
-                const Eigen::Ref<const Eigen::MatrixXd> &X,
-                Eigen::MatrixXd &&XtX = Eigen::MatrixXd()
+                const Eigen::Ref<const Eigen::MatrixXd> &X
                 );
 
         /** The X data that has been loaded into the model but before X has full column rank.  Such
-         * a model is considered partially noninformative (fullyInformative() returns false) and
-         * cannot be used for results until more data is added.
+         * a model is still considered noninformative and cannot be used for results until more data
+         * is added.
          *
-         * If the model is weakened before becoming fully informative, this X data and the
+         * If the model is weakened before becoming informative, this X data and the
          * associated y data is scaled by 1/w, where w is the weakening factor, so that \f$(X\^top
          * X)^{-1}\f$ is scaled by \f$w^2\f$, and that y data stays proportional to X.
          */
         std::shared_ptr<MatrixXdR> noninf_X_;
-        /// The y data for a not-fully-informed model.  \sa noninf_X_.
+        /// The y data for a non-informative model.  \sa noninf_X_.
         std::shared_ptr<Eigen::VectorXd> noninf_y_;
 
 };

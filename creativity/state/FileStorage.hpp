@@ -493,8 +493,7 @@ class FileStorage final : public StorageBackend {
         /// Structure holding parsed belief data
         typedef struct {
             uint32_t K; ///< Number of parameters; K=0 for a default constructed (invalid) model (the remaining values will be uninitialized)
-            bool noninformative; ///< True if this is a noninformative model (in which case the remaining values will be uninitialized)
-            bool fullyinformative; ///< True if this is a fully informative model (in which case indep_data will be a null matrix)
+            bool noninformative; ///< True if this is a noninformative model (in which only noninf_X and noninf_y are set)
             Eigen::VectorXd beta; ///< belief::Linear beta vector
             double s2; ///< belief::Linear s2 value
             double n; ///< belief::Linear n value
@@ -512,9 +511,9 @@ class FileStorage final : public StorageBackend {
          * is required.  When a file location (or the "immediately following" -512 value) is
          * recognized, that indicated location contains a belief record structured as follows:
          *
-         *     i8       K, the number of model parameters, with special values described below
+         *     i8       K, the number of model parameters
          *     u8       status bits (described below)
-         * then either (if fully informed bit set):
+         * then either (if noninformative bit not set):
          *     dbl*K    beta vector (K values)
          *     dbl      s2
          *     dbl      n
@@ -524,26 +523,25 @@ class FileStorage final : public StorageBackend {
          *              models)
          *     u32      the cumulative discarded LinearRestricted draws (only for LinearRestricted
          *              models)
-         * or (not fully informed):
-         *     u32      r, the number of noninformative rows (for partially-informed models)
+         * or (non-informative):
+         *     u32      r, the number of noninformative rows (for partially-informed models), which
+         *              could be 0 (for an entirely noninformative model with no data).
          *     dbl*r*K  the X data (for partially-informed models)
          *     dbl*r    the y data (for partially-informed models)
          *
          * The K value has the following interpretations: if in [1,120], the model has this number of
-         * parameters, and is not a completely noninformative model.  If in [-120,-1], the model has
-         * -(this number) parameters, but is a completely noninformative model (and so no other data
-         * follows).  If -128, the model object is default-constructed (and thus has no useful
-         * data).  Anything else is invalid.
+         * parameters, and is not a completely noninformative model.  If -128, the model object is
+         * default-constructed (and thus has no useful data).  Anything else is invalid.
          *
          * The second byte is a bit field, which currently has the following interpretations:
-         * - lowest bit (& 1): the model is a LinearRestricted model, and thus carries extra
+         * - lowest bit (bit & 1): the model is a LinearRestricted model, and thus carries extra
          *   LinearRestricted data (the two u32's above).  If not set, the u32s are not present in
          *   the record.
-         * - bit 2 (& 2): the last draw from this model used Gibbs sampling (only applicable to
+         * - bit 2 (bit & 2): the last draw from this model used Gibbs sampling (only applicable to
          *   restricted models)
-         * - bit 3 (& 4): the model is fully informative.  If this bit is *not* set, then the values
-         *   following the V matrix data are present: the number of independent rows, and the data
-         *   for those rows (unless number of rows is 0).
+         * - bit 3 (bit & 4): the model is noninformative.  If this bit is set, then instead of
+         *   beta/V/etc. data the record contains non-informative data that hasn't been loaded yet;
+         *   otherwise the beta/V/n/s2 data follows.
          * - other bits are currently unused.
          */
         belief_data readBelief() const;

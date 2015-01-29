@@ -497,7 +497,7 @@ const std::map<unsigned int, belief::ProfitStream>& Reader::profitStreamBeliefs(
 }
 
 bool Reader::usableBelief(const belief::Linear &model) const {
-    return model.fullyInformative() and model.n() - model.K() >= creativity_->parameters.initial.belief_threshold;
+    return not model.noninformative() and model.n() - model.K() >= creativity_->parameters.initial.belief_threshold;
 }
 
 void Reader::updateBeliefs() {

@@ -44,7 +44,10 @@ class Quality : public Linear {
          */
         template <typename ...Args>
         explicit Quality(Args &&...args) : Linear(std::forward<Args>(args)...)
-        {}
+        {
+            // Set beta names for nicer output
+            names({"const", "I(firstBook)", "prevBooks", "age", "price", "price×age", "numSales"});
+        }
 
         /// Returns the number of parameters of this model (7)
         static unsigned int parameters() { return 7; }

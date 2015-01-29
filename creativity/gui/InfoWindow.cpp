@@ -105,6 +105,8 @@ InfoWindow::InfoWindow(std::shared_ptr<const State> state, std::shared_ptr<Gtk::
     if (state->readers.count(reader) == 0)
         throw std::out_of_range("InfoWindow() called with invalid reader id");
 
+    auto rdr = state->readers.at(reader);
+
     initWindow(*main_window);
 
     set_title("Reader/author details (" + std::to_string(reader) + ")");
@@ -135,7 +137,7 @@ InfoWindow::InfoWindow(std::shared_ptr<const State> state, std::shared_ptr<Gtk::
     labels_append(grid_quality, "Dependent variable", "<i>quality</i>");
     data_append(grid_quality, "q_n", "n");
     data_append(grid_quality, "q_s2", "s<sup>2</sup>");
-    std::vector<std::string> q_vars{{"constant", "I(firstBook)", "prevBooks", "age", "price", "price×age", "copiesSold"}};
+    std::vector<std::string> q_vars(rdr.quality.names());
     for (size_t i = 0; i < q_vars.size(); i++)
         data_append(grid_quality, "q_" + std::to_string(i), BETA "[" + q_vars[i] + "]", 1, 1);
     matrix_at(grid_quality, "q_V", "s<sup>2</sup><b>V</b>", 2, 2, q_vars.size(), q_vars.size());
@@ -144,7 +146,7 @@ InfoWindow::InfoWindow(std::shared_ptr<const State> state, std::shared_ptr<Gtk::
     labels_append(grid_profit, "Dependent variable", "<i>lifetimeProfit</i>");
     data_append(grid_profit, "p_n", "n");
     data_append(grid_profit, "p_s2", "s<sup>2</sup>");
-    std::vector<std::string> p_vars{{"constant", "quality", "quality<sup>2</sup>", "I(firstBook)", "previousBooks", "marketBooks"}};
+    std::vector<std::string> p_vars(rdr.profit.names());
     for (size_t i = 0; i < p_vars.size(); i++)
         data_append(grid_profit, "p_" + std::to_string(i), BETA "[" + p_vars[i] + "]");
     data_append(grid_profit, "_p_draws", "# successful draws");
@@ -156,7 +158,7 @@ InfoWindow::InfoWindow(std::shared_ptr<const State> state, std::shared_ptr<Gtk::
     labels_append(grid_demand, "Dependent variable", "<i>quantityDemanded</i>");
     data_append(grid_demand, "d_n", "n");
     data_append(grid_demand, "d_s2", "s<sup>2</sup>");
-    std::vector<std::string> d_vars{{"constant", "price", "quality", "quality<sup>2</sup>", "prevSales", "age", "I(onlyBook)", "otherBooks", "marketBooks"}};
+    std::vector<std::string> d_vars(rdr.demand.names());
     for (size_t i = 0; i < d_vars.size(); i++)
         data_append(grid_demand, "d_" + std::to_string(i), BETA "[" + d_vars[i] + "]");
     data_append(grid_demand, "_d_draws", "# successful draws");
