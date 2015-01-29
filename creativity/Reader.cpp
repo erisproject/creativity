@@ -215,41 +215,11 @@ void Reader::interOptimize() {
             auto book_mkt = book->market();
 
             try {
-                auto max = demand_belief_.argmaxP(book->quality(), book->lifeSales(), book->age(), authored_books - 1, market_books, cost_unit);
+                auto max = demand_belief_.argmaxP(book->quality(), book->lifeSales(), book->lifePirated(), creativity_->parameters.readers,
+                        book->sales(sim->t()-1), book->age(), authored_books - 1, market_books, cost_unit);
                 const double &p = max.first;
                 const double &q = max.second;
-#ifdef ERIS_DEBUG
-                if (p > 1000) {
-                    ERIS_DBG("Found p=" << p << " > 1000");
-                    ERIS_DBGVAR(id());
-                    ERIS_DBGVAR(book->id());
-                    ERIS_DBGVAR(p);
-                    ERIS_DBGVAR(q);
-                    ERIS_DBGVAR(demand_belief_.draw_rejection_discards_last);
-                    ERIS_DBGVAR(demand_belief_.draw_rejection_discards);
-                    ERIS_DBGVAR(demand_belief_.draw_rejection_success);
-                    std::cerr << "\n    VectorXd beta(10); beta << ";
-                    for (int i = 0; i < demand_belief_.beta().size(); i++) {
-                        if (i > 0) std::cerr << ", ";
-                        std::cerr << demand_belief_.beta()[i];
-                    }
-                    std::cerr << ";\n";
-                    std::cerr << "    MatrixXd V(10,10); V <<\n    ";
-                    for (int r = 0; r < demand_belief_.V().rows(); r++) {
-                        if (r > 0) std::cerr << ",\n    ";
-                        for (int c = 0; c < demand_belief_.V().cols(); c++) {
-                            if (c > 0) std::cerr << ", ";
-                            std::cerr << demand_belief_.V()(r, c);
-                        }
-                    }
-                    std::cerr << ";\n";
-                    std::cerr << "    double n = " << demand_belief_.n() << ";\n";
-                    std::cerr << "    double s2 = " << demand_belief_.s2() << ";\n";
-                    std::cerr << "    struct { double q = " << book->quality() << ", c = " << cost_unit << "; unsigned long lifesales = " << book->lifeSales()
-                        << ", otherbooks = " << authored_books - 1 << ", marketbooks = " << market_books << "; } book;\n";
 
-                }
-#endif
                 const double profit = (p - cost_unit) * q - cost_fixed;
 
                 if (profit > 0) {
@@ -258,8 +228,7 @@ void Reader::interOptimize() {
                 }
             }
             catch (belief::LinearRestricted::draw_failure &fail) {
-                // If we fail to get an admissable draw, fall back to default behaviour.
-                //bypass_beliefs.push_back(book);
+                // If we fail to get an admissable draw, pull the book from the market.
             }
         }
 
@@ -354,7 +323,7 @@ void Reader::interOptimize() {
 #                   ifdef ERIS_DEBUG
                     try {
 #                   endif
-                    max = demand_belief_.argmaxP(quality, 0, 0, authored_books, market_books, cost_unit);
+                    max = demand_belief_.argmaxP(quality, 0, 0, creativity_->parameters.readers, 0, 0, authored_books, market_books, cost_unit);
 #                   ifdef ERIS_DEBUG
                     }
                     catch (belief::LinearRestricted::draw_failure &e) {
@@ -362,14 +331,18 @@ void Reader::interOptimize() {
                         throw;
                     }
 #                   endif
-                    create_price_ = max.first;
-                    create_quality_ = quality;
-                    create_effort_ = effort;
-                    create_ = true;
+                    if (max.first > 0) {
+                        create_price_ = max.first;
+                        create_quality_ = quality;
+                        create_effort_ = effort;
+                        create_ = true;
+                    }
+                    // else: even though our Profit seems like it would be positive, our demand
+                    // belief suggests otherwise, so don't create.
                 }
             }
             catch (belief::Linear::draw_failure &e) {
-                ERIS_DBG("draw failure: " << e.what());
+                // Ignore draw failures
             }
         }
         else {
@@ -569,18 +542,13 @@ void Reader::updateDemandBelief() {
     double weaken = creativity_->priorWeight();
     if (weaken != 1.0) demand_belief_ = std::move(demand_belief_).weaken(weaken);
 
-    // FIXME: we only add books once, when they are first added to the library (*if* they are on the
-    // market).  It would be nicer to incorporate library books (i.e. everything in
-    // library_on_market_) *each* period we have them, to get multiple demand observations, but the
-    // concern is that that would overweight some books (i.e. those that happen to stay on the
-    // market longer).  For now, just learn book demand in the period a book is obtained.
-    if (not newBooks().empty()) {
-        VectorXd y(newBooks().size());
-        MatrixXdR X(newBooks().size(), demand_belief_.K());
+    if (not library_on_market_.empty()) {
+        VectorXd y(library_on_market_.size());
+        MatrixXdR X(library_on_market_.size(), demand_belief_.K());
         // NB: this runs in the interoptimizer, which means t has already been incremented
         auto last_t = simulation()->t() - 1;
         size_t i = 0;
-        for (const auto &b : newBooks()) {
+        for (const auto &b : library_on_market_) {
             if (b.first->hasMarket()) {
                 y[i] = b.first->sales(last_t);
                 X.row(i) = demand_belief_.bookRow(b.first, b.second.get().quality, creativity_->market_books_lagged);
