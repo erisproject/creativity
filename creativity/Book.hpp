@@ -123,7 +123,9 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         /// Returns the number of sales of this book so far in the current period
         unsigned int currSales() const;
 
-        /// Returns the number of sales in simulation period `t`
+        /** Returns the number of sales in simulation period `t`.  Calling with `t` earlier than the
+         * period this book was created is allowed: it simply returns 0.
+         */
         unsigned int sales(eris::eris_time_t t) const;
 
         /** Returns the last simulation period `t` in which this book had at least one sale, or 0 if
