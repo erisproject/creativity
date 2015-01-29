@@ -526,7 +526,7 @@ class LinearRestricted : public Linear {
                                 >::type
 #endif
         {
-            if (min >= max) throw std::logic_error("Can't call truncDist() with min >= max!");
+            if (min >= max) throw draw_failure("truncDist() called with empty truncation range (min >= max)");
 
             auto dist_range = range(dist);
             auto &dist_min = dist_range.first, &dist_max = dist_range.second;
@@ -534,7 +534,7 @@ class LinearRestricted : public Linear {
                 // Truncation range isn't limiting the distribution:
                 return generator(eris::Random::rng());
             if (max <= dist_min or min >= dist_max)
-                throw std::logic_error("Can't call truncDist() with truncatation range outside the support of the distribution");
+                throw draw_failure("truncDist() called with empty truncation range ([min,max] outside distribution support)");
 
             ResultType alpha, omega;
             bool alpha_comp, omega_comp;
@@ -583,7 +583,7 @@ class LinearRestricted : public Linear {
                 // Check for underflow (essentially: is 1-alpha equal to or closer to 0 than a ResultType
                 // (typically a double) can represent without reduced precision)
                 if (alpha == 0 or std::fpclassify(alpha) == FP_SUBNORMAL)
-                    throw draw_failure("LinearRestricted::truncDist(): Unable to draw from truncated distribution: truncation range is too far in the upper tail");
+                    throw draw_failure("truncDist(): Unable to draw from truncated distribution: truncation range is too far in the upper tail");
 
                 // Both alpha and omega are complements, so take a draw from [omega,alpha], then pass it
                 // through the quantile_complement
@@ -593,7 +593,7 @@ class LinearRestricted : public Linear {
                 // Check for underflow (essentially, is omega equal to or closer to 0 than a ResultType
                 // (typically a double) can represent without reduced precision)
                 if (omega == 0 or std::fpclassify(omega) == FP_SUBNORMAL)
-                    throw draw_failure("LinearRestricted::truncDist(): Unable to draw from truncated distribution: truncation range is too far in the lower tail");
+                    throw draw_failure("truncDist(): Unable to draw from truncated distribution: truncation range is too far in the lower tail");
 
                 // Otherwise they are ordinary cdf values, draw from the uniform and invert:
                 return quantile(dist, std::uniform_real_distribution<ResultType>(alpha, omega)(eris::Random::rng()));

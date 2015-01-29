@@ -94,6 +94,11 @@ class Linear {
          *   updated data without adding the initial small n value.
          * - noninformative() will return true (unless noninf_X/noninf_y data is given), and
          *   fullyInformative() will return false.
+         *
+         * \param K the number of model parameters
+         * \param noninf_X a matrix of `K` columns of data that this model should be loaded with,
+         * once enough additional data is added to make \f$X^\top X\f$ invertible.
+         * \param noninf_y the y data associated with `noninf_X`
          */
         explicit Linear(
                 const unsigned int K,
@@ -114,11 +119,6 @@ class Linear {
          *
          * \param n the number of data points supporting the other values (which can be a
          * non-integer value).
-         *
-         * \param indep_data a matrix of size r-by-K (with r < K) that contains a set of linearly
-         * independent data rows that this model has been updated with.  If omitted, or given as an
-         * empty (0-by-0) matrix, the model will be assumed to be based on at least K linearly
-         * independent data rows.
          *
          * \throws std::runtime_error if any of (`K >= 1`, `V.rows() == V.cols()`, `K == V.rows()`)
          * are not satisfied (where `K` is determined by the number of rows of `beta`).
@@ -449,7 +449,9 @@ class Linear {
          */
         void updateInPlaceInformative(
                 const Eigen::Ref<const Eigen::VectorXd> &y,
-                const Eigen::Ref<const Eigen::MatrixXd> &X);
+                const Eigen::Ref<const Eigen::MatrixXd> &X,
+                Eigen::MatrixXd &&XtX = Eigen::MatrixXd()
+                );
 
         /** The X data that has been loaded into the model but before X has full column rank.  Such
          * a model is considered partially noninformative (fullyInformative() returns false) and

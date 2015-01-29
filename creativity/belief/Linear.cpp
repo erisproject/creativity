@@ -213,10 +213,17 @@ void Linear::updateInPlace(const Ref<const VectorXd> &y, const Ref<const MatrixX
         noninf_X_->bottomRows(X.rows()) = X;
         noninf_y_->tail(y.rows()) = y;
 
-        if (noninf_X_->rows() >= K() and noninf_X_->colPivHouseholderQr().rank() >= K()) {
-            updateInPlaceInformative(*noninf_y_, *noninf_X_);
-            noninf_X_.reset();
-            noninf_y_.reset();
+        if (noninf_X_->rows() >= K()) {
+            MatrixXd XtX = noninf_X_->transpose() * *noninf_X_;
+            if (XtX.colPivHouseholderQr().rank() >= K()) {
+                updateInPlaceInformative(*noninf_y_, *noninf_X_
+#ifdef EIGEN_HAVE_RVALUE_REFERENCES
+                        , std::move(XtX)
+#endif
+                        );
+                noninf_X_.reset();
+                noninf_y_.reset();
+            }
         }
     }
     else {
@@ -226,9 +233,9 @@ void Linear::updateInPlace(const Ref<const VectorXd> &y, const Ref<const MatrixX
     noninformative_ = false; // We aren't completely noninformative anymore!
 }
 
-void Linear::updateInPlaceInformative(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X) {
+void Linear::updateInPlaceInformative(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X, MatrixXd &&XtX) {
     MatrixXd Xt = X.transpose();
-    MatrixXd XtX = Xt * X;
+    if (XtX.rows() == 0 and XtX.cols() == 0) XtX = Xt * X;
 
     // We need the inverse of (V^{-1} + X^\top X) for V_post, but store the value in a shared
     // pointer before inverting because there's a good chance that the next object will need the
@@ -247,9 +254,19 @@ void Linear::updateInPlaceInformative(const Ref<const VectorXd> &y, const Ref<co
     n_ = n_prior + X.rows();
 
     VectorXd residualspost = y - X * beta_post;
-    VectorXd beta_diff = beta_post - beta_;
-    s2_ = (n_prior * s2_ + residualspost.squaredNorm() + beta_diff.transpose() * Vinv() * beta_diff) / n_;
-    beta_ = beta_post;
+    if (first_data) {
+        s2_ = residualspost.squaredNorm() / n_;
+    }
+    else {
+        VectorXd beta_diff = beta_post - beta_;
+        s2_ = (n_prior * s2_ + residualspost.squaredNorm() + beta_diff.transpose() * Vinv() * beta_diff) / n_;
+    }
+    beta_ =
+#ifdef EIGEN_HAVE_RVALUE_REFERENCES
+        std::move(beta_post);
+#else
+        beta_post;
+#endif
 
     V_inv_ = std::move(V_post_inv);
     // The decompositions will have to be recalculated:
