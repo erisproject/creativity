@@ -562,24 +562,35 @@ void Reader::updateQualityBelief() {
     }
 }
 void Reader::updateDemandBelief() {
+    // If we aren't starting simulation period t=3 or later, don't do anything: we can't
+    // incorporated books into the belief because we need the lagged market book count
+    if (simulation()->t() < 3) return;
+
     double weaken = creativity_->priorWeight();
     if (weaken != 1.0) demand_belief_ = std::move(demand_belief_).weaken(weaken);
 
-    if (not library_on_market_.empty()) {
-        VectorXd y(library_on_market_.size());
-        MatrixXdR X(library_on_market_.size(), demand_belief_.K());
+    // FIXME: we only add books once, when they are first added to the library (*if* they are on the
+    // market).  It would be nicer to incorporate library books (i.e. everything in
+    // library_on_market_) *each* period we have them, to get multiple demand observations, but the
+    // concern is that that would overweight some books (i.e. those that happen to stay on the
+    // market longer).  For now, just learn book demand in the period a book is obtained.
+    if (not newBooks().empty()) {
+        VectorXd y(newBooks().size());
+        MatrixXdR X(newBooks().size(), demand_belief_.K());
         // NB: this runs in the interoptimizer, which means t has already been incremented
         auto last_t = simulation()->t() - 1;
         size_t i = 0;
-        for (const auto &b : library_on_market_) {
+        for (const auto &b : newBooks()) {
             if (b.first->hasMarket()) {
                 y[i] = b.first->sales(last_t);
-                X.row(i) = demand_belief_.bookRow(b.first, b.second.get().quality);
+                X.row(i) = demand_belief_.bookRow(b.first, b.second.get().quality, creativity_->market_books_lagged);
                 i++;
             }
         }
 
-        demand_belief_ = std::move(demand_belief_).update(y.head(i), X.topRows(i));
+        if (i > 0) {
+            demand_belief_ = std::move(demand_belief_).update(y.head(i), X.topRows(i));
+        }
     }
 }
 void Reader::updateProfitStreamBelief() {

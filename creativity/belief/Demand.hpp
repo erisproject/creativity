@@ -31,7 +31,11 @@ namespace belief {
  * - \f$\beta_1 \leq 0\f$ (demand curve is downward sloping (at least for sufficiently small p))
  * - \f$\beta_2 \geq 0\f$ (higher quality means more sales (at least for low quality))
  * - \f$\beta_3 \leq 0\f$ (quality increase effect is concave)
- * - \f$\beta_8 \leq 0\f$ (more competition means lower (individual) demand)
+ *
+ * \f$\beta_8 \leq 0\f$ seems an intuitive restriction, but isn't imposed because we actually use
+ * lagged market size, not current market size, because lagged market size is all the reader has
+ * when doing demand prediction.  Positive values aren't entirely possible there, in particular if
+ * the market exhibits cyclical behaviour.
  *
  * These constraints are combined with a natural conjugate prior for the purposes of updating the
  * beliefs via Bayesian econometrics.
@@ -59,7 +63,6 @@ class Demand : public LinearRestricted {
             restrict(1) <= 0.0; // beta_price <= 0 (higher price <-> lower quantity)
             restrict(2) >= 0.0; // beta_q >= 0
             restrict(3) <= 0.0; // beta_{q^2} <= 0
-            restrict(8) <= 0.0; // more competition <-> lower demand
         }
 
         /// Returns the number of parameters of this model
@@ -76,11 +79,11 @@ class Demand : public LinearRestricted {
          * \param age of the book
          * \param otherBooks the number of other books created by this book's author.  This parameter
          * also determines the `onlyBook` dummy (`= 1` iff `otherBooks == 0`).
-         * \param marketBooks the number of books on the market last period
+         * \param lag_marketBooks the number of books on the market in the previous period
          *
          * \throws std::domain_error if `P < 0` or `q < 0`.
          */
-        double predict(double P, double q, unsigned long S, unsigned long age, unsigned long otherBooks, unsigned long marketBooks);
+        double predict(double P, double q, unsigned int S, unsigned int age, unsigned int otherBooks, unsigned int lag_marketBooks);
 
         using LinearRestricted::predict;
 
@@ -112,14 +115,17 @@ class Demand : public LinearRestricted {
          *
          * \throws std::domain_error if `c < 0` or `q < 0`
          */
-        std::pair<double, double> argmaxP(double q, unsigned long S, unsigned long age, unsigned long otherBooks, unsigned long marketBooks, double c);
+        std::pair<double, double> argmaxP(double q, unsigned int S, unsigned int age, unsigned int otherBooks, unsigned int marketBooks, double c);
 
         /** Given a book and perceived quality, this builds an X matrix row of data representing
          * that book.  This method may only be called in the inter-period optimization stage, after
          * `t` has been incremented but before new books/markets have been created.  The book must
          * still be on the market: its current market price is used to build the row.
+         *
+         * Note that this method typically should only be used beginning in t=3: before that,
+         * lag_market_books would be 0.
          */
-        Eigen::RowVectorXd bookRow(eris::SharedMember<Book> book, double quality) const;
+        Eigen::RowVectorXd bookRow(eris::SharedMember<Book> book, double quality, unsigned int lag_market_books) const;
 
         /// Returns "Demand", the name of this model.
         virtual std::string display_name() const override { return "Demand"; }
