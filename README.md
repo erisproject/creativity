@@ -17,7 +17,7 @@ creative output where copies of an original are the marketable good.
 
 ## License
 
-Copyright © 2014 Jason Rhinelander
+Copyright © 2015 Jason Rhinelander
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
