@@ -15,6 +15,7 @@ struct args {
                  new_piracy_periods = 50,
                  post_piracy_periods = 50,
                  double_precision = std::numeric_limits<double>::digits10;
+    bool human_readable = false;
 
     std::vector<std::string> input;
 };
@@ -29,7 +30,9 @@ args parseArgs(int argc, const char *argv[]) {
     TCLAP::ValueArg<unsigned int> new_piracy_periods_arg("p", "new", "Use the first 'n' post-piracy periods to calculate the new-piracy values", true, a.new_piracy_periods, "integer");
     TCLAP::ValueArg<unsigned int> post_piracy_periods_arg("z", "post", "Use the last 't' periods to calculate the post-piracy values", true, a.post_piracy_periods, "integer");
     TCLAP::ValueArg<unsigned int> double_precision_arg("", "precision", "Specifies the precision level for double values. The default, " + std::to_string(a.double_precision) + ", is the minimum required to exactly represent all possible double values", false, a.double_precision, "integer");
+    TCLAP::SwitchArg human_readable("H", "human-readable", "Produce output in human-readable format.  The default (when this is not specified) outputs comma-separated values.");
 
+    cmd.add(human_readable);
     cmd.add(double_precision_arg);
     cmd.add(piracy_begins_arg);
     cmd.add(periods_arg);
@@ -50,6 +53,7 @@ args parseArgs(int argc, const char *argv[]) {
     a.new_piracy_periods = new_piracy_periods_arg.getValue();
     a.post_piracy_periods = post_piracy_periods_arg.getValue();
     a.double_precision = double_precision_arg.getValue();
+    a.human_readable = human_readable.getValue();
     a.input = input.getValue();
 
     return a;
@@ -66,12 +70,19 @@ int main(int argc, const char *argv[]) {
     std::ostringstream output;
     int output_count = 0;
     output << std::setprecision(a.double_precision);
-    output << "source";
-    for (const auto &d : initial_data) output << "," << d.name;
-    for (const auto &d : data) if (!d.piracy_only) output << "," << "pre_" << d.name;
-    for (const auto &d : data) output << "," << "new_" << d.name;
-    for (const auto &d : data) output << "," << "post_" << d.name;
-    output << "\n";
+    unsigned int longest_name = 0;
+    if (not a.human_readable) {
+        output << "source";
+        for (const auto &d : initial_data) output << "," << d.name;
+        for (const auto &d : data) if (!d.piracy_only) output << "," << "pre_" << d.name;
+        for (const auto &d : data) output << "," << "new_" << d.name;
+        for (const auto &d : data) output << "," << "post_" << d.name;
+        output << "\n";
+    }
+    else {
+        for (const auto &d : initial_data) if (d.name.length() > longest_name) longest_name = d.name.length();
+        for (const auto &d : data) if (d.name.length() + 5 > longest_name) longest_name = d.name.length() + 5;
+    }
 
     for (const auto &source : a.input) {
         auto creativity = Creativity::create();
@@ -114,10 +125,16 @@ int main(int argc, const char *argv[]) {
 
         const eris_time_t &piracy_begins = creativity->parameters.piracy_begins;
 
-        output << data::csv_escape(source);
+        if (a.human_readable) output << "\n\n" << source << "\n==========\n";
+        else output << data::csv_escape(source);
         for (auto &d : initial_data) {
-            if (d.calc_double) output << "," << d.calc_double(creativity->parameters);
-            else output << "," << d.calc_int(creativity->parameters);
+            if (a.human_readable) output << std::setw(longest_name+1) << d.name + ":" << " ";
+            else output << ",";
+
+            if (d.calc_double) output << d.calc_double(creativity->parameters);
+            else output << d.calc_int(creativity->parameters);
+
+            if (a.human_readable) output << "\n";
         }
 
         // Keep a reference to all of the periods, so that the following don't end up continually
@@ -128,16 +145,37 @@ int main(int argc, const char *argv[]) {
         for (eris_id_t t = storage.size() - a.post_piracy_periods; t < storage.size(); t++)
             state_cache.push_back(storage[t]);
 
+        // pre_*:
         for (auto &d : data) {
-            if (not d.piracy_only)
-                output << "," << d.calculate(storage, piracy_begins - a.pre_piracy_periods, piracy_begins - 1);
+            if (not d.piracy_only) {
+                if (a.human_readable) output << std::setw(longest_name+1) << "pre_" + d.name + ":" << " ";
+                else output << ",";
+
+                output << d.calculate(storage, piracy_begins - a.pre_piracy_periods, piracy_begins - 1);
+
+                if (a.human_readable) output << "\n";
+            }
         }
 
-        for (auto &d : data)
-            output << "," << d.calculate(storage, piracy_begins, piracy_begins + a.new_piracy_periods - 1);
+        // new_*:
+        for (auto &d : data) {
+            if (a.human_readable) output << std::setw(longest_name+1) << "new_" + d.name + ":" << " ";
+            else output << ",";
 
-        for (auto &d : data)
-            output << "," << d.calculate(storage, storage.size() - a.post_piracy_periods, storage.size() - 1);
+            output << d.calculate(storage, piracy_begins, piracy_begins + a.new_piracy_periods - 1);
+
+            if (a.human_readable) output << "\n";
+        }
+
+        // post_*:
+        for (auto &d : data) {
+            if (a.human_readable) output << std::setw(longest_name+1) << "post_" + d.name + ":" << " ";
+            else output << ",";
+
+            output << d.calculate(storage, storage.size() - a.post_piracy_periods, storage.size() - 1);
+
+            if (a.human_readable) output << "\n";
+        }
 
         output << "\n";
         output_count++;
