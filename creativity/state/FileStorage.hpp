@@ -497,7 +497,7 @@ class FileStorage final : public StorageBackend {
             Eigen::VectorXd beta; ///< belief::Linear beta vector
             double s2; ///< belief::Linear s2 value
             double n; ///< belief::Linear n value
-            Eigen::MatrixXd V; ///< belief::Linear V matrix
+            Eigen::MatrixXd Vinv; ///< belief::Linear Vinv matrix
             belief::MatrixXdR noninf_X; ///< belief::Linear noninfXData() matrix
             Eigen::VectorXd noninf_y; ///< belief::Linear noninfYData() vector
             bool draw_gibbs; ///< If true, the last draw from this belief used Gibbs sampling (false = no draws, or rejection sampling)
@@ -517,7 +517,7 @@ class FileStorage final : public StorageBackend {
          *     dbl*K    beta vector (K values)
          *     dbl      s2
          *     dbl      n
-         *     dbl*Z    the `Z=K(K+1)/2` elements of the lower triangle of the V matrix, in column-major
+         *     dbl*Z    the `Z=K(K+1)/2` elements of the lower triangle of the V^{-1} matrix, in column-major
          *              order (that is, [0,0], [1,0], [2,0], ..., [K,0], [1,1], [2,1], ..., [K,1], ..., [K,K])
          *     u32      the cumulative successful LinearRestricted draws (only for LinearRestricted
          *              models)

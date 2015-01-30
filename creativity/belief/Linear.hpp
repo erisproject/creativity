@@ -119,8 +119,8 @@ class Linear {
          *
          * \param s2 the \f$\sigma^2\f$ value of the error term variance.  Typically the \f$\sigma^2\f$ estimate.
          *
-         * \param V the model's V matrix (where \f$s^2 V\f$ is the variance matrix of \f$\beta\f$).
-         * Note: only the lower triangle of the matrix will be used.
+         * \param V_inverse the inverse of the model's V matrix (where \f$s^2 V\f$ is the variance
+         * matrix of \f$\beta\f$).  Note: only the lower triangle of the matrix will be used.
          *
          * \param n the number of data points supporting the other values (which can be a
          * non-integer value).
@@ -131,7 +131,7 @@ class Linear {
         Linear(
                 const Eigen::Ref<const Eigen::VectorXd> beta,
                 double s2,
-                const Eigen::Ref<const Eigen::MatrixXd> V,
+                const Eigen::Ref<const Eigen::MatrixXd> V_inverse,
                 double n
               );
 
@@ -171,22 +171,20 @@ class Linear {
         /** Accesses the n value of the model. */
         const double& n() const;
 
-        /** Accesses the V value of the model. */
-        const Eigen::MatrixXd& V() const;
-
         /** Accesses the inverse of the V value of the model.  If the inverse has not been
          * calculated yet, this calculates and caches the value before returning it.
          */
         const Eigen::MatrixXd& Vinv() const;
 
         /** Accesses (calculating if not previously calculated) the "L" matrix of the cholesky
-         * decomposition of V, where LL' = V.
+         * decomposition of V, where LL' = V.  This is calculated by inverting the value of
+         * VinvCholL(), but caches the value (and so is more efficient if called more than once).
          */
         const Eigen::MatrixXd& VcholL() const;
 
         /** Accesses (calculating if not previous calculated) the inverse of `VcholL()`.  Note that
          * if VcholL() hasn't been calculated yet, this will calculate it. */
-        const Eigen::MatrixXd& VcholLinv() const;
+        const Eigen::MatrixXd& VinvCholL() const;
 
         /** Returns the X data that has been added into this model but hasn't yet been used due to
          * it not being sufficiently large and different enough to achieve full column rank.  The
@@ -222,8 +220,8 @@ class Linear {
          *
          * In particular, this uses a gamma distribution to first draw an h value, then uses that h
          * value to draw multivariate normal beta values.  This means the \f$\beta\f$ values will have a
-         * multivariate t distribution with mean `beta()`, covariance parameter `s2()*V()`, and
-         * degrees of freedom parameter `n()`.
+         * multivariate t distribution with mean `beta()`, covariance parameter s2() times the
+         * inverse of Vinv(), and degrees of freedom parameter `n()`.
          *
          * \returns a const reference to the vector of values.  This same vector is accessible by
          * calling lastDraw().  Note that this vector is reused for subsequent draw() calls and so
@@ -424,20 +422,20 @@ class Linear {
         Eigen::VectorXd beta_;
         /// The prior value of \f$s^2\f$, the error term variance estimator
         double s2_;
-        /** The prior V matrix, which is the \f$(X^\top X)^{-1}\f$ matrix, *not* the \f$s^2(X^\top
-         * X)^{-1}\f$ matrix.  This matrix should be symmetric and positive definite.
+        /** The inverse of the prior V matrix, that is, which would be the \f$X^\top X\f$ in OLS
+         * (and if model weakening is not used)., This matrix should be symmetric and positive
+         * definite.
          */
-        Eigen::MatrixXd V_;
+        Eigen::MatrixXd V_inv_;
 
         mutable std::shared_ptr<Eigen::MatrixXd>
-            /// The cached inverse of the prior V matrix, which isn't set until/unless needed.
-            V_inv_,
-
-            /// The cached "L" matrix of the cholesky decomposition of V, where LL' = V.
+            /** The inverse of the "L" matrix of the Cholesky decomposition of V^{-1}, where LL' =
+             * V^{-1}.  This is effectively the Cholesky decomposition of V.
+             */
             V_chol_L_,
 
-            /// The cached inverse of the "L" matrix of the cholesky decomposition of V.
-            V_chol_L_inv_;
+            /// The cached "L" matrix of the Cholesky decomposition of V^{-1}, where LL' = V^{-1}.
+            V_inv_chol_L_;
 
         /// The number of data points supporting this model, which need not be an integer.
         double n_;

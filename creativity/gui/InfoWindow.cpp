@@ -3,6 +3,7 @@
 #include <iomanip>
 #include <gtkmm/box.h>
 #include <gtkmm/treemodelcolumn.h>
+#include <Eigen/QR>
 
 using namespace eris;
 using namespace creativity::state;
@@ -307,7 +308,7 @@ void InfoWindow::refresh(std::shared_ptr<const State> state) {
 #define UPDATE_LIN(PREFIX, VAR) \
         updateValue(PREFIX + std::string("n"), VAR.n()); \
         updateValue(PREFIX + std::string("s2"), VAR.s2()); \
-        updateMatrix(PREFIX + std::string("V"), VAR.s2() * VAR.V(), true); \
+        updateMatrix(PREFIX + std::string("V"), VAR.s2() * VAR.Vinv().fullPivHouseholderQr().inverse(), true); \
         for (size_t i = 0; i < VAR.K(); i++) \
             updateValue(PREFIX + std::to_string(i), VAR.beta()[i]);
 #define UPDATE_LIN_RB(PREFIX, BELIEF) UPDATE_LIN(PREFIX, r.BELIEF)
@@ -316,6 +317,7 @@ void InfoWindow::refresh(std::shared_ptr<const State> state) {
         UPDATE_LIN_RB("p_", profit);
         UPDATE_LIN_RB("d_", demand);
         UPDATE_LIN_RB("pe_", profit_extrap);
+
 
         updateValue("_p_draws", r.profit.draw_rejection_success);
         updateValue("_p_discards", r.profit.draw_rejection_discards);

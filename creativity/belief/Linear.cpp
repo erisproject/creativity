@@ -12,16 +12,16 @@ constexpr double Linear::NONINFORMATIVE_N, Linear::NONINFORMATIVE_S2, Linear::NO
 Linear::Linear(
         const Ref<const VectorXd> beta,
         double s2,
-        const Ref<const MatrixXd> V,
+        const Ref<const MatrixXd> V_inverse,
         double n)
-    : beta_(beta), s2_{s2}, V_(V.selfadjointView<Lower>()), n_{n}, K_(beta_.rows())
+    : beta_(beta), s2_{s2}, V_inv_(V_inverse.selfadjointView<Lower>()), n_{n}, K_(beta_.rows())
 {
     // Check that the given matrices conform
     checkLogic();
 }
 
 Linear::Linear(unsigned int K, const Ref<const MatrixXdR> noninf_X, const Ref<const VectorXd> noninf_y) :
-    beta_{VectorXd::Zero(K)}, s2_{NONINFORMATIVE_S2}, V_{NONINFORMATIVE_Vc * MatrixXd::Identity(K, K)},
+    beta_{VectorXd::Zero(K)}, s2_{NONINFORMATIVE_S2}, V_inv_{1.0/NONINFORMATIVE_Vc * MatrixXd::Identity(K, K)},
     n_{NONINFORMATIVE_N}, noninformative_{true}, K_{K}
 {
     if (K < 1) throw std::logic_error("Linear model requires at least one parameter");
@@ -40,12 +40,10 @@ Linear::Linear(unsigned int K, const Ref<const MatrixXdR> noninf_X, const Ref<co
 void Linear::checkLogic() {
     auto k = K();
     if (k < 1) throw std::logic_error("Linear model requires at least one parameter");
-    if (V_.rows() != V_.cols()) throw std::logic_error("Linear requires square V matrix");
-    if (k != V_.rows()) throw std::logic_error("Linear requires beta and V of same number of rows");
-    if (V_inv_ and (V_inv_->rows() != V_inv_->cols() or V_inv_->rows() != k))
-        throw std::logic_error("Linear constructed with invalid V_inv");
-    if (V_chol_L_ and (V_chol_L_->rows() != V_chol_L_->cols() or V_chol_L_->rows() != k))
-        throw std::logic_error("Linear constructed with invalid V_chol_L");
+    if (V_inv_.rows() != V_inv_.cols()) throw std::logic_error("Linear requires square V_inverse matrix");
+    if (k != V_inv_.rows()) throw std::logic_error("Linear requires beta and V_inverse of same number of rows");
+    if (V_inv_chol_L_ and (V_inv_chol_L_->rows() != V_inv_chol_L_->cols() or V_inv_chol_L_->rows() != k))
+        throw std::logic_error("Linear constructed with invalid VinvCholL() matrix");
     auto fixed = fixedModelSize();
     if (fixed and k != fixed) throw std::logic_error("Linear model constructed with incorrect number of model parameters");
 }
@@ -57,24 +55,18 @@ unsigned int Linear::fixedModelSize() const { return 0; }
 const VectorXd& Linear::beta() const { NO_EMPTY_MODEL; return beta_; }
 const double& Linear::s2() const { NO_EMPTY_MODEL; return s2_; }
 const double& Linear::n() const { NO_EMPTY_MODEL; return n_; }
-const MatrixXd& Linear::V() const { NO_EMPTY_MODEL; return V_; }
-const MatrixXd& Linear::Vinv() const {
-    NO_EMPTY_MODEL;
-    if (not V_inv_)
-        V_inv_ = std::make_shared<MatrixXd>(V_.fullPivHouseholderQr().inverse().selfadjointView<Lower>());
-    return *V_inv_;
-}
+const MatrixXd& Linear::Vinv() const { NO_EMPTY_MODEL; return V_inv_; }
 const MatrixXd& Linear::VcholL() const {
     NO_EMPTY_MODEL;
     if (not V_chol_L_)
-        V_chol_L_ = std::make_shared<MatrixXd>(V_.selfadjointView<Lower>().llt().matrixL());
+        V_chol_L_ = std::make_shared<MatrixXd>(VinvCholL().fullPivHouseholderQr().inverse());
     return *V_chol_L_;
 }
-const MatrixXd& Linear::VcholLinv() const {
+const MatrixXd& Linear::VinvCholL() const {
     NO_EMPTY_MODEL;
-    if (not V_chol_L_inv_)
-        V_chol_L_inv_ = std::make_shared<MatrixXd>(VcholL().fullPivHouseholderQr().inverse());
-    return *V_chol_L_inv_;
+    if (not V_inv_chol_L_)
+        V_inv_chol_L_ = std::make_shared<MatrixXd>(V_inv_.llt().matrixL());
+    return *V_inv_chol_L_;
 }
 
 const bool& Linear::noninformative() const { NO_EMPTY_MODEL; return noninformative_; }
@@ -199,7 +191,7 @@ Linear::operator std::string() const {
         }
         summary <<
             "\n  beta = " << beta_.transpose().format(IOFormat(StreamPrecision, 0, ", ")) <<
-            "\n  V = " << V_.format(IOFormat(6, 0, " ", "\n      ")) << "\n";
+            "\n  V = " << V_inv_.fullPivHouseholderQr().inverse().format(IOFormat(6, 0, " ", "\n      ")) << "\n";
     }
     return summary.str();
 }
@@ -257,19 +249,18 @@ void Linear::updateInPlace(const Ref<const VectorXd> &y, const Ref<const MatrixX
             MatrixXd XtX = noninf_X_->transpose() * *noninf_X_;
             auto qr = XtX.fullPivHouseholderQr();
             if (qr.rank() >= K()) {
-                V_ = qr.inverse().selfadjointView<Lower>();
-                V_inv_.reset(new MatrixXd(
+                beta_ = qr.solve(noninf_X_->transpose() * *noninf_y_);
 #ifdef EIGEN_HAVE_RVALUE_REFERENCES
-                        std::move
+                V_inv_ = std::move(XtX);
+#else
+                V_inv_ = XtX;
 #endif
-                        (XtX)));
-                beta_ = V_ * (noninf_X_->transpose() * *noninf_y_);
-                n_ = X.rows();
-                s2_ = (*noninf_y_ - *noninf_X_ * beta_).squaredNorm() / (n_ - K());
+                n_ = noninf_X_->rows();
+                s2_ = (*noninf_y_ - *noninf_X_ * beta_).squaredNorm() / n_;
     
-                // These are unlikely to be set, but just in case:
+                // These are unlikely to be set since this model was noninformative, but just in case:
                 if (V_chol_L_) V_chol_L_.reset();
-                if (V_chol_L_inv_) V_chol_L_inv_.reset(); 
+                if (V_inv_chol_L_) V_inv_chol_L_.reset(); 
 
                 noninf_X_.reset();
                 noninf_y_.reset();
@@ -285,34 +276,40 @@ void Linear::updateInPlace(const Ref<const VectorXd> &y, const Ref<const MatrixX
 
 void Linear::updateInPlaceInformative(const Ref<const VectorXd> &y, const Ref<const MatrixXd> &X) {
     MatrixXd Xt = X.transpose();
-    MatrixXd XtX = Xt * X;
 
-    // We need the inverse of (V^{-1} + X^\top X) for V_post, but store the value in a shared
-    // pointer before inverting because there's a good chance that the next object will need the
-    // inverse of the inverse, i.e. by calling its own Vinv()--so, by storing the intermediate value
-    // before the inverse, we may be able to avoid inverting an inverse later: so in such a case we
-    // save time *and* avoid the numerical precision loss from taking an extra inverse.
-    auto V_post_inv = std::make_shared<MatrixXd>(Vinv() + XtX);
-    V_ = V_post_inv->fullPivHouseholderQr().inverse();
-    VectorXd beta_post(V_ * (Vinv() * beta_ + Xt * y));
+    // betanew = Vnew (Vold^{-1}*betaold + X'y), but we don't want to actually do a matrix inverse,
+    // so calculate the inside first (this is essentially the X'y term for the entire data)
+    VectorXd inside = V_inv_ * beta_ + Xt * y;
+
+    // New V^{-1} is just the old one plus the new data X'X:
+    MatrixXd V_inv_post = V_inv_ + Xt * X;
+
+    // Now get new beta:
+    VectorXd beta_post(V_inv_post.fullPivHouseholderQr().solve(inside));
 
     double n_prior = n_;
     n_ += X.rows();
 
+    // Now calculate the residuals for the new data:
     VectorXd residualspost = y - X * beta_post;
+
+    // And get the difference between new and old beta:
     VectorXd beta_diff = beta_post - beta_;
-    s2_ = (n_prior * s2_ + residualspost.squaredNorm() + beta_diff.transpose() * Vinv() * beta_diff) / n_;
-    beta_ =
+
+    // Calculate new s2 from previous s2, SSR of new data, and change resulting from beta changing:
+    s2_ = (n_prior * s2_ + residualspost.squaredNorm() + beta_diff.transpose() * V_inv_ * beta_diff) / n_;
+
 #ifdef EIGEN_HAVE_RVALUE_REFERENCES
-        std::move(beta_post);
+    beta_ = std::move(beta_post);
+    V_inv_ = std::move(V_inv_post);
 #else
-        beta_post;
+    beta_ = beta_post;
+    V_inv_ = V_inv_post;
 #endif
 
-    V_inv_ = std::move(V_post_inv);
-    // The decompositions will have to be recalculated:
+    // The decompositions will have to be recalculated, if set:
     if (V_chol_L_) V_chol_L_.reset();
-    if (V_chol_L_inv_) V_chol_L_inv_.reset(); 
+    if (V_inv_chol_L_) V_inv_chol_L_.reset(); 
 }
 
 Linear Linear::weaken(const double stdev_scale) const & {
@@ -344,34 +341,22 @@ void Linear::weakenInPlace(const double stdev_scale) {
         return;
     }
 
-    const double var_scale = stdev_scale*stdev_scale;
+    // scale V^{-1} appropriately
+    V_inv_ /= stdev_scale*stdev_scale;
 
-    // If V_inv_ is set, scale it (because this is much cheaper than inverting the scaled V_ later)
-    if (V_inv_) {
-        // If we're the unique owner of the inverse matrix, scale it directly
-        if (V_inv_.unique())
-            *V_inv_ /= var_scale;
-        // Otherwise we have to make a copy (because we don't want to change the original!)
-        else
-            V_inv_ = std::make_shared<Eigen::MatrixXd>(*V_inv_ / var_scale);
-    }
-
-    // Likewise for the Cholesky decomposition (and its inverse)
+    // Likewise for the Cholesky decomposition (and its inverse), if set
     if (V_chol_L_) {
         if (V_chol_L_.unique())
             *V_chol_L_ *= stdev_scale;
         else
             V_chol_L_.reset(new Eigen::MatrixXd(*V_chol_L_ * stdev_scale));
     }
-    if (V_chol_L_inv_) {
-        if (V_chol_L_inv_.unique())
-            *V_chol_L_inv_ /= stdev_scale;
+    if (V_inv_chol_L_) {
+        if (V_inv_chol_L_.unique())
+            *V_inv_chol_L_ /= stdev_scale;
         else
-            V_chol_L_inv_.reset(new Eigen::MatrixXd(*V_chol_L_inv_ / stdev_scale));
+            V_inv_chol_L_.reset(new Eigen::MatrixXd(*V_inv_chol_L_ / stdev_scale));
     }
-
-    // And of course V gets scaled
-    V_ *= var_scale;
 
     return;
 }

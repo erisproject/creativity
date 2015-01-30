@@ -648,7 +648,7 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
     if (belief.K > 0) {
         r.profit = belief.noninformative
             ? Profit(belief.K, belief.noninf_X, belief.noninf_y)
-            : Profit(belief.beta, belief.s2, belief.V, belief.n);
+            : Profit(belief.beta, belief.s2, belief.Vinv, belief.n);
         r.profit.draw_rejection_success = belief.draw_success_cumulative;
         r.profit.draw_rejection_discards = belief.draw_discards_cumulative;
     }
@@ -657,7 +657,7 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
     if (belief.K > 0) {
         r.profit_extrap = belief.noninformative
             ? Profit(belief.K, belief.noninf_X, belief.noninf_y)
-            : Profit(belief.beta, belief.s2, belief.V, belief.n);
+            : Profit(belief.beta, belief.s2, belief.Vinv, belief.n);
         r.profit_extrap.draw_rejection_success = belief.draw_success_cumulative;
         r.profit_extrap.draw_rejection_discards = belief.draw_discards_cumulative;
     }
@@ -666,7 +666,7 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
     if (belief.K > 0) {
         r.demand = belief.noninformative
             ? Demand(belief.K, belief.noninf_X, belief.noninf_y)
-            : Demand(belief.beta, belief.s2, belief.V, belief.n);
+            : Demand(belief.beta, belief.s2, belief.Vinv, belief.n);
         r.demand.draw_rejection_success = belief.draw_success_cumulative;
         r.demand.draw_rejection_discards = belief.draw_discards_cumulative;
     }
@@ -675,7 +675,7 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
     if (belief.K > 0)
         r.quality = belief.noninformative
             ? Quality(belief.K, belief.noninf_X, belief.noninf_y)
-            : Quality(belief.beta, belief.s2, belief.V, belief.n);
+            : Quality(belief.beta, belief.s2, belief.Vinv, belief.n);
 
     auto pstream_locs = read_u32();
     for (uint32_t i = 0; i < pstream_locs; i++) {
@@ -684,7 +684,7 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
         else if (r.profit_stream.count(belief.K)) throwParseError("found duplicate K value in profit_stream beliefs");
         r.profit_stream.emplace((unsigned int) belief.beta.rows(), belief.noninformative
                 ? ProfitStream(belief.K, belief.noninf_X, belief.noninf_y)
-                : ProfitStream(belief.beta, belief.s2, belief.V, belief.n));
+                : ProfitStream(belief.beta, belief.s2, belief.Vinv, belief.n));
     }
 
     return pair;
@@ -730,12 +730,12 @@ FileStorage::belief_data FileStorage::readBelief() const {
         belief.n = read_dbl();
 
         // Then K*(K+1)/2 V values (but we set them symmetrically in V)
-        belief.V = MatrixXd(k, k);
+        belief.Vinv = MatrixXd(k, k);
         for (unsigned int r = 0; r < belief.K; r++) {
             for (unsigned int c = 0; c <= r; c++) {
                 double cov = read_dbl();
-                belief.V(r,c) = cov;
-                if (c != r) belief.V(c,r) = cov;
+                belief.Vinv(r,c) = cov;
+                if (c != r) belief.Vinv(c,r) = cov;
             }
         }
 
@@ -751,6 +751,7 @@ FileStorage::belief_data FileStorage::readBelief() const {
         // rows worth of independent data follow (i.e. r*K values follow).
         uint32_t noninf_rows = read_u32();
         belief.noninf_X = MatrixXdR(noninf_rows, k);
+        belief.noninf_y = VectorXd(noninf_rows);
         for (uint32_t i = 0; i < noninf_rows; i++) for (unsigned int j = 0; j < belief.K; j++) {
             belief.noninf_X(i, j) = read_dbl();
         }
@@ -868,11 +869,11 @@ void FileStorage::writeBelief(const Linear &m) {
         write_dbl(m.s2());
         write_dbl(m.n());
 
-        auto &V = m.V();
+        auto &Vinv = m.Vinv();
         // The last k*(k+1)/2 are the lower triangle of the V matrix, in row major order
         for (unsigned int r = 0; r < k; r++) {
             for (unsigned int c = 0; c <= r; c++) {
-                write_dbl(V(r,c));
+                write_dbl(Vinv(r,c));
             }
         }
 

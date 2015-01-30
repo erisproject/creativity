@@ -166,7 +166,7 @@ void LinearRestricted::gibbsInitialize(const Ref<const VectorXd> &initial, unsig
 
     gibbs_draws_ = 0;
 
-    const MatrixXd &A = VcholLinv();
+    const MatrixXd &A = VinvCholL();
     auto &rng = Random::rng();
 
     if (restrict_size_ == 0) {
