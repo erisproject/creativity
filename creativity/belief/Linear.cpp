@@ -95,11 +95,41 @@ void Linear::names(const std::vector<std::string> &names) {
     beta_names_default_ = false;
 }
 
-double Linear::predict(const Ref<const RowVectorXd> &Xi) {
-    NO_EMPTY_MODEL;
+double Linear::predict(const Eigen::Ref<const Eigen::RowVectorXd> &Xi, unsigned int draws) {
     if (noninformative_)
-        throw std::logic_error("Cannot call predict() on noninformative model");
-    return Xi * beta_;
+        throw std::logic_error("Cannot call predict() on a noninformative model");
+
+    if (draws == 0) draws = mean_beta_draws_ > 0 ? mean_beta_draws_ : 1000;
+
+    // If fewer draws were requested, we need to start over
+    if (draws < mean_beta_draws_)  {
+        mean_beta_draws_ = 0;
+    }
+
+    if (draws > mean_beta_draws_) {
+        // First sum up new draws to make up the difference:
+        VectorXd new_beta = VectorXd::Zero(K_);
+        for (long i = mean_beta_draws_; i < draws; i++) {
+            new_beta += draw().head(K_);
+        }
+        // Turn into a mean:
+        new_beta /= draws;
+
+        // If we had no draws at all before, just use the new vector
+        if (mean_beta_draws_ == 0) {
+            mean_beta_.swap(new_beta);
+        }
+        else {
+            // Otherwise we need to combine means by calculating a weighted mean of the two means,
+            // weighted by each mean's proportion of draws:
+            double w_existing = (double) mean_beta_draws_ / draws;
+            mean_beta_ = w_existing * mean_beta_ + (1 - w_existing) * new_beta;
+        }
+
+        mean_beta_draws_ = draws;
+    }
+
+    return Xi * mean_beta_;
 }
 
 const VectorXd& Linear::draw() {
@@ -161,14 +191,18 @@ const VectorXd& Linear::lastDraw() const {
 
 void Linear::discard(unsigned int) {
     NO_EMPTY_MODEL;
-    // Default implementation is a no-op since the default draw() distributions are already
-    // independent.
+    // We don't have to actually call draw(), since the default implementation doesn't need a
+    // burn-in.
+
+    mean_beta_draws_ = 0;
 }
 
 void Linear::discardForce(unsigned int burn) {
     NO_EMPTY_MODEL;
     for (unsigned int i = 0; i < burn; i++)
         draw();
+
+    mean_beta_draws_ = 0;
 }
 
 std::ostream& operator<<(std::ostream &os, const Linear &b) {
@@ -379,6 +413,7 @@ const VectorXd& Linear::noninfYData() const {
 
 void Linear::reset() {
     if (last_draw_.size() > 0) last_draw_.resize(0);
+    mean_beta_draws_ = 0;
 }
 
 Linear::draw_failure::draw_failure(const std::string &what) : std::runtime_error(what) {}

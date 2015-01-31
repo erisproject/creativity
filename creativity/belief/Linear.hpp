@@ -203,16 +203,42 @@ class Linear {
         const Eigen::VectorXd& noninfYData() const;
 
         /** Given a row vector of values \f$X^*\f$, predicts \f$y^*\f$ using the current model
-         * values.  The default implementation provided by this class simply returns the mean \f$X^*
-         * \beta\f$ (the mean of the multivariate \f$t\f$ density for an unrestricted, natural
-         * conjugate prior); subclasses may override, particularly for models with restrictions or
-         * other model parameter distribution assumptions where the parameter means may have
-         * differences from the restricted distribution means due to the restrictions.
+         * values by calling `draw()` the requested number of times, averaging the results, and
+         * returning Xi times the average beta.
          *
+         * The average beta value is cached and reused, when possible.  In particular, if the
+         * currently cached beta means contains the requested number of draws, it is reused as is;
+         * if the current cached beta means is less than the requested number, new draws are
+         * performed to make up the difference; otherwise, if the requested draws is smaller than
+         * the current value, an entirely new set of draws is obtained.
+         *
+         * As a consequence, `double y1 = predict(X, 1000); double y2 = predict(X, 1000)` will
+         * return the same predicted values of y, but `double y1 = predict(X, 1000); predict(X, 1);
+         * double y2 = predict(X, 1000)` will typically produce entirely different values of `y1`
+         * and `y2`.
+         *
+         * The cached mean beta value can be implicitly reset by calling predict with a smaller
+         * value (as above), or explicitly reset by calling discard().
+         *
+         * If `draws` is passed with a value of 0 (the default), the most recent draw is reused; if
+         * no draws have previously been done, this is equivalent to calling the method with
+         * draws=1000.
+         *
+         * \throws std::logic_error if attempting to call predict() on an empty or noninformative
+         * model.  (Such a model has no useful parameters).
+         *
+         * \param Xi the data row
+         * \param draws the number of draws to take (or reuse).  See description above.
          * \throws std::logic_error if attempting to call predict() on an empty or noninformative
          * model.
          */
-        virtual double predict(const Eigen::Ref<const Eigen::RowVectorXd> &Xi);
+        virtual double predict(const Eigen::Ref<const Eigen::RowVectorXd> &Xi, unsigned int draws = 0);
+
+        /** This method explicitly discards any previously obtained mean of beta draws, as used by
+         * predict.  The next predict() call after a call to this method will always perform new
+         * draws.
+         */
+        void discard();
 
         /** Draws a vector of \f$\beta\f$ values and \f$h^{-1} = \sigma^2\f$ values distributed
          * according to the model's parameters.  The first `K()` values are the drawn \f$\beta\f$
@@ -270,13 +296,6 @@ class Linear {
          * last call to draw().  If draw() has not yet been called, the vector will be empty.
          */
         const Eigen::VectorXd& lastDraw() const;
-
-        /** This method performs burn-in draws for subclasses that need such a burn-in period.
-         * Since the default draw() implementation of this class returns independent draws, the
-         * default implementation of this method does nothing; subclasses overriding draw() should
-         * also consider overriding this method.
-         */
-        virtual void discard(unsigned int burn);
 
         /** The number of parameters of the model, or 0 if this is not a valid model (i.e. a
          * default-constructed model).
@@ -401,7 +420,8 @@ class Linear {
          * when creating a new updated or weakened object), after the new object's various
          * parameters (beta_, n_, etc.) have been updated.
          *
-         * The default base implementation clears the last draw value (as returned by draw() and lastDraw()).
+         * The default base implementation clears the last draw value (as returned by draw() and lastDraw()),
+         * and clears the mean beta draws (as used by predict()).
          */
         virtual void reset();
 
@@ -410,13 +430,6 @@ class Linear {
          * in this class does nothing.
          */
         virtual void verifyParameters() const;
-
-        /** This method calls draw() the given number of times, discarding the results.  Unlike
-         * discard(), this always calls draw(), while discard() is meant to only call draw() when
-         * needed (i.e. when draws are not independent).  This method should generally not be called
-         * directly, but instead invoked by subclasses in overridden discard() methods.
-         */
-        virtual void discardForce(unsigned int burn);
 
         /// The column vector prior of coefficient means
         Eigen::VectorXd beta_;
@@ -462,6 +475,15 @@ class Linear {
          * produced by the draw() method.  Will be an empty vector before the first call to draw().
          */
         Eigen::VectorXd last_draw_;
+
+        /** The cache of drawn beta vectors used for prediction.  Must not be used if
+         * mean_beta_draws_ is 0.
+         */
+        Eigen::VectorXd mean_beta_;
+
+        /// The number of beta draws used to calculate mean_beta_
+        unsigned long mean_beta_draws_ = 0;
+
 
     private:
         // Checks that the given matrices conform; called during construction; throws on error.

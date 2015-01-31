@@ -88,19 +88,8 @@ void LinearRestricted::removeRestriction(size_t r) {
     --restrict_size_;
 }
 
-void LinearRestricted::discard(unsigned int burn) {
-    Linear::discard(burn); // Pass it up (mainly for the no-empty-model check)
-    mean_beta_draws_ = 0; // Reset the number of beta draws so that the next predict() redraws
-}
-
-void LinearRestricted::discardForce(unsigned int burn) {
-    Linear::discardForce(burn);
-    mean_beta_draws_ = 0;
-}
-
 void LinearRestricted::reset() {
     Linear::reset();
-    mean_beta_draws_ = 0;
     draw_rejection_discards_last = 0;
     draw_rejection_discards = 0;
     draw_rejection_success = 0;
@@ -388,40 +377,6 @@ const VectorXd& LinearRestricted::drawRejection(long max_discards) {
     ++draw_rejection_success;
 
     return last_draw_;
-}
-
-double LinearRestricted::predict(const Eigen::Ref<const Eigen::RowVectorXd> &Xi) {
-    return predict(Xi, 1000);
-}
-
-double LinearRestricted::predict(const Eigen::Ref<const Eigen::RowVectorXd> &Xi, long min_draws) {
-    if (noninformative_)
-        throw std::logic_error("Cannot call predict() on noninformative model");
-
-    if (min_draws > mean_beta_draws_) {
-        // First sum up new draws to make up the difference:
-        VectorXd new_beta = VectorXd::Zero(K_);
-        for (long i = mean_beta_draws_; i < min_draws; i++) {
-            new_beta += draw().head(K_);
-        }
-        // Turn into a mean:
-        new_beta /= min_draws;
-
-        // If we had no draws at all before, just use the new vector
-        if (mean_beta_draws_ == 0) {
-            mean_beta_.swap(new_beta);
-        }
-        else {
-            // Otherwise we need to combine means by calculating a weighted mean of the two means,
-            // weighted by each mean's proportion of draws:
-            double w_existing = (double) mean_beta_draws_ / min_draws;
-            mean_beta_ = w_existing * mean_beta_ + (1 - w_existing) * new_beta;
-        }
-
-        mean_beta_draws_ = min_draws;
-    }
-
-    return Xi * mean_beta_;
 }
 
 bool LinearRestricted::hasRestriction(size_t k, bool upper) const {

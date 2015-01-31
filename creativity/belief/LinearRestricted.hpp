@@ -194,15 +194,6 @@ class LinearRestricted : public Linear {
         /** Clears the restriction stored as row `r` of R(). */
         void removeRestriction(size_t r);
 
-        /** Overridden to reset the cached value of mean beta draws.  Since draws produced by this
-         * class are independent, this does not actually perform any draws.
-         *
-         * Calling discard(0) will perform no actual burn-in (even for subclasses that might
-         * override to provide a burn-in), but will ensure that the next predict() call is based on
-         * a fresh set of beta draws (instead of reusing the results of previous predict() draws).
-         */
-        virtual void discard(unsigned int burn) override;
-
         /** The different draw modes supported by the `draw_mode` parameter and the `draw(mode)`
          * method.
          */
@@ -624,31 +615,6 @@ class LinearRestricted : public Linear {
          */
         virtual const Eigen::VectorXd& drawRejection(long max_discards = -1);
 
-        /** Predicts using this model using the beta values from at least 1000 draws.
-         *
-         * The mean of the drawn beta values are cached and will be reused by the next call to
-         * draw() unless discard() is called between calls to draw.
-         *
-         * This method simply calls `predict(Xi, 1000)`.
-         */
-        virtual double predict(const Eigen::Ref<const Eigen::RowVectorXd> &Xi) override;
-
-        /** Predicts using this model using at least the given number of beta values.
-         *
-         * If the currently cached beta means contains fewer than the requested number of draws, it
-         * is updated with new draws before being used.  If a previous predict() call specified a
-         * larger number of draws, the beta means from the larger number of draws is used.
-         *
-         * As a consequence, `double y1 = predict(X, 1000); double y2 = predict(X, 1000)` will
-         * return the same predictions, but `double y1 = predict(X, 1000); predict(X, 2000); double
-         * y2 = predict(X, 1000)` could produce different values of `y1` and `y2`.
-         *
-         * \throws std::logic_error if attempting to call predict() on an empty or noninformative
-         * model.  (Because of the large s2 and small n values, draws would be highly random and in
-         * no way useful for prediction).
-         */
-        virtual double predict(const Eigen::Ref<const Eigen::RowVectorXd> &Xi, long min_draws);
-
         int draw_rejection_discards_last = 0, ///< Tracks the number of inadmissable draws by the most recent call to drawRejection()
             draw_rejection_success = 0, ///< The cumulative number of successful rejection draws
             draw_rejection_discards = 0, ///< The cumulative number of inadmissable rejection draws
@@ -680,9 +646,6 @@ class LinearRestricted : public Linear {
          * restriction, in addition to the `Linear` cases (updating and weakening).
          */
         virtual void reset() override;
-
-        /** Overridden to also reset mean_beta_draws_ to 0 (to force predict() value redrawing). */
-        virtual void discardForce(unsigned int burn) override;
 
         /** Proxy object that converts assignments into restriction rows on the associated
          * LinearRestricted model.
@@ -818,14 +781,6 @@ class LinearRestricted : public Linear {
         /** Called to ensure the above are set and have (at least) the required number of rows free
          * (beginning at row `restrict_linear_size_`). */
         void allocateRestrictions(size_t more);
-
-        /** The cache of drawn beta vectors used for prediction.  Must not be used if
-         * mean_beta_draws_ is 0.
-         */
-        Eigen::VectorXd mean_beta_;
-
-        /// The number of beta draws used to calculate mean_beta_
-        long mean_beta_draws_ = 0;
 
         CREATIVITY_LINEAR_DERIVED_COMMON_METHODS(LinearRestricted)
 
