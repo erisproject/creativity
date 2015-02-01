@@ -647,7 +647,7 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
     belief_data belief = readBelief();
     if (belief.K > 0) {
         r.profit = belief.noninformative
-            ? Profit(belief.K, belief.noninf_X, belief.noninf_y)
+            ? Profit(belief.K)
             : Profit(belief.beta, belief.s2, belief.Vinv, belief.n);
         r.profit.draw_rejection_success = belief.draw_success_cumulative;
         r.profit.draw_rejection_discards = belief.draw_discards_cumulative;
@@ -656,7 +656,7 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
     belief = readBelief();
     if (belief.K > 0) {
         r.profit_extrap = belief.noninformative
-            ? Profit(belief.K, belief.noninf_X, belief.noninf_y)
+            ? Profit(belief.K)
             : Profit(belief.beta, belief.s2, belief.Vinv, belief.n);
         r.profit_extrap.draw_rejection_success = belief.draw_success_cumulative;
         r.profit_extrap.draw_rejection_discards = belief.draw_discards_cumulative;
@@ -665,7 +665,7 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
     belief = readBelief();
     if (belief.K > 0) {
         r.demand = belief.noninformative
-            ? Demand(belief.K, belief.noninf_X, belief.noninf_y)
+            ? Demand(belief.K)
             : Demand(belief.beta, belief.s2, belief.Vinv, belief.n);
         r.demand.draw_rejection_success = belief.draw_success_cumulative;
         r.demand.draw_rejection_discards = belief.draw_discards_cumulative;
@@ -674,7 +674,7 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
     belief = readBelief();
     if (belief.K > 0)
         r.quality = belief.noninformative
-            ? Quality(belief.K, belief.noninf_X, belief.noninf_y)
+            ? Quality(belief.K)
             : Quality(belief.beta, belief.s2, belief.Vinv, belief.n);
 
     auto pstream_locs = read_u32();
@@ -683,7 +683,7 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
         if (belief.K == 0) throwParseError("found illegal profitStream belief with K = 0 (i.e. default constructed model)");
         else if (r.profit_stream.count(belief.K)) throwParseError("found duplicate K value in profit_stream beliefs");
         r.profit_stream.emplace((unsigned int) belief.beta.rows(), belief.noninformative
-                ? ProfitStream(belief.K, belief.noninf_X, belief.noninf_y)
+                ? ProfitStream(belief.K)
                 : ProfitStream(belief.beta, belief.s2, belief.Vinv, belief.n));
     }
 
@@ -745,18 +745,6 @@ FileStorage::belief_data FileStorage::readBelief() const {
             belief.draw_discards_cumulative = read_u32();
             belief.draw_gibbs = last_draw_was_gibbs;
         }
-    }
-    else {
-        // If the model was not fully informative, we immediately get a value r < K telling us how many
-        // rows worth of independent data follow (i.e. r*K values follow).
-        uint32_t noninf_rows = read_u32();
-        belief.noninf_X = MatrixXdR(noninf_rows, k);
-        belief.noninf_y = VectorXd(noninf_rows);
-        for (uint32_t i = 0; i < noninf_rows; i++) for (unsigned int j = 0; j < belief.K; j++) {
-            belief.noninf_X(i, j) = read_dbl();
-        }
-        for (uint32_t i = 0; i < noninf_rows; i++)
-            belief.noninf_y(i) = read_dbl();
     }
 
     return belief;
@@ -882,22 +870,11 @@ void FileStorage::writeBelief(const Linear &m) {
             write_u32(lr->draw_rejection_discards);
         }
     }
-    else {
-        const auto &noninf_X = m.noninfXData();
-        const auto &noninf_y = m.noninfYData();
-        write_u32(noninf_X.rows());
-        for (int i = 0; i < noninf_X.rows(); i++) for (unsigned j = 0; j < k; j++) {
-            write_dbl(noninf_X(i,j));
-        }
-        for (int i = 0; i < noninf_y.rows(); i++)
-            write_dbl(noninf_y(i));
-    }
 
     FILESTORAGE_DEBUG_WRITE_CHECK(
             2 + (
                 m.noninformative()
-                ? (4 + 8*(m.noninfXData().rows()*(k+1)))
-                : (8*(2+k+k*(k+1)/2) + (restricted_model ? 4*2 : 0))
+                ? 0 : (8*(2+k+k*(k+1)/2) + (restricted_model ? 4*2 : 0))
                 )
             );
 }

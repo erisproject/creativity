@@ -479,7 +479,9 @@ class FileStorage final : public StorageBackend {
          * stored in the locations referenced in the dedicated reader library section at the
          * beginning of the file.
          *
-         * BELIEF is a set of belief data, as handled by readBelief(int64_t).
+         * BELIEF is a set of belief data, as handled by readBelief(int64_t).  profit extrapolated
+         * belief is set to a belief only if it differs from profit_belief; otherwise it is simply
+         * set to a no-data, noninformative belief record (and shouldn't be used).
          *
          * profit stream beliefs may not be placeholder beliefs (i.e. default constructed objects);
          * such objects should simply be omitted when writing the data.  Each profit stream belief K
@@ -493,13 +495,11 @@ class FileStorage final : public StorageBackend {
         /// Structure holding parsed belief data
         typedef struct {
             uint32_t K; ///< Number of parameters; K=0 for a default constructed (invalid) model (the remaining values will be uninitialized)
-            bool noninformative; ///< True if this is a noninformative model (in which only noninf_X and noninf_y are set)
+            bool noninformative; ///< True if this is a noninformative model (in which case the following are not set)
             Eigen::VectorXd beta; ///< belief::Linear beta vector
             double s2; ///< belief::Linear s2 value
             double n; ///< belief::Linear n value
             Eigen::MatrixXd Vinv; ///< belief::Linear Vinv matrix
-            belief::MatrixXdR noninf_X; ///< belief::Linear noninfXData() matrix
-            Eigen::VectorXd noninf_y; ///< belief::Linear noninfYData() vector
             bool draw_gibbs; ///< If true, the last draw from this belief used Gibbs sampling (false = no draws, or rejection sampling)
             uint32_t draw_success_cumulative, ///< For a restricted belief, the number of successful draws
                      draw_discards_cumulative; ///< For a restricted belief, the number of discarded draws
@@ -513,7 +513,7 @@ class FileStorage final : public StorageBackend {
          *
          *     i8       K, the number of model parameters
          *     u8       status bits (described below)
-         * then either (if noninformative bit not set):
+         * then (if noninformative bit not set):
          *     dbl*K    beta vector (K values)
          *     dbl      s2
          *     dbl      n
@@ -523,11 +523,6 @@ class FileStorage final : public StorageBackend {
          *              models)
          *     u32      the cumulative discarded LinearRestricted draws (only for LinearRestricted
          *              models)
-         * or (non-informative):
-         *     u32      r, the number of noninformative rows (for partially-informed models), which
-         *              could be 0 (for an entirely noninformative model with no data).
-         *     dbl*r*K  the X data (for partially-informed models)
-         *     dbl*r    the y data (for partially-informed models)
          *
          * The K value has the following interpretations: if in [1,120], the model has this number of
          * parameters, and is not a completely noninformative model.  If -128, the model object is
