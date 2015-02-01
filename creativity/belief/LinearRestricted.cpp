@@ -244,6 +244,8 @@ const VectorXd& LinearRestricted::drawGibbs() {
     // but having the median avoids potential extra cdf calls below.
     if (std::isnan(chisq_n_median_) and restrict_size_ > 0) chisq_n_median_ = median(chisq_dist);
 
+    int draw_failures = 0;
+
     for (int t = 0; t < num_draws; t++) { // num_draws > 1 if thinning or burning in
 
         // First take a sigma^2 draw that agrees with the previous z draw
@@ -257,92 +259,84 @@ const VectorXd& LinearRestricted::drawGibbs() {
             // gibbsInitialize() and draw an admissable sigma^2 value from the range of values that
             // wouldn't have caused a constraint violation had we used it to form beta = beta_ +
             // sigma*s*Ainv*z.  (See the method documentation for thorough details)
-            double sigma_l = 0, sigma_u = INFINITY;
-            for (size_t i = 0; i < restrict_size_; i++) {
-                double denom = D.row(i) * z;
-                if (denom == 0) {
-                    // This means our z draw was exactly parallel to the restriction line--in which
-                    // case, any amount of scaling will not violate the restriction (since we
-                    // already know Z satisfies this restriction), so we don't need to do anything.
-                    // (This case seems extremely unlikely, but just in case).
-                    continue;
-                }
-                double limit = r_minus_Rbeta_[i] / denom;
 
-                if (denom > 0) {
-                    if (limit < sigma_u) sigma_u = limit;
-                }
-                else {
-                    if (limit > sigma_l) sigma_l = limit;
-                }
-            }
+            auto range = sigmaRange(z);
 
-#ifdef ERIS_DEBUG
+            // If we get a draw failure here, redrawing won't help (because the draw failure is
+            // caused by the betas), but we can try to restart at the previous beta draw, which
+            // might help.
             try {
-#endif
+                sigma = std::sqrt(n_ / truncDist(chisq_dist, chisq, n_ / (range.second*range.second), n_ / (range.first*range.first), chisq_n_median_, 0.05, 10));
+            }
+            catch (const draw_failure &df) {
+                if (gibbs_2nd_last_z_) {
+                    range = sigmaRange(*gibbs_2nd_last_z_);
+
+                    // Don't catch this one if it fails again (in that case, there's nothing we can
+                    // do)
+                    sigma = std::sqrt(n_ / truncDist(chisq_dist, chisq, n_ / (range.second*range.second), n_ / (range.first*range.first), chisq_n_median_, 0.05, 10));
+                }
+                else
+                    throw; // Don't have a previous beta to save us, so just rethrow the exception
+            }
 
             // We want sigma s.t. beta_ + sigma * (s * A) * z has the right distribution for a
             // multivariate t, which is sigma ~ sqrt(n_ / chisq(n_)), *but* truncated to [sigma_l,
             // sigma_u].  To accomplish that truncation for sigma, we need to truncate the chisq(n_)
             // to [n_/sigma_u^2, n/sigma_l^2].
-            sigma = std::sqrt(n_ / truncDist(chisq_dist, chisq, n_ / (sigma_u*sigma_u), n_ / (sigma_l*sigma_l), chisq_n_median_));
 
-#ifdef ERIS_DEBUG
-            }
-            catch (draw_failure &f) {
-                throw draw_failure(f.what(), *this);
-            }
-#endif
         }
 
         s_sigma = sigma*s;
 
-        for (unsigned int j = 0; j < K_; j++) {
-            // Temporarily set the coefficient to 0, so that we don't have to maintain a bunch of
-            // one-column-removed vectors and matrices below
-            z[j] = 0.0;
+        try {
+            for (unsigned int j = 0; j < K_; j++) {
+                // Temporarily set the coefficient to 0, so that we don't have to maintain a bunch of
+                // one-column-removed vectors and matrices below
+                z[j] = 0.0;
 
-            // Figure out l_j and u_j, the most binding constraints on z_j
-            double lj = -INFINITY, uj = INFINITY;
-            for (size_t r = 0; r < restrict_size_; r++) {
-                // NB: not calculating the whole LHS vector and RHS vector at once, because there's
-                // a good chance of 0's in the LHS vector, in which case we don't need to bother
-                // calculting the RHS at all
-                auto &dj = D(r, j);
-                if (dj != 0) {
-                    // Take the other z's as given, find the range for this one
-                    double constraint = (r_minus_Rbeta_[r] / sigma - (D.row(r) * z)) / dj;
-                    if (dj > 0) { // <= constraint (we didn't flip the sign by dividing by dj)
-                        if (constraint < uj) uj = constraint;
-                    }
-                    else { // >= constraint
-                        if (constraint > lj) lj = constraint;
+                // Figure out l_j and u_j, the most binding constraints on z_j
+                double lj = -INFINITY, uj = INFINITY;
+                for (size_t r = 0; r < restrict_size_; r++) {
+                    // NB: not calculating the whole LHS vector and RHS vector at once, because there's
+                    // a good chance of 0's in the LHS vector, in which case we don't need to bother
+                    // calculting the RHS at all
+                    auto &dj = D(r, j);
+                    if (dj != 0) {
+                        // Take the other z's as given, find the range for this one
+                        double constraint = (r_minus_Rbeta_[r] / sigma - (D.row(r) * z)) / dj;
+                        if (dj > 0) { // <= constraint (we didn't flip the sign by dividing by dj)
+                            if (constraint < uj) uj = constraint;
+                        }
+                        else { // >= constraint
+                            if (constraint > lj) lj = constraint;
+                        }
                     }
                 }
+
+                // Now lj is the most-binding bottom constraint, uj is the most-binding upper
+                // constraint.  Make sure they aren't conflicting:
+                if (lj >= uj) throw draw_failure("drawGibbs(): found impossible-to-satisfy linear constraints", *this);
+
+                // Our new Z is a truncated standard normal (truncated by the bounds we just found)
+                z[j] = truncDist(stdnorm_dist, Random::stdnorm, lj, uj, 0.0);
             }
-
-            // Now lj is the most-binding bottom constraint, uj is the most-binding upper
-            // constraint.  Make sure they aren't conflicting:
-            if (lj >= uj) throw draw_failure("drawGibbs(): found impossible-to-satisfy linear constraints", *this);
-
-#ifdef ERIS_DEBUG
-            try {
-#endif
-
-            // Our new Z is a truncated standard normal (truncated by the bounds we just found)
-            z[j] = truncDist(stdnorm_dist, Random::stdnorm, lj, uj, 0.0);
-
-#ifdef ERIS_DEBUG
-            }
-            catch (draw_failure &f) {
-                throw draw_failure(f.what(), *this);
-            }
-#endif
+        }
+        catch (const draw_failure &df) {
+            draw_failures++;
+            // Allow up to `draw_gibbs_retry` consecutive failures
+            if (draw_failures > draw_gibbs_retry) throw;
+            // Retry:
+            t--;
+            continue;
         }
 
-        *gibbs_last_z_ = z;
+        // If we get here, we succeeded in the draw, hurray!
+        gibbs_2nd_last_z_ = gibbs_last_z_;
+        gibbs_last_z_.reset(new VectorXd(z));
         gibbs_last_sigma_ = sigma;
         gibbs_draws_++;
+        draw_failures = 0;
     }
 
     if (last_draw_.size() != K_ + 1) last_draw_.resize(K_ + 1);
@@ -351,6 +345,26 @@ const VectorXd& LinearRestricted::drawGibbs() {
     last_draw_[K_] = s_sigma * s_sigma;
 
     return last_draw_;
+}
+
+std::pair<double, double> LinearRestricted::sigmaRange(const Eigen::VectorXd &z) {
+    std::pair<double, double> range(0, INFINITY);
+    for (size_t i = 0; i < restrict_size_; i++) {
+        double denom = gibbs_D_->row(i) * z;
+        if (denom == 0) {
+            // This means our z draw was exactly parallel to the restriction line--in which
+            // case, any amount of scaling will not violate the restriction (since we
+            // already know Z satisfies this restriction), so we don't need to do anything.
+            // (This case seems extremely unlikely, but just in case).
+            continue;
+        }
+        double limit = (*gibbs_r_Rbeta_)[i] / denom;
+
+        if (denom > 0) { if (limit < range.second) range.second = limit; }
+        else { if (limit > range.first) range.first = limit; }
+    }
+
+    return range;
 }
 
 const VectorXd& LinearRestricted::drawRejection(long max_discards) {

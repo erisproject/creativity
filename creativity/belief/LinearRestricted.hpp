@@ -240,11 +240,20 @@ class LinearRestricted : public Linear {
          * Multivariate Normal with Application to Constrained Linear Regression," with
          * modifications as described below to draw from a truncated multivariate t instead.
          *
-         * The behaviour of drawGibbs() is affected by two parameters:
+         * The behaviour of drawGibbs() is affected by three parameters:
          * - `draw_gibbs_burnin` controls the number of burn-in draws to perform for the first
          *   drawGibbs() call
          * - `draw_gibbs_thinning` controls how many (internal) draws to skip between subsequent
          *   drawGibbs() draws.
+         * - `draw_gibbs_retry` controls how many consecutive beta draw failures are permitted.
+         *   Draw failures typically occur when a particularly extreme previous beta parameter or
+         *   sigma draw implies truncation ranges too far in one tail to handle; if such an error
+         *   occurs, this is the number of attempts to redraw (by discarding the current gibbs
+         *   iteration and resuming from the previous one) that will be done before giving up and
+         *   passing through the draw_failure exception.  Note that this is separate from sigma draw
+         *   failures: if sigma cannot be drawn using the current gibbs iteration beta values, we
+         *   try to draw using the previous iteration's beta values, and if that fails, give up (and
+         *   rethrow the draw_failure exception).
          *
          * \throws draw_failure if called on a model with no restrictions
          *
@@ -480,6 +489,24 @@ class LinearRestricted : public Linear {
          * median), 3 cdf calls will be used (either two cdfs and one cdf complement, or one cdf and
          * two complements).  If specified, exactly two cdf calls are used always.
          *
+         * \param invcdf_below specifies the cdf range below which the algorithm will draw by
+         * passing a random uniform value through the inverse cdf.  If the cdf range is above this
+         * value, this algorithm will use rejection sampling instead.  Warning: setting this to a
+         * very small value can result in a truncDist call drawing a very large number of values
+         * before returning.  The optimal value for this really depends on the distribution, and in
+         * particular, how quickly quantiles can be calculated from probabilities.  The default,
+         * 0.3, seems roughly appropriate for a normal distribution.  A chi squared distribution,
+         * which has expensive inverse cdf lookups, seems to have an optimal value of around 0.05.
+         *
+         * \param precdf_tries specifies that number of draws from the distribution that will be
+         * attempted before calculating cdf values.  When drawing random values is cheap compared to
+         * calculating cdfs, specifying this value can be very beneficial whenever the truncation
+         * range isn't too small.  The default is 0 (i.e. don't do pre-cdf calculation draws), which
+         * is suitable for a normal distribution or other distribution that has a relatively simple
+         * closed-form cdf calculation.  Setting this to a positive value can make a substantial
+         * difference for other distributions (such as chi-squared), when the truncation range isn't
+         * extremely small.
+         *
          * \returns a draw (of type `dist::value_type`) from the truncated distribution.
          *
          * \throws std::logic_error if called with min >= max
@@ -489,21 +516,21 @@ class LinearRestricted : public Linear {
          * though doubles can store subnormal values as small as 4.9e-324 with reduced numerical
          * precision).
          */
-#ifdef DOXYGEN_SHOULD_SEE_THIS
-        template <class DistType, class RNGType> static auto truncDist(
-                const DistType &dist,
-                RNGType &generator,
-                ResultType min,
-                ResultType max,
-                ResultType median = std::numeric_limits<ResultType>::signaling_NaN())
-#else
         template <class DistType, class RNGType, typename ResultType = typename DistType::value_type>
+#ifdef DOXYGEN_SHOULD_SEE_THIS
+        static ResultType truncDist(
+#else
         static auto truncDist(
+#endif
                 const DistType &dist,
                 RNGType &generator,
                 ResultType min,
                 ResultType max,
-                ResultType median = std::numeric_limits<ResultType>::signaling_NaN())
+                ResultType median = std::numeric_limits<ResultType>::signaling_NaN(),
+                double invcdf_below = 0.5,
+                unsigned int precdf_draws = 0
+                )
+#ifndef DOXYGEN_SHOULD_SEE_THIS
                 -> typename std::enable_if<
                                   // Check that DistType and RNGType operate on the same type of floating-point variable:
                                   std::is_same<typename DistType::value_type, typename RNGType::result_type>::value and
@@ -526,6 +553,11 @@ class LinearRestricted : public Linear {
                 return generator(eris::Random::rng());
             if (max <= dist_min or min >= dist_max)
                 throw draw_failure("truncDist() called with empty truncation range ([min,max] outside distribution support)");
+
+            for (unsigned int i = 0; i < precdf_draws; i++) {
+                double x = generator(eris::Random::rng());
+                if (x >= min and x <= max) return x;
+            }
 
             ResultType alpha, omega;
             bool alpha_comp, omega_comp;
@@ -570,24 +602,33 @@ class LinearRestricted : public Linear {
             // (alpha_comp and not omega_comp) is impossible, because that would mean 'min > max'
             // and we would have thrown an exception above.
 
-            if (alpha_comp) {
-                // Check for underflow (essentially: is 1-alpha equal to or closer to 0 than a ResultType
-                // (typically a double) can represent without reduced precision)
-                if (alpha == 0 or std::fpclassify(alpha) == FP_SUBNORMAL)
-                    throw draw_failure("truncDist(): Unable to draw from truncated distribution: truncation range is too far in the upper tail");
-
-                // Both alpha and omega are complements, so take a draw from [omega,alpha], then pass it
-                // through the quantile_complement
-                return quantile(complement(dist, std::uniform_real_distribution<ResultType>(omega, alpha)(eris::Random::rng())));
+            if (std::fabs(omega - alpha) >= invcdf_below) {
+                double x;
+                do {
+                    x = generator(eris::Random::rng());
+                } while (x < min or x > max);
+                return x;
             }
             else {
-                // Check for underflow (essentially, is omega equal to or closer to 0 than a ResultType
-                // (typically a double) can represent without reduced precision)
-                if (omega == 0 or std::fpclassify(omega) == FP_SUBNORMAL)
-                    throw draw_failure("truncDist(): Unable to draw from truncated distribution: truncation range is too far in the lower tail");
+                if (alpha_comp) {
+                    // Check for underflow (essentially: is 1-alpha equal to or closer to 0 than a ResultType
+                    // (typically a double) can represent without reduced precision)
+                    if (alpha == 0 or std::fpclassify(alpha) == FP_SUBNORMAL)
+                        throw draw_failure("truncDist(): Unable to draw from truncated distribution: truncation range is too far in the upper tail");
 
-                // Otherwise they are ordinary cdf values, draw from the uniform and invert:
-                return quantile(dist, std::uniform_real_distribution<ResultType>(alpha, omega)(eris::Random::rng()));
+                    // Both alpha and omega are complements, so take a draw from [omega,alpha], then pass it
+                    // through the quantile_complement
+                    return quantile(complement(dist, std::uniform_real_distribution<ResultType>(omega, alpha)(eris::Random::rng())));
+                }
+                else {
+                    // Check for underflow (essentially, is omega equal to or closer to 0 than a ResultType
+                    // (typically a double) can represent without reduced precision)
+                    if (omega == 0 or std::fpclassify(omega) == FP_SUBNORMAL)
+                        throw draw_failure("truncDist(): Unable to draw from truncated distribution: truncation range is too far in the lower tail");
+
+                    // Otherwise they are ordinary cdf values, draw from the uniform and invert:
+                    return quantile(dist, std::uniform_real_distribution<ResultType>(alpha, omega)(eris::Random::rng()));
+                }
             }
         }
 
@@ -619,8 +660,9 @@ class LinearRestricted : public Linear {
             draw_rejection_success = 0, ///< The cumulative number of successful rejection draws
             draw_rejection_discards = 0, ///< The cumulative number of inadmissable rejection draws
             draw_rejection_max_discards = 100, ///< The maximum number of inadmissable draws for a single rejection draw before aborting
-            draw_gibbs_burnin = 100, ///< The number of burn-in draws for the first Gibbs sampler draw
-            draw_gibbs_thinning = 3; ///< drawGibbs() uses every `draw_gibbs_thinning`th sample (1 = use every draw)
+            draw_gibbs_burnin = 50, ///< The number of burn-in draws for the first Gibbs sampler draw
+            draw_gibbs_thinning = 3, ///< drawGibbs() uses every `draw_gibbs_thinning`th sample (1 = use every draw)
+            draw_gibbs_retry = 3; ///< how many times drawGibbs() will retry in the event of a draw failure
         double draw_auto_min_success_rate = 0.2; ///< The minimum draw success rate below which we switch to Gibbs sampling
 
         /// Accesses the restriction coefficient selection matrix (the \f$R\f$ in \f$R\beta <= r\f$).
@@ -788,10 +830,15 @@ class LinearRestricted : public Linear {
         // Values used for Gibbs sampling.  These aren't set until first needed.
         std::shared_ptr<decltype(restrict_select_)> gibbs_D_; // D = R A^{-1}
         // z ~ restricted N(0, I); sigma = sqrt of last sigma^2 draw; r_Rbeta_ = r-R*beta_
-        std::shared_ptr<Eigen::VectorXd> gibbs_last_z_, gibbs_r_Rbeta_;
+        std::shared_ptr<Eigen::VectorXd> gibbs_last_z_, gibbs_2nd_last_z_, gibbs_r_Rbeta_;
         double gibbs_last_sigma_ = std::numeric_limits<double>::signaling_NaN();
         long gibbs_draws_ = 0;
         double chisq_n_median_ = std::numeric_limits<double>::signaling_NaN();
+
+        /* Returns the bounds on sigma for the given z draw. Lower bound is .first, upper bound is
+         * .second.  gibbs_D_ and gibbs_r_Rbeta_ must be set.
+         */
+        std::pair<double, double> sigmaRange(const Eigen::VectorXd &z);
 
 };
 

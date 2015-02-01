@@ -189,7 +189,8 @@ class Linear {
         /** Returns the X data that has been added into this model but hasn't yet been used due to
          * it not being sufficiently large and different enough to achieve full column rank.  The
          * data will be scaled appropriately if weaken() has been called, and so does not
-         * necessarily reflect the actual data added.
+         * necessarily reflect the actual data added.  If no data has been added, returns a null
+         * (0x0) matrix.
          *
          * \throws std::logic_error if noninformative() would return false.
          */
@@ -507,9 +508,12 @@ class Linear {
          * associated y data is scaled by 1/w, where w is the weakening factor, so that \f$(X\^top
          * X)^{-1}\f$ is scaled by \f$w^2\f$, and that y data stays proportional to X.
          */
-        std::shared_ptr<MatrixXdR> noninf_X_;
+        std::shared_ptr<MatrixXdR> noninf_X_, noninf_X_unweakened_;
         /// The y data for a non-informative model.  \sa noninf_X_.
-        std::shared_ptr<Eigen::VectorXd> noninf_y_;
+        std::shared_ptr<Eigen::VectorXd> noninf_y_, noninf_y_unweakened_;
+
+        /// The amount of weakening that has taken place since the last update (needed to updating)
+        double pending_weakening_ = 1.0;
 
 };
 

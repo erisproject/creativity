@@ -189,19 +189,8 @@ const VectorXd& Linear::lastDraw() const {
     return last_draw_;
 }
 
-void Linear::discard(unsigned int) {
+void Linear::discard() {
     NO_EMPTY_MODEL;
-    // We don't have to actually call draw(), since the default implementation doesn't need a
-    // burn-in.
-
-    mean_beta_draws_ = 0;
-}
-
-void Linear::discardForce(unsigned int burn) {
-    NO_EMPTY_MODEL;
-    for (unsigned int i = 0; i < burn; i++)
-        draw();
-
     mean_beta_draws_ = 0;
 }
 
@@ -268,6 +257,15 @@ void Linear::updateInPlace(const Ref<const VectorXd> &y, const Ref<const MatrixX
         }
         else noninf_X_->conservativeResize(noninf_X_->rows() + X.rows(), K());
 
+        if (not noninf_X_unweakened_ or noninf_X_unweakened_->rows() == 0) noninf_X_unweakened_.reset(new MatrixXdR(X.rows(), K()));
+        else if (not noninf_X_unweakened_.unique()) {
+            auto old_x = noninf_X_unweakened_;
+            noninf_X_unweakened_.reset(new MatrixXdR(old_x->rows() + X.rows(), K()));
+            noninf_X_unweakened_->topRows(old_x->rows()) = *old_x;
+        }
+        else noninf_X_unweakened_->conservativeResize(noninf_X_unweakened_->rows() + X.rows(), K());
+
+
         if (not noninf_y_ or noninf_y_->rows() == 0) noninf_y_.reset(new VectorXd(y.rows()));
         else if (not noninf_y_.unique()) {
             auto old_y = noninf_y_;
@@ -276,11 +274,21 @@ void Linear::updateInPlace(const Ref<const VectorXd> &y, const Ref<const MatrixX
         }
         else noninf_y_->conservativeResize(noninf_y_->rows() + y.rows());
 
+        if (not noninf_y_unweakened_ or noninf_y_unweakened_->rows() == 0) noninf_y_unweakened_.reset(new VectorXd(y.rows()));
+        else if (not noninf_y_unweakened_.unique()) {
+            auto old_y = noninf_y_unweakened_;
+            noninf_y_unweakened_.reset(new VectorXd(old_y->rows() + y.rows()));
+            noninf_y_unweakened_->head(old_y->rows()) = *old_y;
+        }
+        else noninf_y_unweakened_->conservativeResize(noninf_y_unweakened_->rows() + y.rows());
+
         noninf_X_->bottomRows(X.rows()) = X;
+        noninf_X_unweakened_->bottomRows(X.rows()) = X;
         noninf_y_->tail(y.rows()) = y;
+        noninf_y_unweakened_->tail(y.rows()) = y;
 
         if (noninf_X_->rows() > K()) {
-            MatrixXd XtX = noninf_X_->transpose() * *noninf_X_;
+            MatrixXd XtX = (noninf_X_->transpose() * *noninf_X_).selfadjointView<Lower>();
             auto qr = XtX.fullPivHouseholderQr();
             if (qr.rank() >= K()) {
                 beta_ = qr.solve(noninf_X_->transpose() * *noninf_y_);
@@ -290,14 +298,15 @@ void Linear::updateInPlace(const Ref<const VectorXd> &y, const Ref<const MatrixX
                 V_inv_ = XtX;
 #endif
                 n_ = noninf_X_->rows();
-                s2_ = (*noninf_y_ - *noninf_X_ * beta_).squaredNorm() / n_;
-    
+                s2_ = (*noninf_y_unweakened_ - *noninf_X_unweakened_ * beta_).squaredNorm() / n_;
+
                 // These are unlikely to be set since this model was noninformative, but just in case:
                 if (V_chol_L_) V_chol_L_.reset();
-                if (V_inv_chol_L_) V_inv_chol_L_.reset(); 
-
+                if (V_inv_chol_L_) V_inv_chol_L_.reset();
                 noninf_X_.reset();
                 noninf_y_.reset();
+                noninf_X_unweakened_.reset();
+                noninf_y_unweakened_.reset();
                 noninformative_ = false; // We aren't noninformative anymore!
             }
         }
@@ -330,8 +339,13 @@ void Linear::updateInPlaceInformative(const Ref<const VectorXd> &y, const Ref<co
     // And get the difference between new and old beta:
     VectorXd beta_diff = beta_post - beta_;
 
-    // Calculate new s2 from previous s2, SSR of new data, and change resulting from beta changing:
-    s2_ = (n_prior * s2_ + residualspost.squaredNorm() + beta_diff.transpose() * V_inv_ * beta_diff) / n_;
+    double s2_prior_beta_delta = beta_diff.transpose() * V_inv_ * beta_diff;
+    s2_prior_beta_delta *= pending_weakening_;
+    pending_weakening_ = 1.0;
+
+    // Calculate new s2 from SSR of new data plus n times previous s2 (==SSR before) plus the change
+    // to the old SSR that would are a result of beta changing:
+    s2_ = (residualspost.squaredNorm() + n_prior * s2_ +  s2_prior_beta_delta) / n_;
 
 #ifdef EIGEN_HAVE_RVALUE_REFERENCES
     beta_ = std::move(beta_post);
@@ -343,7 +357,7 @@ void Linear::updateInPlaceInformative(const Ref<const VectorXd> &y, const Ref<co
 
     // The decompositions will have to be recalculated, if set:
     if (V_chol_L_) V_chol_L_.reset();
-    if (V_inv_chol_L_) V_inv_chol_L_.reset(); 
+    if (V_inv_chol_L_) V_inv_chol_L_.reset();
 }
 
 Linear Linear::weaken(const double stdev_scale) const & {
@@ -363,7 +377,7 @@ void Linear::weakenInPlace(const double stdev_scale) {
 
     reset();
 
-    if (noninformative() or stdev_scale == 1.0) // Nothing to do here
+    if (stdev_scale == 1.0) // Nothing to do here
         return;
 
     if (noninf_X_) {
@@ -372,11 +386,16 @@ void Linear::weakenInPlace(const double stdev_scale) {
         else *noninf_X_ /= stdev_scale;
         if (not noninf_y_.unique()) noninf_y_.reset(new VectorXd(*noninf_y_ / stdev_scale));
         else *noninf_y_ /= stdev_scale;
-        return;
     }
 
+    if (noninformative()) return; // Nothing else to do
+
+    double var_scale = stdev_scale*stdev_scale;
     // scale V^{-1} appropriately
-    V_inv_ /= stdev_scale*stdev_scale;
+    V_inv_ /= var_scale;
+
+    // This tracks how to undo the V_inv_ weakening when calculating an updated s2 value
+    pending_weakening_ *= var_scale;
 
     // Likewise for the Cholesky decomposition (and its inverse), if set
     if (V_chol_L_) {
@@ -398,7 +417,7 @@ void Linear::weakenInPlace(const double stdev_scale) {
 const MatrixXdR& Linear::noninfXData() const {
     if (not noninformative_) throw std::logic_error("noninfXData() cannot be called on a fully-informed model");
 
-    if (not noninf_X_) const_cast<std::shared_ptr<MatrixXdR>&>(noninf_X_).reset(new MatrixXdR(0, K()));
+    if (not noninf_X_) const_cast<std::shared_ptr<MatrixXdR>&>(noninf_X_).reset(new MatrixXdR(0, 0));
 
     return *noninf_X_;
 }
