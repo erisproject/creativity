@@ -475,6 +475,10 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         const belief::Profit& profitBelief() const;
         /// Read-only access to this reader's profit belief with profit stream extrapolations
         const belief::Profit& profitExtrapBelief() const;
+        /** Returns true if profitExtrapBelief is actually just profitBelief (i.e. there were no
+         * profit extrapolations to incorporated this period).
+         */
+        bool profitExtrapBeliefDiffers() const;
         /** Read-only access to this reader's profit stream belief for books with age `age`.  The
          * returned object will be a belief::ProfitStream model with between 1 and `age` parameters.
          * When a model for the requested age is not available the model with the highest age less
@@ -600,7 +604,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
     protected:
         /// The Creativity object that owns the simulation this reader belongs to
         std::shared_ptr<Creativity> creativity_;
-        belief::Profit profit_belief_, ///< Belief about lifetime book profits
+        std::shared_ptr<belief::Profit> profit_belief_, ///< Belief about lifetime book profits
             profit_belief_extrap_; ///< Beliefs about lifetime book profits using profit stream expectations
         belief::Demand demand_belief_; ///< Belief about per-period demand
         belief::Quality quality_belief_; ///< Belief about book quality

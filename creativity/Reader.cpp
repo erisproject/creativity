@@ -26,7 +26,8 @@ Reader::Reader(
         )
     : WrappedPositional<agent::AssetAgent>(pos, creativity->parameters.boundary, -creativity->parameters.boundary),
     cost_fixed{cFixed}, cost_unit{cUnit}, cost_piracy{cPiracy}, income{inc},
-    creativity_{std::move(creativity)}
+    creativity_{std::move(creativity)},
+    profit_belief_{new Profit()}, profit_belief_extrap_{profit_belief_}
 {
     profit_stream_beliefs_.emplace(1, ProfitStream(1));
 }
@@ -275,7 +276,7 @@ void Reader::interOptimize() {
     if (income_available >= cost_fixed) {
         // Creating a book requires an ability to predict profit (to determine whether creation is
         // worthwhile), and an ability to predict demand (to determine the initial price)
-        if (usableBelief(profit_belief_) and usableBelief(demand_belief_)) { // NB: profit_belief_extrap_ is a copy or update of profit_belief_, so will also be usable
+        if (usableBelief(*profit_belief_) and usableBelief(demand_belief_)) { // NB: profit_belief_extrap_ is a copy or update of profit_belief_, so will also be usable
             // Create a book if E(profit) > effort required
 
             // Find the l that maximizes creation profit given current wealth (which would have come from
@@ -289,7 +290,7 @@ void Reader::interOptimize() {
 #               ifdef ERIS_DEBUG
                 try {
 #               endif
-                effort = profit_belief_extrap_.argmaxL(
+                effort = profit_belief_extrap_->argmaxL(
                         [this] (double l) -> double { return creationQuality(l); },
                         authored_books, market_books, income_available - cost_fixed
                         );
@@ -305,7 +306,7 @@ void Reader::interOptimize() {
 #               ifdef ERIS_DEBUG
                 try {
 #               endif
-                exp_profit = profit_belief_extrap_.predict(quality, authored_books, market_books);
+                exp_profit = profit_belief_extrap_->predict(quality, authored_books, market_books);
 #               ifdef ERIS_DEBUG
                 }
                 catch (belief::LinearRestricted::draw_failure &e) {
@@ -474,8 +475,9 @@ void Reader::receiveProceeds(const SharedMember<Book> &book, const Bundle &reven
     tvc.transferApprox(tvc, assets(), 1e-8);
 }
 
-const belief::Profit& Reader::profitBelief() const { return profit_belief_; }
-const belief::Profit& Reader::profitExtrapBelief() const { return profit_belief_extrap_; }
+const belief::Profit& Reader::profitBelief() const { return *profit_belief_; }
+const belief::Profit& Reader::profitExtrapBelief() const { return *profit_belief_extrap_; }
+bool Reader::profitExtrapBeliefDiffers() const { return profit_belief_ == profit_belief_extrap_; }
 const belief::Demand& Reader::demandBelief() const { return demand_belief_; }
 const belief::Quality& Reader::qualityBelief() const { return quality_belief_; }
 const belief::ProfitStream& Reader::profitStreamBelief(const unsigned int age, const bool usable) const {
@@ -690,10 +692,10 @@ void Reader::updateProfitBelief() {
     }
 
     double weaken = creativity_->priorWeight();
-    if (weaken != 1.0) profit_belief_ = std::move(profit_belief_).weaken(weaken);
+    if (weaken != 1.0) *profit_belief_ = std::move(*profit_belief_).weaken(weaken);
 
     if (not new_prof_books.empty()) {
-        MatrixXd X(new_prof_books.size(), profit_belief_.K());
+        MatrixXd X(new_prof_books.size(), profit_belief_->K());
         VectorXd y(new_prof_books.size());
 
         size_t i = 0;
@@ -721,7 +723,7 @@ void Reader::updateProfitBelief() {
             i++;
         }
 
-        profit_belief_ = profit_belief_.update(y, X);
+        *profit_belief_ = std::move(*profit_belief_).update(y, X);
     }
 
     // Extrapolate based on profit stream predictions for profit levels for books that are still on
@@ -731,7 +733,7 @@ void Reader::updateProfitBelief() {
         profit_belief_extrap_ = profit_belief_;
     }
     else {
-        MatrixXd X(extrap_books.size(), profit_belief_.K());
+        MatrixXd X(extrap_books.size(), profit_belief_->K());
         VectorXd y(extrap_books.size());
 
         size_t i = 0;
@@ -741,8 +743,8 @@ void Reader::updateProfitBelief() {
             for (auto it = profit_stream_beliefs_.rbegin(); it != profit_stream_beliefs_.rend(); it++) {
                 if (it->first <= bc.first->age() and usableBelief(it->second)) {
                     // We have a winner:
-                    y[i] = it->second.predict(bc.first);
-                    X.row(i) = profit_belief_.profitRow(bc.first, bc.second.get().quality, creativity_->market_books_lagged);
+                    y[i] = it->second.predict(bc.first, creativity_->parameters.prediction_draws);
+                    X.row(i) = Profit::profitRow(bc.second.get().quality, bc.first->order(), creativity_->market_books_lagged);
                     i++;
                     break;
                 }
@@ -750,7 +752,7 @@ void Reader::updateProfitBelief() {
         }
 
         // NB: extrapolation uses just-updated non-extrapolation as prior, with no weakening
-        profit_belief_extrap_ = profit_belief_.update(y, X);
+        profit_belief_extrap_.reset(new Profit(profit_belief_->update(y, X)));
     }
 }
 
