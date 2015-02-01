@@ -22,14 +22,14 @@ class Creativity;
  * and sells copies of those books.  The Reader's utility is determined by books read and an outside
  * option; in particular it is quasilinear of the form:
  *
- * \f$u(m, x_0, x_1, \ldots, x_{n-1}) = m + \sum_{i=1}^{n} f(b_i) - p(n)\f$
+ * \f$u(m, b_1, b_2, \ldots, b_n) = m + \sum_{i=1}^{n} f(b_i) - p(n)\f$
  *
  * where:
  *     - \f$r\f$ is the Reader's position
- *     - \f$b_1, \ldots, b_n\f$ are the positions of the \f$n\f$ books the agent buys this period
- *     - \f$f(b)\f$ is a function that maps a book into a utility value using a decreasing function
- *     of the distance between the reader's position and the book's position.  It returns 0 for any
- *     books that the reader already owns.
+ *     - \f$b_1, \ldots, b_n\f$ are the \f$n\f$ books the agent buys this period
+ *     - \f$f(b)\f$ is a function that maps a book into a utility value using the book's quality
+ *     plus a decreasing function of the distance between the reader's position and the book's
+ *     position.  It returns 0 for any books that the reader already owns.
  *     - \f$p(n)\f$ is a penalty function that increases in the number of books read
  *     - \f$m\f$ is the quantity of non-book spending the reader engages in which delivers a
  *     constant marginal utility of 1.

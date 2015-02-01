@@ -216,8 +216,9 @@ void Reader::interOptimize() {
             auto book_mkt = book->market();
 
             try {
-                auto max = demand_belief_.argmaxP(book->quality(), book->lifeSales(), book->lifePirated(), creativity_->parameters.readers,
-                        book->sales(sim->t()-1), book->age(), authored_books - 1, market_books, cost_unit);
+                auto max = demand_belief_.argmaxP(creativity_->parameters.prediction_draws, book->quality(), book->lifeSales(), book->lifePirated(), creativity_->parameters.readers,
+                        sim->t() - 1 - book->lastSale(), book->age(), authored_books - 1, market_books, cost_unit,
+                        income / 10);
                 const double &p = max.first;
                 const double &q = max.second;
 
@@ -291,6 +292,7 @@ void Reader::interOptimize() {
                 try {
 #               endif
                 effort = profit_belief_extrap_->argmaxL(
+                        creativity_->parameters.prediction_draws,
                         [this] (double l) -> double { return creationQuality(l); },
                         authored_books, market_books, income_available - cost_fixed
                         );
@@ -306,7 +308,7 @@ void Reader::interOptimize() {
 #               ifdef ERIS_DEBUG
                 try {
 #               endif
-                exp_profit = profit_belief_extrap_->predict(quality, authored_books, market_books);
+                exp_profit = profit_belief_extrap_->predict(creativity_->parameters.prediction_draws, quality, authored_books, market_books);
 #               ifdef ERIS_DEBUG
                 }
                 catch (belief::LinearRestricted::draw_failure &e) {
@@ -324,11 +326,14 @@ void Reader::interOptimize() {
 #                   ifdef ERIS_DEBUG
                     try {
 #                   endif
-                    max = demand_belief_.argmaxP(quality, 0, 0, creativity_->parameters.readers, 0, 0, authored_books, market_books, cost_unit);
+                    max = demand_belief_.argmaxP(creativity_->parameters.prediction_draws, quality, 0, 0,
+                            creativity_->parameters.readers, 0, 0, authored_books, market_books, cost_unit,
+                            income / 10);
 #                   ifdef ERIS_DEBUG
                     }
                     catch (belief::LinearRestricted::draw_failure &e) {
                         ERIS_DBG("draw failure in demand argmaxP calculation; reader="<<id() << ", t=" << simulation()->t());
+                        ERIS_DBGVAR(demand_belief_.draw_rejection_success);
                         throw;
                     }
 #                   endif
@@ -450,9 +455,8 @@ double Reader::quality(const SharedMember<Book> &b) const {
     double q_hat;
     if (usableBelief(quality_belief_)) {
         // Use the quality belief to predict the quality
-        // FIXME: check for proper Bayesian MC averaging
         auto &q_b = const_cast<belief::Quality&>(quality_belief_);
-        q_hat = q_b.predict(b);
+        q_hat = q_b.predict(b, creativity_->parameters.prediction_draws);
     }
     else {
         // No informative beliefs above quality, so just use initial parameter mean (= midpoint)
@@ -521,9 +525,9 @@ void Reader::updateBeliefs() {
 
 void Reader::updateQualityBelief() {
     double weaken = creativity_->priorWeight();
-    if (weaken != 1.0) quality_belief_ = std::move(quality_belief_).weaken(weaken);
+    bool belief_changed = true;
 
-    // If we obtained any new books, update the demand belief with them
+    // If we obtained any new books, update the quality belief with them
     if (not newBooks().empty()) {
         std::vector<SharedMember<Book>> books;
         VectorXd y(newBooks().size());
@@ -533,7 +537,17 @@ void Reader::updateQualityBelief() {
             y[i++] = a.second.get().quality;
         }
 
-        quality_belief_ = std::move(quality_belief_).update(y, quality_belief_.bookData(books));
+        quality_belief_ = std::move(quality_belief_).weaken(weaken).update(y, Quality::bookData(books));
+    }
+    else if (weaken != 1.0) {
+        quality_belief_ = std::move(quality_belief_).weaken(weaken);
+    }
+    else {
+        belief_changed = false;
+    }
+
+    if (belief_changed) {
+        quality_predictions_.clear();
     }
 }
 void Reader::updateDemandBelief() {
@@ -553,7 +567,7 @@ void Reader::updateDemandBelief() {
         for (const auto &b : library_on_market_) {
             if (b.first->hasMarket()) {
                 y[i] = b.first->sales(last_t);
-                X.row(i) = demand_belief_.bookRow(b.first, b.second.get().quality, creativity_->market_books_lagged);
+                X.row(i) = Demand::bookRow(b.first, b.second.get().quality, creativity_->market_books_lagged);
                 i++;
             }
         }
@@ -719,7 +733,7 @@ void Reader::updateProfitBelief() {
                 }
             }
             y[i] = profit_total;
-            X.row(i) = profit_belief_.profitRow(bc.first, bc.second.get().quality, creativity_->market_books_lagged);
+            X.row(i) = Profit::profitRow(bc.second.get().quality, bc.first->order(), creativity_->market_books_lagged);
             i++;
         }
 
@@ -792,8 +806,8 @@ void Reader::intraOptimize() {
             for (auto &f : friends()) {
                 if (f->library().count(book) > 0) {
                     // My friend owns the book
-                    if (book->author() != f) {
-                        // ... and isn't the author (who presumably wouldn't share it)
+                    if (book->author() != f or not book->hasMarket()) {
+                        // ... and either isn't the author, or is (and the book has left the market)
                         shared = true;
                         break;
                     }

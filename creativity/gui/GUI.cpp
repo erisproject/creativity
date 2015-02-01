@@ -557,6 +557,53 @@ void GUI::thr_set_state(unsigned long t) {
     widget<Gtk::Label>("lbl_tab_agents")->set_text("Agents (" + std::to_string(state->readers.size()) + ")");
     widget<Gtk::Label>("lbl_tab_books")->set_text("Books (" + std::to_string(state->books.size()) + ")");
 
+    // Update the summary tab fields
+#define GUI_SUMMARY_CALC(NAME, VALUE) do { std::ostringstream os; os << VALUE; widget<Gtk::Label>("summary_"#NAME)->set_text(os.str()); } while (0)
+#define GUI_SUMMARY(NAME) GUI_SUMMARY_CALC(NAME, NAME)
+    GUI_SUMMARY(t);
+    GUI_SUMMARY_CALC(agents, state->readers.size());
+    double n = (double) state->readers.size(), u = 0, ulife = 0, book_price = 0, book_revenue = 0, book_quality = 0;
+    int authors = 0, last_wrote = 0, books_new = 0, books_market = 0, books_w_sales = 0, books_pirated = 0, book_sales = 0, book_pirated = 0,
+        readers_bought = 0, readers_pirated = 0, readers_either = 0, library_bought = 0, library_pirated = 0;
+    for (auto &rp : state->readers) {
+        auto &r = rp.second;
+        u += r.u;
+        ulife += r.u_lifetime;
+        if (r.wrote.size() > 0) { authors++; last_wrote += t - state->books.at(*r.wrote.crbegin()).created; }
+        if (r.library_purchased_new > 0) { readers_bought++; }
+        if (r.library_pirated_new > 0) { readers_pirated++; }
+        if (r.library_purchased_new > 0 or r.library_pirated_new > 0) { readers_either++; }
+        library_bought += r.library_purchased;
+        library_pirated += r.library_pirated;
+    }
+    for (auto &bp : state->books) {
+        auto &b = bp.second;
+        if (b.created == t) { books_new++; }
+        if (b.market()) { books_market++; book_sales += b.sales; book_price += b.price; book_revenue += b.revenue; book_quality += b.quality; }
+        if (b.sales > 0) { books_w_sales++; }
+        if (b.pirated > 0) { books_pirated++; book_pirated += b.pirated; }
+    }
+    GUI_SUMMARY_CALC(u, u / n);
+    GUI_SUMMARY_CALC(ulife, ulife / n);
+    GUI_SUMMARY(authors);
+    GUI_SUMMARY_CALC(last_wrote, last_wrote / (double) authors);
+    GUI_SUMMARY(books_new);
+    GUI_SUMMARY(books_market);
+    GUI_SUMMARY(books_w_sales);
+    GUI_SUMMARY(books_pirated);
+    GUI_SUMMARY_CALC(book_sales, book_sales / (double) books_market);
+    GUI_SUMMARY_CALC(book_price, book_price / books_market);
+    GUI_SUMMARY_CALC(book_revenue, book_revenue / books_market);
+    GUI_SUMMARY_CALC(book_quality, book_quality / books_market);
+    GUI_SUMMARY_CALC(book_pirated, book_pirated / (double) books_pirated);
+    GUI_SUMMARY(readers_bought);
+    GUI_SUMMARY(readers_pirated);
+    GUI_SUMMARY(readers_either);
+    GUI_SUMMARY_CALC(library_bought, library_bought / n);
+    GUI_SUMMARY_CALC(library_pirated, library_pirated / n);
+#undef GUI_SUMMARY
+#undef GUI_SUMMARY_CALC
+
     if (graph_->get_is_drawable()) graph_->queue_draw();
 }
 
@@ -649,6 +696,7 @@ void GUI::thr_update_parameters() {
     SET_SB(prior_scale_piracy);
     SET_SB(prior_scale_burnin);
     SET_SB(burnin_periods);
+    SET_SB(prediction_draws);
     widget<Gtk::SpinButton>("set_piracy_link_proportion")->set_value(creativity_->parameters.piracy_link_proportion * 100.0);
 #define SET_INIT_SB(PARAMETER) widget<Gtk::SpinButton>("set_init_" #PARAMETER)->set_value(creativity_->parameters.initial.PARAMETER)
     SET_INIT_SB(prob_write);
@@ -715,6 +763,22 @@ void GUI::thr_signal() {
 
         widget<Gtk::Button>("btn_init")->set_sensitive(false);
         widget<Gtk::Button>("btn_start")->set_sensitive(false);
+
+        auto l = widget<Gtk::Label>("label_summary_t_desc");
+        std::string d = l->get_text();
+        auto pos = d.find("###");
+        if (pos != d.npos) l->set_markup(d.replace(pos, 3, std::to_string(creativity_->parameters.piracy_begins)));
+
+        std::ostringstream incstr; incstr << creativity_->parameters.income;
+        for (auto &w : {"label_summary_u_desc", "label_summary_ulife_desc"}) {
+            l = widget<Gtk::Label>(w);
+            d = l->get_text();
+            pos = d.find("###");
+            if (pos != d.npos) l->set_markup(d.replace(pos, 3, incstr.str()));
+        }
+    }
+
+    if (last_state.type == Signal::Type::initialized) {
         widget<Gtk::Button>("btn_run")->set_visible(true);
         widget<Gtk::Button>("btn_run")->set_sensitive(true);
         widget<Gtk::Button>("btn_resume")->set_visible(false);
@@ -722,8 +786,6 @@ void GUI::thr_signal() {
         widget<Gtk::Button>("btn_step")->set_sensitive(true);
     }
     else if (last_state.type == Signal::Type::running) {
-        widget<Gtk::Notebook>("nb_tabs")->set_current_page(1);
-
         widget<Gtk::Button>("btn_run")->set_visible(false);
         widget<Gtk::Button>("btn_run")->set_sensitive(true);
         widget<Gtk::Button>("btn_resume")->set_visible(false);
@@ -775,7 +837,7 @@ void GUI::thr_signal() {
 
         if (state_num_ > old_state_num) {
             // - 1 here because we don't really count 0 as a stage
-            widget<Gtk::Label>("lbl_total")->set_text(std::to_string(state_num_-1));
+            //widget<Gtk::Label>("lbl_total")->set_text(std::to_string(state_num_-1));
 
             widget<Gtk::Scale>("scale_state")->set_fill_level(state_num_-1);
 
@@ -850,8 +912,9 @@ void GUI::setupSim() {
     auto &set = creativity_->set();
     set.readers = lround(sb("set_readers"));
     set.boundary = Creativity::boundaryFromDensity(set.readers, set.dimensions, sb("set_density"));
-    set.piracy_begins = lround(sb("set_piracy_begins"));
 #define COPY_SB_D(PARAMETER) set.PARAMETER = sb("set_"#PARAMETER)
+#define COPY_SB_I(PARAMETER) set.PARAMETER = lround(sb("set_"#PARAMETER))
+    COPY_SB_I(piracy_begins);
     COPY_SB_D(piracy_link_proportion) * 0.01; // From percentage
     COPY_SB_D(book_distance_sd);
     COPY_SB_D(book_quality_sd);
@@ -866,7 +929,8 @@ void GUI::setupSim() {
     COPY_SB_D(prior_scale);
     COPY_SB_D(prior_scale_piracy);
     COPY_SB_D(prior_scale_burnin);
-    set.burnin_periods = lround(sb("set_burnin_periods"));
+    COPY_SB_I(burnin_periods);
+    COPY_SB_I(prediction_draws);
 #define COPY_SB_INIT_D(PARAMETER) set.initial.PARAMETER = sb("set_init_"#PARAMETER)
     COPY_SB_INIT_D(prob_write);
     COPY_SB_INIT_D(q_min);

@@ -7,13 +7,13 @@ namespace creativity { namespace belief {
 
 using namespace Eigen;
 
-double ProfitStream::predict(SharedMember<Book> book) {
+double ProfitStream::predict(SharedMember<Book> book, unsigned int draws) {
     RowVectorXd X(K());
     for (size_t i = 0; i < K(); i++) {
         X[i] = book->revenue(book->created() + i);
     }
 
-    return Linear::predict(X);
+    return predict(X, draws);
 }
 
 } }

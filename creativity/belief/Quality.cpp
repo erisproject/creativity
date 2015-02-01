@@ -10,13 +10,10 @@ using namespace Eigen;
 
 unsigned int Quality::fixedModelSize() const { return parameters(); }
 
-double Quality::predict(const Book &book) {
-    double price = 0;
-    if (book.hasMarket())
-        price = book.market()->price();
+double Quality::predict(const Book &book, unsigned int draws) {
     RowVectorXd X(K());
-    X << 1, book.order() == 0, book.order(), book.age(), price, price*book.age(), book.lifeSales();
-    return predict(X);
+    X << 1, book.order(), book.age(), book.lifeSales() + book.lifePirated();
+    return predict(X, draws);
 }
 
 }}

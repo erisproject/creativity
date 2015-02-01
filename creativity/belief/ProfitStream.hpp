@@ -38,8 +38,9 @@ class ProfitStream : public Linear {
          *
          * \param book the book, which should have an age of at least K (otherwise the prediction
          * will be wrong as 0 will be used for revenue in \f$(age, K]\f$).
+         * \param draws the number of draws to use for prediction
          */
-        double predict(eris::SharedMember<Book> book);
+        double predict(eris::SharedMember<Book> book, unsigned int draws);
 
         using Linear::predict;
 

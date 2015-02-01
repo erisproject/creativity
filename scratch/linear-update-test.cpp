@@ -8,7 +8,7 @@
         "beta_: " << M.beta().transpose() << "\n" << \
         "n_: " << M.n() << "\n" << \
         "s2_: " << M.s2() << "\n" << \
-        "V_:\n" << M.V() << "\n" << \
+        "V_inv_:\n" << M.Vinv() << "\n" << \
         "\n"
 
 using namespace creativity::belief;
@@ -76,4 +76,16 @@ int main() {
     print_model(foo_100_fiveshot);
     print_model(foo_100_tenshot);
     print_model(foo_100_hundredshot);
+
+    Linear foo_100_weakened_fiftyshot = foo.update(y.head(50), X.topRows(50));
+    foo_100_weakened_fiftyshot = foo_100_weakened_fiftyshot.weaken(2).update(y.tail(50), X.bottomRows(50));
+
+    MatrixXd Xw = X;
+    Xw.topRows(50) *= 0.5;
+    VectorXd yw = y;
+    yw.head(50) *= 0.5;
+    Linear foo_100_weakened_direct = foo.update(yw, Xw);
+
+    print_model(foo_100_weakened_direct);
+    print_model(foo_100_weakened_fiftyshot);
 }

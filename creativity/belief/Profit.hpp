@@ -7,13 +7,11 @@ namespace creativity { namespace belief {
 /** This class represents an author's belief about the lifetime profitability of a work.  The model
  * is:
  *
- * \f$\Pi_b = \beta_0 + \beta_1 q_b + \beta_2 q_b^2 + \beta_3 firstBook + \beta_4 previousBooks + \beta_5 marketBooks + u\f$
+ * \f$\Pi_b = \beta_0 + \beta_1 q_b + \beta_2 q_b^2 + \beta_3 previousBooks + \beta_4 marketBooks + u\f$
  *
  * Specifically, the fields above are:
  * - \f$Pi_b\f$ is the lifetime profits of the book
  * - \f$q_b\f$ is the (non-negative) quality of the book.
- * - \f$firstBook\f$ is a dummy: 1 if this is the creator's first work, 0 if the creator has other
- *   works.
  * - \f$previousBooks\f$ is the number of previous books the author has created.
  * - \f$marketBooks\f$ is the number of books on the market in the previous period (books in the
  *   current period can't be used because it is unknown at the time the reader is making the
@@ -23,7 +21,7 @@ namespace creativity { namespace belief {
  * - \f$\beta_1 \geq 0\f$ (profit increases with quality, at least for low quality values)
  * - \f$\beta_2 \leq 0\f$ (the effect of profit is concave)
  *
- * Although a \f$\beta_5 \leq 0\f$ restriction would make some intuitive sense (more competition
+ * Although a \f$\beta_4 \leq 0\f$ restriction would make some intuitive sense (more competition
  * means lower profit), it isn't imposed because readers can only use the previous period's number
  * of market books when deciding on an action for the next period, and it seems entirely reasonable
  * that this value is positive, to allow for cyclical behaviour.
@@ -51,14 +49,14 @@ class Profit : public LinearRestricted {
             // Add restrictions:
             restrict(1) >= 0; // beta_q >= 0 (higher quality <-> higher profits, at least for low quality)
             restrict(2) <= 0; // beta_{q^2} <= 0 (quality effect is concave)
-            //restrict(5) <= 0; // beta_{marketbooks} <= 0 (more competition <-> lower profit)
+            //restrict(4) <= 0; // beta_{marketbooks} <= 0 (more competition <-> lower profit)
 
             // Set beta names for nicer output
-            names({"const", "quality", u8"quality²", "I(firstBook)", "prevBooks", "marketBooks"});
+            names({"const", "quality", u8"quality²", "prevBooks", "marketBooks"});
         }
 
-        /// Returns the number of parameters of this model (6)
-        static unsigned int parameters() { return 6; }
+        /// Returns the number of parameters of this model (5)
+        static unsigned int parameters() { return 5; }
 
         /// Returns `parameters()`
         virtual unsigned int fixedModelSize() const override;
@@ -66,12 +64,13 @@ class Profit : public LinearRestricted {
         /** Given a set of model parameters, this returns an expected value \f$\Pi_b\f$, the
          * lifetime profit of the book.
          *
+         * \param draws the number of draws to use for prediction
          * \param q the quality of the book
          * \param previousBooks the number of previous books created by this book's author.  This
          * parameter also determines the `firstBook` dummy (`= 1` iff `previousBooks == 0`).
          * \param marketBooks the number of books on the market last period
          */
-        double predict(double q, unsigned long previousBooks, unsigned long marketBooks);
+        double predict(unsigned int draws, double q, unsigned long previousBooks, unsigned long marketBooks);
 
         using LinearRestricted::predict;
 
@@ -88,6 +87,7 @@ class Profit : public LinearRestricted {
          * using the current values of `beta`.  Note that this maximum is likely to simply be
          * \f$0\f$ or \f$\ell_{max}\f$ if \f$(q(\ell))^D\f$ is not concave.
          *
+         * \param draws the number of beta draws to use for prediction
          * \param q A function, lambda or similar object that takes a double and returns the quality
          * associated with that double.  If the function returns a negative value, 0 will be
          * substituted instead.
@@ -101,6 +101,7 @@ class Profit : public LinearRestricted {
          * \sa eris::single_peak_search for the numerical algorithm used.
          */
         double argmaxL(
+                unsigned int draws,
                 const std::function<double(const double &)> q,
                 unsigned long previousBooks, unsigned long marketBooks,
                 double l_max
@@ -114,14 +115,14 @@ class Profit : public LinearRestricted {
          * value will be 0 at the beginning of \f$t=2\f$, thus need to wait until the beginning of
          * \f$t=3\f$).
          *
-         * \param book the book itself
+         * \param previous_books the number of previous books written by the same author
          * \param quality the quality of the book as perceived by the reader this belief is for
          * \param lag_market_books the number of books that was in the market in the period just
          * before the just-ended period.
          *
          * \returns a row containing the book's information as used for this model
          */
-        Eigen::RowVectorXd profitRow(eris::SharedMember<Book> book, double quality, int lag_market_books) const;
+        static Eigen::RowVectorXd profitRow(double quality, int previous_books, int lag_market_books);
 
         /// Returns "Profit", the name of this model
         virtual std::string display_name() const override { return "Profit"; }

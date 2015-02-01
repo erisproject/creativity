@@ -12,8 +12,8 @@ namespace belief {
 /** This class represents an author's belief about the per-period demand for books.  The model is of
  * the form:
  *
- * \f$Q_b = \beta_0 + \beta_1 P_b + \beta_2 q_b + \beta_3 q_b^2 + \beta_4 S_{b-} + \beta_5 S_{nosales}
- * + \beta_6 new + \beta_7 age + \beta_8 onlyBook + \beta_9 otherBooks + \beta_{10} marketBooks + u\f$
+ * \f$Q_b = \beta_0 + \beta_1 P_b + \beta_2 q_b + \beta_3 q_b^2 + \beta_4 S_{b-} + \beta_5 nosales
+ * + \beta_6 new + \beta_7 age + \beta_8 otherBooks + \beta_9 marketBooks + u\f$
  * where:
  * - \f$Q_b\f$ is the quantity (i.e. copies) sold
  * - \f$P_b\f$ is the price of a copy (which must be non-negative)
@@ -21,11 +21,8 @@ namespace belief {
  *   non-negative.
  * - \f$S_{b-}\f$ is the number of copies sold in previous periods
  * - \f$new\f$ is a dummy which is 1 for a new book (\f$age = 0\f$), 0 otherwise.
- * - \f$S_{nosales}\f$ is a dummy which is true if the book was on the market in the previous period
- *   but had no sales.  (It is 0 for new books).
+ * - \f$nosales\f$ is the number of periods the book has gone without sales
  * - \f$age\f$ is the age of the book, in simulation periods, starting from 0.
- * - \f$onlyBook\f$ is a dummy: 1 if this is the creator's only work, 0 if the creator has other
- *   works.  (Note that this can change during a book's lifetime.)
  * - \f$otherBooks\f$ is the number of other books the author has created.  (Note that this can
  *   change during a book's lifetime.)
  * - \f$marketBooks\f$ is the number of books on the market in the previous period
@@ -33,13 +30,9 @@ namespace belief {
  * The following restrictions are imposed on beliefs:
  * - \f$\beta_1 \leq -0.05\f$ (demand curve is downward sloping (at least for sufficiently small p))
  * - \f$\beta_2 \geq 0\f$ (higher quality means more sales (at least for low quality))
- * - \f$\beta_3 \leq 0\f$ (quality increase effect is concave)
  * - \f$\beta_5 \leq 0\f$ (no sales last period means less demand)
- *
- * \f$\beta_9 \leq 0\f$ seems an intuitive restriction, but isn't imposed because we actually use
- * lagged market size, not current market size, because lagged market size is all the reader has
- * when doing demand prediction.  Positive values aren't entirely possible there, in particular if
- * the market exhibits cyclical behaviour.
+ * - \f$\beta_7 \leq 0\f$ demand is lower for older books
+ * - \f$\beta_9 \leq 0\f$ more books on the market means reduced demand
  *
  * These constraints are combined with a natural conjugate prior for the purposes of updating the
  * beliefs via Bayesian econometrics.
@@ -69,25 +62,28 @@ class Demand : public LinearRestricted {
             // Add restrictions:
             restrict(1) <= -0.05; // beta_price <= 0 (higher price <-> lower quantity)
             restrict(2) >= 0.0; // beta_q >= 0
-            restrict(3) <= 0.0; // beta_{q^2} <= 0
-            restrict(5) <= 0.0; // beta_{nosales_last_period} <= 0
+            restrict(4) <= 0.0; // beta_{nosales_last_period} <= 0
+//            restrict(7) <= 0.0; // beta_{age} <= 0
+//            restrict(9) <= 0.0; // beta_{market_size} <= 0
 
             // Set beta names for nicer output
-            names({"const", "price", "quality", u8"quality²", "prevSales", "I(noSales)", "I(new)", "age", "I(onlyBook)", "otherBooks", "marketBooks"});
+            names({"const", "price", "quality", /*u8"quality²",*/ "prevSales", "noSales"});//, "I(new)", "age", "otherBooks", "marketBooks"});
         }
 
-        /// Returns the number of parameters of this model
-        static unsigned int parameters() { return 11; } // NB: when changing this, change following doc, too!
+        /// Returns the number of parameters of this model (5)
+        static unsigned int parameters() { return 5; }
 
-        /// This model always has exactly 11 parameters
+        /// This model always has exactly `parameters()` parameters
         virtual unsigned int fixedModelSize() const override;
 
         /** Given a set of model parameters, this returns an expected value \f$Q_b\f$, the number of sales.
          *
+         * \param draws the number of draws to use for prediction
          * \param P the price of a copy of the book
          * \param q the quality of the book
          * \param S prior book sales
-         * \param last_sales number of sales in the previous period
+         * \param nosales the number of time periods since the book last had a sale; if greater than
+         * age, age is used (so that `sim->t() - book->lastSale()` can be passed)
          * \param age of the book
          * \param otherBooks the number of other books created by this book's author.  This parameter
          * also determines the `onlyBook` dummy (`= 1` iff `otherBooks == 0`).
@@ -95,7 +91,7 @@ class Demand : public LinearRestricted {
          *
          * \throws std::domain_error if `P < 0` or `q < 0`.
          */
-        double predict(double P, double q, unsigned int S, unsigned int last_sales, unsigned int age, unsigned int otherBooks, unsigned int lag_marketBooks);
+        double predict(unsigned int draws, double P, double q, unsigned int S, unsigned int nosales, unsigned int age, unsigned int otherBooks, unsigned int lag_marketBooks);
 
         using LinearRestricted::predict;
 
@@ -117,17 +113,21 @@ class Demand : public LinearRestricted {
          * copies previously sold minus the copies pirated minus 1 (an author doesn't buy his own
          * book).
          *
+         * \param draws the number of draws to use for prediction
          * \param q the quality of the book
          * \param s prior book sales
          * \param z book pirated copies
          * \param n simulation readers size (including the author)
-         * \param last_sales the sales in the previous period (0 if this is the book's first period)
+         * \param nosales the number of periods the book has gone without sales (`age` is used if
+         * this is > age).
          * \param age the age of the book, in simulation periods
          * \param otherBooks the number of other books created by this book's author.  This parameter
          * also determines the `onlyBook` dummy (`= 1` iff `otherBooks == 0`).
          * \param marketBooks the number of books on the market in the last pre-prediction period
          * (including this book, if this book was on the market)
          * \param c the per-unit cost of copies.
+         * \param max_price the maximum price to set (if optimum is predicted above this, reduce to
+         * this)
          *
          * \returns a std::pair of double values where `.first` is the maximizing price and
          * `.second` is the quantity predicted at that price.  If optimal price is below `c` (i.e.
@@ -135,7 +135,7 @@ class Demand : public LinearRestricted {
          *
          * \throws std::domain_error if `c < 0` or `q < 0`
          */
-        std::pair<double, double> argmaxP(double q, unsigned int s, unsigned int z, unsigned int n, unsigned int last_sales, unsigned int age, unsigned int otherBooks, unsigned int marketBooks, double c);
+        std::pair<double, double> argmaxP(unsigned int draws, double q, unsigned int s, unsigned int z, unsigned int n, unsigned int nosales, unsigned int age, unsigned int otherBooks, unsigned int marketBooks, double c, double max_price);
 
         /** Given a book and perceived quality, this builds an X matrix row of data representing
          * that book.  This method may only be called in the inter-period optimization stage, after
@@ -145,7 +145,7 @@ class Demand : public LinearRestricted {
          * Note that this method typically should only be used beginning in t=3: before that,
          * lag_market_books would be 0.
          */
-        Eigen::RowVectorXd bookRow(eris::SharedMember<Book> book, double quality, unsigned int lag_market_books) const;
+        static Eigen::RowVectorXd bookRow(eris::SharedMember<Book> book, double quality, unsigned int lag_market_books);
 
         /// Returns "Demand", the name of this model.
         virtual std::string display_name() const override { return "Demand"; }

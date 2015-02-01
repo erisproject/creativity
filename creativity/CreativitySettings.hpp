@@ -113,7 +113,7 @@ struct CreativitySettings {
     /** The factor by which parameter standard deviations should be multiplied when using it as a
      * prior for a subsequent period, after the initial burn-in period.
      */
-    double prior_scale = 1.1;
+    double prior_scale = 1.05;
 
     /** The factor by which to multiply standard deviations in the first piracy period.  This value
      * overrides `prior_scale` in the `piracy_begins` period.
@@ -124,10 +124,15 @@ struct CreativitySettings {
      * so that the simulation results of pre-belief initial parameters have significantly less
      * weight in readers' beliefs.
      */
-    double prior_scale_burnin = 2;
+    double prior_scale_burnin = 1.5;
 
     /** The number of "burn-in" periods, during which priors are discounted at a higher rate. */
     uint32_t burnin_periods = 20;
+
+    /** The number of model draws to use for prediction.  Higher values yield more "accurate"
+     * predictions, but lower values may be desirable to introduce more random agent behaviour.
+     */
+    uint32_t prediction_draws = 50;
 
     /** The values in this struct define fixed probabilities and distributions of simulation
      * actions.  This is needed because, in the initial simulation periods, readers only have

@@ -14,16 +14,13 @@ namespace belief {
 /** This class represents a reader's belief about the quality of an unread book.  The model is:
  *
  * \f[
- *     q = \beta_0 + \beta_1 firstBook + \beta_2 prevBooks + \beta_3 age + \beta_4 P + \beta_5 P
- *     \times age + \beta_6 numSales + u_{i}
+ *     q = \beta_0 + \beta_1 prevBooks + \beta_2 age + \beta_3 numCopies + u_{i}
  * \f]
  * where:
- * - \f$firstBook\f$ is a dummy: 1 iff this was the author's first book
  * - \f$prevBooks\f$ is the number of previous books written by this author (so if this was the
  *   author's fourth book, \f$firstBook=0, prevBooks=3\f$).
  * - \f$age\f$ is the age of this book in number of periods since it was released.
- * - \f$P\f$ is the market price of the book
- * - \f$numCopies\f$ is the number of copies of the book that have been sold
+ * - \f$numCopies\f$ is the number of copies of the book that exist in the world (sold or pirated)
  *
  * The model is updated using Bayesian econometrics as new books (and realized quality values of
  * those books) are obtained.
@@ -46,11 +43,11 @@ class Quality : public Linear {
         explicit Quality(Args &&...args) : Linear(std::forward<Args>(args)...)
         {
             // Set beta names for nicer output
-            names({"const", "I(firstBook)", "prevBooks", "age", "price", "price×age", "numSales"});
+            names({"const", "prevBooks", "age", "numCopies"});
         }
 
-        /// Returns the number of parameters of this model (7)
-        static unsigned int parameters() { return 7; }
+        /// Returns the number of parameters of this model (4)
+        static unsigned int parameters() { return 4; }
 
         /// Returns `parameters()`
         virtual unsigned int fixedModelSize() const override;
@@ -58,26 +55,23 @@ class Quality : public Linear {
         /** Given a book, this returns \f$\widehat q_b\f$, the predicted quality of the book.
          *
          * \param book the book being considered.
+         * \param draws the number of beta draws to use for prediction
          */
-        double predict(const Book &book);
+        double predict(const Book &book, unsigned int draws);
 
         using Linear::predict;
 
         /** Given a container of books, this builds an X matrix of data representing those books.
          */
         template <class Container, typename = typename std::enable_if<std::is_same<typename Container::value_type, eris::SharedMember<Book>>::value>::type>
-        Eigen::MatrixXd bookData(const Container books) {
-            Eigen::MatrixXd X(books.size(), K());
+        static Eigen::MatrixXd bookData(const Container books) {
+            Eigen::MatrixXd X(books.size(), parameters());
             size_t i = 0;
             for (const eris::SharedMember<Book> &book : books) {
                 X(i, 0) = 1;
-                X(i, 1) = book->order() == 0;
-                X(i, 2) = book->order();
-                X(i, 3) = book->age();
-                double price = book->hasMarket() ? book->market()->price() : 0.0;
-                X(i, 4) = price;
-                X(i, 5) = price*book->age();
-                X(i, 6) = book->lifeSales();
+                X(i, 1) = book->order();
+                X(i, 2) = book->age();
+                X(i, 3) = book->lifeSales() + book->lifePirated();
                 i++;
             }
             return X;

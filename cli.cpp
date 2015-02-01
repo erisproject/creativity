@@ -134,7 +134,7 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
 #define OPTION_UNBOUNDED_INIT(PARAM, SHORT, LONG, DESC) OPTION_UNBOUNDED_NAME(initial_##PARAM, initial.PARAM, SHORT, LONG, DESC)
 
 // Single-letter options used:
-// b B c C d D f i j k K m M n N o O P Q r R s T u U w W x y z Z
+// b B c C d D f i j k K m M n N o O p P Q r R s T u U w W x y z Z
 
         OPTION_LBOUND(readers, "r", "readers", "Number of reader/author agents in the simulation", 1);
         OPTION_LBOUND(dimensions, "D", "dimensions", "Number of dimensions of the simulation", 1);
@@ -157,6 +157,7 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         OPTION_LBOUND(prior_scale_piracy, "W", "prior-scale-piracy", "The same as --prior-weight, but applied in the first piracy period", 1);
         OPTION_LBOUND(prior_scale_burnin, "U", "prior-scale-burnin", "The same as --prior-weight, but applied in the first `--burnin-periods' periods", 1);
         OPTION_LBOUND(burnin_periods, "u", "burnin-periods", "The number of initial periods during which `--prior-scale-burnin' should be used instead of `--prior-scale'", 0);
+        OPTION_LBOUND(prediction_draws, "p", "prediction-draws", "The number of draws agents take from beliefs when using for prediction.  Lower values can be used to introduce deliberate randomness into the simulation", 1);
 
         OPTION_UNBOUNDED_INIT(belief_threshold, "b", "belief-threshold", "The minimum n-k value at which a readers bases decision on beliefs instead of initial parameters");
         OPTION_BOUND_INIT(prob_write, "x", "initial-prob-write", "The probability of writing in initial periods", 0, 1);
@@ -209,6 +210,7 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         COPY_PARAM_SETTING(prior_scale_piracy);
         COPY_PARAM_SETTING(prior_scale_burnin);
         COPY_PARAM_SETTING(burnin_periods);
+        COPY_PARAM_SETTING(prediction_draws);
         COPY_INIT_PARAM_SETTING(prob_write);
         COPY_INIT_PARAM_SETTING(q_min);
         COPY_INIT_PARAM_SETTING(q_max);
