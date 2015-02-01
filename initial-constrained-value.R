@@ -8,7 +8,6 @@ z <- c(1, 1)
 x <- z[1]
 y <- z[2]
 plot(x, y, xlim=c(-2,2), ylim=c(0,4), asp=1)
-polygon(poly_x, poly_y, lwd=2)
 P <- list()
 M <- list()
 for (i in 1:nrow(R)) {
@@ -17,6 +16,8 @@ for (i in 1:nrow(R)) {
   if (slope == Inf || slope == -Inf) abline(v=r[i]/R[i,1], col="gray")
   else abline(rint[i,1], -R[i,1]/R[i,2], col="gray")
 }
+polygon(poly_x, poly_y, lwd=2)
+
 
 pnext <- z
 restrs <- R %*% pnext - r
