@@ -78,6 +78,8 @@ int main(int argc, const char *argv[]) {
         for (const auto &d : data) output << "," << "new_" << d.name;
         for (const auto &d : data) output << "," << "post_" << d.name;
         output << "\n";
+        std::cout << output.str();
+        output.str("");
     }
     else {
         for (const auto &d : initial_data) if (d.name.length() > longest_name) longest_name = d.name.length();
@@ -178,12 +180,12 @@ int main(int argc, const char *argv[]) {
         }
 
         output << "\n";
+        std::cout << output.str();
+        output.str("");
         output_count++;
     }
 
-    if (output_count > 0)
-        std::cout << output.str();
-    else
+    if (output_count == 0)
         std::cerr << "Error: no usable data sources!\n";
 }
 
