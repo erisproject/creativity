@@ -142,12 +142,12 @@ bool ReaderStore::greater_pos_str(const ReaderState &a, const ReaderState &b) {
     return ax == bx ? a.position[1] > b.position[1] : ax > bx;
 }
 bool ReaderStore::less_last_book_age(const ReaderState &a, const ReaderState &b) const {
-    return (a.wrote.empty() ? std::numeric_limits<unsigned long>::max() : state_->books.at(*a.wrote.crbegin()).created)
-         < (b.wrote.empty() ? std::numeric_limits<unsigned long>::max() : state_->books.at(*b.wrote.crbegin()).created);
+    return (a.wrote.empty() ? 0 : state_->books.at(*a.wrote.crbegin()).created)
+         > (b.wrote.empty() ? 0 : state_->books.at(*b.wrote.crbegin()).created);
 }
 bool ReaderStore::greater_last_book_age(const ReaderState &a, const ReaderState &b) const {
-    return (a.wrote.empty() ? std::numeric_limits<unsigned long>::max() : state_->books.at(*a.wrote.crbegin()).created)
-         > (b.wrote.empty() ? std::numeric_limits<unsigned long>::max() : state_->books.at(*b.wrote.crbegin()).created);
+    return (a.wrote.empty() ? 0 : state_->books.at(*a.wrote.crbegin()).created)
+         < (b.wrote.empty() ? 0 : state_->books.at(*b.wrote.crbegin()).created);
 }
 
 void ReaderStore::appendColumnsTo(Gtk::TreeView &v) const {
