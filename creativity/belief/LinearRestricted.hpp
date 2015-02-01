@@ -498,7 +498,7 @@ class LinearRestricted : public Linear {
          * 0.3, seems roughly appropriate for a normal distribution.  A chi squared distribution,
          * which has expensive inverse cdf lookups, seems to have an optimal value of around 0.05.
          *
-         * \param precdf_tries specifies that number of draws from the distribution that will be
+         * \param precdf_draws specifies that number of draws from the distribution that will be
          * attempted before calculating cdf values.  When drawing random values is cheap compared to
          * calculating cdfs, specifying this value can be very beneficial whenever the truncation
          * range isn't too small.  The default is 0 (i.e. don't do pre-cdf calculation draws), which
