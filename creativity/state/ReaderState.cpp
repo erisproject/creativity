@@ -21,11 +21,12 @@ ReaderState::ReaderState(const Reader &r) :
     creation_shape{r.creation_shape},
     creation_scale{r.creation_scale},
     profit{r.profitBelief()},
-    profit_extrap{r.profitExtrapBelief()},
     demand{r.demandBelief()},
     quality{r.qualityBelief()},
     profit_stream{r.profitStreamBeliefs()}
 {
+    if (r.profitExtrapBeliefDiffers()) profit_extrap = r.profitExtrapBelief();
+
     library.reserve(r.library().size());
     for (const auto &bq : r.library())
         library.emplace(bq.first->id(), bq.second);
@@ -50,6 +51,11 @@ void ReaderState::updateLibraryCounts(eris_time_t t) {
         if    (l.second.purchased()) { library_purchased++; if (l.second.acquired == t) library_purchased_new++; }
         else if (l.second.pirated()) { library_pirated++;   if (l.second.acquired == t) library_pirated_new++; }
     }
+}
+
+const belief::Profit& ReaderState::profitExtrap() const {
+    if (profit_extrap.n() > 0) return profit_extrap;
+    return profit;
 }
 
 }}

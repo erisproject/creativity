@@ -88,10 +88,16 @@ class ReaderState final {
 
         // Beliefs, copied out at the time the ReaderState object is created
         belief::Profit profit; ///< Profit beliefs
-        belief::Profit profit_extrap; ///< Profit beliefs using extrapolation for on-market books
+        belief::Profit profit_extrap; ///< Profit beliefs using extrapolation for on-market books (will be default-constructed if there is no extrapolation)
         belief::Demand demand; ///< Single-period demand belief
         belief::Quality quality; ///< Quality belief
         std::map<unsigned int, belief::ProfitStream> profit_stream; ///< Profit stream beliefs
+
+        /** Returns profit_extrap if it exists (i.e. if there is extrapolated data), otherwise
+         * returns profit (i.e. if there was no extrapolated data and so profit_extrap_ is exactly
+         * the same as profit_).
+         */
+        const belief::Profit& profitExtrap() const;
 
         /** Utility method to recalculate `purchased`, `purchased_new`, `pirated`, and `pirated_new`
          * from the current `library`.
