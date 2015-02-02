@@ -11,9 +11,8 @@ using namespace eris;
 struct args {
     long check_piracy_begins = -1,
          check_periods = -1;
-    unsigned int pre_piracy_periods = 50,
-                 new_piracy_periods = 50,
-                 post_piracy_periods = 50,
+    unsigned int periods = 25,
+                 skip_piracy = 1,
                  double_precision = std::numeric_limits<double>::digits10;
     bool human_readable = false;
 
@@ -24,36 +23,31 @@ args parseArgs(int argc, const char *argv[]) {
 
     args a;
 
-    TCLAP::ValueArg<long> piracy_begins_arg("P", "verify-piracy-begins", "Only use given files with a piracy_begins value matching the given argument", false, a.check_piracy_begins, "integer");
-    TCLAP::ValueArg<long> periods_arg("T", "verify-periods", "Only use given files with the last time period matching the given argument", false, a.check_periods, "integer");
-    TCLAP::ValueArg<unsigned int> pre_piracy_periods_arg("t", "pre", "Use the last 'p' pre-piracy periods to calculate pre-piracy values", true, a.pre_piracy_periods, "integer");
-    TCLAP::ValueArg<unsigned int> new_piracy_periods_arg("p", "new", "Use the first 'n' post-piracy periods to calculate the new-piracy values", true, a.new_piracy_periods, "integer");
-    TCLAP::ValueArg<unsigned int> post_piracy_periods_arg("z", "post", "Use the last 't' periods to calculate the post-piracy values", true, a.post_piracy_periods, "integer");
+    TCLAP::ValueArg<long> verify_piracy_begins_arg("P", "verify-piracy-begins", "Only use given files with a piracy_begins value matching the given argument", false, a.check_piracy_begins, "integer");
+    TCLAP::ValueArg<long> verify_periods_arg("T", "verify-periods", "Only use given files with the last time period matching the given argument", false, a.check_periods, "integer");
+    TCLAP::ValueArg<unsigned int> periods_arg("t", "periods", "Specifies the number of periods to use for calculating pre, new, and post-piracy data", true, a.periods, "integer");
+    TCLAP::ValueArg<unsigned int> skip_piracy_arg("s", "skip-piracy", "Skips the first 's' piracy periods.  Defaults to 1, as the first piracy period often involves many mispredicted quality draws.", false, a.skip_piracy, "integer");
     TCLAP::ValueArg<unsigned int> double_precision_arg("", "precision", "Specifies the precision level for double values. The default, " + std::to_string(a.double_precision) + ", is the minimum required to exactly represent all possible double values", false, a.double_precision, "integer");
-    TCLAP::SwitchArg human_readable("H", "human-readable", "Produce output in human-readable format.  The default (when this is not specified) outputs comma-separated values.");
+    TCLAP::SwitchArg human_readable("H", "human-readable", "Produce output in human-readable format.  The default (when this is not specified) outputs comma-separated values.  This also changes the default value for --precision to 8.");
 
     cmd.add(human_readable);
     cmd.add(double_precision_arg);
-    cmd.add(piracy_begins_arg);
+    cmd.add(verify_piracy_begins_arg);
+    cmd.add(verify_periods_arg);
+    cmd.add(skip_piracy_arg);
     cmd.add(periods_arg);
-    cmd.add(post_piracy_periods_arg);
-    cmd.add(new_piracy_periods_arg);
-    cmd.add(pre_piracy_periods_arg);
 
-    //TCLAP::UnlabeledMultiArg<std::string> input("CRSTATE files", "One or more .crstate files to generate statistics from", true, "filenames");
-    //cmd.add(input);
-    TCLAP::UnlabeledMultiArg<std::string> input("input-files", "One or more .crstate files to generate statistics from", true, "DATASOURCE");
+    TCLAP::UnlabeledMultiArg<std::string> input("input-files", "One or more .crstate files to generate statistics from", true, "filenames");
     cmd.add(input);
 
     cmd.parse(argc, argv);
 
-    a.check_piracy_begins = piracy_begins_arg.getValue();
-    a.check_periods = periods_arg.getValue();
-    a.pre_piracy_periods = pre_piracy_periods_arg.getValue();
-    a.new_piracy_periods = new_piracy_periods_arg.getValue();
-    a.post_piracy_periods = post_piracy_periods_arg.getValue();
-    a.double_precision = double_precision_arg.getValue();
+    a.check_piracy_begins = verify_piracy_begins_arg.getValue();
+    a.check_periods = verify_periods_arg.getValue();
+    a.periods = periods_arg.getValue();
+    a.skip_piracy = skip_piracy_arg.getValue();
     a.human_readable = human_readable.getValue();
+    a.double_precision = (double_precision_arg.isSet() or not a.human_readable) ? double_precision_arg.getValue() : 8;
     a.input = input.getValue();
 
     return a;
@@ -112,16 +106,16 @@ int main(int argc, const char *argv[]) {
                 "simulation periods " << storage.size()-1 << " != " << a.check_periods);
         SKIP_IF(a.check_piracy_begins >= 0 and (size_t) a.check_piracy_begins != creativity->parameters.piracy_begins,
                 "simulation piracy_begins " << creativity->parameters.piracy_begins << " != " << a.check_piracy_begins);
-        SKIP_IF(creativity->parameters.piracy_begins <= a.pre_piracy_periods,
-                "simulation per-piracy periods " << creativity->parameters.piracy_begins << " != " << a.pre_piracy_periods);
+        SKIP_IF(creativity->parameters.piracy_begins <= a.periods,
+                "simulation per-piracy periods " << creativity->parameters.piracy_begins << " != " << a.periods);
         SKIP_IF(storage.size() <= creativity->parameters.piracy_begins,
                 "simulation doesn't have any piracy periods (T=" << storage.size()-1 << ", P=" << creativity->parameters.piracy_begins << ")");
         // e.g. size = 200 means we have T=0 through T=199; if P=150, then there are 200-150
         // (==199-150+1) = 50 piracy periods (150 through 199), so we could allow any new+post <=
         // 50.  Or equivalently, size must be at least piracy_begins + new + post:
-        SKIP_IF(storage.size() < creativity->parameters.piracy_begins + a.new_piracy_periods + a.post_piracy_periods,
-                "simulation has insufficient post-piracy periods (need " << a.new_piracy_periods << " (new) + " << a.post_piracy_periods <<
-                " (post) but only have " << storage.size() - creativity->parameters.piracy_begins << " post-piracy periods");
+        SKIP_IF(storage.size() < creativity->parameters.piracy_begins + a.skip_piracy + 2*a.periods,
+                "simulation has insufficient post-piracy periods: need " << a.skip_piracy + 2*a.periods << " ["<< a.skip_piracy << " skip, " << a.periods << " new, " << a.periods <<
+                " post], but only have " << storage.size() - creativity->parameters.piracy_begins << " post-piracy periods");
 
 #undef SKIP_IF
 
@@ -142,9 +136,11 @@ int main(int argc, const char *argv[]) {
         // Keep a reference to all of the periods, so that the following don't end up continually
         // reloading them from disk/database.
         std::list<std::shared_ptr<const State>> state_cache;
-        for (eris_id_t t = piracy_begins - a.pre_piracy_periods; t < piracy_begins + a.new_piracy_periods; t++)
+        for (eris_id_t t = piracy_begins - a.periods; t < piracy_begins; t++)
             state_cache.push_back(storage[t]);
-        for (eris_id_t t = storage.size() - a.post_piracy_periods; t < storage.size(); t++)
+        for (eris_id_t t = piracy_begins + a.skip_piracy; t < piracy_begins + a.skip_piracy + a.periods; t++)
+            state_cache.push_back(storage[t]);
+        for (eris_id_t t = storage.size() - a.periods; t < storage.size(); t++)
             state_cache.push_back(storage[t]);
 
         // pre_*:
@@ -153,18 +149,20 @@ int main(int argc, const char *argv[]) {
                 if (a.human_readable) output << std::setw(longest_name+1) << "pre_" + d.name + ":" << " ";
                 else output << ",";
 
-                output << d.calculate(storage, piracy_begins - a.pre_piracy_periods, piracy_begins - 1);
+                output << d.calculate(storage, piracy_begins - a.periods, piracy_begins - 1);
 
                 if (a.human_readable) output << "\n";
             }
         }
+        std::cout << "skip: " << a.skip_piracy << "\n";
+        std::cout << "skip: " << a.periods << "\n";
 
         // new_*:
         for (auto &d : data) {
             if (a.human_readable) output << std::setw(longest_name+1) << "new_" + d.name + ":" << " ";
             else output << ",";
 
-            output << d.calculate(storage, piracy_begins, piracy_begins + a.new_piracy_periods - 1);
+            output << d.calculate(storage, piracy_begins + a.skip_piracy, piracy_begins + a.skip_piracy + a.periods - 1);
 
             if (a.human_readable) output << "\n";
         }
@@ -174,7 +172,7 @@ int main(int argc, const char *argv[]) {
             if (a.human_readable) output << std::setw(longest_name+1) << "post_" + d.name + ":" << " ";
             else output << ",";
 
-            output << d.calculate(storage, storage.size() - a.post_piracy_periods, storage.size() - 1);
+            output << d.calculate(storage, storage.size() - a.periods, storage.size() - 1);
 
             if (a.human_readable) output << "\n";
         }
