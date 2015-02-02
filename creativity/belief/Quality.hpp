@@ -14,7 +14,7 @@ namespace belief {
 /** This class represents a reader's belief about the quality of an unread book.  The model is:
  *
  * \f[
- *     q = \beta_0 + \beta_1 prevBooks + \beta_2 age + \beta_3 numCopies + u_{i}
+ *     q = \beta_1 prevBooks + \beta_2 age + \beta_3 numCopies + u_{i}
  * \f]
  * where:
  * - \f$prevBooks\f$ is the number of previous books written by this author (so if this was the
@@ -43,11 +43,11 @@ class Quality : public Linear {
         explicit Quality(Args &&...args) : Linear(std::forward<Args>(args)...)
         {
             // Set beta names for nicer output
-            names({"const", "prevBooks", "age", "numCopies"});
+            names({"prevBooks", "age", "numCopies"});
         }
 
-        /// Returns the number of parameters of this model (4)
-        static unsigned int parameters() { return 4; }
+        /// Returns the number of parameters of this model (3)
+        static unsigned int parameters() { return 3; }
 
         /// Returns `parameters()`
         virtual unsigned int fixedModelSize() const override;
@@ -68,10 +68,10 @@ class Quality : public Linear {
             Eigen::MatrixXd X(books.size(), parameters());
             size_t i = 0;
             for (const eris::SharedMember<Book> &book : books) {
-                X(i, 0) = 1;
-                X(i, 1) = book->order();
-                X(i, 2) = book->age();
-                X(i, 3) = book->lifeSales() + book->lifePirated();
+                //X(i, 0) = 1;
+                X(i, 0) = book->order();
+                X(i, 1) = book->age();
+                X(i, 2) = book->lifeSales() + book->lifePirated();
                 i++;
             }
             return X;

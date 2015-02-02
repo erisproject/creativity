@@ -20,7 +20,7 @@ double net_u(const Storage &cs, eris_time_t from, eris_time_t to) {
             net_u_total += r.second.u - r.second.income;
         }
     }
-    return net_u_total / (cs[from]->readers.size() * (from-to+1));
+    return net_u_total / (cs[from]->readers.size() * (to-from+1));
 }
 
 /** Calculates the average market life of books written between `from` and `to`, in simulation
@@ -307,6 +307,7 @@ std::vector<initial_datum> initial_data_fields() {
     ADD_SETTING(cost_fixed);
     ADD_SETTING(cost_unit);
     ADD_SETTING(cost_piracy);
+    ADD_SETTING(creation_time);
     ADD_SETTING(income);
     ADD_SETTING(piracy_begins);
     ADD_SETTING(piracy_link_proportion);
@@ -314,6 +315,7 @@ std::vector<initial_datum> initial_data_fields() {
     ADD_SETTING(prior_scale_piracy);
     ADD_SETTING(prior_scale_burnin);
     ADD_SETTING(burnin_periods);
+    ADD_SETTING(prediction_draws);
     ADD_SETTING(initial.prob_write);
     ADD_SETTING(initial.q_min);
     ADD_SETTING(initial.q_max);

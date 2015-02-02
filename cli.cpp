@@ -134,7 +134,7 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
 #define OPTION_UNBOUNDED_INIT(PARAM, SHORT, LONG, DESC) OPTION_UNBOUNDED_NAME(initial_##PARAM, initial.PARAM, SHORT, LONG, DESC)
 
 // Single-letter options used:
-// b B c C d D f i j k K m M n N o O p P Q r R s T u U w W x y z Z
+// b B c C d D e f i j k K m M n N o O p P Q r R s T u U w W x y z Z
 
         OPTION_LBOUND(readers, "r", "readers", "Number of reader/author agents in the simulation", 1);
         OPTION_LBOUND(dimensions, "D", "dimensions", "Number of dimensions of the simulation", 1);
@@ -149,6 +149,7 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         OPTION_UBOUND_STRICT(reader_creation_shape, "s", "reader-creation-shape", u8"Shape parameter, β, of the creator effort function: q(ℓ) = (α/β)[(ℓ+1)^β - 1]", 1);
         OPTION_LBOUND(reader_creation_scale_min, "z", "reader-creation-scale-min", u8"Minimum support of scale parameter α ~ U[a,b] for the creator effort function: q(ℓ) = (α/β)[(ℓ+1)^β - 1]", 0);
         OPTION_LBOUND(reader_creation_scale_max, "Z", "reader-creation-scale-max", u8"Maximum support of scale parameter α ~ U[a,b] for the creator effort function: q(ℓ) = (α/β)[(ℓ+1)^β - 1]", 0);
+        OPTION_LBOUND(creation_time, "e", "creation-time", u8"The number of periods that elapse between the creation decision and the book being ready", 0);
         OPTION_LBOUND(cost_fixed, "C", "cost-fixed", "Fixed cost of keeping a book on the market for a period", 0);
         OPTION_LBOUND(cost_unit, "c", "cost-unit", "Unit cost of making a copy of a book", 0);
         OPTION_LBOUND(cost_piracy, "y", "cost-piracy", "Cost of receiving a pirated copy of a book", 0);
@@ -200,6 +201,7 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         COPY_PARAM_SETTING(reader_creation_shape);
         COPY_PARAM_SETTING(reader_creation_scale_min);
         COPY_PARAM_SETTING(reader_creation_scale_max);
+        COPY_PARAM_SETTING(creation_time);
         COPY_PARAM_SETTING(cost_fixed);
         COPY_PARAM_SETTING(cost_unit);
         COPY_PARAM_SETTING(cost_piracy);

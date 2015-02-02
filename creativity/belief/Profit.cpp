@@ -35,9 +35,9 @@ double Profit::argmaxL(
     return eris::single_peak_search(profit, 0, l_max);
 }
 
-RowVectorXd Profit::profitRow(double quality, int previous_books, int lag_market_books) {
+RowVectorXd Profit::profitRow(double quality, int, int lag_market_books) {
     RowVectorXd Xi(parameters());
-    Xi << 1.0, quality, quality*quality, previous_books, lag_market_books;
+    Xi << 1.0, quality, quality*quality, lag_market_books;
     return Xi;
 }
 

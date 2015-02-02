@@ -7,12 +7,11 @@ namespace creativity { namespace belief {
 /** This class represents an author's belief about the lifetime profitability of a work.  The model
  * is:
  *
- * \f$\Pi_b = \beta_0 + \beta_1 q_b + \beta_2 q_b^2 + \beta_3 previousBooks + \beta_4 marketBooks + u\f$
+ * \f$\Pi_b = \beta_0 + \beta_1 q_b + \beta_2 q_b^2 + \beta_3 marketBooks + u\f$
  *
  * Specifically, the fields above are:
  * - \f$Pi_b\f$ is the lifetime profits of the book
  * - \f$q_b\f$ is the (non-negative) quality of the book.
- * - \f$previousBooks\f$ is the number of previous books the author has created.
  * - \f$marketBooks\f$ is the number of books on the market in the previous period (books in the
  *   current period can't be used because it is unknown at the time the reader is making the
  *   decision of whether or not to create).
@@ -21,7 +20,7 @@ namespace creativity { namespace belief {
  * - \f$\beta_1 \geq 0\f$ (profit increases with quality, at least for low quality values)
  * - \f$\beta_2 \leq 0\f$ (the effect of profit is concave)
  *
- * Although a \f$\beta_4 \leq 0\f$ restriction would make some intuitive sense (more competition
+ * Although a \f$\beta_3 \leq 0\f$ restriction would make some intuitive sense (more competition
  * means lower profit), it isn't imposed because readers can only use the previous period's number
  * of market books when deciding on an action for the next period, and it seems entirely reasonable
  * that this value is positive, to allow for cyclical behaviour.
@@ -47,16 +46,16 @@ class Profit : public LinearRestricted {
         explicit Profit(Args &&...args) : LinearRestricted(std::forward<Args>(args)...)
         {
             // Add restrictions:
-            restrict(1) >= 0; // beta_q >= 0 (higher quality <-> higher profits, at least for low quality)
-            restrict(2) <= 0; // beta_{q^2} <= 0 (quality effect is concave)
-            //restrict(4) <= 0; // beta_{marketbooks} <= 0 (more competition <-> lower profit)
+            //restrict(1) >= 0; // beta_q >= 0 (higher quality <-> higher profits, at least for low quality)
+            //restrict(2) <= 0; // beta_{q^2} <= 0 (quality effect is concave)
+            //restrict(3) <= 0; // beta_{marketbooks} <= 0 (more competition <-> lower profit)
 
             // Set beta names for nicer output
-            names({"const", "quality", u8"quality²", "prevBooks", "marketBooks"});
+            names({"const", "quality", u8"quality²", "marketBooks"});
         }
 
-        /// Returns the number of parameters of this model (5)
-        static unsigned int parameters() { return 5; }
+        /// Returns the number of parameters of this model (4)
+        static unsigned int parameters() { return 4; }
 
         /// Returns `parameters()`
         virtual unsigned int fixedModelSize() const override;

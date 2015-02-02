@@ -697,6 +697,7 @@ void GUI::thr_update_parameters() {
     SET_SB(prior_scale_burnin);
     SET_SB(burnin_periods);
     SET_SB(prediction_draws);
+    SET_SB(creation_time);
     widget<Gtk::SpinButton>("set_piracy_link_proportion")->set_value(creativity_->parameters.piracy_link_proportion * 100.0);
 #define SET_INIT_SB(PARAMETER) widget<Gtk::SpinButton>("set_init_" #PARAMETER)->set_value(creativity_->parameters.initial.PARAMETER)
     SET_INIT_SB(prob_write);
@@ -931,6 +932,7 @@ void GUI::setupSim() {
     COPY_SB_D(prior_scale_burnin);
     COPY_SB_I(burnin_periods);
     COPY_SB_I(prediction_draws);
+    COPY_SB_I(creation_time);
 #define COPY_SB_INIT_D(PARAMETER) set.initial.PARAMETER = sb("set_init_"#PARAMETER)
     COPY_SB_INIT_D(prob_write);
     COPY_SB_INIT_D(q_min);

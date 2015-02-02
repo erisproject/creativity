@@ -12,7 +12,7 @@ unsigned int Quality::fixedModelSize() const { return parameters(); }
 
 double Quality::predict(const Book &book, unsigned int draws) {
     RowVectorXd X(K());
-    X << 1, book.order(), book.age(), book.lifeSales() + book.lifePirated();
+    X << book.order(), book.age(), book.lifeSales() + book.lifePirated();
     return predict(X, draws);
 }
 

@@ -52,19 +52,24 @@ struct CreativitySettings {
      *
      * \sa Reader.creation_shape
      */
-    double reader_creation_shape = 0.5;
+    double reader_creation_shape = 0;
 
     /** Reader.creation_scale values are drawn from \f$U[a,b]\f$, where this value is the lower
      * bound.  Defaults to 5.
      *
      * \sa Reader.creation_scale
      */
-    double reader_creation_scale_min = 5.0;
+    double reader_creation_scale_min = 1.0;
 
     /** Reader.creation_scale values are drawn from \f$U[a,b]\f$, where this value is the upper
      * bound.  Defaults to 15.
      */
-    double reader_creation_scale_max = 15.0;
+    double reader_creation_scale_max = 10.0;
+
+    /** The length of time (in simulation periods) it takes to create a book.  If 0, books are
+     * created instantly; if larger, the given number of periods go by before the book is finished.
+     */
+    unsigned int creation_time = 3;
 
     /** The fixed cost of keeping a book on the market.
      */
@@ -113,7 +118,7 @@ struct CreativitySettings {
     /** The factor by which parameter standard deviations should be multiplied when using it as a
      * prior for a subsequent period, after the initial burn-in period.
      */
-    double prior_scale = 1.05;
+    double prior_scale = 1.02;
 
     /** The factor by which to multiply standard deviations in the first piracy period.  This value
      * overrides `prior_scale` in the `piracy_begins` period.
@@ -132,7 +137,7 @@ struct CreativitySettings {
     /** The number of model draws to use for prediction.  Higher values yield more "accurate"
      * predictions, but lower values may be desirable to introduce more random agent behaviour.
      */
-    uint32_t prediction_draws = 50;
+    uint32_t prediction_draws = 100;
 
     /** The values in this struct define fixed probabilities and distributions of simulation
      * actions.  This is needed because, in the initial simulation periods, readers only have

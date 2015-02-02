@@ -700,7 +700,12 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
             /// Books written by this reader that are still on the market
             wrote_market_,
             /// Cache of the set of all simulation books that haven't been read yet
-            book_cache_;
+            book_cache_,
+            /** Cache of the set of books that haven't been read and haven't been learned (because
+             * they were still on the market last time profit belief was updated).  This cache is
+             * cleared of off-market books in updateBeliefs().
+             */
+            book_cache_market_;
         /** The set of books associated with reservations_ and reserved_piracy_cost_; the bool is
          * true if this is a pirated book, false for a purchased book. */
         std::unordered_map<eris::SharedMember<Book>, bool> reserved_books_;
@@ -722,9 +727,11 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         // or has a negative price, it'll be removed from the market
         std::unordered_map<eris::SharedMember<Book>, double> new_prices_;
 
-        // Whether to create, and the various attributes of that creation
-        bool create_ = false;
+        bool create_started_ = false;
+        int create_countdown_ = -1; // the number of periods remaining until the book is finished; new books are only created when this is -1.
         double create_effort_ = 0, create_quality_ = 0, create_price_ = 0;
+        // The author's position at the time of creation; the final position will be this plus noise
+        eris::Position create_position_;
 
 };
 

@@ -660,8 +660,8 @@ class LinearRestricted : public Linear {
             draw_rejection_success = 0, ///< The cumulative number of successful rejection draws
             draw_rejection_discards = 0, ///< The cumulative number of inadmissable rejection draws
             draw_rejection_max_discards = 100, ///< The maximum number of inadmissable draws for a single rejection draw before aborting
-            draw_gibbs_burnin = 50, ///< The number of burn-in draws for the first Gibbs sampler draw
-            draw_gibbs_thinning = 3, ///< drawGibbs() uses every `draw_gibbs_thinning`th sample (1 = use every draw)
+            draw_gibbs_burnin = 100, ///< The number of burn-in draws for the first Gibbs sampler draw
+            draw_gibbs_thinning = 2, ///< drawGibbs() uses every `draw_gibbs_thinning`th sample (1 = use every draw)
             draw_gibbs_retry = 3; ///< how many times drawGibbs() will retry in the event of a draw failure
         double draw_auto_min_success_rate = 0.2; ///< The minimum draw success rate below which we switch to Gibbs sampling
 

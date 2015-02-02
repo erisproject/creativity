@@ -272,96 +272,101 @@ void Reader::interOptimize() {
         }
     }
 
-    //// NEW BOOK CREATION:
-    create_ = false;
-    if (income_available >= cost_fixed) {
-        // Creating a book requires an ability to predict profit (to determine whether creation is
-        // worthwhile), and an ability to predict demand (to determine the initial price)
-        if (usableBelief(*profit_belief_) and usableBelief(demand_belief_)) { // NB: profit_belief_extrap_ is a copy or update of profit_belief_, so will also be usable
-            // Create a book if E(profit) > effort required
+    if (create_countdown_ == -1) {
+        //// NEW BOOK CREATION:
+        if (income_available >= cost_fixed) {
+            // Creating a book requires an ability to predict profit (to determine whether creation is
+            // worthwhile), and an ability to predict demand (to determine the initial price)
+            if (usableBelief(*profit_belief_) and usableBelief(demand_belief_)) { // NB: profit_belief_extrap_ is a copy or update of profit_belief_, so will also be usable
+                // Create a book if E(profit) > effort required
 
-            // Find the l that maximizes creation profit given current wealth (which would have come from
-            // past sales, if non-zero) plus the fixed income we're about to receive, minus whatever we
-            // decided to spend above to keep books on the market.
+                // Find the l that maximizes creation profit given current wealth (which would have come from
+                // past sales, if non-zero) plus the fixed income we're about to receive, minus whatever we
+                // decided to spend above to keep books on the market.
 
-            try {
-                // FIXME: is this right, w.r.t. Bayesian MC prediction?  (Is averaging being done too
-                // early?)
-                double effort;
-#               ifdef ERIS_DEBUG
                 try {
-#               endif
-                effort = profit_belief_extrap_->argmaxL(
-                        creativity_->parameters.prediction_draws,
-                        [this] (double l) -> double { return creationQuality(l); },
-                        authored_books, market_books, income_available - cost_fixed
-                        );
+                    // FIXME: is this right, w.r.t. Bayesian MC prediction?  (Is averaging being done too
+                    // early?)
+                    double effort;
 #               ifdef ERIS_DEBUG
-                } catch (belief::Linear::draw_failure &e) {
-                    ERIS_DBG("draw failure in profit_extrap argmaxL for reader=" << id() << ", t=" << simulation()->t() << ": " << e.what());
-                    throw;
-                }
-#               endif
-                double quality = creationQuality(effort);
-
-                double exp_profit;
-#               ifdef ERIS_DEBUG
-                try {
-#               endif
-                exp_profit = profit_belief_extrap_->predict(creativity_->parameters.prediction_draws, quality, authored_books, market_books);
-#               ifdef ERIS_DEBUG
-                }
-                catch (belief::LinearRestricted::draw_failure &e) {
-                    ERIS_DBG("draw failure in profit_extrap belief prediction; reader="<<id() << ", t=" << simulation()->t());
-                    throw;
-                }
-#               endif
-
-                // If the optimal effort level gives a book with positive expected profits, do it:
-                if (exp_profit > effort) {
-                    // We're going to create, so calculate the optimal first-period price.  It's possible that
-                    // we get back cost_unit (and so predicted profit is non-positive); write the book anyway:
-                    // perhaps profits are expected to come in later periods?
-                    std::pair<double, double> max;
-#                   ifdef ERIS_DEBUG
                     try {
-#                   endif
-                    max = demand_belief_.argmaxP(creativity_->parameters.prediction_draws, quality, 0, 0,
-                            creativity_->parameters.readers, 0, 0, authored_books, market_books, cost_unit,
-                            income / 10);
-#                   ifdef ERIS_DEBUG
-                    }
-                    catch (belief::LinearRestricted::draw_failure &e) {
-                        ERIS_DBG("draw failure in demand argmaxP calculation; reader="<<id() << ", t=" << simulation()->t());
-                        ERIS_DBGVAR(demand_belief_.draw_rejection_success);
+#               endif
+                    effort = profit_belief_extrap_->argmaxL(
+                            creativity_->parameters.prediction_draws,
+                            [this] (double l) -> double { return creationQuality(l); },
+                            authored_books, market_books, income_available - cost_fixed
+                            );
+#               ifdef ERIS_DEBUG
+                    } catch (belief::Linear::draw_failure &e) {
+                        ERIS_DBG("draw failure in profit_extrap argmaxL for reader=" << id() << ", t=" << simulation()->t() << ": " << e.what());
                         throw;
                     }
-#                   endif
-                    if (max.first > 0) {
-                        create_price_ = max.first;
-                        create_quality_ = quality;
-                        create_effort_ = effort;
-                        create_ = true;
+#               endif
+                    double quality = creationQuality(effort);
+
+                    double exp_profit;
+#               ifdef ERIS_DEBUG
+                    try {
+#               endif
+                    exp_profit = profit_belief_extrap_->predict(creativity_->parameters.prediction_draws, quality, authored_books, market_books);
+#               ifdef ERIS_DEBUG
                     }
-                    // else: even though our Profit seems like it would be positive, our demand
-                    // belief suggests otherwise, so don't create.
+                    catch (belief::LinearRestricted::draw_failure &e) {
+                        ERIS_DBG("draw failure in profit_extrap belief prediction; reader="<<id() << ", t=" << simulation()->t());
+                        throw;
+                    }
+#               endif
+
+                    // If the optimal effort level gives a book with positive expected profits, do it:
+                    if (exp_profit > effort) {
+                        // We're going to create, so calculate the optimal first-period price.  It's possible that
+                        // we get back cost_unit (and so predicted profit is non-positive); write the book anyway:
+                        // perhaps profits are expected to come in later periods?
+                        std::pair<double, double> max;
+#                   ifdef ERIS_DEBUG
+                        try {
+#                   endif
+                        max = demand_belief_.argmaxP(creativity_->parameters.prediction_draws, quality, 0, 0,
+                                creativity_->parameters.readers, 0, 0, authored_books, market_books, cost_unit,
+                                income / 10);
+#                   ifdef ERIS_DEBUG
+                        }
+                        catch (belief::LinearRestricted::draw_failure &e) {
+                            ERIS_DBG("draw failure in demand argmaxP calculation; reader="<<id() << ", t=" << simulation()->t());
+                            ERIS_DBGVAR(demand_belief_.draw_rejection_success);
+                            throw;
+                        }
+#                   endif
+                        if (max.first > 0) {
+                            create_price_ = max.first;
+                            create_quality_ = quality;
+                            create_effort_ = effort;
+                            create_started_ = true;
+                            create_countdown_ = creativity_->parameters.creation_time;
+                            create_position_ = position();
+                        }
+                        // else: even though our Profit seems like it would be positive, our demand
+                        // belief suggests otherwise, so don't create.
+                    }
+                }
+                catch (belief::Linear::draw_failure &e) {
+                    // Ignore draw failures
                 }
             }
-            catch (belief::Linear::draw_failure &e) {
-                // Ignore draw failures
-            }
-        }
-        else {
-            // If we have no useful profit belief yet, just use the initial values:
-            if (creativity_->parameters.initial.prob_write > 0 and std::bernoulli_distribution(creativity_->parameters.initial.prob_write)(rng)) {
-                double q = std::uniform_real_distribution<double>(creativity_->parameters.initial.q_min, creativity_->parameters.initial.q_max)(rng);
-                double effort = creationEffort(q);
-                // Make sure the required effort doesn't exceed the available funds
-                if (income_available >= cost_fixed + effort) {
-                    create_ = true;
-                    create_price_ = cost_unit + std::uniform_real_distribution<double>(creativity_->parameters.initial.p_min, creativity_->parameters.initial.p_max)(rng);
-                    create_quality_ = q;
-                    create_effort_ = effort;
+            else {
+                // If we have no useful profit belief yet, just use the initial values:
+                if (creativity_->parameters.initial.prob_write > 0 and std::bernoulli_distribution(creativity_->parameters.initial.prob_write)(rng)) {
+                    double q = std::uniform_real_distribution<double>(creativity_->parameters.initial.q_min, creativity_->parameters.initial.q_max)(rng);
+                    double effort = creationEffort(q);
+                    // Make sure the required effort doesn't exceed the available funds
+                    if (income_available >= effort) {
+                        create_started_ = true;
+                        create_countdown_ = creativity_->parameters.creation_time;
+                        create_price_ = cost_unit + std::uniform_real_distribution<double>(creativity_->parameters.initial.p_min, creativity_->parameters.initial.p_max)(rng);
+                        create_quality_ = q;
+                        create_effort_ = effort;
+                        create_position_ = position();
+                    }
                 }
             }
         }
@@ -382,29 +387,50 @@ void Reader::interApply() {
 
     auto sim = simulation();
     SharedMember<Book> newbook;
-    if (create_) {
-        // The cost (think of this as an opportunity cost) of creating, and the first period fixed
-        // cost:
-        assets()[creativity_->money] -= create_effort_ + cost_fixed;
+    if (create_started_) {
+        // Incur the creation effort cost right away
+        assets()[creativity_->money] -= create_effort_;
+        create_started_ = false;
+    }
+    if (create_countdown_ > 0) {
+        create_countdown_--;
+    }
+    else if (create_countdown_ == 0) {
+        // Book is finished, release it.
 
-        // The book is centered at the reader's position, plus some noise we add below
-        Position bookPos{position()};
+        if (assets()[creativity_->money] >= cost_fixed) {
+            // We can't afford to release it right now, so just hang onto it and release it next
+            // period.
 
-        auto qdraw = [this] (const Book &book) -> double {
-            return std::max(0.0, book.quality() + writer_quality_sd * Random::rstdnorm());
-        };
-        newbook = sim->spawn<Book>(creativity_, bookPos, sharedSelf(), wrote_.size(), create_price_, create_quality_, qdraw);
+            // The cost (think of this as an opportunity cost) of creating, and the first period fixed
+            // cost:
+            assets()[creativity_->money] -= cost_fixed;
 
-        /// If enabled, add some noise in a random direction to the position
-        if (writer_book_sd > 0) {
-            double step_dist = writer_book_sd * Random::rstdnorm();
-            newbook->moveBy(step_dist * Position::random(bookPos.dimensions));
+            auto qdraw = [this] (const Book &book) -> double {
+                // Truncated normal.  Since book.quality() > 0, this should return a valid draw 50% of
+                // the time, so this loop shouldn't run that much, usually.
+                double x;
+                do { x = book.quality() + writer_quality_sd * Random::rstdnorm(); }
+                while (x < 0);
+                return x;
+            };
+            newbook = sim->spawn<Book>(creativity_, create_position_, sharedSelf(), wrote_.size(), create_price_, create_quality_, qdraw);
+
+            /// If enabled, add some noise in a random direction to the position
+            if (writer_book_sd > 0) {
+                double step_dist = writer_book_sd * Random::rstdnorm();
+                newbook->moveBy(step_dist * Position::random(create_position_.dimensions));
+            }
+
+            wrote_.insert(wrote_.end(), newbook);
+            wrote_market_.insert(newbook);
+            auto ins = library_.emplace(SharedMember<Book>(newbook), BookCopy(create_quality_, BookCopy::Status::wrote, sim->t()));
+            library_on_market_.emplace(newbook, std::ref(ins.first->second));
+
+            create_countdown_--;
         }
-
-        wrote_.insert(wrote_.end(), newbook);
-        wrote_market_.insert(newbook);
-        auto ins = library_.emplace(SharedMember<Book>(newbook), BookCopy(create_quality_, BookCopy::Status::wrote, sim->t()));
-        library_on_market_.emplace(newbook, std::ref(ins.first->second));
+        // Otherwise we can't afford to bring it to market just now, so hold onto it until next
+        // time.
     }
 
     std::vector<SharedMember<Book>> remove;
@@ -414,8 +440,8 @@ void Reader::interApply() {
             b->market()->setPrice(new_prices_[b]);
             assets()[creativity_->money] -= cost_fixed;
         }
-        else if (not create_ or b != newbook) {
-            // No new price, which means we're removing the book from the market
+        else if (newbook != b) {
+            // No new price (and not the newbie), which means we're removing the book from the market
             remove.push_back(b);
         }
     }
@@ -462,6 +488,7 @@ double Reader::quality(const SharedMember<Book> &b) const {
         // No informative beliefs above quality, so just use initial parameter mean (= midpoint)
         q_hat = (creativity_->parameters.initial.q_max + creativity_->parameters.initial.q_min) / 2.0;
     }
+    if (q_hat < 0) q_hat = 0;
     quality_predictions_.emplace(b, q_hat);
 
     return q_hat;
@@ -481,7 +508,7 @@ void Reader::receiveProceeds(const SharedMember<Book> &book, const Bundle &reven
 
 const belief::Profit& Reader::profitBelief() const { return *profit_belief_; }
 const belief::Profit& Reader::profitExtrapBelief() const { return *profit_belief_extrap_; }
-bool Reader::profitExtrapBeliefDiffers() const { return profit_belief_ == profit_belief_extrap_; }
+bool Reader::profitExtrapBeliefDiffers() const { return profit_belief_ != profit_belief_extrap_; }
 const belief::Demand& Reader::demandBelief() const { return demand_belief_; }
 const belief::Quality& Reader::qualityBelief() const { return quality_belief_; }
 const belief::ProfitStream& Reader::profitStreamBelief(const unsigned int age, const bool usable) const {
@@ -509,7 +536,7 @@ bool Reader::usableBelief(const belief::Linear &model) const {
 void Reader::updateBeliefs() {
     updateQualityBelief();
     updateDemandBelief();
-    updateProfitStreamBelief();
+    //updateProfitStreamBelief();
     updateProfitBelief();
 
     // Clear any "on-market" book references that aren't on the market anymore, since they just got
@@ -521,6 +548,14 @@ void Reader::updateBeliefs() {
     }
     for (auto &book : remove)
         library_on_market_.erase(book);
+
+    remove.clear();
+    for (auto &book : book_cache_market_) {
+        if (not book->hasMarket())
+            remove.push_back(book);
+    }
+    for (auto &book : remove)
+        book_cache_market_.erase(book);
 }
 
 void Reader::updateQualityBelief() {
@@ -556,34 +591,49 @@ void Reader::updateDemandBelief() {
     if (simulation()->t() < 3) return;
 
     double weaken = creativity_->priorWeight();
-    if (weaken != 1.0) demand_belief_ = std::move(demand_belief_).weaken(weaken);
 
-    if (not library_on_market_.empty()) {
-        VectorXd y(library_on_market_.size());
-        MatrixXdR X(library_on_market_.size(), demand_belief_.K());
+    // Figure out which books might yield usable data: i.e. those on the market
+    std::list<SharedMember<Book>> mktbooks;
+    for (auto &bu : library_on_market_) {
+        if (bu.first->hasMarket()) mktbooks.push_back(bu.first);
+    }
+    for (auto &b : book_cache_market_) {
+        if (b->hasMarket()) mktbooks.push_back(b);
+    }
+
+    if (not mktbooks.empty()) {
+        VectorXd y(mktbooks.size());
+        MatrixXdR X(mktbooks.size(), demand_belief_.K());
         // NB: this runs in the interoptimizer, which means t has already been incremented
         auto last_t = simulation()->t() - 1;
         size_t i = 0;
-        for (const auto &b : library_on_market_) {
-            if (b.first->hasMarket()) {
-                y[i] = b.first->sales(last_t);
-                X.row(i) = Demand::bookRow(b.first, b.second.get().quality, creativity_->market_books_lagged);
-                i++;
-            }
+        for (const auto &b : mktbooks) {
+            y[i] = b->sales(last_t);
+            X.row(i) = Demand::bookRow(b, quality(b), creativity_->market_books_lagged);
+            i++;
         }
 
-        if (i > 0) {
-            demand_belief_ = std::move(demand_belief_).update(y.head(i), X.topRows(i));
-        }
+        demand_belief_ = std::move(demand_belief_).weaken(weaken).update(y.head(i), X.topRows(i));
     }
+    else if (weaken != 1.0)
+        demand_belief_ = std::move(demand_belief_).weaken(weaken);
 }
 void Reader::updateProfitStreamBelief() {
+
+    // Figure out which books might yield usable data
+    std::list<SharedMember<Book>> potential;
+    for (auto &bu : library_on_market_) {
+        if (not bu.first->hasMarket()) potential.push_back(bu.first);
+    }
+    for (auto &b : book_cache_market_) {
+        if (not b->hasMarket()) potential.push_back(b);
+    }
+
     // Map book age into lists of books that survived on the market at least that long.  Only books
     // that have just left the market are considered (whether or not this reader bought or obtained
     // by piracy).
     std::map<unsigned int, std::vector<SharedMember<Book>>> to_learn;
-    for (auto &bu : library_on_market_) {
-        auto &book = bu.first;
+    for (auto &book : potential) {
         if (not book->hasMarket()) { // The last time we checked, it had a market, so it just left
             unsigned long periods = book->marketPeriods();
             if (periods <= 1) continue; // We can't do anything with a single-period book
@@ -692,56 +742,51 @@ void Reader::updateProfitBelief() {
     // incorporated books into the belief because we need the lagged market book count
     if (simulation()->t() < 3) return;
 
-    std::vector<std::pair<SharedMember<Book>, std::reference_wrapper<BookCopy>>> new_prof_books, extrap_books;
+    std::vector<std::pair<SharedMember<Book>, double>> new_prof_books, extrap_books;
+
     for (auto &bc : library_on_market_) {
         if (bc.first->hasMarket()) {
             // The book is still on the market, so we'll have to extrapolate using profit stream
             // beliefs
-            extrap_books.push_back(bc);
+            extrap_books.push_back(std::make_pair(bc.first, bc.second.get().quality));
         }
         else {
             // The book just left the market
-            new_prof_books.push_back(bc);
+            new_prof_books.push_back(std::make_pair(bc.first, bc.second.get().quality));
         }
     }
 
+    // Also need to go through books that we don't own, using predicted quality
+    for (auto &b : book_cache_market_) {
+        if (b->hasMarket())
+            extrap_books.push_back(std::make_pair(b, quality(b)));
+        else
+            new_prof_books.push_back(std::make_pair(b, quality(b)));
+    }
+
     double weaken = creativity_->priorWeight();
-    if (weaken != 1.0) *profit_belief_ = std::move(*profit_belief_).weaken(weaken);
 
     if (not new_prof_books.empty()) {
         MatrixXd X(new_prof_books.size(), profit_belief_->K());
         VectorXd y(new_prof_books.size());
 
         size_t i = 0;
-        for (auto &bc : new_prof_books) {
-            auto &book = bc.first;
-            // Calculate the book's total (optimal) profit, ignoring trailing negative profit
-            // periods (which would be non-optimal for this reader (and probably for the actual
-            // author, though not necessarily because the actual author might have different
-            // costs)).
-            double profit_total = 0;
-            for (auto t = book->outOfPrint()-1; t >= book->created(); t--) {
-                double prof_t = book->revenue(t) - cost_fixed - cost_unit * book->sales(t);
-                profit_total += prof_t;
-                if (profit_total < 0) {
-                    // Total profit is negative, which means that keeping the book past this point
-                    // was non-optimal, so reset to 0 (i.e. don't count profits from this point on).
-                    // This only happens when the period's profits are negative, but doesn't
-                    // *necessarily* happen in such a case: it could also be that negative profits
-                    // are followed by larger, positive profits.
-                    profit_total = 0;
-                }
-            }
-            y[i] = profit_total;
-            X.row(i) = Profit::profitRow(bc.second.get().quality, bc.first->order(), creativity_->market_books_lagged);
+        for (auto &bq : new_prof_books) {
+            auto &book = bq.first;
+            // Calculate the book's total profit
+            y[i] = book->lifeRevenue() - creationEffort(bq.second) - book->marketPeriods() * cost_fixed - book->lifeSales() * cost_unit;
+            X.row(i) = Profit::profitRow(bq.second, bq.first->order(), creativity_->market_books_lagged);
             i++;
         }
 
-        *profit_belief_ = std::move(*profit_belief_).update(y, X);
+        *profit_belief_ = std::move(*profit_belief_).weaken(weaken).update(y, X);
+    }
+    else if (weaken != 1.0) {
+        *profit_belief_ = std::move(*profit_belief_).weaken(weaken);
     }
 
-    // Extrapolate based on profit stream predictions for profit levels for books that are still on
-    // the market (since their profit level is not yet finalized)
+    // Also include books still on the market in an extrapolated belief, but we want to throw these
+    // away later (because their profit level could change)
     if (extrap_books.empty()) {
         // No extrapolation books, so the "extrapolation" belief is just the profit belief
         profit_belief_extrap_ = profit_belief_;
@@ -751,21 +796,15 @@ void Reader::updateProfitBelief() {
         VectorXd y(extrap_books.size());
 
         size_t i = 0;
-        for (auto &bc : extrap_books) {
-            // Look for the largest model that doesn't exceed the book's age, then use it for
-            // prediction
-            for (auto it = profit_stream_beliefs_.rbegin(); it != profit_stream_beliefs_.rend(); it++) {
-                if (it->first <= bc.first->age() and usableBelief(it->second)) {
-                    // We have a winner:
-                    y[i] = it->second.predict(bc.first, creativity_->parameters.prediction_draws);
-                    X.row(i) = Profit::profitRow(bc.second.get().quality, bc.first->order(), creativity_->market_books_lagged);
-                    i++;
-                    break;
-                }
-            }
+        for (auto &bq : extrap_books) {
+            auto &book = bq.first;
+            // Calculate the book's total profit
+            y[i] = book->lifeRevenue() - creationEffort(bq.second) - book->marketPeriods() * cost_fixed - book->lifeSales() * cost_unit;
+            X.row(i) = Profit::profitRow(bq.second, bq.first->order(), creativity_->market_books_lagged);
+            i++;
         }
 
-        // NB: extrapolation uses just-updated non-extrapolation as prior, with no weakening
+        // extrapolation uses just-updated non-extrapolation as prior, with no weakening
         profit_belief_extrap_.reset(new Profit(profit_belief_->update(y, X)));
     }
 }
@@ -774,6 +813,7 @@ void Reader::intraInitialize() {
     auto nb = creativity_->newBooks();
     for (auto &bm : nb.first) {
         book_cache_.insert(bm);
+        book_cache_market_.insert(bm);
     }
 }
 

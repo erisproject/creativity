@@ -62,7 +62,7 @@ class Demand : public LinearRestricted {
             // Add restrictions:
             restrict(1) <= -0.05; // beta_price <= 0 (higher price <-> lower quantity)
             restrict(2) >= 0.0; // beta_q >= 0
-            restrict(4) <= 0.0; // beta_{nosales_last_period} <= 0
+            restrict(4) <= -1.0; // beta_{nosales_periods} <= 0
 //            restrict(7) <= 0.0; // beta_{age} <= 0
 //            restrict(9) <= 0.0; // beta_{market_size} <= 0
 
