@@ -2,6 +2,7 @@
 #include <eris/Random.hpp>
 #include <Eigen/Core>
 #include <iostream>
+#include <iomanip>
 
 #define print_model(M) \
     std::cout << #M ":\n" << \
@@ -17,6 +18,7 @@ using namespace eris;
 
 int main() {
 
+    std::cout << std::setprecision(std::numeric_limits<double>::max_digits10);
     Linear foo(3);
 
     VectorXd beta(3);
@@ -37,16 +39,6 @@ int main() {
 
     y = X * beta + u;
 
-    Linear foo_10_oneshot = foo.update(y.head(10), X.topRows(10));
-
-    Linear foo_10_twoshot = foo.update(y.head(5), X.topRows(5));
-    foo_10_twoshot = foo_10_twoshot.update(y.middleRows(5, 5), X.middleRows(5, 5));
-
-    Linear foo_10_tenshot = foo;
-    for (int i = 0; i < 10; i++) {
-        foo_10_tenshot = foo_10_tenshot.update(y.row(i), X.row(i));
-    }
-
     Linear foo_100_oneshot = foo.update(y, X);
 
     Linear foo_100_twoshot = foo.update(y.topRows(50), X.topRows(50));
@@ -66,10 +58,6 @@ int main() {
     for (int i = 0; i < 100; i++) {
         foo_100_hundredshot = foo_100_hundredshot.update(y.row(i), X.row(i));
     }
-
-    print_model(foo_10_oneshot);
-    print_model(foo_10_twoshot);
-    print_model(foo_10_tenshot);
 
     print_model(foo_100_oneshot);
     print_model(foo_100_twoshot);
