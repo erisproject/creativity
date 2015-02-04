@@ -69,7 +69,7 @@ struct CreativitySettings {
     /** The length of time (in simulation periods) it takes to create a book.  If 0, books are
      * created instantly; if larger, the given number of periods go by before the book is finished.
      */
-    unsigned int creation_time = 3;
+    uint32_t creation_time = 3;
 
     /** The fixed cost of keeping a book on the market.
      */
