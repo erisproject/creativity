@@ -37,6 +37,7 @@ int main(int argc, char *argv[]) {
     PRINT_SETTING(reader_creation_shape);
     PRINT_SETTING(reader_creation_scale_min);
     PRINT_SETTING(reader_creation_scale_max);
+    PRINT_SETTING(creation_time);
     PRINT_SETTING(cost_fixed);
     PRINT_SETTING(cost_unit);
     PRINT_SETTING(cost_piracy);
