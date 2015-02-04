@@ -16,17 +16,14 @@ namespace creativity { namespace belief {
  *   current period can't be used because it is unknown at the time the reader is making the
  *   decision of whether or not to create).
  *
- * The following restrictions are imposed on beliefs:
- * - \f$\beta_1 \geq 0\f$ (profit increases with quality, at least for low quality values)
- * - \f$\beta_2 \leq 0\f$ (the effect of profit is concave)
- *
  * Although a \f$\beta_3 \leq 0\f$ restriction would make some intuitive sense (more competition
- * means lower profit), it isn't imposed because readers can only use the previous period's number
- * of market books when deciding on an action for the next period, and it seems entirely reasonable
- * that this value is positive, to allow for cyclical behaviour.
+ * means lower profit), it isn't imposed because doing so induces volatile creation cycles: readers decide
+ * to create in low-book periods, which results in an immediate surge in on-market books, which
+ * induces readers to not create in the next period, and so on.  Not imposing it still often has it
+ * be significant for many readers, but seems to avoid the strong behavioural cycles.
  *
- * These constraints are combined with a natural conjugate prior for the purposes of updating the
- * beliefs via Bayesian econometrics.
+ * The model uses a natural conjugate prior for the purposes of updating the beliefs via Bayesian
+ * econometrics.
  */
 class Profit : public LinearRestricted {
     public:

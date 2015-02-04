@@ -12,27 +12,20 @@ namespace belief {
 /** This class represents an author's belief about the per-period demand for books.  The model is of
  * the form:
  *
- * \f$Q_b = \beta_0 + \beta_1 P_b + \beta_2 q_b + \beta_3 q_b^2 + \beta_4 S_{b-} + \beta_5 nosales
- * + \beta_6 new + \beta_7 age + \beta_8 otherBooks + \beta_9 marketBooks + u\f$
+ * \f$Q_b = \beta_0 + \beta_1 P_b + \beta_2 q_b + \beta_3 prevSales + \beta_4 nosales + u\f$
  * where:
- * - \f$Q_b\f$ is the quantity (i.e. copies) sold
+ * - \f$Q_b\f$ is the quantity (i.e. copies) demanded
  * - \f$P_b\f$ is the price of a copy (which must be non-negative)
  * - \f$q_b\f$ is the quality of the work, determined when the work is created, which must be
  *   non-negative.
- * - \f$S_{b-}\f$ is the number of copies sold in previous periods
- * - \f$new\f$ is a dummy which is 1 for a new book (\f$age = 0\f$), 0 otherwise.
+ * - \f$prevSales\f$ is the number of copies sold in previous periods
  * - \f$nosales\f$ is the number of periods the book has gone without sales
- * - \f$age\f$ is the age of the book, in simulation periods, starting from 0.
- * - \f$otherBooks\f$ is the number of other books the author has created.  (Note that this can
- *   change during a book's lifetime.)
  * - \f$marketBooks\f$ is the number of books on the market in the previous period
  *
  * The following restrictions are imposed on beliefs:
  * - \f$\beta_1 \leq -0.05\f$ (demand curve is downward sloping (at least for sufficiently small p))
  * - \f$\beta_2 \geq 0\f$ (higher quality means more sales (at least for low quality))
- * - \f$\beta_5 \leq 0\f$ (no sales last period means less demand)
- * - \f$\beta_7 \leq 0\f$ demand is lower for older books
- * - \f$\beta_9 \leq 0\f$ more books on the market means reduced demand
+ * - \f$\beta_4 \leq -1\f$ (each no sales period decreases quantity demanded by at least 1)
  *
  * These constraints are combined with a natural conjugate prior for the purposes of updating the
  * beliefs via Bayesian econometrics.

@@ -317,8 +317,8 @@ class LinearRestricted : public Linear {
          * to draw from the (independent) multivariate normal \f$Z \sim N_S(\mathbf{A}\mathbf{\mu},
          * \sigma^2\mathbf{I_k})\f$.  \f$\mathbf{A}\f$ here is any matrix satisfying
          * \f$\mathbf{A}\mathbf{\Sigma}\mathbf{A}^\top = \mathbf{I}\f$, where an obvious choice of
-         * \f$\mathbf{A}\f$ is the inverse of the Cholesky decomposition of \f$mathbf{A}\f$, that
-         * is, \f$\mathbf{L}^{-1}\f$ where \f$\mathbf{L}\mathbf{L}^\top = \mathbf{A}\f$.  The
+         * \f$\mathbf{A}\f$ is the inverse of the Cholesky decomposition of \f$mathbf{\Sigma}\f$, that
+         * is, \f$\mathbf{L}^{-1}\f$ where \f$\mathbf{L}\mathbf{L}^\top = \mathbf{\Sigma}\f$.  The
          * truncation region is, of course, the same, but reexpressed in terms of \f$\mathbf{z}\f$
          * as points satisfying \f$\mathbf{D}\mathbf{z} \leq b\f$, where \f$\mathbf{D} =
          * \mathbf{R}\mathbf{A}^{-1}\f$.
