@@ -154,8 +154,6 @@ int main(int argc, const char *argv[]) {
                 if (a.human_readable) output << "\n";
             }
         }
-        std::cout << "skip: " << a.skip_piracy << "\n";
-        std::cout << "skip: " << a.periods << "\n";
 
         // new_*:
         for (auto &d : data) {
@@ -177,8 +175,7 @@ int main(int argc, const char *argv[]) {
             if (a.human_readable) output << "\n";
         }
 
-        output << "\n";
-        std::cout << output.str();
+        std::cout << output.str() << std::endl;
         output.str("");
         output_count++;
     }
