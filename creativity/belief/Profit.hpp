@@ -7,10 +7,10 @@ namespace creativity { namespace belief {
 /** This class represents an author's belief about the lifetime profitability of a work.  The model
  * is:
  *
- * \f$\Pi_b = \beta_0 + \beta_1 q_b + \beta_2 q_b^2 + \beta_3 marketBooks + u\f$
+ * \f$\pi_b = \beta_0 + \beta_1 q_b + \beta_2 q_b^2 + \beta_3 marketBooks + u\f$
  *
  * Specifically, the fields above are:
- * - \f$Pi_b\f$ is the lifetime profits of the book
+ * - \f$\pi_b\f$ is the lifetime profits of the book *without* considering the initial creation effort
  * - \f$q_b\f$ is the (non-negative) quality of the book.
  * - \f$marketBooks\f$ is the number of books on the market in the previous period (books in the
  *   current period can't be used because it is unknown at the time the reader is making the

@@ -285,8 +285,6 @@ void Reader::interOptimize() {
                 // decided to spend above to keep books on the market.
 
                 try {
-                    // FIXME: is this right, w.r.t. Bayesian MC prediction?  (Is averaging being done too
-                    // early?)
                     double effort;
 #               ifdef ERIS_DEBUG
                     try {
@@ -774,7 +772,7 @@ void Reader::updateProfitBelief() {
         for (auto &bq : new_prof_books) {
             auto &book = bq.first;
             // Calculate the book's total profit
-            y[i] = book->lifeRevenue() - creationEffort(bq.second) - book->marketPeriods() * cost_fixed - book->lifeSales() * cost_unit;
+            y[i] = book->lifeRevenue() - book->marketPeriods() * cost_fixed - book->lifeSales() * cost_unit;
             X.row(i) = Profit::profitRow(bq.second, bq.first->order(), creativity_->market_books_lagged);
             i++;
         }
@@ -798,8 +796,8 @@ void Reader::updateProfitBelief() {
         size_t i = 0;
         for (auto &bq : extrap_books) {
             auto &book = bq.first;
-            // Calculate the book's total profit
-            y[i] = book->lifeRevenue() - creationEffort(bq.second) - book->marketPeriods() * cost_fixed - book->lifeSales() * cost_unit;
+            // Calculate the book's total profit (ignoring initial creation cost)
+            y[i] = book->lifeRevenue() - book->marketPeriods() * cost_fixed - book->lifeSales() * cost_unit;
             X.row(i) = Profit::profitRow(bq.second, bq.first->order(), creativity_->market_books_lagged);
             i++;
         }
