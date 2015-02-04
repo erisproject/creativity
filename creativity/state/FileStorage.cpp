@@ -50,6 +50,7 @@ constexpr int64_t
         FileStorage::HEADER::pos::reader_creation_shape,
         FileStorage::HEADER::pos::reader_creation_scale_min,
         FileStorage::HEADER::pos::reader_creation_scale_max,
+        FileStorage::HEADER::pos::creation_time,
         FileStorage::HEADER::pos::cost_fixed,
         FileStorage::HEADER::pos::cost_unit,
         FileStorage::HEADER::pos::cost_piracy,
@@ -247,6 +248,7 @@ void FileStorage::writeSettings(const CreativitySettings &settings) {
     write_value(settings.reader_creation_shape);
     write_value(settings.reader_creation_scale_min);
     write_value(settings.reader_creation_scale_max);
+    write_value(settings.creation_time);
     write_value(settings.cost_fixed);
     write_value(settings.cost_unit);
     write_value(settings.cost_piracy);
@@ -266,8 +268,8 @@ void FileStorage::writeSettings(const CreativitySettings &settings) {
     write_value(settings.initial.keep_price);
     write_value(settings.initial.belief_threshold);
 
-    // No padding currently needed
-    //write_u32(0); // Unused padding value
+    // Uncommented when padding needed:
+    write_u32(0); // Unused padding value
 
     if (f_.tellp() != HEADER::pos::state_first) {
         // If this exception occurs, something in the above sequence is wrong.
@@ -505,6 +507,7 @@ void FileStorage::parseMetadata() {
     parse_value(block[HEADER::pos::reader_creation_shape], settings_.reader_creation_shape);
     parse_value(block[HEADER::pos::reader_creation_scale_min], settings_.reader_creation_scale_min);
     parse_value(block[HEADER::pos::reader_creation_scale_max], settings_.reader_creation_scale_max);
+    parse_value(block[HEADER::pos::creation_time], settings_.creation_time);
     parse_value(block[HEADER::pos::cost_fixed], settings_.cost_fixed);
     parse_value(block[HEADER::pos::cost_unit], settings_.cost_unit);
     parse_value(block[HEADER::pos::cost_piracy], settings_.cost_piracy);
