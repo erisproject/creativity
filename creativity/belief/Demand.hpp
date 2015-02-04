@@ -17,7 +17,7 @@ namespace belief {
  * - \f$Q_b\f$ is the quantity (i.e. copies) demanded
  * - \f$P_b\f$ is the price of a copy (which must be non-negative)
  * - \f$q_b\f$ is the quality of the work, determined when the work is created, which must be
- *   non-negative.
+ *   non-negative.  Readers observe either a draw based on this, or a predicted quality.
  * - \f$prevSales\f$ is the number of copies sold in previous periods
  * - \f$nosales\f$ is the number of periods the book has gone without sales
  * - \f$marketBooks\f$ is the number of books on the market in the previous period
