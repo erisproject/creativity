@@ -1680,6 +1680,7 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
                                                 <property name="tooltip_markup" translatable="yes">The amount of time (in simulation periods) required to create a book.  If 0, books are created instantly; otherwise this many periods must elapsed between the creation decision and the book actually being created.</property>
+                                                <property name="margin_right">15</property>
                                                 <property name="margin_bottom">1</property>
                                                 <property name="invisible_char">●</property>
                                                 <property name="text" translatable="yes">0.50</property>
