@@ -18,7 +18,7 @@ drawrestr <- function() {
     if (slope == Inf || slope == -Inf) abline(v=r[i]/R[i,1], col="gray")
     else abline(rint[i,1], -R[i,1]/R[i,2], col="gray")
   }
-  polygon(poly_x, poly_y, lwd=2)
+  polygon(poly_x, poly_y, lwd=2, col="#dddddd")
   
   
   pnext <- z
