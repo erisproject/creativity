@@ -1,6 +1,7 @@
 #include "creativity/belief/Linear.hpp"
 #include <eris/Random.hpp>
 #include <Eigen/Core>
+#include <Eigen/QR>
 #include <iostream>
 #include <iomanip>
 
@@ -18,7 +19,7 @@ using namespace eris;
 
 int main() {
 
-    std::cout << std::setprecision(std::numeric_limits<double>::max_digits10);
+    std::cout << std::setprecision(std::numeric_limits<double>::max_digits10) << std::fixed;
     Linear foo(3);
 
     VectorXd beta(3);
@@ -38,6 +39,13 @@ int main() {
     }
 
     y = X * beta + u;
+
+    VectorXd betahat = (X.transpose() * X).fullPivHouseholderQr().solve(X.transpose() * y);
+    std::cout << "OLS:\n" << "beta^: " << betahat.transpose() << "\n" <<
+        "n: " << X.rows() << "\n" <<
+        "sigmahat^2: " << (y - X * betahat).squaredNorm() / X.rows() << "\n" <<
+        "X'X:\n" << (X.transpose() * X) << "\n" <<
+        "\n";
 
     Linear foo_100_oneshot = foo.update(y, X);
 
