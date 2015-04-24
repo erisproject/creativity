@@ -417,7 +417,7 @@ void Linear::weakenInPlace(const double stdev_scale) {
 const MatrixXdR& Linear::noninfXData() const {
     if (not noninformative_) throw std::logic_error("noninfXData() cannot be called on a fully-informed model");
 
-    if (not noninf_X_) const_cast<std::shared_ptr<MatrixXdR>&>(noninf_X_).reset(new MatrixXdR(0, 0));
+    if (not noninf_X_) const_cast<std::shared_ptr<MatrixXdR>&>(noninf_X_).reset(new MatrixXdR());
 
     return *noninf_X_;
 }
@@ -425,7 +425,7 @@ const MatrixXdR& Linear::noninfXData() const {
 const VectorXd& Linear::noninfYData() const {
     if (not noninformative_) throw std::logic_error("noninfYData() cannot be called on a fully-informed model");
 
-    if (not noninf_y_) const_cast<std::shared_ptr<VectorXd>&>(noninf_y_).reset(new VectorXd(0));
+    if (not noninf_y_) const_cast<std::shared_ptr<VectorXd>&>(noninf_y_).reset(new VectorXd());
 
     return *noninf_y_;
 }
