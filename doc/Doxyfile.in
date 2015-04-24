@@ -5,7 +5,7 @@ DOXYFILE_ENCODING      = UTF-8
 PROJECT_NAME           = @PROJECT_NAME@
 PROJECT_NUMBER         = v@CREATIVITY_VERSION@
 PROJECT_BRIEF          = "@creativity_description@"
-INPUT                  = README.md creativity
+INPUT                  = README.md @CMAKE_BINARY_DIR@/creativity
 INPUT_ENCODING         = UTF-8
 FILE_PATTERNS          = *.hpp
 RECURSIVE              = YES
@@ -14,7 +14,9 @@ OUTPUT_DIRECTORY       = @CMAKE_CURRENT_BINARY_DIR@
 QUIET                  = YES
 
 FULL_PATH_NAMES        = YES
+STRIP_FROM_PATH        = @CMAKE_BINARY_DIR@
 STRIP_FROM_PATH        = @CMAKE_SOURCE_DIR@
+STRIP_FROM_INC_PATH    = @CMAKE_BINARY_DIR@
 
 JAVADOC_AUTOBRIEF      = YES
 

@@ -15,6 +15,38 @@ creative output where copies of an original are the marketable good.
 - A C++ compiler supporting the C++11 standard, such as
   [clang](http://clang.llvm.org/) (3.3+) or [g++](https://gcc.gnu.org/) (4.9+)
 
+## Compiling
+
+To compile on a unix-like system, create a new build directory somewhere, then
+from this directory run:
+
+    cmake /path/to/creativity
+    make -j4
+
+To compile without the GTK GUI, change the cmake line to:
+
+    cmake -DGUI=off /path/to/creativity
+
+You can install directly to the system (usually under /usr/local) using:
+
+    make install
+
+or alternatively simply run the executables directly from the build directory.
+To build a .deb to install on a Debian derivative, run:
+
+    make package
+
+followed by an appropriate package command to install the package, such as:
+
+    dpkg -i eris_x.y.z~gityyyymmdd~tag_amd64.deb
+
+You may also be able to use:
+
+    cpack -G RPM
+
+to generate a .rpm package instead of a .deb, but this functionality is
+untested by the author.
+
 ## License
 
 Copyright © 2015 Jason Rhinelander
