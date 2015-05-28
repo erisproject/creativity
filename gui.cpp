@@ -180,10 +180,8 @@ int main(int argc, char *argv[1]) {
         // Tell the GUI we finished
         gui.stopped(sim->t() < run_end);
 
-        std::cerr << "waiting for more\n";
         // Wait for the GUI to tell us to do something else
         gui.waitEvents();
-        std::cerr << "got more\n";
 
         // Update this so that the speed is right (otherwise however long waitEvents() waits for the
         // user waits would be included in the calculation).
@@ -191,6 +189,4 @@ int main(int argc, char *argv[1]) {
     }
 
     creativity->storage().first->flush();
-
-    std::cerr << "running off the bottom of main\n";
 }
