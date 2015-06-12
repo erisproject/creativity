@@ -52,7 +52,9 @@ void GUI::start(int argc, char *argv[]) {
     builder_ = Gtk::Builder::create();
 
     std::list<std::string> datadirs;
-    datadirs.push_front(DATADIR);
+    for (const auto &dir : DATADIR) {
+        datadirs.push_back(dir);
+    }
     datadirs.push_back(".");
     char *envdatadir = getenv("CREATIVITY_DATADIR");
     if (envdatadir) {

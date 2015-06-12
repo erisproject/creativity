@@ -3,6 +3,6 @@
 namespace creativity {
 
 /// The location where data files (such as gui.glade) are located.
-constexpr char DATADIR[] = "@CMAKE_INSTALL_FULL_DATADIR@/creativity";
+constexpr char DATADIR[][100] = {"/usr/@CMAKE_INSTALL_DATADIR@/creativity", "@CMAKE_INSTALL_FULL_DATADIR@/creativity"};
 
 }
