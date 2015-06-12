@@ -85,7 +85,7 @@ class BookStore : public MemberStore<state::BookState>, public virtual Glib::Obj
         std::unique_ptr<ColRec> columns{new ColRec};
 
         /** Takes a Gtk::TreeView and adds this object's columns to it. */
-        virtual void appendColumnsTo(Gtk::TreeView &v) const;
+        virtual void appendColumnsTo(Gtk::TreeView &v) const override;
 
     protected:
         /// Protected constructor; this object should be constructed using create().

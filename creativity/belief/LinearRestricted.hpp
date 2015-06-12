@@ -675,10 +675,10 @@ class LinearRestricted : public Linear {
          */
         virtual operator std::string() const override;
 
-        /** The display name of the model to use when printing it.  Defaults to "Linear" but
-         * subclasses should override.
+        /** The display name of the model to use when printing it.  Defaults to "LinearRestricted"
+         * but subclasses should override.
          */
-        virtual std::string display_name() const;
+        virtual std::string display_name() const override;
 
     protected:
         /// Creates a LinearRestricted from a Linear rvalue

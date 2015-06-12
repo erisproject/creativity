@@ -35,7 +35,7 @@ class MemoryStorage final : public StorageBackend {
         virtual std::shared_ptr<const State> load(eris::eris_time_t t) const override;
 
         /// Adds the given state to the stored states_ directly.
-        virtual void enqueue(std::shared_ptr<const State> &&s);
+        virtual void enqueue(std::shared_ptr<const State> &&s) override;
 
     private:
         std::vector<std::shared_ptr<const State>> states_;
