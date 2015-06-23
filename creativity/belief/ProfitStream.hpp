@@ -1,5 +1,5 @@
 #pragma once
-#include "creativity/belief/Linear.hpp"
+#include <eris/belief/BayesianLinear.hpp>
 #include "creativity/Book.hpp"
 #include <eris/algorithms.hpp>
 #include <unordered_set>
@@ -27,10 +27,10 @@ namespace creativity { namespace belief {
  *
  * \f$\beta\f$ values are not restricted.
  */
-class ProfitStream : public Linear {
+class ProfitStream : public eris::belief::BayesianLinear {
     public:
-        /// Inherit constructors from Linear
-        using Linear::Linear;
+        /// Inherit constructors from BayesianLinear
+        using BayesianLinear::BayesianLinear;
 
         /** Given a book, this uses the profit of the first \f$K\f$ periods the book has been on the
          * market to predict the remaining cumulative lifetime profit,
@@ -42,12 +42,12 @@ class ProfitStream : public Linear {
          */
         double predict(eris::SharedMember<Book> book, unsigned int draws);
 
-        using Linear::predict;
+        using BayesianLinear::predict;
 
         /// Returns "ProfitStream", the name of this model
         virtual std::string display_name() const override { return "ProfitStream"; }
 
-        CREATIVITY_LINEAR_DERIVED_COMMON_METHODS(ProfitStream)
+        ERIS_BELIEF_BAYESIANLINEAR_DERIVED_COMMON_METHODS(ProfitStream)
 };
 
 }}

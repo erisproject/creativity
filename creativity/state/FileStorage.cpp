@@ -19,6 +19,7 @@
 namespace creativity { namespace state {
 
 using namespace eris;
+using namespace eris::belief;
 using namespace creativity::belief;
 using namespace Eigen;
 
@@ -817,7 +818,7 @@ void FileStorage::writeReader(const ReaderState &r) {
     }
 }
 
-void FileStorage::writeBelief(const Linear &m) {
+void FileStorage::writeBelief(const BayesianLinear &m) {
     FILESTORAGE_DEBUG_WRITE_START
     auto &k = m.K();
     if (k > 120) {
@@ -835,13 +836,13 @@ void FileStorage::writeBelief(const Linear &m) {
     bool restricted_model = false;
     // First up is the status field.  Currently we have one status bit for a restricted model, and
     // one for the last draw mode
-    const LinearRestricted *lr = dynamic_cast<const LinearRestricted*>(&m);
+    const BayesianLinearRestricted *lr = dynamic_cast<const BayesianLinearRestricted*>(&m);
     if (lr) restricted_model = true;
 
     uint8_t status = 0;
     if (restricted_model) {
         status |= 1;
-        if (lr->last_draw_mode == LinearRestricted::DrawMode::Gibbs) status |= 2;
+        if (lr->last_draw_mode == BayesianLinearRestricted::DrawMode::Gibbs) status |= 2;
     }
     if (m.noninformative()) {
         status |= 4;

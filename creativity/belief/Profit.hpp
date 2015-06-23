@@ -1,6 +1,6 @@
 #pragma once
-#include "creativity/belief/LinearRestricted.hpp"
 #include "creativity/Book.hpp"
+#include <eris/belief/BayesianLinearRestricted.hpp>
 
 namespace creativity { namespace belief {
 
@@ -25,22 +25,22 @@ namespace creativity { namespace belief {
  * The model uses a natural conjugate prior for the purposes of updating the beliefs via Bayesian
  * econometrics.
  */
-class Profit : public LinearRestricted {
+class Profit : public eris::belief::BayesianLinearRestricted {
     public:
         /** Construct a noninformative profit model.
          *
-         * \sa Linear::Linear
+         * \sa eris::belief::BayesianLinear::BayesianLinear
          */
         Profit() : Profit(parameters()) {}
 
         /** Constructs a profit model with the given parameter information.
          *
-         * \param args prior arguments to forward to the base Linear constructor.
+         * \param args prior arguments to forward to the base BayesianLinear constructor.
          *
-         * \sa Linear::Linear
+         * \sa BayesianLinear::BayesianLinear
          */
         template <typename ...Args>
-        explicit Profit(Args &&...args) : LinearRestricted(std::forward<Args>(args)...)
+        explicit Profit(Args &&...args) : BayesianLinearRestricted(std::forward<Args>(args)...)
         {
             // Add restrictions:
             //restrict(1) >= 0; // beta_q >= 0 (higher quality <-> higher profits, at least for low quality)
@@ -68,7 +68,7 @@ class Profit : public LinearRestricted {
          */
         double predict(unsigned int draws, double q, unsigned long previousBooks, unsigned long marketBooks);
 
-        using LinearRestricted::predict;
+        using BayesianLinearRestricted::predict;
 
         /** Given `previousBooks` and `marketBooks` parameters, a function \f$q(\ell)\f$ that returns
          * expected quality for a given value \f$\ell\f$, and \f$\ell_{max}\f$, this numerically
@@ -123,7 +123,7 @@ class Profit : public LinearRestricted {
         /// Returns "Profit", the name of this model
         virtual std::string display_name() const override { return "Profit"; }
 
-        CREATIVITY_LINEAR_DERIVED_COMMON_METHODS(Profit)
+        ERIS_BELIEF_BAYESIANLINEAR_DERIVED_COMMON_METHODS(Profit)
 };
 
 }}

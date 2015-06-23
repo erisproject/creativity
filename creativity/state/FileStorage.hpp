@@ -497,10 +497,10 @@ class FileStorage final : public StorageBackend {
         typedef struct {
             uint32_t K; ///< Number of parameters; K=0 for a default constructed (invalid) model (the remaining values will be uninitialized)
             bool noninformative; ///< True if this is a noninformative model (in which case the following are not set)
-            Eigen::VectorXd beta; ///< belief::Linear beta vector
-            double s2; ///< belief::Linear s2 value
-            double n; ///< belief::Linear n value
-            Eigen::MatrixXd Vinv; ///< belief::Linear Vinv matrix
+            Eigen::VectorXd beta; ///< eris::belief::BayesianLinear beta vector
+            double s2; ///< eris::belief::BayesianLinear s2 value
+            double n; ///< eris::belief::BayesianLinear n value
+            Eigen::MatrixXd Vinv; ///< eris::belief::BayesianLinear Vinv matrix
             bool draw_gibbs; ///< If true, the last draw from this belief used Gibbs sampling (false = no draws, or rejection sampling)
             uint32_t draw_success_cumulative, ///< For a restricted belief, the number of successful draws
                      draw_discards_cumulative; ///< For a restricted belief, the number of discarded draws
@@ -553,7 +553,7 @@ class FileStorage final : public StorageBackend {
          *
          * \sa readBelief() for the structure and values actually written
          */
-        void writeBelief(const belief::Linear &belief);
+        void writeBelief(const eris::belief::BayesianLinear &belief);
 
         /** Reads a book state data from the current file position and returns it in a <eris_id_t,
          * BookState> pair, where the eris_id_t is the book id.  The book data is:

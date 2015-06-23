@@ -501,7 +501,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * noninformative() belief, and must have at least `K` plus `belief_min_n_less_k`
          * observations.
          */
-        bool usableBelief(const belief::Linear &model) const;
+        bool usableBelief(const eris::belief::BayesianLinear &model) const;
 
         /** Returns the map of all current profit stream beliefs.  The keys of the map are the
          * minimum age for which the belief applies and the value is the actual belief with `age`

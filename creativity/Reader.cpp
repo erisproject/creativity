@@ -11,6 +11,7 @@
 
 using namespace eris;
 using namespace Eigen;
+using namespace eris::belief;
 using namespace creativity::belief;
 
 namespace creativity {
@@ -229,7 +230,7 @@ void Reader::interOptimize() {
                     profitability[profit].push_back(std::make_pair(book, p));
                 }
             }
-            catch (belief::LinearRestricted::draw_failure &fail) {
+            catch (BayesianLinear::draw_failure &fail) {
                 // If we fail to get an admissable draw, pull the book from the market.
             }
         }
@@ -295,7 +296,7 @@ void Reader::interOptimize() {
                             authored_books, market_books, income_available - cost_fixed
                             );
 #               ifdef ERIS_DEBUG
-                    } catch (belief::Linear::draw_failure &e) {
+                    } catch (BayesianLinear::draw_failure &e) {
                         ERIS_DBG("draw failure in profit_extrap argmaxL for reader=" << id() << ", t=" << simulation()->t() << ": " << e.what());
                         throw;
                     }
@@ -309,7 +310,7 @@ void Reader::interOptimize() {
                     exp_profit = profit_belief_extrap_->predict(creativity_->parameters.prediction_draws, quality, authored_books, market_books);
 #               ifdef ERIS_DEBUG
                     }
-                    catch (belief::LinearRestricted::draw_failure &e) {
+                    catch (BayesianLinear::draw_failure &e) {
                         ERIS_DBG("draw failure in profit_extrap belief prediction; reader="<<id() << ", t=" << simulation()->t());
                         throw;
                     }
@@ -329,7 +330,7 @@ void Reader::interOptimize() {
                                 income / 10);
 #                   ifdef ERIS_DEBUG
                         }
-                        catch (belief::LinearRestricted::draw_failure &e) {
+                        catch (BayesianLinear::draw_failure &e) {
                             ERIS_DBG("draw failure in demand argmaxP calculation; reader="<<id() << ", t=" << simulation()->t());
                             ERIS_DBGVAR(demand_belief_.draw_rejection_success);
                             throw;
@@ -347,7 +348,7 @@ void Reader::interOptimize() {
                         // belief suggests otherwise, so don't create.
                     }
                 }
-                catch (belief::Linear::draw_failure &e) {
+                catch (BayesianLinear::draw_failure &e) {
                     // Ignore draw failures
                 }
             }
@@ -527,7 +528,7 @@ const std::map<unsigned int, belief::ProfitStream>& Reader::profitStreamBeliefs(
     return profit_stream_beliefs_;
 }
 
-bool Reader::usableBelief(const belief::Linear &model) const {
+bool Reader::usableBelief(const BayesianLinear &model) const {
     return not model.noninformative() and model.n() - model.K() >= creativity_->parameters.initial.belief_threshold;
 }
 

@@ -9,6 +9,7 @@
 namespace creativity {
 
 namespace state {
+// Forward declaration
 class Storage;
 }
 

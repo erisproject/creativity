@@ -1,7 +1,7 @@
 #pragma once
-#include "creativity/belief/Linear.hpp"
 #include "creativity/Book.hpp"
 #include "creativity/BookMarket.hpp"
+#include <eris/belief/BayesianLinear.hpp>
 #include <eris/algorithms.hpp>
 #include <eris/SharedMember.hpp>
 
@@ -25,22 +25,22 @@ namespace belief {
  * The model is updated using Bayesian econometrics as new books (and realized quality values of
  * those books) are obtained.
  */
-class Quality : public Linear {
+class Quality : public eris::belief::BayesianLinear {
     public:
-        /** Default constructor: note that unlike default constructed Linear objects, this creates a noninformative model.
+        /** Default constructor: note that unlike default constructed BayesianLinear objects, this creates a noninformative model.
          *
-         * \sa belief::Linear::Linear()
+         * \sa eris::belief::BayesianLinear::BayesianLinear()
          */
         Quality() : Quality(parameters()) {}
 
         /** Constructs a Quality object with the given parameter information.
          *
-         * \param args a parameter pack to forward to the base Linear constructor.
+         * \param args a parameter pack to forward to the base BayesianLinear constructor.
          * 
-         * \sa Linear::Linear
+         * \sa eris::belief::BayesianLinear::BayesianLinear
          */
         template <typename ...Args>
-        explicit Quality(Args &&...args) : Linear(std::forward<Args>(args)...)
+        explicit Quality(Args &&...args) : BayesianLinear(std::forward<Args>(args)...)
         {
             // Set beta names for nicer output
             names({"prevBooks", "age", "numCopies"});
@@ -59,7 +59,7 @@ class Quality : public Linear {
          */
         double predict(const Book &book, unsigned int draws);
 
-        using Linear::predict;
+        using BayesianLinear::predict;
 
         /** Given a container of books, this builds an X matrix of data representing those books.
          */
@@ -80,7 +80,7 @@ class Quality : public Linear {
         /// Returns "Quality", the name of this model
         virtual std::string display_name() const override { return "Quality"; }
 
-        CREATIVITY_LINEAR_DERIVED_COMMON_METHODS(Quality)
+        ERIS_BELIEF_BAYESIANLINEAR_DERIVED_COMMON_METHODS(Quality)
 };
 
 }}

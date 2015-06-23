@@ -1,5 +1,5 @@
 #pragma once
-#include "creativity/belief/LinearRestricted.hpp"
+#include <eris/belief/BayesianLinearRestricted.hpp>
 #include <eris/algorithms.hpp>
 #include <eris/SharedMember.hpp>
 
@@ -33,24 +33,24 @@ namespace belief {
  * Additionally, when predicting, readers know that Q can never be larger than the number of readers
  * in the world minus the copies already sold, and incorporate this limitation into predictions.
  */
-class Demand : public LinearRestricted {
+class Demand : public eris::belief::BayesianLinearRestricted {
     public:
-        /** Default constructor: note that unlike a default-constructed Linear model, this default
-         * constructed object is a usable (but noninformative) model.
+        /** Default constructor: note that unlike a default-constructed BayesianLinear model, this
+         * default constructed object is a usable (but noninformative) model.
          *
-         * \sa belief::Linear::Linear()
+         * \sa eris::belief::BayesianLinear::BayesianLinear()
          */
         Demand() : Demand(parameters()) {}
 
         /** Constructs a demand model with the given prior information.  This forwards arguments to
-         * the LinearRestricted constructor, but also adds the model's restrictions.
+         * the BayesianLinearRestricted constructor, but also adds the model's restrictions.
          *
-         * \param args prior arguments to forward to the base LinearRestricted constructor.
+         * \param args prior arguments to forward to the base BayesianLinearRestricted constructor.
          *
-         * \sa Linear::Linear
+         * \sa eris::belief::BayesianLinear::BayesianLinear
          */
         template <typename ...Args>
-        explicit Demand(Args &&...args) : LinearRestricted(std::forward<Args>(args)...)
+        explicit Demand(Args &&...args) : BayesianLinearRestricted(std::forward<Args>(args)...)
         {
             // Add restrictions:
             restrict(1) <= -0.05; // beta_price <= 0 (higher price <-> lower quantity)
@@ -86,7 +86,7 @@ class Demand : public LinearRestricted {
          */
         double predict(unsigned int draws, double P, double q, unsigned int S, unsigned int nosales, unsigned int age, unsigned int otherBooks, unsigned int lag_marketBooks);
 
-        using LinearRestricted::predict;
+        using BayesianLinearRestricted::predict;
 
         /** Given a set of model parameters (other than \f$P_b\f$) and a per-unit cost this returns
          * the \f$P_b\f$ value that maximizes expected total profits:
@@ -143,7 +143,7 @@ class Demand : public LinearRestricted {
         /// Returns "Demand", the name of this model.
         virtual std::string display_name() const override { return "Demand"; }
 
-        CREATIVITY_LINEAR_DERIVED_COMMON_METHODS(Demand)
+        ERIS_BELIEF_BAYESIANLINEAR_DERIVED_COMMON_METHODS(Demand)
 };
 
 }}

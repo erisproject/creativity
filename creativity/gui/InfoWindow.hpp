@@ -15,8 +15,6 @@
 #include "creativity/gui/LibraryStore.hpp"
 #include "creativity/state/State.hpp"
 
-using namespace Eigen;
-
 namespace creativity {
 
 // forward declarations
@@ -82,7 +80,7 @@ class InfoWindow : public Gtk::Window {
          * optional lower_triangle parameter is given as true, only the lower diagonal of the matrix
          * is displayed; the upper-triangle values are set to blanks.
          */
-        void updateMatrix(const std::string &code, const Ref<const MatrixXd> &m, bool lower_triangle = false);
+        void updateMatrix(const std::string &code, const Eigen::Ref<const Eigen::MatrixXd> &m, bool lower_triangle = false);
         /** Clears all values of a matrix set up with matrix_at, setting all values to the given
          * value (defaulting to an empty string).
          */
