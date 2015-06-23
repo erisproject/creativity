@@ -17,12 +17,7 @@ SharedMember<Book> BookMarket::book() {
 
 BookMarket::price_info BookMarket::price(double q) const {
     unsigned long ql = (unsigned long) std::floor(q);
-    return {
-        .feasible = true,
-            .total = ql*price_,
-            .marginal = price_,
-            .marginalFirst = price_
-    };
+    return price_info(ql*price_, price_, price_);
 }
 
 void BookMarket::setPrice(double p) {
