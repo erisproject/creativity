@@ -188,35 +188,45 @@
     <property name="step_increment">1</property>
     <property name="page_increment">10</property>
   </object>
+  <object class="GtkImage" id="image_open">
+    <property name="visible">True</property>
+    <property name="can_focus">False</property>
+    <property name="icon_name">document-open</property>
+  </object>
+  <object class="GtkImage" id="image_save_as">
+    <property name="visible">True</property>
+    <property name="can_focus">False</property>
+    <property name="icon_name">document-save-as</property>
+  </object>
   <object class="GtkImage" id="img_pause">
     <property name="visible">True</property>
     <property name="can_focus">False</property>
-    <property name="stock">gtk-media-pause</property>
+    <property name="icon_name">media-playback-pause</property>
   </object>
   <object class="GtkImage" id="img_play">
     <property name="visible">True</property>
     <property name="can_focus">False</property>
-    <property name="stock">gtk-media-play</property>
+    <property name="icon_name">media-playback-start</property>
   </object>
   <object class="GtkImage" id="img_resume">
     <property name="visible">True</property>
     <property name="can_focus">False</property>
-    <property name="stock">gtk-media-play</property>
+    <property name="icon_name">media-playback-start</property>
   </object>
   <object class="GtkImage" id="img_run">
     <property name="visible">True</property>
     <property name="can_focus">False</property>
-    <property name="stock">gtk-media-play</property>
+    <property name="icon_name">media-playback-start</property>
   </object>
   <object class="GtkImage" id="img_setup">
     <property name="visible">True</property>
     <property name="can_focus">False</property>
-    <property name="stock">gtk-go-forward</property>
+    <property name="icon_name">go-next</property>
   </object>
   <object class="GtkImage" id="img_step">
     <property name="visible">True</property>
     <property name="can_focus">False</property>
-    <property name="stock">gtk-go-forward</property>
+    <property name="icon_name">go-next</property>
   </object>
   <object class="GtkWindow" id="window1">
     <property name="can_focus">False</property>
@@ -320,9 +330,9 @@
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <property name="margin_bottom">1</property>
-                    <property name="yalign">0</property>
                     <property name="ypad">6</property>
                     <property name="label" translatable="yes"> Showing: </property>
+                    <property name="yalign">0</property>
                   </object>
                   <packing>
                     <property name="expand">False</property>
@@ -352,9 +362,9 @@
                   <object class="GtkLabel" id="lbl_of_total">
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
-                    <property name="yalign">0</property>
                     <property name="ypad">6</property>
                     <property name="label" translatable="yes"> of </property>
+                    <property name="yalign">0</property>
                   </object>
                   <packing>
                     <property name="expand">False</property>
@@ -368,10 +378,10 @@
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <property name="margin_right">3</property>
-                    <property name="xalign">0</property>
-                    <property name="yalign">0</property>
                     <property name="ypad">6</property>
                     <property name="label" translatable="yes">0</property>
+                    <property name="xalign">0</property>
+                    <property name="yalign">0</property>
                   </object>
                   <packing>
                     <property name="expand">False</property>
@@ -384,11 +394,11 @@
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <property name="margin_left">3</property>
-                    <property name="xalign">1</property>
-                    <property name="yalign">0</property>
                     <property name="xpad">2</property>
                     <property name="ypad">6</property>
                     <property name="label" translatable="yes">Speed:</property>
+                    <property name="xalign">1</property>
+                    <property name="yalign">0</property>
                   </object>
                   <packing>
                     <property name="expand">False</property>
@@ -400,14 +410,14 @@
                   <object class="GtkLabel" id="status_speed">
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
-                    <property name="xalign">1</property>
-                    <property name="yalign">0</property>
                     <property name="ypad">6</property>
                     <property name="label" translatable="yes">N/A</property>
                     <property name="justify">right</property>
                     <property name="ellipsize">end</property>
                     <property name="width_chars">7</property>
                     <property name="max_width_chars">7</property>
+                    <property name="xalign">1</property>
+                    <property name="yalign">0</property>
                   </object>
                   <packing>
                     <property name="expand">False</property>
@@ -419,9 +429,9 @@
                   <object class="GtkLabel" id="lbl_speed_units">
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
-                    <property name="yalign">0</property>
                     <property name="ypad">6</property>
                     <property name="label" translatable="yes"> Hz</property>
+                    <property name="yalign">0</property>
                   </object>
                   <packing>
                     <property name="expand">False</property>
@@ -547,11 +557,11 @@
                                                 </child>
                                                 <child>
                                                   <object class="GtkButton" id="btn_load">
-                                                    <property name="label">gtk-open</property>
+                                                    <property name="label">Open</property>
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">True</property>
                                                     <property name="receives_default">True</property>
-                                                    <property name="use_stock">True</property>
+                                                    <property name="image">image_open</property>
                                                     <property name="always_show_image">True</property>
                                                   </object>
                                                   <packing>
@@ -677,11 +687,11 @@
                                                 </child>
                                                 <child>
                                                   <object class="GtkButton" id="btn_choose_save">
-                                                    <property name="label">gtk-save-as</property>
+                                                    <property name="label">Save As</property>
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">True</property>
                                                     <property name="receives_default">True</property>
-                                                    <property name="use_stock">True</property>
+                                                    <property name="image">image_save_as</property>
                                                     <property name="always_show_image">True</property>
                                                   </object>
                                                   <packing>
@@ -754,8 +764,8 @@
                                               <object class="GtkLabel" id="label8">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Density</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">0</property>
@@ -787,8 +797,8 @@
                                               <object class="GtkLabel" id="label3">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Readers</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">0</property>
@@ -819,9 +829,9 @@
                                               <object class="GtkLabel" id="label41">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Pr(&lt;i&gt;write&lt;/i&gt;)</property>
                                                 <property name="use_markup">True</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">4</property>
@@ -832,9 +842,9 @@
                                               <object class="GtkLabel" id="label42">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Q ~ U[A,&lt;b&gt;&lt;i&gt;B&lt;/i&gt;&lt;/b&gt;]</property>
                                                 <property name="use_markup">True</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">4</property>
@@ -845,9 +855,9 @@
                                               <object class="GtkLabel" id="label43">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Q ~ U[&lt;b&gt;&lt;i&gt;A&lt;/i&gt;&lt;/b&gt;,B]</property>
                                                 <property name="use_markup">True</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">4</property>
@@ -858,9 +868,9 @@
                                               <object class="GtkLabel" id="label44">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">P ~ U[&lt;b&gt;&lt;i&gt;A&lt;/i&gt;&lt;/b&gt;,B]</property>
                                                 <property name="use_markup">True</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">4</property>
@@ -871,9 +881,9 @@
                                               <object class="GtkLabel" id="label45">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">P ~ U[A,&lt;b&gt;&lt;i&gt;B&lt;/i&gt;&lt;/b&gt;]</property>
                                                 <property name="use_markup">True</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">4</property>
@@ -884,9 +894,9 @@
                                               <object class="GtkLabel" id="label46">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Pr(&lt;i&gt;keep&lt;/i&gt;)</property>
                                                 <property name="use_markup">True</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">4</property>
@@ -897,8 +907,8 @@
                                               <object class="GtkLabel" id="label47">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Keep price</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">4</property>
@@ -1016,8 +1026,8 @@ For example, if this is set to 0.6 and, the previous market price was 6, and mar
                                               <object class="GtkLabel" id="label7">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Book distance s.d.</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">0</property>
@@ -1049,8 +1059,8 @@ For example, if this is set to 0.6 and, the previous market price was 6, and mar
                                               <object class="GtkLabel" id="label30">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Income</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">2</property>
@@ -1080,8 +1090,8 @@ For example, if this is set to 0.6 and, the previous market price was 6, and mar
                                               <object class="GtkLabel" id="label5">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Cost (fixed)</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">2</property>
@@ -1112,8 +1122,8 @@ For example, if this is set to 0.6 and, the previous market price was 6, and mar
                                               <object class="GtkLabel" id="label1">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Book quality s.d.</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">0</property>
@@ -1145,8 +1155,8 @@ For example, if this is set to 0.6 and, the previous market price was 6, and mar
                                               <object class="GtkLabel" id="label10">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Cost (unit)</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">2</property>
@@ -1177,8 +1187,8 @@ For example, if this is set to 0.6 and, the previous market price was 6, and mar
                                               <object class="GtkLabel" id="label32">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Cost (piracy)</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">2</property>
@@ -1254,8 +1264,8 @@ For example, if this is set to 0.6 and, the previous market price was 6, and mar
                                               <object class="GtkLabel" id="label17">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Random step s.d.</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">0</property>
@@ -1287,8 +1297,8 @@ For example, if this is set to 0.6 and, the previous market price was 6, and mar
                                               <object class="GtkLabel" id="label18">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Quality fn. shape</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">0</property>
@@ -1299,8 +1309,8 @@ For example, if this is set to 0.6 and, the previous market price was 6, and mar
                                               <object class="GtkLabel" id="label33">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Quality fn. scale min</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">0</property>
@@ -1386,8 +1396,8 @@ q(ℓ) = &lt;b&gt;&lt;i&gt;α&lt;/i&gt;&lt;/b&gt; [(ℓ+1)&lt;sup&gt;&lt;b&gt;&l
                                               <object class="GtkLabel" id="label35">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Quality fn. scale max</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">0</property>
@@ -1412,8 +1422,8 @@ q(ℓ) = &lt;b&gt;&lt;i&gt;α&lt;/i&gt;&lt;/b&gt; [(ℓ+1)&lt;sup&gt;&lt;b&gt;&l
                                               <object class="GtkLabel" id="label23">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Piracy begins</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">4</property>
@@ -1445,8 +1455,8 @@ If 0, piracy never becomes available.</property>
                                               <object class="GtkLabel" id="label31">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Friendship %</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">4</property>
@@ -1491,8 +1501,8 @@ The maximum number of links in a simulation of &lt;b&gt;&lt;i&gt;R&lt;/i&gt;&lt;
                                               <object class="GtkLabel" id="label34">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Prior discounting</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">2</property>
@@ -1526,8 +1536,8 @@ More specifically, this scales the prior's &lt;tt&gt;V&lt;/tt&gt; matrix such th
                                               <object class="GtkLabel" id="label66">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Piracy intro discount</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">2</property>
@@ -1561,8 +1571,8 @@ This value overrides the "Prior discounting" setting in just the "Sharing begins
                                               <object class="GtkLabel" id="label36">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Burn-in discount</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">2</property>
@@ -1593,8 +1603,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                                               <object class="GtkLabel" id="label37">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Burn-in periods</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">2</property>
@@ -1624,8 +1634,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                                               <object class="GtkLabel" id="label38">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Prediction draws</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">2</property>
@@ -1655,8 +1665,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                                               <object class="GtkLabel" id="label40">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Creation time</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">0</property>
@@ -2237,8 +2247,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                                               <object class="GtkLabel" id="threads">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">CPU Threads</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">0</property>
@@ -2249,8 +2259,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                                               <object class="GtkLabel" id="periods">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Periods</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">0</property>
@@ -2290,9 +2300,9 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                                               <object class="GtkLabel" id="comment_periods">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">The number of periods to run the simulation when hitting Start or Run.</property>
                                                 <property name="wrap">True</property>
+                                                <property name="xalign">0</property>
                                                 <attributes>
                                                   <attribute name="style" value="italic"/>
                                                 </attributes>
@@ -2306,8 +2316,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                                               <object class="GtkLabel" id="lbl_seed">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">Random Seed</property>
+                                                <property name="xalign">0</property>
                                               </object>
                                               <packing>
                                                 <property name="left_attach">0</property>
@@ -2334,9 +2344,9 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                                               <object class="GtkLabel" id="comment_seed">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="xalign">0</property>
                                                 <property name="label" translatable="yes">The random seed.  For reproducible results, you must also disable CPU Threads.</property>
                                                 <property name="wrap">True</property>
+                                                <property name="xalign">0</property>
                                                 <attributes>
                                                   <attribute name="style" value="italic"/>
                                                 </attributes>
@@ -2465,9 +2475,9 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                                   <object class="GtkLabel" id="label6">
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
-                                    <property name="xalign">0.49000000953674316</property>
                                     <property name="ypad">1</property>
                                     <property name="label" translatable="yes">Run Simulation</property>
+                                    <property name="xalign">0.49000000953674316</property>
                                     <attributes>
                                       <attribute name="weight" value="bold"/>
                                     </attributes>
@@ -2550,8 +2560,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label49">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">1</property>
                                 <property name="label" translatable="yes">t</property>
+                                <property name="xalign">1</property>
                               </object>
                               <packing>
                                 <property name="left_attach">0</property>
@@ -2562,8 +2572,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label53">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">1</property>
                                 <property name="label" translatable="yes"># Agents</property>
+                                <property name="xalign">1</property>
                               </object>
                               <packing>
                                 <property name="left_attach">0</property>
@@ -2574,9 +2584,9 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label_summary_t_desc">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">0</property>
                                 <property name="label" translatable="yes">The simulation period. Piracy begins at t=###.</property>
                                 <property name="wrap">True</property>
+                                <property name="xalign">0</property>
                               </object>
                               <packing>
                                 <property name="left_attach">2</property>
@@ -2587,9 +2597,9 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label56">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">0</property>
                                 <property name="label" translatable="yes">The number of simulation agents.</property>
                                 <property name="wrap">True</property>
+                                <property name="xalign">0</property>
                               </object>
                               <packing>
                                 <property name="left_attach">2</property>
@@ -2600,8 +2610,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label54">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">1</property>
                                 <property name="label" translatable="yes">📚 (+)</property>
+                                <property name="xalign">1</property>
                               </object>
                               <packing>
                                 <property name="left_attach">0</property>
@@ -2612,8 +2622,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label58">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">1</property>
                                 <property name="label" translatable="yes">📚 ($)</property>
+                                <property name="xalign">1</property>
                               </object>
                               <packing>
                                 <property name="left_attach">0</property>
@@ -2624,8 +2634,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label59">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">0</property>
                                 <property name="label" translatable="yes">The number of books on the market in this period.</property>
+                                <property name="xalign">0</property>
                               </object>
                               <packing>
                                 <property name="left_attach">2</property>
@@ -2636,8 +2646,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label57">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">0</property>
                                 <property name="label" translatable="yes">The number of new books created in this period.</property>
+                                <property name="xalign">0</property>
                               </object>
                               <packing>
                                 <property name="left_attach">2</property>
@@ -2648,8 +2658,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label60">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">1</property>
                                 <property name="label" translatable="yes">Mean utility</property>
+                                <property name="xalign">1</property>
                               </object>
                               <packing>
                                 <property name="left_attach">0</property>
@@ -2660,8 +2670,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label62">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">1</property>
                                 <property name="label" translatable="yes">Mean lifetime utility</property>
+                                <property name="xalign">1</property>
                               </object>
                               <packing>
                                 <property name="left_attach">0</property>
@@ -2672,9 +2682,9 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label_summary_u_desc">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">0</property>
                                 <property name="label" translatable="yes">The mean utility of readers this period. Base utility (before reading/writing) is ###.</property>
                                 <property name="wrap">True</property>
+                                <property name="xalign">0</property>
                               </object>
                               <packing>
                                 <property name="left_attach">2</property>
@@ -2685,10 +2695,10 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label_summary_ulife_desc">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">0</property>
                                 <property name="label" translatable="yes">The mean lifetime utility of readers up to and including this period. Base lifetime utility is ### × &lt;b&gt;&lt;i&gt;t&lt;/i&gt;&lt;/b&gt;.</property>
                                 <property name="use_markup">True</property>
                                 <property name="wrap">True</property>
+                                <property name="xalign">0</property>
                               </object>
                               <packing>
                                 <property name="left_attach">2</property>
@@ -2699,8 +2709,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label67">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">1</property>
                                 <property name="label" translatable="yes"># Authors</property>
+                                <property name="xalign">1</property>
                               </object>
                               <packing>
                                 <property name="left_attach">0</property>
@@ -2711,9 +2721,9 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label68">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">0</property>
                                 <property name="label" translatable="yes">The number of simulation readers who have written at least one book.</property>
                                 <property name="wrap">True</property>
+                                <property name="xalign">0</property>
                               </object>
                               <packing>
                                 <property name="left_attach">2</property>
@@ -2724,8 +2734,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label64">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">1</property>
                                 <property name="label" translatable="yes">Mean last wrote</property>
+                                <property name="xalign">1</property>
                               </object>
                               <packing>
                                 <property name="left_attach">0</property>
@@ -2736,9 +2746,9 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label65">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">0</property>
                                 <property name="label" translatable="yes">The mean number of periods since an author last wrote.  Readers who have never written are excluded.</property>
                                 <property name="wrap">True</property>
+                                <property name="xalign">0</property>
                               </object>
                               <packing>
                                 <property name="left_attach">2</property>
@@ -2749,8 +2759,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label76">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">1</property>
                                 <property name="label" translatable="yes">📚 (☠)</property>
+                                <property name="xalign">1</property>
                               </object>
                               <packing>
                                 <property name="left_attach">0</property>
@@ -2761,8 +2771,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label77">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">0</property>
                                 <property name="label" translatable="yes">The number of books that were pirated at least once in this period.</property>
+                                <property name="xalign">0</property>
                               </object>
                               <packing>
                                 <property name="left_attach">2</property>
@@ -2773,8 +2783,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label78">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">1</property>
                                 <property name="label" translatable="yes">📚 ($ &gt; 0)</property>
+                                <property name="xalign">1</property>
                               </object>
                               <packing>
                                 <property name="left_attach">0</property>
@@ -2785,8 +2795,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label79">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">0</property>
                                 <property name="label" translatable="yes">The number of books on the market in this period that sold at least one copy.</property>
+                                <property name="xalign">0</property>
                               </object>
                               <packing>
                                 <property name="left_attach">2</property>
@@ -2797,8 +2807,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label75">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">1</property>
                                 <property name="label" translatable="yes">Mean 📚 sales</property>
+                                <property name="xalign">1</property>
                               </object>
                               <packing>
                                 <property name="left_attach">0</property>
@@ -2809,8 +2819,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label81">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">1</property>
                                 <property name="label" translatable="yes">Mean 📚 price</property>
+                                <property name="xalign">1</property>
                               </object>
                               <packing>
                                 <property name="left_attach">0</property>
@@ -2821,8 +2831,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label82">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">0</property>
                                 <property name="label" translatable="yes">The average number of sales of books on the market this period.</property>
+                                <property name="xalign">0</property>
                               </object>
                               <packing>
                                 <property name="left_attach">2</property>
@@ -2833,8 +2843,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label83">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">0</property>
                                 <property name="label" translatable="yes">The average price of books on the market this period.</property>
+                                <property name="xalign">0</property>
                               </object>
                               <packing>
                                 <property name="left_attach">2</property>
@@ -2845,8 +2855,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label80">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">1</property>
                                 <property name="label" translatable="yes">Mean 📚 pirated</property>
+                                <property name="xalign">1</property>
                               </object>
                               <packing>
                                 <property name="left_attach">0</property>
@@ -2857,8 +2867,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label84">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">0</property>
                                 <property name="label" translatable="yes">The average number of pirated copies of books that were pirated at least once this period.</property>
+                                <property name="xalign">0</property>
                               </object>
                               <packing>
                                 <property name="left_attach">2</property>
@@ -2869,8 +2879,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label85">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">1</property>
                                 <property name="label" translatable="yes">Mean 📚 revenue</property>
+                                <property name="xalign">1</property>
                               </object>
                               <packing>
                                 <property name="left_attach">0</property>
@@ -2881,8 +2891,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label86">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">0</property>
                                 <property name="label" translatable="yes">The average total revenue of books on the market this period.</property>
+                                <property name="xalign">0</property>
                               </object>
                               <packing>
                                 <property name="left_attach">2</property>
@@ -2893,8 +2903,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label73">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">1</property>
                                 <property name="label" translatable="yes"># Readers ($ ∪ ☠)</property>
+                                <property name="xalign">1</property>
                               </object>
                               <packing>
                                 <property name="left_attach">0</property>
@@ -2905,8 +2915,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label71">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">1</property>
                                 <property name="label" translatable="yes"># Readers (☠)</property>
+                                <property name="xalign">1</property>
                               </object>
                               <packing>
                                 <property name="left_attach">0</property>
@@ -2917,8 +2927,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label69">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">1</property>
                                 <property name="label" translatable="yes"># Readers ($)</property>
+                                <property name="xalign">1</property>
                               </object>
                               <packing>
                                 <property name="left_attach">0</property>
@@ -2929,9 +2939,9 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label74">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">0</property>
                                 <property name="label" translatable="yes">The number of agents that read at least one book in this period (whether purchased or pirated).</property>
                                 <property name="wrap">True</property>
+                                <property name="xalign">0</property>
                               </object>
                               <packing>
                                 <property name="left_attach">2</property>
@@ -2942,9 +2952,9 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label72">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">0</property>
                                 <property name="label" translatable="yes">The number of agents that pirated at least one book in this period.</property>
                                 <property name="wrap">True</property>
+                                <property name="xalign">0</property>
                               </object>
                               <packing>
                                 <property name="left_attach">2</property>
@@ -2955,9 +2965,9 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label70">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">0</property>
                                 <property name="label" translatable="yes">The number of agents that bought at least one book in this period.</property>
                                 <property name="wrap">True</property>
+                                <property name="xalign">0</property>
                               </object>
                               <packing>
                                 <property name="left_attach">2</property>
@@ -2968,8 +2978,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label87">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">1</property>
                                 <property name="label" translatable="yes">Mean 📚 quality</property>
+                                <property name="xalign">1</property>
                               </object>
                               <packing>
                                 <property name="left_attach">0</property>
@@ -2980,8 +2990,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label88">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">0</property>
                                 <property name="label" translatable="yes">The average quality of books on the market this period.</property>
+                                <property name="xalign">0</property>
                               </object>
                               <packing>
                                 <property name="left_attach">2</property>
@@ -3244,8 +3254,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label89">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">1</property>
                                 <property name="label" translatable="yes">Mean library ($)</property>
+                                <property name="xalign">1</property>
                               </object>
                               <packing>
                                 <property name="left_attach">0</property>
@@ -3256,8 +3266,8 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label90">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">1</property>
                                 <property name="label" translatable="yes">Mean library (☠)</property>
+                                <property name="xalign">1</property>
                               </object>
                               <packing>
                                 <property name="left_attach">0</property>
@@ -3296,9 +3306,9 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label91">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">0</property>
                                 <property name="label" translatable="yes">The average number of purchased books owned by agents.</property>
                                 <property name="wrap">True</property>
+                                <property name="xalign">0</property>
                               </object>
                               <packing>
                                 <property name="left_attach">2</property>
@@ -3309,9 +3319,9 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                               <object class="GtkLabel" id="label92">
                                 <property name="visible">True</property>
                                 <property name="can_focus">False</property>
-                                <property name="xalign">0</property>
                                 <property name="label" translatable="yes">The average number of pirated books owned by agents.</property>
                                 <property name="wrap">True</property>
+                                <property name="xalign">0</property>
                               </object>
                               <packing>
                                 <property name="left_attach">2</property>
