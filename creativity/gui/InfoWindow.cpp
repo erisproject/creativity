@@ -7,7 +7,8 @@
 
 using namespace eris;
 using namespace creativity::state;
-using namespace creativity::belief;
+using namespace eris::belief;
+using namespace Eigen;
 
 namespace creativity { namespace gui {
 
@@ -321,13 +322,13 @@ void InfoWindow::refresh(std::shared_ptr<const State> state) {
 
         updateValue("_p_draws", r.profit.draw_rejection_success);
         updateValue("_p_discards", r.profit.draw_rejection_discards);
-        updateValue("_p_drawtype", r.profit.last_draw_mode == LinearRestricted::DrawMode::Gibbs ? "gibbs" : "rejection");
+        updateValue("_p_drawtype", r.profit.last_draw_mode == BayesianLinearRestricted::DrawMode::Gibbs ? "gibbs" : "rejection");
         updateValue("_pe_draws", r.profitExtrap().draw_rejection_success);
         updateValue("_pe_discards", r.profitExtrap().draw_rejection_discards);
-        updateValue("_pe_drawtype", r.profitExtrap().last_draw_mode == LinearRestricted::DrawMode::Gibbs ? "gibbs" : "rejection");
+        updateValue("_pe_drawtype", r.profitExtrap().last_draw_mode == BayesianLinearRestricted::DrawMode::Gibbs ? "gibbs" : "rejection");
         updateValue("_d_draws", r.demand.draw_rejection_success);
         updateValue("_d_discards", r.demand.draw_rejection_discards);
-        updateValue("_d_drawtype", r.demand.last_draw_mode == LinearRestricted::DrawMode::Gibbs ? "gibbs" : "rejection");
+        updateValue("_d_drawtype", r.demand.last_draw_mode == BayesianLinearRestricted::DrawMode::Gibbs ? "gibbs" : "rejection");
 
         for (unsigned long a : Reader::profit_stream_ages) {
             std::string code_prefix = "ps" + std::to_string(a) + "_";
