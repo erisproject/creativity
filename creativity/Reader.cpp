@@ -20,14 +20,10 @@ const std::vector<double> Reader::default_polynomial{{4., -1.}};
 const std::vector<double> Reader::default_penalty_polynomial{{0, 0, 0.25}};
 const std::vector<unsigned int> Reader::profit_stream_ages{{1,2,4,8}};
 
-Reader::Reader(
-        std::shared_ptr<Creativity> creativity,
-        const Position &pos,
-        double cFixed, double cUnit, double cPiracy, double inc
-        )
+Reader::Reader(std::shared_ptr<Creativity> creativity, const Position &pos)
     : WrappedPositional<agent::AssetAgent>(pos, creativity->parameters.boundary, -creativity->parameters.boundary),
-    cost_fixed{cFixed}, cost_unit{cUnit}, cost_piracy{cPiracy}, income{inc},
     creativity_{std::move(creativity)},
+    cost_unit{creativity_->parameters.cost_unit}, cost_fixed{creativity_->parameters.cost_fixed}, income{creativity_->parameters.income},
     profit_belief_{new Profit()}, profit_belief_extrap_{profit_belief_}
 {
     profit_stream_beliefs_.emplace(1, ProfitStream(1));
@@ -406,9 +402,9 @@ void Reader::interApply() {
             assets()[creativity_->money] -= cost_fixed;
 
             auto qdraw = [this] (const Book &book) -> double {
-                // Truncated normal.  Since book.quality() > 0, this should return a valid draw 50% of
-                // the time, so this loop shouldn't run that much, usually.
                 double x;
+                // Truncated normal.  Since book.quality() > 0, this should return a valid draw more
+                // than 50% of the time, so this loop shouldn't run that much, usually.
                 do { x = book.quality() + writer_quality_sd * Random::rstdnorm(); }
                 while (x < 0);
                 return x;

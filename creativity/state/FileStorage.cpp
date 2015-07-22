@@ -215,7 +215,7 @@ void FileStorage::flush() {
 void FileStorage::writeEmptyHeader() {
     f_.seekp(0);
     f_.write(HEADER::fileid, sizeof HEADER::fileid); // 'CrSt' file signature
-    write_u32(1); // file version
+    write_u32(version_); // file version
     f_.write(HEADER::test_value, sizeof HEADER::test_value); // All test values squished into one
 
     // Write out 0s for everything else:
@@ -467,12 +467,13 @@ void FileStorage::parseMetadata() {
         throwParseError("'CrSt' file signature not found");
 
     auto version = parse_value<uint32_t>(block[4]);
-    if (version != 1)
-        throwParseError("encountered unknown version " + std::to_string(version) + " != 1");
+    if (version < 1 or version > 2)
+        throwParseError("encountered unknown version " + std::to_string(version) + " != {1,2}");
+    version_ = version;
 
-    // Okay, so we've got a CrSt version 1 file.  The version number lets the file format change
+    // Okay, so we've got a CrSt version 1 or 2 file.  The version number lets the file format change
     // later, if necessary, in which case this code will need to handle the different versions.  For
-    // now there is one and only one version, 1.
+    // now there are v1 and v2 files: v2 files don't include the per-user cost and income variables.
 
     // Sanity check: make sure these types are the size we expect
 #define CHECK_SIZE(TYPE, SIZE) if (sizeof(TYPE) != SIZE) throwParseError("sizeof(" #TYPE ") != " #SIZE)
@@ -639,11 +640,13 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
     // Utility
     r.u = read_dbl();
     r.u_lifetime = read_dbl();
-    // Costs
-    r.cost_fixed = read_dbl();
-    r.cost_unit = read_dbl();
-    r.cost_piracy = read_dbl();
-    r.income = read_dbl();
+    if (version_ == 1) {
+        // Skip old fields (no longer used or supported)
+        read_dbl(); // cost_fixed
+        read_dbl(); // cost_unit
+        read_dbl(); // cost_piracy
+        read_dbl(); // income
+    }
     r.creation_shape = read_dbl();
     r.creation_scale = read_dbl();
 
@@ -789,11 +792,14 @@ void FileStorage::writeReader(const ReaderState &r) {
     // Utility
     write_value(r.u);
     write_value(r.u_lifetime);
-    // Costs
-    write_value(r.cost_fixed);
-    write_value(r.cost_unit);
-    write_value(r.cost_piracy);
-    write_value(r.income);
+    if (version_ == 1) {
+        // If we're writing a v1 file (which can only happen if we're appending to a v1 file rather
+        // than creating a new file), we need 4 fields for costs/income
+        write_value(settings_.cost_fixed);
+        write_value(settings_.cost_unit);
+        write_value(settings_.cost_piracy);
+        write_value(settings_.income);
+    }
     // Creation parameters
     write_value(r.creation_shape);
     write_value(r.creation_scale);

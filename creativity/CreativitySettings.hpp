@@ -90,9 +90,6 @@ struct CreativitySettings {
 
     /** The per-period external income readers receive.  Effort spent creating a book in a period is
      * subtracted from this amount.
-     *
-     * Like `cost_fixed` and `cost_unit` this only specifies the default reader income: reader
-     * income can be updated on a individual reader level.
      */
     double income = 1000.0;
 

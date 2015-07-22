@@ -103,12 +103,17 @@ class FileStorage final : public StorageBackend {
          */
         virtual void flush() override;
 
-    protected:
+    private:
+
+        /** The file version.  The default is 2, but we can read and write v1 files as well (v1
+         * files have per-user costs and income, but those never differed from the creativity
+         * setting; v2 files don't include them).
+         */
+        uint32_t version_ = 2;
 
         /// Called from the queue thread to write the given State to the file.
         virtual void thread_insert(std::shared_ptr<const State> &&s) override;
 
-    private:
         /** The file buffer object. Mutable because we need to read from it in const methods. */
         mutable std::fstream f_;
 
@@ -457,10 +462,6 @@ class FileStorage final : public StorageBackend {
          *     u32[]            friend ids
          *     dbl              u
          *     dbl              u_lifetime
-         *     dbl              cost_fixed
-         *     dbl              cost_unit
-         *     dbl              cost_piracy
-         *     dbl              income
          *     dbl              creation_shape
          *     dbl              creation_scale
          *     BELIEF           profit belief
@@ -487,6 +488,18 @@ class FileStorage final : public StorageBackend {
          * profit stream beliefs may not be placeholder beliefs (i.e. default constructed objects);
          * such objects should simply be omitted when writing the data.  Each profit stream belief K
          * value must also be unique.
+         *
+         * Version 1 state files additionally include the following fields after u_lifetime but
+         * before creation_shape:
+         *
+         *     dbl              cost_fixed
+         *     dbl              cost_unit
+         *     dbl              cost_piracy
+         *     dbl              income
+         *
+         * Version 2 files omit these because per-user costs/income were never entirely supported,
+         * tested, or used: all users simple use the values in the creativity parameters block.
+         * When loading a v1 file, these fields are ignored.
          */
         std::pair<eris::eris_id_t, ReaderState> readReader(eris::eris_time_t t) const;
 

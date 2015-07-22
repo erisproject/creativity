@@ -68,18 +68,6 @@ class ReaderState final {
         /// Lifetime cumulative utility up to and including the current period.
         double u_lifetime;
 
-        /// Fixed cost of keeping a book on the market
-        double cost_fixed;
-
-        /// Unit cost of creating a copy of a book
-        double cost_unit;
-
-        /// Unit cost of obtaining a pirated copy of a book
-        double cost_piracy;
-
-        /// Per-period (external) income
-        double income;
-
         /// Creation shape coefficient
         double creation_shape;
 
