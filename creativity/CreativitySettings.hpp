@@ -99,6 +99,20 @@ struct CreativitySettings {
      */
     eris::eris_time_t piracy_begins = 100;
 
+    /** The period in which the PublicTracker agent is created.  The public tracker provides
+     * marginal cost access to copies of books but taxes all agents a lump sum amount,
+     * redistributing the collected tax money to authors proportionally to the number of copies
+     * obtained of each author's works.
+     */
+    eris::eris_time_t public_sharing_begins = 200;
+
+    /** The lump size tax extracted by the public tracker from each agent in each period.
+     *
+     * Currently this is fixed, but future versions of this code may interpret this value as a
+     * starting value and attempt to adjust it to maximize long-term utility.
+     */
+    double public_sharing_tax = 10.0;
+
     /** The number of sharing/friendship links as a proportion of the maxinum number of sharing
      * links possible (which is \f$\frac{R(R-1)}{2}\f$, where \f$R\f$ is the number of readers).
      *
@@ -121,6 +135,11 @@ struct CreativitySettings {
      * overrides `prior_scale` in the `piracy_begins` period.
      */
     double prior_scale_piracy = 2;
+
+    /** The factor by which to multiply standard deviations in the first public sharing period.
+     * This value overrides `prior_scale` in the `public_sharing_begins` period.
+     */
+    double prior_scale_public_sharing = 2;
 
     /** The prior weight to use during the burn-in period; typically much larger than prior_scale
      * so that the simulation results of pre-belief initial parameters have significantly less

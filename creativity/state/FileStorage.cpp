@@ -28,6 +28,7 @@ constexpr unsigned int
         FileStorage::BLOCK_SIZE,
         FileStorage::HEADER::size,
         FileStorage::HEADER::states,
+        FileStorage::HEADER::states_v1,
         FileStorage::CBLOCK::states,
         FileStorage::CBLOCK::next_cblock,
         FileStorage::LIBRARY::record_size,
@@ -37,6 +38,10 @@ constexpr char
         FileStorage::HEADER::test_value[],
         FileStorage::ZERO_BLOCK[];
 constexpr uint64_t FileStorage::HEADER::u64_test;
+constexpr  int64_t FileStorage::HEADER::i64_test;
+constexpr uint32_t FileStorage::HEADER::u32_test;
+constexpr  int32_t FileStorage::HEADER::i32_test;
+constexpr double FileStorage::HEADER::dbl_test;
 constexpr int64_t
         FileStorage::HEADER::pos::fileid,
         FileStorage::HEADER::pos::filever,
@@ -69,13 +74,14 @@ constexpr int64_t
         FileStorage::HEADER::pos::init_p_max,
         FileStorage::HEADER::pos::init_prob_keep,
         FileStorage::HEADER::pos::init_keep_price,
+        FileStorage::HEADER::pos::public_sharing_begins,
+        FileStorage::HEADER::pos::public_sharing_tax,
+        FileStorage::HEADER::pos::prior_scale_public_sharing,
         FileStorage::HEADER::pos::state_first,
+        FileStorage::HEADER::pos::state_first_v1,
         FileStorage::HEADER::pos::state_last,
-        FileStorage::HEADER::pos::continuation,
-        FileStorage::HEADER::i64_test;
-constexpr uint32_t FileStorage::HEADER::u32_test;
-constexpr int32_t FileStorage::HEADER::i32_test;
-constexpr double FileStorage::HEADER::dbl_test;
+        FileStorage::HEADER::pos::continuation;
+
 constexpr std::ios_base::openmode FileStorage::open_readonly, FileStorage::open_overwrite, FileStorage::open_readwrite;
 
 FileStorage::ParseError::ParseError(const std::string &message) : std::runtime_error(message) {}
@@ -463,17 +469,21 @@ void FileStorage::parseMetadata() {
     f_.seekg(0);
     f_.read(block, HEADER::size);
 
-    if (block[0] != 'C' or block[1] != 'r' or block[2] != 'S' or block[3] != 't')
-        throwParseError("'CrSt' file signature not found");
+    // Make sure the CrSt file signature is found:
+    for (unsigned int i = 0; i < 4; i++) {
+        if (block[HEADER::pos::fileid+i] != HEADER::fileid[i])
+            throwParseError("'CrSt' file signature not found");
+    }
 
-    auto version = parse_value<uint32_t>(block[4]);
+    auto version = parse_value<uint32_t>(block[HEADER::pos::filever]);
     if (version < 1 or version > 2)
         throwParseError("encountered unknown version " + std::to_string(version) + " != {1,2}");
     version_ = version;
 
     // Okay, so we've got a CrSt version 1 or 2 file.  The version number lets the file format change
     // later, if necessary, in which case this code will need to handle the different versions.  For
-    // now there are v1 and v2 files: v2 files don't include the per-user cost and income variables.
+    // now there are v1 and v2 files: v2 files don't include the per-user cost and income variables,
+    // and adds PublicTracker settings and an agent.
 
     // Sanity check: make sure these types are the size we expect
 #define CHECK_SIZE(TYPE, SIZE) if (sizeof(TYPE) != SIZE) throwParseError("sizeof(" #TYPE ") != " #SIZE)
@@ -500,34 +510,43 @@ void FileStorage::parseMetadata() {
     // number of states:
     auto num_states = parse_value<uint32_t>(block[HEADER::pos::num_states]);
 
-    parse_value(block[HEADER::pos::dimensions], settings_.dimensions);
-    parse_value(block[HEADER::pos::readers], settings_.readers);
-    parse_value(block[HEADER::pos::boundary], settings_.boundary);
-    parse_value(block[HEADER::pos::book_distance_sd], settings_.book_distance_sd);
-    parse_value(block[HEADER::pos::book_quality_sd], settings_.book_quality_sd);
-    parse_value(block[HEADER::pos::reader_step_sd], settings_.reader_step_sd);
-    parse_value(block[HEADER::pos::reader_creation_shape], settings_.reader_creation_shape);
-    parse_value(block[HEADER::pos::reader_creation_scale_min], settings_.reader_creation_scale_min);
-    parse_value(block[HEADER::pos::reader_creation_scale_max], settings_.reader_creation_scale_max);
-    parse_value(block[HEADER::pos::creation_time], settings_.creation_time);
-    parse_value(block[HEADER::pos::cost_fixed], settings_.cost_fixed);
-    parse_value(block[HEADER::pos::cost_unit], settings_.cost_unit);
-    parse_value(block[HEADER::pos::cost_piracy], settings_.cost_piracy);
-    parse_value(block[HEADER::pos::income], settings_.income);
-    parse_value(block[HEADER::pos::piracy_begins], settings_.piracy_begins);
-    parse_value(block[HEADER::pos::piracy_link_proportion], settings_.piracy_link_proportion);
-    parse_value(block[HEADER::pos::prior_scale], settings_.prior_scale);
-    parse_value(block[HEADER::pos::prior_scale_piracy], settings_.prior_scale_piracy);
-    parse_value(block[HEADER::pos::prior_scale_burnin], settings_.prior_scale_burnin);
-    parse_value(block[HEADER::pos::burnin_periods], settings_.burnin_periods);
-    parse_value(block[HEADER::pos::init_prob_write], settings_.initial.prob_write);
-    parse_value(block[HEADER::pos::init_q_min], settings_.initial.q_min);
-    parse_value(block[HEADER::pos::init_q_max], settings_.initial.q_max);
-    parse_value(block[HEADER::pos::init_p_min], settings_.initial.p_min);
-    parse_value(block[HEADER::pos::init_p_max], settings_.initial.p_max);
-    parse_value(block[HEADER::pos::init_prob_keep], settings_.initial.prob_keep);
-    parse_value(block[HEADER::pos::init_keep_price], settings_.initial.keep_price);
-    parse_value(block[HEADER::pos::init_belief_threshold], settings_.initial.belief_threshold);
+#define PARSE_VALUE(FIELD) parse_value(block[HEADER::pos::FIELD], settings_.FIELD)
+#define PARSE_VALUE_INIT(FIELD) parse_value(block[HEADER::pos::init_##FIELD], settings_.initial.FIELD)
+    PARSE_VALUE(dimensions);
+    PARSE_VALUE(readers);
+    PARSE_VALUE(boundary);
+    PARSE_VALUE(book_distance_sd);
+    PARSE_VALUE(book_quality_sd);
+    PARSE_VALUE(reader_step_sd);
+    PARSE_VALUE(reader_creation_shape);
+    PARSE_VALUE(reader_creation_scale_min);
+    PARSE_VALUE(reader_creation_scale_max);
+    PARSE_VALUE(creation_time);
+    PARSE_VALUE(cost_fixed);
+    PARSE_VALUE(cost_unit);
+    PARSE_VALUE(cost_piracy);
+    PARSE_VALUE(income);
+    PARSE_VALUE(piracy_begins);
+    PARSE_VALUE(piracy_link_proportion);
+    PARSE_VALUE(prior_scale);
+    PARSE_VALUE(prior_scale_piracy);
+    PARSE_VALUE(prior_scale_burnin);
+    PARSE_VALUE(burnin_periods);
+    PARSE_VALUE_INIT(prob_write);
+    PARSE_VALUE_INIT(q_min);
+    PARSE_VALUE_INIT(q_max);
+    PARSE_VALUE_INIT(p_min);
+    PARSE_VALUE_INIT(p_max);
+    PARSE_VALUE_INIT(prob_keep);
+    PARSE_VALUE_INIT(keep_price);
+    PARSE_VALUE_INIT(belief_threshold);
+    if (version_ >= 2) {
+        PARSE_VALUE(public_sharing_begins);
+        PARSE_VALUE(public_sharing_tax);
+        PARSE_VALUE(prior_scale_public_sharing);
+    }
+#undef PARSE_VALUE
+#undef PARSE_VALUE_INIT
 
     if (settings_.dimensions == 0) throwParseError("found invalid dimensions == 0");
     if (settings_.readers == 0) throwParseError("found invalid readers == 0");
@@ -543,8 +562,8 @@ void FileStorage::parseMetadata() {
 
     state_pos_.reserve(num_states);
 
-    size_t header_states = std::min(num_states, HEADER::states);
-    parseStateLocations(block[HEADER::pos::state_first], header_states, file_size);
+    size_t header_states = std::min(num_states, version_ == 1 ? HEADER::states_v1 : HEADER::states);
+    parseStateLocations(block[version_ == 1 ? HEADER::pos::state_first_v1 : HEADER::pos::state_first], header_states, file_size);
 
     uint32_t remaining = num_states - header_states;
     while (remaining > 0) {
@@ -804,7 +823,7 @@ void FileStorage::writeReader(const ReaderState &r) {
     write_value(r.creation_shape);
     write_value(r.creation_scale);
 
-    FILESTORAGE_DEBUG_WRITE_CHECK(4*(1+2*settings_.dimensions+1+r.friends.size()+2+2+2+2+2+2+2+2))
+    FILESTORAGE_DEBUG_WRITE_CHECK(4*(1+2*settings_.dimensions+1+r.friends.size()+2+2+(version_ == 1 ? 2+2+2+2 : 0)+2+2))
 
     // Beliefs
     writeBelief(r.profit);

@@ -4,6 +4,7 @@
 #include "creativity/belief/Demand.hpp"
 #include "creativity/belief/Quality.hpp"
 #include "creativity/belief/Profit.hpp"
+#include "creativity/PublicTracker.hpp"
 #include <eris/Random.hpp>
 #include <eris/interopt/Callback.hpp>
 #include <eris/intraopt/Callback.hpp>
@@ -77,57 +78,22 @@ void Creativity::setup() {
         if (not st.first) st.first = Storage::create<MemoryStorage>(set_);
     }
 
-    std::uniform_real_distribution<double> unif_pmb(-parameters.boundary, parameters.boundary);
-    std::uniform_real_distribution<double> unif_cr_shape(parameters.reader_creation_scale_min, parameters.reader_creation_scale_max);
-
     sim = Simulation::create();
 
     money = sim->spawn<Good::Continuous>();
 
     auto &rng = eris::Random::rng();
-
-    if (parameters.piracy_link_proportion < 0 or parameters.piracy_link_proportion > 1)
-        throw std::logic_error("Creativity piracy_link_proportion parameter is invalid (not in [0,1])");
-
-    unsigned long max_links = parameters.readers * (parameters.readers - 1) / 2;
-    unsigned long num_links = std::lround(parameters.piracy_link_proportion * max_links);
-
-    // Track ids of created readers, to build the set of all possible edges as we go
-    std::vector<eris_id_t> created;
-    std::vector<std::pair<eris_id_t, eris_id_t>> potential_edges;
-    if (num_links > 0) {
-        created.reserve(parameters.readers);
-        potential_edges.reserve(max_links);
-    }
+    std::uniform_real_distribution<double> unif_pmb(-parameters.boundary, parameters.boundary);
+    std::uniform_real_distribution<double> unif_cr_shape(parameters.reader_creation_scale_min, parameters.reader_creation_scale_max);
 
     for (unsigned int i = 0; i < parameters.readers; i++) {
-        auto r = sim->spawn<Reader>(shared_from_this(),
-                Position{unif_pmb(rng), unif_pmb(rng)},
-                parameters.cost_fixed, parameters.cost_unit, parameters.cost_piracy, parameters.income
-                );
+        auto r = sim->spawn<Reader>(shared_from_this(), Position{unif_pmb(rng), unif_pmb(rng)});
         r->writer_book_sd = parameters.book_distance_sd;
         r->writer_quality_sd = parameters.book_quality_sd;
         r->creation_shape = parameters.reader_creation_shape;
         r->creation_scale = unif_cr_shape(rng);
-
-        if (num_links > 0) {
-            for (auto &other : created) {
-                potential_edges.emplace_back(r->id(), other);
-            }
-            created.push_back(r->id());
-        }
     }
 
-    if (num_links > 0 and num_links < max_links) {
-        // We aren't a full graph, so shuffle then throw away the ones we don't need
-        auto &rng = Random::rng();
-        std::shuffle(potential_edges.begin(), potential_edges.end(), rng);
-        potential_edges.resize(num_links);
-    }
-
-    for (auto &e : potential_edges) {
-        sim->agent<Reader>(e.first)->addFriend(sim->agent<Reader>(e.second));
-    }
 
     sim->spawn<intraopt::FinishCallback>([this] { new_books_.clear(); });
 
@@ -140,6 +106,87 @@ void Creativity::setup() {
 
     setup_sim_ = true;
     storage().first->updateSettings();
+}
+
+void Creativity::run() {
+    if (setup_read_) throw std::logic_error("Cannot call Creativity::run() on a preloaded simulation data file");
+    else if (not setup_sim_) throw std::logic_error("Creativity::run() cannot be called before Creativity::setup()");
+
+
+    // If piracy begins in the next period, set up the piracy network
+    if (sim->t() + 1 == parameters.piracy_begins)
+        createPiracyNetwork();
+
+    // If the next period is the first when the PublicTracker becomes available, create it
+    if (sim->t() + 1 == parameters.public_sharing_begins)
+        sim->spawn<PublicTracker>(shared_from_this(), parameters.public_sharing_tax);
+
+    sim->run();
+
+    storage().first->emplace_back(sim);
+}
+
+void Creativity::createPiracyNetwork() {
+
+    if (parameters.piracy_link_proportion < 0 or parameters.piracy_link_proportion > 1)
+        throw std::logic_error("Creativity piracy_link_proportion parameter is invalid (not in [0,1])");
+
+    auto readers = sim->agents<Reader>();
+    unsigned long max_links = readers.size() * (readers.size() - 1) / 2;
+    unsigned long num_links = std::lround(parameters.piracy_link_proportion * max_links);
+
+    // If piracy_link_proportion is 0, we don't actually have any piracy links
+    if (num_links == 0) return;
+
+    // Use reservoir sampling: the first num_links edges get added with probability 1.  Once filled
+    // up, each new potential link makes the cut with probability num_links / i, where i is the
+    // iteration number (beginning at 1).  If it makes the cut, it replaces a random element in the
+    // current list of elements.
+    //
+    // If L is the number of links, the (L+1)th element has probability L/(L+1) of being added.  If
+    // this happens, an arbitrary existing element has conditional probability 1/L of being removed
+    // and so has unconditional probability of 1/(L+1) of being removed, which means an
+    // unconditional probability of L/(L+1) of surviving (which, by design, equals the probability
+    // of the new element being added).
+    //
+    // For i >= 2, the (L+i)th element has probability L/(L+i) of being incorporated.  If this
+    // happens, an arbitrary element currently in the list has probability 1/L of being removed,
+    // conditional on both being in the list in the first place, and on the new element being
+    // incorporated--which are independent events.  Thus the probability of being replaced in this
+    // round conditional on surviving the previous round is 1/L * L/(L+i) = 1/(L+i).  The
+    // unconditional probability of being still in the list after element L+i is thus the
+    // probability of being in the list in the previous step minus the probability of being replaced
+    // by element L+i, or in other words, L/(L+i-1) - L/((L+i-1)(L+i)) = L/(L+i)--which again equals
+    // the probability of the new element having been incorporated.
+    //
+    // Thus, by induction, after all N >= L steps, every element has probability L/N of being in the
+    // list, and the list contains exactly L elements.
+
+    auto &rng = eris::Random::rng();
+    std::uniform_int_distribution<size_t> replace_dist(0, num_links-1);
+
+    std::vector<std::pair<size_t, size_t>> edges;
+    edges.reserve(num_links);
+    unsigned long index = 1;
+    for (size_t i = 1; i < readers.size(); i++) {
+        for (size_t j = 0; j < i; j++, index++) {
+            if (index <= num_links) {
+                edges.emplace_back(i, j);
+            }
+            else {
+                // Replace with probability num_links / index:
+                if (std::uniform_int_distribution<size_t>(0, index)(rng) <= num_links) {
+                    size_t replace = replace_dist(rng);
+                    edges[replace].first = i;
+                    edges[replace].second = j;
+                }
+            }
+        }
+    }
+
+    for (auto &e : edges) {
+        readers[e.first]->addFriend(readers[e.second]);
+    }
 }
 
 double Creativity::boundaryFromDensity(uint32_t readers, uint32_t dimensions, double density) {
@@ -182,6 +229,7 @@ double Creativity::priorWeight() const {
     if (!setup_sim_) throw std::logic_error("Cannot call priorWeight() on a non-live or unconfigured simulation");
     auto t = sim->t();
     return t == parameters.piracy_begins ? parameters.prior_scale_piracy :
+        t == parameters.public_sharing_begins ? parameters.prior_scale_public_sharing :
         t <= parameters.burnin_periods ? parameters.prior_scale_burnin :
         parameters.prior_scale;
 }

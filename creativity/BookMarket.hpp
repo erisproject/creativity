@@ -18,21 +18,21 @@ class BookMarket : public eris::Market, public virtual eris::intraopt::Finish {
          * this price into is simple: it's always feasible, and total is just quantity times price,
          * truncated to an integer (since books are discrete).
          */
-        price_info price(double q) const override;
+        virtual price_info price(double q) const override;
 
         /** Returns quantity info for a given payment.  Since price is constant, this is simple:
          * .quantity is the floor of p divided by current price, .constrained is always false,
          * .spent equals p*.quantity, and .unspent equals whatever amount is leftover which can't
          * buy another whole book.
          */
-        quantity_info quantity(double p) const override;
+        virtual quantity_info quantity(double p) const override;
 
         /** Sets the price of copies of the book on the market for future sales.  The value is a
          * multiple of creativity::MONEY.
          *
          * This may not be called during an intra-optimization phase.
          */
-        void setPrice(double p);
+        virtual void setPrice(double p);
 
         /** Returns the price of a single copy of the book.  This will be the same value as any of
          * `m.price(1).total`, `m.price(1).marginalFirst`, `m.price(1).marginal`.
@@ -40,7 +40,7 @@ class BookMarket : public eris::Market, public virtual eris::intraopt::Finish {
          * This is guaranteed not to change during an intra-period optimization phase (and so a read
          * lock on the market to obtain market price is not required).
          */
-        const double& price();
+        virtual const double& price();
 
         /** Reserves q units, paying at most p_max for them.  Note that if q is not an integer, this
          * will actually purchase floor(q) units.
@@ -55,7 +55,7 @@ class BookMarket : public eris::Market, public virtual eris::intraopt::Finish {
 
         /** Transfers all sales generated in the previous period to the author.
          */
-        void intraFinish() override;
+        virtual void intraFinish() override;
 
     protected:
         /** We override reservation completion to transfer the payment to the author and put the
@@ -66,11 +66,13 @@ class BookMarket : public eris::Market, public virtual eris::intraopt::Finish {
          */
         virtual void buy_(Reservation_ &res) override;
 
-    private:
+        /// The creativity object pointer
         std::shared_ptr<Creativity> creativity_;
+        /// The book this market object sells
         eris::SharedMember<Book> book_;
+        /// The current price of the book
         double price_;
-        // The income of the book (these get transferred in the interApply phase)
+        /// Accrued income of the book (these get transferred in the interApply phase)
         eris::Bundle proceeds_;
 };
 

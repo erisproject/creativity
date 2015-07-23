@@ -143,9 +143,7 @@ int main(int argc, char *argv[1]) {
         while (not quit and (step or (not stopped and sim->t() < run_end))) {
             start = std::chrono::high_resolution_clock::now();
 
-            sim->run();
-
-            creativity->storage().first->emplace_back(sim);
+            creativity->run();
 
             if (step) step = false;
 

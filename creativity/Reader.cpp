@@ -409,7 +409,13 @@ void Reader::interApply() {
                 while (x < 0);
                 return x;
             };
-            newbook = sim->spawn<Book>(creativity_, create_position_, sharedSelf(), wrote_.size(), create_price_, create_quality_, qdraw);
+            newbook = sim->spawn<Book>(creativity_, create_position_, sharedSelf(), wrote_.size(), create_quality_, qdraw);
+            // FIXME: authors can choose to not put this book on the market at all and instead
+            // release directly to the public market (if available).
+            newbook->setMarket(
+                    sim->spawn<BookMarket>(creativity_, newbook, create_price_),
+                    true // primary market
+                    );
 
             /// If enabled, add some noise in a random direction to the position
             if (writer_book_sd > 0) {

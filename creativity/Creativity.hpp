@@ -83,6 +83,12 @@ class Creativity : private eris::noncopyable, public std::enable_shared_from_thi
          */
         void setup();
 
+        /** Runs one iteration of the simulation.  This calls simulation()->run(), but also takes
+         * care of other details (such as setting up the piracy network at the right time, creating
+         * a public tracker agent when appropriate, and updating stored simulation state data).
+         */
+        void run();
+
         /** Static method that calculates a boundary given a number of readers, dimensions, and a
          * desired density.
          *
@@ -145,8 +151,13 @@ class Creativity : private eris::noncopyable, public std::enable_shared_from_thi
         unsigned long market_books_lagged = 0;
 
     protected:
-        /* Default constructor is protected; construct by calling create(). */
+        /** Default constructor is protected; construct by calling create(). */
         Creativity() = default;
+
+        /** Sets up the piracy network.  Called automatically by run() just before the
+         * `piracy_begins` period.
+         */
+        void createPiracyNetwork();
 
     private:
         // True if this is a live simulation.  Exclusive of setup_read_.

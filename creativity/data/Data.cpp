@@ -17,7 +17,7 @@ double net_u(const Storage &cs, eris_time_t from, eris_time_t to) {
     for (eris_time_t t = from; t <= to; t++) {
         auto cst = cs[t];
         for (auto &r : cst->readers) {
-            net_u_total += r.second.u - r.second.income;
+            net_u_total += r.second.u - cs.settings.income;
         }
     }
     return net_u_total / (cs[from]->readers.size() * (to-from+1));
@@ -176,8 +176,7 @@ double book_gross_margin(const Storage &cs, eris_time_t from, eris_time_t to) {
         for (const auto &bp : cst->books) {
             auto &b = bp.second;
             if (b.market()) {
-                auto &r = cst->readers.at(b.author);
-                margin_total += b.revenue - r.cost_unit * b.sales;
+                margin_total += b.revenue -  cs.settings.cost_unit * b.sales;
                 seen.insert(b.id);
             }
         }
@@ -204,11 +203,11 @@ double book_profit(const Storage &cs, eris_time_t from, eris_time_t to) {
             auto &b = bp.second;
             if (b.market()) {
                 seen.insert(b.id);
-                auto &r = period->readers.at(b.author);
-                profit_total += b.revenue - r.cost_unit * b.sales - r.cost_fixed;
+                profit_total += b.revenue - cs.settings.cost_unit * b.sales - cs.settings.cost_fixed;
                 if (b.created == t) {
                     // In the creation period, subtract the effort that had to be expended to write
                     // the book
+                    auto &r = period->readers.at(b.author);
                     profit_total -= Reader::creationEffort(r.creation_shape, r.creation_scale, b.quality);
                 }
             }

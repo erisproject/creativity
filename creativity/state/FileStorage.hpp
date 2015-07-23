@@ -257,6 +257,14 @@ class FileStorage final : public StorageBackend {
             static constexpr char fileid[4] = {'C', 'r', 'S', 't'};
             /// The test value bytes, which should be interpreted as the various test values below
             static constexpr char test_value[8] = {20,106,10,-50,0,24,69,-64};
+            static constexpr uint32_t u32_test = 3456789012; ///< unsigned 32-bit integer test value
+            static constexpr int32_t  i32_test = -838178284; ///< signed 32-bit integer test value
+            static constexpr uint64_t u64_test = 13854506220411054612ul; ///< unsigned 64-bit integer test value
+            static constexpr int64_t  i64_test = -4592237853298497004; ///< signed 64-bit integer test value
+            // The following constant is exactly representable in a 64-bit double (in fact it is the
+            // exact value of the test_value characters above, interpreted as a little-endian stored
+            // IEEE754 double).
+            static constexpr double dbl_test = -42.187524561963215319337905384600162506103515625; ///< double test value
             /// Header positions of various fields
             struct pos {
                 static constexpr int64_t
@@ -278,7 +286,7 @@ class FileStorage final : public StorageBackend {
                     cost_unit = 96, ///< Unit cost of an author creating a copy of a book (dbl)
                     cost_piracy = 104, ///< Unit cost of getting a copy of a book via piracy (dbl)
                     income = 112, ///< Per-period reader external income (before incurring authorship costs or receiving book profits) (dbl)
-                    piracy_begins = 120, ///< the sharing start period (eris_time_t = u32)
+                    piracy_begins = 120, ///< the sharing start period (u32)
                     piracy_link_proportion = 124, ///< The proportion of potential friendship links that exist
                     prior_scale = 132, ///< The prior 'n' multiplier (usually 0-1)
                     prior_scale_piracy = 140, ///< The prior 'n' multiplier in the first piracy period
@@ -292,11 +300,17 @@ class FileStorage final : public StorageBackend {
                     init_prob_keep = 200, ///< The probability of keeping a book on the market (uninformed beliefs)
                     init_keep_price = 208, ///< If keeping a book on the market, the new price is (p-c)*s+c, where this is s
                     init_belief_threshold = 216, ///< The required n-k value for readers to use beliefs instead of initial behaviour (i32)
+                    state_first_v1 = 224, ///< the first state record in version 1 files
+
+                    // Added in version 2:
+                    public_sharing_begins = 220, ///< The period in which the PublicTracker is created (u32)
+                    public_sharing_tax = 224, ///< The lump sum tax the PublicTracker collects (dbl)
+                    prior_scale_public_sharing = 232, ///< The prior scale for the period the PublicTracker first becomes available (dbl)
                     // NB: this next one should be an integer multiple of 8 (so that states+cont
                     // location go to the end, and so the `states` division below has no remainder)
                     //
                     // padding, if needed, here.
-                    state_first = 224, ///< the first state record
+                    state_first = 240, ///< the first state record
                     state_last = size - 16, ///< the last state record
                     continuation = size - 8; ///< the header continuation block pointer (used once header state blocks fill up)
             };
@@ -304,14 +318,7 @@ class FileStorage final : public StorageBackend {
              * requires using continuation blocks.
              */
             static constexpr unsigned int states = (pos::state_last - pos::state_first) / 8 + 1;
-            static constexpr uint32_t u32_test = 3456789012; ///< unsigned 32-bit integer test value
-            static constexpr int32_t  i32_test = -838178284; ///< signed 32-bit integer test value
-            static constexpr uint64_t u64_test = 13854506220411054612ul; ///< unsigned 64-bit integer test value
-            static constexpr int64_t  i64_test = -4592237853298497004; ///< signed 64-bit integer test value
-            // The following constant is exactly representable in a 64-bit double (in fact it is the
-            // exact value of the test_value characters above, interpreted as a little-endian stored
-            // IEEE754 double).
-            static constexpr double dbl_test = -42.187524561963215319337905384600162506103515625; ///< double test value
+            static constexpr unsigned int states_v1 = (pos::state_last - pos::state_first_v1) / 8 + 1;
         };
 
         /// Constants for continuation blocks

@@ -155,7 +155,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          */
         Reader(
                 std::shared_ptr<Creativity> creativity,
-                const eris::Position &pos,
+                const eris::Position &pos
               );
 
         /** Takes a money value and a container of SharedMember<Book> objects and returns the

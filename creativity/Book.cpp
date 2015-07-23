@@ -12,14 +12,12 @@ Book::Book(
         const Position &p,
         SharedMember<Reader> author,
         unsigned int order,
-        double initial_price,
         double quality,
         std::function<double(const Book&)> qDraw)
     : WrappedPositional<Good::Discrete>(p, author->wrapLowerBound(), author->wrapUpperBound()),
         creativity_{std::move(creativity)},
         author_{std::move(author)},
         order_{order},
-        init_price_{initial_price},
         quality_{quality},
         quality_draw_{std::move(qDraw)}
 {}
@@ -36,10 +34,15 @@ void Book::added() {
     revenue_total_ = 0;
     revenue_.clear();
 
-    auto mkt = sim->spawn<BookMarket>(creativity_, sharedSelf(), init_price_);
     creativity_->newBooks().first.push_back(sharedSelf());
-    market_ = mkt;
-    dependsWeaklyOn(mkt);
+}
+
+void Book::setMarket(SharedMember<BookMarket> market, bool primary) {
+    if (market_) throw std::runtime_error("Attempt to set a market for a book that already has a market");
+    market_primary_ = primary;
+    market_ = market;
+    out_of_print_ = 0;
+    dependsWeaklyOn(market);
 }
 
 void Book::weakDepRemoved(SharedMember<Member>, eris_id_t old) {
@@ -168,6 +171,10 @@ SharedMember<Reader> Book::author() const {
 
 bool Book::hasMarket() const {
     return market_ != 0;
+}
+
+bool Book::hasPrimaryMarket() const {
+    return market_primary_ and market_ != 0;
 }
 
 SharedMember<BookMarket> Book::market() const {

@@ -7,10 +7,13 @@
 
 namespace creativity { namespace state {
 
-/** Base class for state storage which accesses State values.
+/** Class for state storage access which accesses State values.
  *
- * Subclasses must implement the subscript [] operator, size() method, and push_back(&&) method.
+ * Instances of this class are creates with a StorageBackend subclass; this class provides a
+ * subscript [] operator, size() method, and push_back(&&) method, which are forward to the back-end
+ * class.
  *
+ * \sa creativity::state::StorageBackend
  * \sa creativity::state::MemoryStorage
  * \sa creativity::state::FileStorage
  */
@@ -70,6 +73,10 @@ class Storage final {
          */
         void updateSettings();
 
+        /** Read-only access to the settings object referenced by this object. This object
+         * references the settings reference given during construction. */
+        const CreativitySettings& settings;
+
         /// Constructs a State using the given arguments, wraps it in a shared_ptr, then inserts it by calling push_back
         template<class... Args>
         void emplace_back(Args&&... args);
@@ -127,7 +134,7 @@ class Storage final {
          * this storage class represents.
          * \param backend a StorageBackend-derived object
          */
-        Storage(CreativitySettings &settings, StorageBackend *sb) : settings_(settings), backend_(sb)
+        Storage(CreativitySettings &settings, StorageBackend *sb) : settings(settings), settings_(settings), backend_(sb)
         {
             if (backend_->have_settings) backend_->readSettings(settings_);
             // Track the number of states using the size of the cache_

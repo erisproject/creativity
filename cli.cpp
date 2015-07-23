@@ -341,10 +341,10 @@ int main(int argc, char *argv[]) {
     auto count_bnew = [](const Book &b) -> bool { return b.age() == 0; };
 
     while (sim->t() < args.periods) {
-        sim->run();
+        creativity->run();
 
-        creativity->storage().first->emplace_back(sim);
-
+        // Calculate and show various status information, such as simulation speed, number of books,
+        // etc.
         auto now = std::chrono::high_resolution_clock::now();
         std::ostringstream speed;
         speed << std::setprecision(6) << std::showpoint;

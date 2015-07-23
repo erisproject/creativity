@@ -39,18 +39,14 @@ void ReaderStore::get_value_vfunc(const iterator &iter, int column, Glib::ValueB
         v.set(r.id);
         value.init(v.gobj());
     }
-    else if (column == columns.pos_x.index() or column == columns.pos_y.index() or column == columns.u.index() or column == columns.u_lifetime.index()
-            or column == columns.cost_fixed.index() or column == columns.cost_unit.index() or column == columns.cost_piracy.index() or column == columns.income.index()) {
+    else if (column == columns.pos_x.index() or column == columns.pos_y.index() or column == columns.u.index() or column == columns.u_lifetime.index()) {
         Glib::Value<double> v;
         v.init(v.value_type());
         v.set(  column == columns.pos_x.index() ? r.position[0] :
                 column == columns.pos_y.index() ? r.position[1] :
                 column == columns.u.index() ? r.u :
                 column == columns.u_lifetime.index() ? r.u_lifetime :
-                column == columns.cost_fixed.index() ? r.cost_fixed :
-                column == columns.cost_unit.index() ? r.cost_unit :
-                column == columns.cost_piracy.index() ? r.cost_piracy :
-                r.income
+                std::numeric_limits<double>::quiet_NaN()
              );
         value.init(v.gobj());
     }

@@ -18,12 +18,19 @@ class Creativity;
  * This class automatically establishes momentary read/write locks when accessing or modifying the
  * sales and revenue information.  However, when outside locks are also in use it is recommended to
  * include the book in the encompassing lock.
+ *
+ * Books have three potential states: they can be on the market controlled by the author (``primary
+ * market''); on the market controlled by someone else (``secondary market'') such as the
+ * PublicTracker agent; or off the market.
+ *
+ * Without a secondary market provider such as PublicTracker, books start out in the primary market
+ * and eventually move off market.  With a secondary market provider, books can start out in either
+ * a primary market and then move to secondary market, or start out directly in the secondary
+ * market.  See PublicTracker for details.
  */
 class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
     public:
-        /** Constructs a new book at the given position created by the given author.  When the book
-         * is added to the simulation, a BookMarket is constructed for selling the book which starts
-         * the price at `initial_price`.  
+        /** Constructs a new book at the given position created by the given author.
          *
          * \param creativity the Creativity object that owns the simulation this book belongs to
          * \param p the position of the book
@@ -31,7 +38,6 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
          * \param order the number of this book in the author's authored books list.  `order == 0`
          * indicates that this is the author's first book; `order == 12` indicates that this is the
          * author's thirteenth book.
-         * \param initial_price the price of the book for the next period
          * \param quality the quality of the book
          * \param qDraw a callable object that can be called upon to produce a quality draw for a
          * given book, passed as the argument.  This is often a random draw (and so different
@@ -42,7 +48,7 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
          * from the simulation, it will still be kept from destruction by this class.
          */
         Book(std::shared_ptr<Creativity> creativity, const eris::Position &p, eris::SharedMember<Reader> author, unsigned int order,
-                double initial_price, double quality, std::function<double(const Book&)> qDraw);
+                double quality, std::function<double(const Book&)> qDraw);
 
         /// Returns the age of the book, in simulation periods.
         eris::eris_time_t age() const;
@@ -88,8 +94,17 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
          */
         void added() override;
 
-        /** When the market or author is removed from the simulation, record it by clearing the
-         * stored author/market fields.
+        /** Sets a new market for this book.  Throws an exception if the book already has a market,
+         * or if the given market is not a market for this book.  Called automatically by
+         * BookMarket; calling this externally should not be required.
+         *
+         * \param market the market object providing copies of this book
+         * \param primary true if the market is a primary (i.e. author-controlled) market, false
+         * otherwise.
+         */
+        void setMarket(eris::SharedMember<BookMarket> market, bool primary);
+
+        /** When the market is removed from the simulation, record it by clearing the stored market.
          */
         void weakDepRemoved(eris::SharedMember<Member>, eris::eris_id_t old) override;
 
@@ -103,9 +118,20 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         eris::SharedMember<Reader> author() const;
 
         /** Returns true if this book is currently on the market, false if there is no associated
-         * market for this book.
+         * market for this book.  Note that this could be the author's market, or a public market
+         * (if the simulation contains a suitable public agent).
          */
         bool hasMarket() const;
+
+        /** Returns true if this book is currently on the primary market, that is, on the market as
+         * controlled by the book's author.  This can return false when hasMarket() returns true if
+         * the book is on a secondary market, such as PublicTrackerMarket.
+         */
+        bool hasPrimaryMarket() const;
+
+        /** Returns true if this book has a market, but that market is not the primary market (that
+         * is, it's on a market not controlled by the author).
+         */
 
         /** Returns the BookMarket that sells this Book.  Will throw an exception (via Simulation)
          * if no Market doesn't exist, so check hasMarket() first.
@@ -203,8 +229,9 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         std::map<eris::eris_time_t, double> revenue_;
         eris::SharedMember<Reader> author_;
         const unsigned int order_;
+        bool market_primary_;
         eris::eris_id_t market_;
-        const double init_price_, quality_;
+        const double quality_;
         std::function<double(const Book&)> quality_draw_;
 };
 
