@@ -133,9 +133,9 @@ LESS_GREATER(quality)
 // price handled below
 LESS_GREATER(revenue)
 LESS_GREATER(revenue_lifetime)
-LESS_GREATER_A(age, created)
 // pos_str handled below
 LESS_GREATER_A(market, market())
+// age handled below
 LESS_GREATER(created)
 LESS_GREATER(sales)
 LESS_GREATER(sales_lifetime)
@@ -164,6 +164,9 @@ bool BookStore::greater_price(const BookState &a, const BookState &b) {
     return (a.market() ? a.price : -std::numeric_limits<double>::infinity())
          > (b.market() ? b.price : -std::numeric_limits<double>::infinity());
 }
+// Age sorts in the opposite order from created
+bool BookStore::less_age   (const BookState &a, const BookState &b) { return a.created > b.created; }
+bool BookStore::greater_age(const BookState &a, const BookState &b) { return a.created < b.created; }
 
 void BookStore::appendColumnsTo(Gtk::TreeView &v) const {
     appendCol(v, "ID", columns->id, 50);
