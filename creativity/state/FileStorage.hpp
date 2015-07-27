@@ -49,6 +49,14 @@ class FileStorage final : public StorageBackend {
             OVERWRITE
         };
 
+        /** The supported record types within a state. */
+        enum TYPE : uint8_t {
+            TYPE_DONE = 0, ///< Psuedo-type indicating the end of the record list
+            TYPE_READERS = 1, ///< An array of readers
+            TYPE_BOOKS = 2, ///< An array of books
+            TYPE_PUBLIC_TRACKER = 3 ///< A PublicTracker state
+        };
+
         /** Constructs and returns a FileStorage object that uses the given file for reading and
          * (optionally) writing state data.  The file is read or created immediately.
          *
@@ -446,20 +454,38 @@ class FileStorage final : public StorageBackend {
          * follows:
          *
          *     u32      t (simulation time period)
-         *     READER[] readers array
-         *     BOOK[]   books
          *
-         * where type[] indicates an array structured as:
-         *     u32          length
-         *     type*length  sequential type records
+         * followed by any number of:
+         *     u8       TYPE != 0
+         *     DATA     specific to TYPE
          *
-         * \see readReader() for the structure of READER
-         * \see readBook() for the structure of BOOK
+         * and finally a terminating u8 value of TYPE = 0.  Typically there is at least a reader
+         * array (TYPE_READERS) and (except in the first states) a book array (TYPE_BOOKS).
+         *
+         * \see TYPE for the different TYPE values supported.
          */
         std::shared_ptr<const State> readState() const;
 
+        /** Called by readState() when reading from a v1 file.  In version 1 files the state data
+         * structure is:
+         *
+         *     u32      t (simulation time period)
+         *     READER[] readers array
+         *     BOOK[]   books array
+         *
+         * where X[] indicates an array structured as:
+         *     u32          length
+         *     type*length  sequential X records
+         */
+        std::shared_ptr<const State> readState_v1() const;
+
         /// Writes the given state at the current file position.
         void writeState(const State &state);
+
+        /** Writes the given state to a v1 file.  Will throw an exception if the state contains data
+         * not representable in a v1 file, such as a PublicTracker.
+         */
+        void writeState_v1(const State &state);
 
         /** Reads a ReaderState record from the current file position and returns it in an
          * {eris_id_t, ReaderState} pair, where `.first` is the id.  Such a record consists of:
@@ -582,21 +608,34 @@ class FileStorage final : public StorageBackend {
          *     u32          author id
          *     dbl*DIM      position (DIM = dimensions)
          *     dbl          quality
+         *     u8           status fields (current just 1 for private market) -- added in v2
          *     dbl          price (market is derived from this: market=true unless price is NaN)
          *     dbl          revenue
-         *     dbl          revenueLifetime
+         *     dbl          revenue_lifetime
          *     u32          sales
-         *     u32          salesLifetime
+         *     u32          sales_lifetime_private
+         *     u32          sales_lifetime_public -- added in v2
          *     u32          pirated
          *     u32          piratedLifetime
          *     u32          created
-         *     u32          lifetime
+         *     u32          lifetime_private
          */
         std::pair<eris::eris_id_t, BookState> readBook() const;
 
         /** Writes a book at the current file position.  See readBook() for data layout. */
         void writeBook(const BookState &book);
 
+        /** Reads public tracker state data from the current file position and returns it in a
+         * PublicTrackerState unique pointer.  The data is:
+         *
+         *     u32          id
+         *     dbl          tax (per-user lump sum tax)
+         *     dbl          unspent (!= 0 only if the previous period had no publid downloads)
+         */
+        std::unique_ptr<PublicTrackerState> readPublicTracker() const;
+
+        /// Writes a public tracker to the current file position.
+        void writePublicTracker(const PublicTrackerState &pt);
 };
 
 #if defined(BOOST_BIG_ENDIAN)

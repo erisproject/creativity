@@ -23,9 +23,9 @@ double net_u(const Storage &cs, eris_time_t from, eris_time_t to) {
     return net_u_total / (cs[from]->readers.size() * (to-from+1));
 }
 
-/** Calculates the average market life of books written between `from` and `to`, in simulation
- * periods.  Books still on the market in period `to` aren't included (because they might stay on
- * the market).
+/** Calculates the average (private) market life of books written between `from` and `to`, in
+ * simulation periods.  Books still on the market in period `to` aren't included (because they might
+ * stay on the market).
  */
 double book_market_periods(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (from > to) throw std::logic_error("from > to");
@@ -34,8 +34,8 @@ double book_market_periods(const Storage &cs, eris_time_t from, eris_time_t to) 
     auto csto = cs[to];
     for (auto &bp : csto->books) {
         auto &b = bp.second;
-        if (b.created >= from and not b.market()) {
-            total += b.lifetime;
+        if (b.created >= from and not b.market_private) {
+            total += b.lifetime_private;
             count++;
         }
     }
@@ -54,7 +54,7 @@ double book_p0(const Storage &cs, eris_time_t from, eris_time_t to) {
         auto cst = cs[t];
         for (auto &bp : cst->books) {
             auto &b = bp.second;
-            if (b.created == t and b.market()) {
+            if (b.created == t and b.market_private) {
                 p_total += b.price;
                 count++;
             }
@@ -79,7 +79,7 @@ double book_p1(const Storage &cs, eris_time_t from, eris_time_t to) {
         auto cst = cs[t];
         for (auto &bp : cst->books) {
             auto &b = bp.second;
-            if (b.created == t-1 and b.market()) {
+            if (b.created == t-1 and b.market_private) {
                 p_total += b.price;
                 count++;
             }
@@ -104,7 +104,7 @@ double book_p2(const Storage &cs, eris_time_t from, eris_time_t to) {
         auto cst = cs[t];
         for (auto &bp : cst->books) {
             auto &b = bp.second;
-            if (b.created == t-2 and b.market()) {
+            if (b.created == t-2 and b.market_private) {
                 p_total += b.price;
                 count++;
             }
@@ -114,8 +114,8 @@ double book_p2(const Storage &cs, eris_time_t from, eris_time_t to) {
     return p_total / count;
 }
 
-/** Average copies sold per book.  All books on the market in the given range are included.  The
- * average is per book seen in the period, not per simulation period.
+/** Average private copies sold per book.  All books on the private market in the given range are
+ * included.  The average is per book seen in the period, not per simulation period.
  */
 double book_sales(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (from > to) throw std::logic_error("from > to");
@@ -125,7 +125,7 @@ double book_sales(const Storage &cs, eris_time_t from, eris_time_t to) {
         auto cst = cs[t];
         for (auto &bp : cst->books) {
             auto &b = bp.second;
-            if (b.market()) {
+            if (b.market_private) {
                 sales_total += b.sales;
                 seen.insert(b.id);
             }
@@ -150,7 +150,7 @@ double book_revenue(const Storage &cs, eris_time_t from, eris_time_t to) {
         auto cst = cs[t];
         for (auto &bp : cst->books) {
             auto &b = bp.second;
-            if (b.market()) {
+            if (b.market_private) {
                 revenue_total += b.revenue;
                 seen.insert(b.id);
             }
@@ -175,7 +175,7 @@ double book_gross_margin(const Storage &cs, eris_time_t from, eris_time_t to) {
         auto cst = cs[t];
         for (const auto &bp : cst->books) {
             auto &b = bp.second;
-            if (b.market()) {
+            if (b.market_private) {
                 margin_total += b.revenue -  cs.settings.cost_unit * b.sales;
                 seen.insert(b.id);
             }
@@ -201,7 +201,7 @@ double book_profit(const Storage &cs, eris_time_t from, eris_time_t to) {
         auto period = cs[t];
         for (const auto &bp : period->books) {
             auto &b = bp.second;
-            if (b.market()) {
+            if (b.market_private) {
                 seen.insert(b.id);
                 profit_total += b.revenue - cs.settings.cost_unit * b.sales - cs.settings.cost_fixed;
                 if (b.created == t) {

@@ -21,6 +21,9 @@ void PublicTrackerMarket::interAdvance() {
 }
 
 void PublicTrackerMarket::intraFinish() {
+    // This is overriding BookMarket to skip everything it does: price equals marginal cost, and so
+    // there can never be any profits to transfer.  Clear the proceeds_ jar (in case it contains
+    // epsilon amounts).
     proceeds_.clear();
 }
 

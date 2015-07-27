@@ -57,6 +57,11 @@ class BookMarket : public eris::Market, public virtual eris::intraopt::Finish {
          */
         virtual void intraFinish() override;
 
+        /** Returns true if this is a public market.  *This* class always returns false; public
+         * market subclasses are intended to override.
+         */
+        virtual bool isPublic() const { return false; }
+
     protected:
         /** We override reservation completion to transfer the payment to the author and put the
          * book into the b_ bundle.

@@ -652,6 +652,9 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          *
          * The current belief is used as a prior, suitably weakened if
          * CreativitySettings.prior_weight is not equal to 1.
+         *
+         * This method is currently disabled; attempting to call it will result in a
+         * std::runtime_error exception.
          */
         void updateProfitStreamBelief();
 

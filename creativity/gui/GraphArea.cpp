@@ -151,24 +151,30 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
 
         // Draw books.  On-market and off-market books have different colours, and newer books are
         // larger than older books.
-        if (design.enabled.book_live or design.enabled.book_dead) {
+        if (design.enabled.book_live or design.enabled.book_dead or design.enabled.book_public) {
             for (auto &bpair : state->books) {
                 auto &b = bpair.second;
                 // Give new books a larger cross: a brand new book gets a point scaled larges; this
                 // scaling decreases linearly until reading the regular size.
+                const double size = std::max(1.0, design.size.book_scale_a - design.size.book_scale_b*(state->t - b.created))
+                    * design.size.book;
 
-                if (b.market()) {
+                if (b.market_private) {
                     if (design.enabled.book_live) {
-                        const double scale = std::max(1.0, design.size.book_live_scale_a - design.size.book_live_scale_b*(state->t - b.created));
                         drawPoint(cr, trans, b.position[0], b.position[1], design.style.book_live,
-                                design.colour.book_live, design.size.book_live*scale, design.stroke_width.book_live);
+                                design.colour.book_live, size, design.stroke_width.book_live);
+                    }
+                }
+                else if (b.market_public()) {
+                    if (design.enabled.book_public) {
+                        drawPoint(cr, trans, b.position[0], b.position[1], design.style.book_public,
+                                design.colour.book_public, size, design.stroke_width.book_public);
                     }
                 }
                 else {
                     if (design.enabled.book_dead) {
-                        const double scale = std::max(1.0, design.size.book_dead_scale_a - design.size.book_dead_scale_b*(state->t - b.created));
                         drawPoint(cr, trans, b.position[0], b.position[1], design.style.book_dead,
-                                design.colour.book_dead, design.size.book_dead*scale, design.stroke_width.book_dead);
+                                design.colour.book_dead, size, design.stroke_width.book_dead);
                     }
                 }
             }
@@ -205,12 +211,19 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
             cr->save();
             for (auto &bpair : state->books) {
                 auto &b = bpair.second;
-                if (b.market()) {
+                if (b.market_private) {
                     if (not design.enabled.author_live) continue;
 
                     cr->set_source(design.colour.author_live);
                     cr->set_dash(design.dash.author_live, 0);
                     cr->set_line_width(design.stroke_width.author_live);
+                }
+                if (b.market_public()) {
+                    if (not design.enabled.author_public) continue;
+
+                    cr->set_source(design.colour.author_public);
+                    cr->set_dash(design.dash.author_public, 0);
+                    cr->set_line_width(design.stroke_width.author_public);
                 }
                 else {
                     if (not design.enabled.author_dead) continue;

@@ -30,7 +30,7 @@ void PublicTracker::interAdvance() {
 
     // Create new markets for off-market books
     for (auto &b : simulation()->goods<Book>()) {
-        if (not b->hasMarket()) { // The author decided not to put the book on the market for the upcoming period, so we'll take over
+        if (not b->hasAnyMarket()) { // The author decided not to put the book on the market for the upcoming period, so we'll take over
             simulation()->spawn<PublicTrackerMarket>(creativity_, b);
         }
     }
@@ -59,6 +59,14 @@ void PublicTracker::intraFinish() {
         }
     }
     // Otherwise no copies downloaded: just leave the assets for the next period's pool
+}
+
+const double& PublicTracker::tax() const {
+    return tax_;
+}
+
+const double& PublicTracker::pool() const {
+    return assets()[creativity_->money];
 }
 
 }

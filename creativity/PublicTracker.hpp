@@ -58,6 +58,16 @@ class PublicTracker : public eris::agent::AssetAgent,
         /** When the period finishes, we return the lump sum tax proportionally to all authors. */
         void intraFinish() override;
 
+        /// Returns the lump sum per-reader tax collected each period
+        const double& tax() const;
+
+        /** Returns the current total asset pool that will be distributed to authors (proportional
+         * to downloads) at the end of the current period.  If called between periods, this will be
+         * 0 unless the previous period had no public downloads at all: in such a case, this is the
+         * amount that will be added to collected lump sum amounts in the upcoming period.
+         */
+        const double& pool() const;
+
     protected:
         /// The Creativity object that owns the simulation this reader belongs to
         std::shared_ptr<Creativity> creativity_;

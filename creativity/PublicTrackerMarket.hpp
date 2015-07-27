@@ -28,6 +28,9 @@ class PublicTrackerMarket : public BookMarket, public virtual eris::interopt::Ad
          */
         virtual void intraFinish() override;
 
+        /** Returns true: this is a public market. */
+        virtual bool isPublic() const override { return true; }
+
     protected:
         /// Resets price to the smaller of cost_unit and cost_piracy.
         void updatePrice();

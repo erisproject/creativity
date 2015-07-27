@@ -77,15 +77,20 @@ void BookStore::get_value_vfunc(const iterator &iter, int column, Glib::ValueBas
     else IFCOL(revenue);
     else IFCOL(revenue_lifetime);
     else IFCOL_V(pos_str, GUI::pos_to_string(b.position));
-    else IFCOL_M(market);
+    else IFCOL_V(market_str, b.market_private ? "Priv." : b.market_any() ? "Pub." : "No");
+    else IFCOL_M(market_any);
+    else IFCOL(market_private);
+    else IFCOL_M(market_public);
     else IFCOL_V(age, state_->t - b.created);
     else IFCOL(created);
     else IFCOL(sales);
-    else IFCOL(sales_lifetime);
+    else IFCOL(sales_lifetime_private);
+    else IFCOL(sales_lifetime_public);
+    else IFCOL_M(sales_lifetime);
     else IFCOL(pirated);
     else IFCOL(pirated_lifetime);
     else IFCOL_M(copies);
-    else IFCOL(lifetime);
+    else IFCOL(lifetime_private);
     else throw std::out_of_range("Invalid column index accessed");
 #undef IFCOL_M
 #undef IFCOL
@@ -107,15 +112,19 @@ void BookStore::set_sort_column_id_vfunc(int sort_column_id, Gtk::SortType order
     ELSE_IF_COL(revenue);
     ELSE_IF_COL(revenue_lifetime);
     ELSE_IF_COL(pos_str);
-    ELSE_IF_COL(market);
+    ELSE_IF_COL(market_private);
+    ELSE_IF_COL(market_public);
+    ELSE_IF_COL(market_any);
     ELSE_IF_COL(age);
     ELSE_IF_COL(created);
     ELSE_IF_COL(sales);
+    ELSE_IF_COL(sales_lifetime_private);
+    ELSE_IF_COL(sales_lifetime_public);
     ELSE_IF_COL(sales_lifetime);
     ELSE_IF_COL(pirated);
     ELSE_IF_COL(pirated_lifetime);
     ELSE_IF_COL(copies);
-    ELSE_IF_COL(lifetime);
+    ELSE_IF_COL(lifetime_private);
 #undef ELSE_IF_COL
 
     sort_members(compare, sort_column_id, order);
@@ -125,6 +134,7 @@ void BookStore::set_sort_column_id_vfunc(int sort_column_id, Gtk::SortType order
 bool BookStore::less_##COL   (const BookState &a, const BookState &b) { return a.ACCESS < b.ACCESS; } \
 bool BookStore::greater_##COL(const BookState &a, const BookState &b) { return a.ACCESS > b.ACCESS; }
 #define LESS_GREATER(FIELD) LESS_GREATER_A(FIELD, FIELD)
+#define LESS_GREATER_M(FIELD) LESS_GREATER_A(FIELD, FIELD())
 LESS_GREATER(id)
 LESS_GREATER(author)
 LESS_GREATER_A(pos_x, position[0])
@@ -134,15 +144,20 @@ LESS_GREATER(quality)
 LESS_GREATER(revenue)
 LESS_GREATER(revenue_lifetime)
 // pos_str handled below
-LESS_GREATER_A(market, market())
+// market_str handled below
+LESS_GREATER(market_private)
+LESS_GREATER_M(market_public)
+LESS_GREATER_M(market_any)
 // age handled below
 LESS_GREATER(created)
 LESS_GREATER(sales)
-LESS_GREATER(sales_lifetime)
+LESS_GREATER(sales_lifetime_private)
+LESS_GREATER(sales_lifetime_public)
+LESS_GREATER_M(sales_lifetime)
 LESS_GREATER(pirated)
 LESS_GREATER(pirated_lifetime)
-LESS_GREATER(lifetime)
 LESS_GREATER_A(copies, copies_lifetime())
+LESS_GREATER(lifetime_private)
 #undef LESS_GREATER
 #undef LESS_GREATER_A
 // First x, then y for ties
@@ -154,15 +169,29 @@ bool BookStore::greater_pos_str(const BookState &a, const BookState &b) {
     auto ax = a.position[0], bx = b.position[0];
     return ax == bx ? a.position[1] > b.position[1] : ax > bx;
 }
+// Sorting by market: No < Pub < Priv
+bool BookStore::less_market_str(const BookState &a, const BookState &b) {
+    return
+        (a.market_private ? 2 : a.market_any() ? 1 : 0)
+        <
+        (b.market_private ? 2 : b.market_any() ? 1 : 0);
+}
+bool BookStore::greater_market_str(const BookState &a, const BookState &b) {
+    return
+        (a.market_private ? 2 : a.market_any() ? 1 : 0)
+        >
+        (b.market_private ? 2 : b.market_any() ? 1 : 0);
+}
+
 // For sorting purposes, marketless books are considered to have a price of negative infinity
 // (rather than the model value of quiet_NaN) to sort them at one end.
 bool BookStore::less_price(const BookState &a, const BookState &b) {
-    return (a.market() ? a.price : -std::numeric_limits<double>::infinity())
-         < (b.market() ? b.price : -std::numeric_limits<double>::infinity());
+    return (a.market_any() ? a.price : -std::numeric_limits<double>::infinity())
+         < (b.market_any() ? b.price : -std::numeric_limits<double>::infinity());
 }
 bool BookStore::greater_price(const BookState &a, const BookState &b) {
-    return (a.market() ? a.price : -std::numeric_limits<double>::infinity())
-         > (b.market() ? b.price : -std::numeric_limits<double>::infinity());
+    return (a.market_any() ? a.price : -std::numeric_limits<double>::infinity())
+         > (b.market_any() ? b.price : -std::numeric_limits<double>::infinity());
 }
 // Age sorts in the opposite order from created
 bool BookStore::less_age   (const BookState &a, const BookState &b) { return a.created > b.created; }
@@ -173,8 +202,8 @@ void BookStore::appendColumnsTo(Gtk::TreeView &v) const {
     appendCol(v, "Position", columns->pos_str, 110);
     if (not author_) appendCol(v, "Author", columns->author, 80);
     appendCol(v, "Created", columns->created, 85);
-    appendCol(v, "Life", columns->lifetime, 65);
-    appendCol(v, "Mkt?", columns->market, 65);
+    appendCol(v, "Life", columns->lifetime_private, 65);
+    appendCol(v, "Mkt", columns->market_str, 65);
     appendCol(v, "Quality", columns->quality, 85);
     appendCol(v, "Price", columns->price, 75);
     appendCol(v, "Rev.", columns->revenue_lifetime, 75);

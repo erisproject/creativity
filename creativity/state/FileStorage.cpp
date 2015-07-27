@@ -601,6 +601,8 @@ void FileStorage::parseStateLocations(const char &from, const size_t count, cons
 }
 
 std::shared_ptr<const State> FileStorage::readState() const {
+    if (version_ == 1) return readState_v1();
+
     State *st_ptr = new State();
     State &state = *st_ptr;
     std::shared_ptr<const State> shst(st_ptr);
@@ -609,20 +611,56 @@ std::shared_ptr<const State> FileStorage::readState() const {
     state.dimensions = settings_.dimensions;
     state.boundary = settings_.boundary;
 
-    auto num_readers = read_u32();
-    state.readers.reserve(num_readers);
-    for (uint32_t i = 0; i < num_readers; i++) {
-        state.readers.insert(readReader(state.t));
-    }
-
-    auto num_books = read_u32();
-    state.books.reserve(num_books);
-    for (uint32_t i = 0; i < num_books; i++) {
-        state.books.insert(readBook());
+    for (uint8_t type = read_u8(); type != TYPE_DONE; type = read_u8()) {
+        switch (type) {
+            case TYPE_READERS:
+                {
+                    auto num = read_u32();
+                    state.readers.reserve(state.readers.size() + num);
+                    for (uint32_t i = 0; i < num; i++) state.readers.insert(readReader(state.t));
+                    break;
+                }
+            case TYPE_BOOKS:
+                {
+                    auto num = read_u32();
+                    state.books.reserve(state.books.size() + num);
+                    for (uint32_t i = 0; i < num; i++) state.books.insert(readBook());
+                    break;
+                }
+            case TYPE_PUBLIC_TRACKER:
+                {
+                    if (state.publictracker) throw std::runtime_error("File error: found multiple public trackers");
+                    state.publictracker = readPublicTracker();
+                    break;
+                }
+            default:
+                throw std::runtime_error("File error: found invalid/unsupported record type `" + std::to_string(type) + "'");
+        }
     }
 
     return shst;
 }
+
+std::shared_ptr<const State> FileStorage::readState_v1() const {
+    State *st_ptr = new State();
+    State &state = *st_ptr;
+    std::shared_ptr<const State> shst(st_ptr);
+
+    state.t = read_u32();
+    state.dimensions = settings_.dimensions;
+    state.boundary = settings_.boundary;
+
+    auto num = read_u32();
+    state.readers.reserve(num);
+    for (uint32_t i = 0; i < num; i++) state.readers.insert(readReader(state.t));
+
+    num = read_u32();
+    state.books.reserve(num);
+    for (uint32_t i = 0; i < num; i++) state.books.insert(readBook());
+
+    return shst;
+}
+
 
 std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
     auto pair = std::make_pair<eris_id_t, ReaderState>(
@@ -777,20 +815,49 @@ FileStorage::belief_data FileStorage::readBelief() const {
 }
 
 void FileStorage::writeState(const State &state) {
-
-    // Now write the state:
-    write_u32(state.t);
     if (state.readers.size() != settings_.readers)
         throw std::runtime_error("FileStorage error: cannot write a simulation where the number of readers changes");
 
+    if (version_ == 1) return writeState_v1(state);
+
+    // First the state's `t`:
+    write_u32(state.t);
+
+    // NB: The order of these doesn't matter
+    if (not state.readers.empty()) {
+        write_u8(TYPE_READERS);
+        write_u32(state.readers.size());
+        for (auto &r : state.readers) writeReader(r.second);
+    }
+
+    if (not state.books.empty()) {
+        write_u8(TYPE_BOOKS);
+        write_u32(state.books.size());
+        for (auto &b : state.books) writeBook(b.second);
+    }
+
+    if (state.publictracker and state.publictracker->id != 0) {
+        write_u8(TYPE_PUBLIC_TRACKER);
+        writePublicTracker(*state.publictracker);
+    }
+
+    write_u8(TYPE_DONE);
+}
+
+void FileStorage::writeState_v1(const State &state) {
+    if (state.publictracker and state.publictracker->id != 0)
+        throw std::runtime_error("FileStorage error: cannot write a simulation state that contains a public tracker to a v1 crstate file.");
+
+    // First the state's `t`:
+    write_u32(state.t);
+
+    // Now an array of readers:
     write_u32(state.readers.size());
-    for (auto &r : state.readers) {
-        writeReader(r.second);
-    }
+    for (auto &r : state.readers) writeReader(r.second);
+
+    // and finally an array of books:
     write_u32(state.books.size());
-    for (auto &b : state.books) {
-        writeBook(b.second);
-    }
+    for (auto &b : state.books) writeBook(b.second);
 }
 
 void FileStorage::writeReader(const ReaderState &r) {
@@ -921,15 +988,28 @@ std::pair<eris_id_t, BookState> FileStorage::readBook() const {
     }
 
     b.quality = read_dbl();
+    if (version_ >= 2) {
+        auto stat = read_u8();
+        b.market_private = stat & 1;
+        stat &= ~1;
+        if (stat != 0) throw std::runtime_error("FileStorage error: found invalid/unknown book status bit");
+    }
+    else {
+        b.market_private = true;
+    }
     b.price = read_dbl();
     b.revenue = read_dbl();
     b.revenue_lifetime = read_dbl();
     b.sales = read_u32();
-    b.sales_lifetime = read_u32();
+    b.sales_lifetime_private = read_u32();
+    if (version_ >= 2)
+        b.sales_lifetime_public = read_u32();
+    else
+        b.sales_lifetime_public = 0;
     b.pirated = read_u32();
     b.pirated_lifetime = read_u32();
     b.created = read_u32();
-    b.lifetime = read_u32();
+    b.lifetime_private = read_u32();
 
     return pair;
 }
@@ -944,15 +1024,45 @@ void FileStorage::writeBook(const BookState &b) {
         write_dbl(b.position[i]);
 
     write_dbl(b.quality);
+    if (version_ >= 2) {
+        uint8_t status = 0;
+        if (b.market_private) status &= 1;
+        write_u8(status);
+    }
+    else {
+        if (b.market_public())
+            throw std::runtime_error("FileStorage error: unable to write a public market book to a v1 crstate file");
+    }
     write_dbl(b.price);
     write_dbl(b.revenue);
     write_dbl(b.revenue_lifetime);
     write_u32(b.sales);
-    write_u32(b.sales_lifetime);
+    write_u32(b.sales_lifetime_private);
+    if (version_ >= 2) {
+        write_u32(b.sales_lifetime_public);
+    }
+    else if (b.sales_lifetime_public > 0)
+        throw std::runtime_error("FileStorage error: unable to write a public market book to a v1 crstate file");
     write_u32(b.pirated);
     write_u32(b.pirated_lifetime);
     write_u32(b.created);
-    write_u32(b.lifetime);
+    write_u32(b.lifetime_private);
+}
+
+std::unique_ptr<PublicTrackerState> FileStorage::readPublicTracker() const {
+    std::unique_ptr<PublicTrackerState> pts(new PublicTrackerState);
+    pts->id = read_u32();
+    pts->tax = read_dbl();
+    pts->unspent = read_dbl();
+    return pts;
+}
+
+void FileStorage::writePublicTracker(const PublicTrackerState &pt) {
+    if (pt.id > std::numeric_limits<uint32_t>::max())
+        throw std::runtime_error("FileStorage error: cannot handle eris ids > 32 bits");
+    write_u32(pt.id);
+    write_dbl(pt.tax);
+    write_dbl(pt.unspent);
 }
 
 }}

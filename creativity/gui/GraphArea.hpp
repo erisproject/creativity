@@ -142,8 +142,10 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
                     movement = true, ///< Whether to draw a reader movement trail
                     book_live = true, ///< Whether to draw on-market books
                     book_dead = true, ///< Whether to draw off-market books
+                    book_public = true, ///< Whether to draw public-market books
                     author_live = true, ///< Whether to draw on-market authorship lines
                     author_dead = true, ///< Whether to draw off-market authorship lines
+                    author_public = true, ///< Whether to draw public-market authorship lines
                     reading = true, ///< Whether to draw lines for newly obtained books
                     utility_gain = true, ///< Whether to draw utility gain circles
                     utility_loss = true, ///< Whether to draw utility loss circles
@@ -153,14 +155,18 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
             /// The colours of various visualization elements
             struct {
                 Colour
-                    /// The colour of on-market books
+                    /// The colour of private, on-market books
                     book_live = Cairo::SolidPattern::create_rgb(0, .4, 1),
                     /// The colour of off-market books
                     book_dead = Cairo::SolidPattern::create_rgb(0.5, 0.5, 0.5),
+                    /// The colour of public-market books
+                    book_public = Cairo::SolidPattern::create_rgb(0, 1, .4),
                     /// Authorship lines from author to book for on-market books
                     author_live = Cairo::SolidPattern::create_rgba(0.5, 0.2, 0.5, 0.5),
                     /// Authorship lines from author to book for off-market books
                     author_dead = Cairo::SolidPattern::create_rgba(0.75, 0.5, 0.75, 0.5),
+                    /// Authorship lines from author to book for public-market books
+                    author_public = Cairo::SolidPattern::create_rgba(0.5, 0.2, 0.5, 0.25),
                     /// The colour of lines from readers to newly purchased books
                     reading = Cairo::SolidPattern::create_rgba(1, 0.55, 0, 0.5),
                     /// The colour of agents (readers/authors)
@@ -191,6 +197,8 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
                     author_live,
                     /// The dash pattern of author lines to off-market books
                     author_dead{{3.0, 2.0}},
+                    /// The dash pattern of author lines to public-market books
+                    author_public{{3.0, 2.0}},
                     /// The dash pattern of lines from readers to newly purchased books
                     reading,
                     /// The dash pattern of friendship links between readers
@@ -206,8 +214,10 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
                 double
                     book_live = 2.0, ///< Stroke width of live books
                     book_dead = 2.0, ///< Stroke width of dead books
+                    book_public = 2.0, ///< Stroke width of public books
                     author_live = 2.0, ///< Stroke width of author-to-live book lines
                     author_dead = 2.0, ///< Stroke width of author-to-dead book lines
+                    author_public = 2.0, ///< Stroke width of author-to-dead book lines
                     reading = 2.0, ///< Width of lines from readers to newly-obtained books
                     reader = 2.0, ///< Stroke width of agent icons
                     friendship = 1.0, ///< Stroke width of reader-to-reader friendship links
@@ -223,30 +233,18 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
             struct {
                 double
                     reader = 7.071, ///< Radius of a reader "x" symbol
-                    /** Pre-scaling radius of a live book "+" symbol.  Note that newer books are scaled
-                     * to a multiple of this size.
+                    /** Minimum radius of a book "+" symbol.  Note that newer books are scaled to a
+                     * multiple of this size.
                      */
-                    book_live = 5.0,
-                    /** Pre-scaling radius of a dead book "+" symbol.  Note that newer books are
-                     * scaled to a multiple of this size.
-                     */
-                    book_dead = 5.0,
-                    /** Scaling parameter 'a' for dead books; books are scaled to the above
-                     * book_dead parameter times \f$\max(1.0, a - b \times age)\f$.
-                     */
-                    book_dead_scale_a = 3.0,
-                    /** Scaling parameter 'b' for dead books; books are scaled to the above
-                     * book_dead parameter times \f$\max(1.0, a - b \times age)\f$.
-                     */
-                    book_dead_scale_b = 0.3,
+                    book = 5.0,
                     /** Scaling parameter 'a' for live books; books are scaled to the above
                      * book_live parameter times \f$\max(1.0, a - b \times age)\f$.
                      */
-                    book_live_scale_a = 3.0,
+                    book_scale_a = 3.0,
                     /** Scaling parameter 'b' for live books; books are scaled to the above
                      * book_live parameter times \f$\max(1.0, a - b \times age)\f$.
                      */
-                    book_live_scale_b = 0.3,
+                    book_scale_b = 0.3,
                     /** The radius multiple for the reader utility gain circle; the circle is drawn
                      * with a radius around the reader of \f$r*ln(u-999)\f$, where this value is
                      * \f$r\f$, but only for readers with utility above 1000.
@@ -274,7 +272,9 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
                     /// The point type of live books
                     book_live = PointType::CROSS,
                     /// The point type of dead books
-                    book_dead = PointType::CROSS;
+                    book_dead = PointType::CROSS,
+                    /// The point type of public books
+                    book_public = PointType::CROSS;
 
                 double
                     /// Spacing of axes tick marks.  2.0 means ticks at 2, 4, 6, etc.

@@ -255,7 +255,8 @@ InfoWindow::InfoWindow(std::shared_ptr<const State> state, std::shared_ptr<Gtk::
     data_append(grid_status, "age", "Age");
     data_append(grid_status, "revenue", "Revenue (lifetime)");
     data_append(grid_status, "revenueLast", "Revenue (current)");
-    data_append(grid_status, "sales", "Copies sold (lifetime)");
+    data_append(grid_status, "salesPrivate", "Copies sold (lifetime)");
+    data_append(grid_status, "salesPublic", "Public market copies sold (lifetime)");
     data_append(grid_status, "salesLast", "Copies sold (current)");
     data_append(grid_status, "pirated", "Copies pirated (lifetime)");
     data_append(grid_status, "piratedLast", "Copies pirated (current)");
@@ -369,14 +370,15 @@ void InfoWindow::refresh(std::shared_ptr<const State> state) {
             updateValue("id", b.id);
             updateValue("author", b.author);
             updateValue("position", GUI::pos_to_string(b.position));
-            updateValue("market", b.market() ? "yes" : "no");
+            updateValue("market", b.market_private ? "yes (private)" : b.market_public() ? "yes (public)" : "no");
             updateValue("price", b.price);
             updateValue("quality", b.quality);
             updateValue("created", b.created);
             updateValue("age", state->t - b.created);
             updateValue("revenue", b.revenue_lifetime);
             updateValue("revenueLast", b.revenue);
-            updateValue("sales", b.sales_lifetime);
+            updateValue("salesPrivate", b.sales_lifetime_private);
+            updateValue("salesPublic", b.sales_lifetime_public);
             updateValue("salesLast", b.sales);
             updateValue("pirated", b.pirated_lifetime);
             updateValue("piratedLast", b.pirated);
@@ -387,7 +389,7 @@ void InfoWindow::refresh(std::shared_ptr<const State> state) {
             // everything to N/A and change the title.
             set_title("Book details (" + std::to_string(book) + "): not yet created!");
             for (auto &key : {"id", "author", "position", "market", "price", "quality", "age", "created",
-                    "revenue", "revenueLast", "sales", "salesLast", "pirated", "piratedLast", "copies"}) {
+                    "revenue", "revenueLast", "salesPrivate", "salesPublic", "salesLast", "pirated", "piratedLast", "copies"}) {
                 updateValue(key, "N/A");
             }
         }

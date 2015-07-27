@@ -58,28 +58,33 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
          */
         const eris::eris_time_t& created() const;
 
-        /** Returns the first simulation period in which the book was no longer on the market.  The
-         * returned value should only be used if hasMarket() returns false.
+        /** Returns the first simulation period in which the book was no longer on the private
+         * market.  The returned value should only be used if hasPrivateMarket() returns false.
          *
-         * \sa hasMarket()
+         * \sa hasPrivateMarket()
          * \sa marketPeriods()
          * \sa age()
          */
-        const eris::eris_time_t& outOfPrint() const;
+        const eris::eris_time_t& leftPrivateMarket() const;
 
-        /** Returns the number of periods the book has been (or was) available on the market,
-         * including the current period (if the book is still on the market).  The value returned by
-         * this method increases by one each period of the simulation until the book exits the
-         * market, from which point on it remains fixed.
+        /** Returns the simulation period in which the book was first placed on the public market or
+         * 0 if the book has never been on the public market.
+         */
+        const eris::eris_time_t& publicMarketCreated() const;
+
+        /** Returns the number of periods the book has been (or was) available on the private
+         * market, including the current period (if the book is still on the market).  The value
+         * returned by this method increases by one each period of the simulation until the book
+         * exits the market, from which point on it remains fixed.
          *
-         * For on-market books, this equals `age() + 1`; for off-market books, this equals
-         * `outOfPrint() - created()`.
+         * For private-market books, this equals `age() + 1`; otherwise this equals
+         * `leftPrivateMarket() - created()`.
          *
          * \sa age()
          * \sa outOfPrint()
          * \sa created()
          */
-        unsigned int marketPeriods() const;
+        unsigned int privateMarketPeriods() const;
 
         /** Returns the order of this book in the author's set of books.  A value of 0 indicates
          * that this is the author's first book, 3 indicates an author's 4th book, etc.
@@ -99,10 +104,8 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
          * BookMarket; calling this externally should not be required.
          *
          * \param market the market object providing copies of this book
-         * \param primary true if the market is a primary (i.e. author-controlled) market, false
-         * otherwise.
          */
-        void setMarket(eris::SharedMember<BookMarket> market, bool primary);
+        void setMarket(eris::SharedMember<BookMarket> market);
 
         /** When the market is removed from the simulation, record it by clearing the stored market.
          */
@@ -121,20 +124,20 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
          * market for this book.  Note that this could be the author's market, or a public market
          * (if the simulation contains a suitable public agent).
          */
-        bool hasMarket() const;
+        bool hasAnyMarket() const;
 
-        /** Returns true if this book is currently on the primary market, that is, on the market as
-         * controlled by the book's author.  This can return false when hasMarket() returns true if
-         * the book is on a secondary market, such as PublicTrackerMarket.
+        /** Returns true if this book's current market exists and is a private market, that is, on
+         * the market as controlled by the book's author.
          */
-        bool hasPrimaryMarket() const;
+        bool hasPrivateMarket() const;
 
-        /** Returns true if this book has a market, but that market is not the primary market (that
-         * is, it's on a market not controlled by the author).
+        /** True if the book is currently on the public market.
          */
+        bool hasPublicMarket() const;
 
-        /** Returns the BookMarket that sells this Book.  Will throw an exception (via Simulation)
-         * if no Market doesn't exist, so check hasMarket() first.
+        /** Returns the BookMarket that sells this Book (which could be a PublicBookMarket if
+         * hasPublicMarket() is true).  Will throw an exception (via Simulation) if no Market
+         * exists, so check hasAnyMarket() first.
          */
         eris::SharedMember<BookMarket> market() const;
 
@@ -143,8 +146,14 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
          */
         double price() const;
 
-        /// Returns the lifelong number of sales of this book
+        /// Returns the lifelong number of sales (on both private and public markets) of this book
         unsigned int lifeSales() const;
+
+        /// Returns the lifelong number of private market sales of this book
+        unsigned int lifeSalesPrivate() const;
+
+        /// Returns the lifelong number of public market sales of this book
+        unsigned int lifeSalesPublic() const;
 
         /// Returns the number of sales of this book so far in the current period
         unsigned int currSales() const;
@@ -168,8 +177,25 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         /// Returns the number of pirated copies in simulation period `t`
         unsigned int pirated(eris::eris_time_t t) const;
 
-        /// Returns the lifelong revenue of this book
+        /// Returns the lifelong revenue (from both private and public markets) of this book
         double lifeRevenue() const;
+
+        /// Returns the lifelong private market revenue of this book
+        double lifeRevenuePrivate() const;
+
+        /// Returns the lifelong public revenue of this book
+        double lifeRevenuePublic() const;
+
+        /** Calculates the lifetime profit of this book from the private market, not including
+         * initial creation cost, but include per-period fixed costs and unit costs.
+         *
+         * Note that if cost_unit or cost_fixed are changed, this will return what the profit would
+         * have been at the current levels.
+         *
+         * Note that it is possible for this value to be negative (typically because the market had
+         * sales insufficient to cover fixed costs).
+         */
+        double lifeProfitPrivate() const;
 
         /// Returns the revenue of this book so far in the current period
         double currRevenue() const;
@@ -188,14 +214,20 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
          * no readers are removed from the simulation, this should always be exactly one larger than
          * the value as returned by copies(), because this counts the author's original copy, while
          * copies() does not.  This method is considerably more expensive than copies() as it has to
-         * examine the library of every reader in the simulation.  Calling copies() is generally
-         * preferable.
+         * examine the library of every reader in the simulation.  Call copies() instead unless you
+         * have a very good reason to perform such a query.
          */
         unsigned int queryCopies() const;
 
         /** Increase the sales and revenue of this book for the current period.  This can safely be
          * called multiple times per period.  Both the current sales/revenue values and global
-         * revenue values will be increased by the call.
+         * revenue values will be increased by the call.  If the book currently has a private
+         * market, these are recorded as private sales; if the book has a public market, these are
+         * public sales.  If the book has no market at all, an exception is thrown.
+         *
+         * \param new_sales the number of new sales to record
+         * \param new_revenue the amount of new revenue to record
+         * \throws std::logic_error if the book has no market
          */
         void recordSale(unsigned int new_sales, double new_revenue);
 
@@ -222,14 +254,14 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
 
     private:
         std::shared_ptr<Creativity> creativity_;
-        eris::eris_time_t created_, out_of_print_;
-        unsigned int copies_sold_total_, copies_pirated_total_;
-        double revenue_total_;
+        eris::eris_time_t created_, left_private_market_, public_market_created_;
+        unsigned int copies_private_total_, copies_pirated_total_, copies_public_total_;
+        double revenue_private_total_, revenue_public_total_;
         std::map<eris::eris_time_t, unsigned int> copies_sold_, copies_pirated_;
         std::map<eris::eris_time_t, double> revenue_;
         eris::SharedMember<Reader> author_;
         const unsigned int order_;
-        bool market_primary_;
+        bool market_private_;
         eris::eris_id_t market_;
         const double quality_;
         std::function<double(const Book&)> quality_draw_;
