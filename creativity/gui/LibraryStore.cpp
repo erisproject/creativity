@@ -26,28 +26,17 @@ void LibraryStore::get_value_vfunc(const iterator &iter, int column, Glib::Value
     if (iter.get_stamp() != stamp_ or column > get_n_columns_vfunc()) return;
 
     const LibraryStore::ColRec &cols = static_cast<const LibraryStore::ColRec&>(*columns);
-    if (column == cols.reader_quality.index()) {
-        Glib::Value<double> v;
-        v.init(v.value_type());
-        auto &bid = members_.at((size_t) iter.gobj()->user_data).get().id;
-        v.set(state_->readers.at(reader_).library.at(bid).quality);
-        value.init(v.gobj());
-    }
-    else if (column == cols.reader_pirated.index() or column == cols.reader_purchased.index()) {
-        Glib::Value<bool> v;
-        v.init(v.value_type());
-        auto &bid = members_.at((size_t) iter.gobj()->user_data).get().id;
-        auto &libbook = state_->readers.at(reader_).library.at(bid);
-        v.set(column == cols.reader_pirated.index() ? libbook.pirated() : libbook.purchased());
-        value.init(v.gobj());
-    }
-    else if (column == cols.reader_acquired.index()) {
-        Glib::Value<eris_time_t> v;
-        v.init(v.value_type());
-        auto &bid = members_.at((size_t) iter.gobj()->user_data).get().id;
-        v.set(state_->readers.at(reader_).library.at(bid).acquired);
-        value.init(v.gobj());
-    }
+
+// If statement for field with accessor A into the reader state library element:
+#define IFCOL(F, A) if (column == cols.F.index()) copy_value_(value, \
+        state_->readers.at(reader_).library.at( \
+                members_.at((size_t) iter.gobj()->user_data).get().id \
+            ).A)
+    IFCOL(reader_quality, quality);
+    else IFCOL(reader_pirated, pirated());
+    else IFCOL(reader_purchased, purchased());
+    else IFCOL(reader_acquired, acquired);
+#undef IFCOL
     else {
         // Otherwise it's a book property, pass through
         BookStore::get_value_vfunc(iter, column, value);

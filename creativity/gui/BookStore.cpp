@@ -62,83 +62,60 @@ void BookStore::get_value_vfunc(const iterator &iter, int column, Glib::ValueBas
     if (iter.get_stamp() != stamp_ or column > get_n_columns_vfunc()) return;
 
     auto &b = members_.at((size_t) iter.gobj()->user_data).get();
-    if (column == columns->id.index() || column == columns->author.index()) {
-        Glib::Value<eris_id_t> v;
-        v.init(v.value_type());
-        v.set(column == columns->id.index() ? b.id : b.author);
-        value.init(v.gobj());
-    }
-    else if (column == columns->pos_x.index() or column == columns->pos_y.index() or column == columns->quality.index() or column == columns->price.index()
-            or column == columns->revenue.index() or column == columns->revenue_lifetime.index()) {
-        Glib::Value<double> v;
-        v.init(v.value_type());
-        v.set(  column == columns->pos_x.index() ? b.position[0] :
-                column == columns->pos_y.index() ? b.position[1] :
-                column == columns->quality.index() ? b.quality :
-                column == columns->price.index() ? b.price :
-                column == columns->revenue.index() ? b.revenue :
-                b.revenue_lifetime
-             );
-        value.init(v.gobj());
-    }
-    else if (column == columns->market.index()) {
-        Glib::Value<bool> v;
-        v.init(v.value_type());
-        v.set(b.market());
-        value.init(v.gobj());
-    }
-    else if (column == columns->pos_str.index()) {
-        Glib::Value<std::string> v;
-        v.init(v.value_type());
-        v.set(GUI::pos_to_string(b.position));
-        value.init(v.gobj());
-    }
-    else if (column == columns->age.index() or column == columns->created.index()
-            or column == columns->sales.index() or column == columns->sales_lifetime.index()
-            or column == columns->pirated.index() or column == columns->pirated_lifetime.index()
-            or column == columns->lifetime.index() or column == columns->copies.index()) {
-        Glib::Value<unsigned int> v;
-        v.init(v.value_type());
-        v.set(  column == columns->age.index() ? state_->t - b.created :
-                column == columns->created.index() ? b.created :
-                column == columns->sales.index() ? b.sales :
-                column == columns->sales_lifetime.index() ? b.sales_lifetime :
-                column == columns->pirated.index() ? b.pirated :
-                column == columns->pirated_lifetime.index() ? b.pirated_lifetime :
-                column == columns->lifetime.index() ? b.lifetime :
-                b.copies_lifetime()
-             );
-        value.init(v.gobj());
-    }
-    else {
-        throw std::out_of_range("Invalid column index accessed");
-    }
+// If statement for field with arbitrary value:
+#define IFCOL_V(F, V) if (column == columns->F.index()) copy_value_(value, V)
+// If statement for field with member of same name as the field:
+#define IFCOL(F) IFCOL_V(F, b.F)
+// If statement for field with member method of same name as the field:
+#define IFCOL_M(F) IFCOL_V(F, b.F())
+    IFCOL(id);
+    else IFCOL(author);
+    else IFCOL_V(pos_x, b.position[0]);
+    else IFCOL_V(pos_y, b.position[1]);
+    else IFCOL(quality);
+    else IFCOL(price);
+    else IFCOL(revenue);
+    else IFCOL(revenue_lifetime);
+    else IFCOL_V(pos_str, GUI::pos_to_string(b.position));
+    else IFCOL_M(market);
+    else IFCOL_V(age, state_->t - b.created);
+    else IFCOL(created);
+    else IFCOL(sales);
+    else IFCOL(sales_lifetime);
+    else IFCOL(pirated);
+    else IFCOL(pirated_lifetime);
+    else IFCOL_M(copies);
+    else IFCOL(lifetime);
+    else throw std::out_of_range("Invalid column index accessed");
+#undef IFCOL_M
+#undef IFCOL
+#undef IFCOL_V
 }
 
 void BookStore::set_sort_column_id_vfunc(int sort_column_id, Gtk::SortType order) {
     bool ascending = (order == Gtk::SORT_ASCENDING);
     std::function<bool(const BookState &a, const BookState &b)> compare;
-#define ELSE_IF_COL(COL) \
-    else if (sort_column_id == columns->COL.index()) compare = ascending ? less_##COL : greater_##COL
     if (sort_column_id == columns->id.index() || sort_column_id == DEFAULT_SORT_COLUMN_ID)
         compare = ascending ? less_id : greater_id;
+#define ELSE_IF_COL(COL) \
+    else if (sort_column_id == columns->COL.index()) compare = ascending ? less_##COL : greater_##COL
     ELSE_IF_COL(author);
-    ELSE_IF_COL(market);
     ELSE_IF_COL(pos_x);
     ELSE_IF_COL(pos_y);
-    ELSE_IF_COL(pos_str);
     ELSE_IF_COL(quality);
     ELSE_IF_COL(price);
     ELSE_IF_COL(revenue);
     ELSE_IF_COL(revenue_lifetime);
+    ELSE_IF_COL(pos_str);
+    ELSE_IF_COL(market);
     ELSE_IF_COL(age);
     ELSE_IF_COL(created);
     ELSE_IF_COL(sales);
     ELSE_IF_COL(sales_lifetime);
     ELSE_IF_COL(pirated);
     ELSE_IF_COL(pirated_lifetime);
-    ELSE_IF_COL(lifetime);
     ELSE_IF_COL(copies);
+    ELSE_IF_COL(lifetime);
 #undef ELSE_IF_COL
 
     sort_members(compare, sort_column_id, order);
@@ -149,20 +126,22 @@ bool BookStore::less_##COL   (const BookState &a, const BookState &b) { return a
 bool BookStore::greater_##COL(const BookState &a, const BookState &b) { return a.ACCESS > b.ACCESS; }
 #define LESS_GREATER(FIELD) LESS_GREATER_A(FIELD, FIELD)
 LESS_GREATER(id)
+LESS_GREATER(author)
 LESS_GREATER_A(pos_x, position[0])
 LESS_GREATER_A(pos_y, position[1])
-LESS_GREATER(author)
 LESS_GREATER(quality)
+// price handled below
 LESS_GREATER(revenue)
 LESS_GREATER(revenue_lifetime)
 LESS_GREATER_A(age, created)
+// pos_str handled below
+LESS_GREATER_A(market, market())
 LESS_GREATER(created)
 LESS_GREATER(sales)
 LESS_GREATER(sales_lifetime)
 LESS_GREATER(pirated)
 LESS_GREATER(pirated_lifetime)
 LESS_GREATER(lifetime)
-LESS_GREATER_A(market, market())
 LESS_GREATER_A(copies, copies_lifetime())
 #undef LESS_GREATER
 #undef LESS_GREATER_A

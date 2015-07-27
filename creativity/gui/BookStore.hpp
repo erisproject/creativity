@@ -13,16 +13,16 @@ class BookStore : public MemberStore<state::BookState>, public virtual Glib::Obj
         /** Interface class between a simulation's Books and a Gtk::TreeView.  This internally
          * stores a vector of Books which can be updated (if needed) by calling the update method.
          *
-         * This exposes 9 columns:
+         * This exposes the following columns:
          * - ID
+         * - author ID
          * - x position
          * - y position
          * - position string (made from x position and y position)
-         * - author ID
          * - quality (reader-perceived quality may diff)
          * - price (NaN if not on market)
          * - revenue
-         * - revenueLifetime
+         * - revenue_lifetime
          * - market (true if on market, false otherwise)
          * - age (in simulation periods)
          * - creation date (i.e. simulation period)
@@ -153,14 +153,14 @@ class BookStore : public MemberStore<state::BookState>, public virtual Glib::Obj
         static bool greater_##col(const state::BookState &a, const state::BookState &b);
         LESS_GREATER_METHODS(id)
         LESS_GREATER_METHODS(author)
-        LESS_GREATER_METHODS(market)
         LESS_GREATER_METHODS(pos_x)
         LESS_GREATER_METHODS(pos_y)
-        LESS_GREATER_METHODS(pos_str)
         LESS_GREATER_METHODS(quality)
         LESS_GREATER_METHODS(price)
         LESS_GREATER_METHODS(revenue)
         LESS_GREATER_METHODS(revenue_lifetime)
+        LESS_GREATER_METHODS(pos_str)
+        LESS_GREATER_METHODS(market)
         LESS_GREATER_METHODS(age)
         LESS_GREATER_METHODS(created)
         LESS_GREATER_METHODS(sales)

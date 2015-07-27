@@ -33,47 +33,27 @@ void ReaderStore::get_value_vfunc(const iterator &iter, int column, Glib::ValueB
 
     auto &r = members_.at((size_t) iter.gobj()->user_data).get();
 
-    if (column == columns.id.index()) {
-        Glib::Value<eris_id_t> v;
-        v.init(v.value_type());
-        v.set(r.id);
-        value.init(v.gobj());
-    }
-    else if (column == columns.pos_x.index() or column == columns.pos_y.index() or column == columns.u.index() or column == columns.u_lifetime.index()) {
-        Glib::Value<double> v;
-        v.init(v.value_type());
-        v.set(  column == columns.pos_x.index() ? r.position[0] :
-                column == columns.pos_y.index() ? r.position[1] :
-                column == columns.u.index() ? r.u :
-                column == columns.u_lifetime.index() ? r.u_lifetime :
-                std::numeric_limits<double>::quiet_NaN()
-             );
-        value.init(v.gobj());
-    }
-    else if (column == columns.pos_str.index()) {
-        Glib::Value<std::string> v;
-        v.init(v.value_type());
-        v.set(GUI::pos_to_string(r.position));
-        value.init(v.gobj());
-    }
-    else if (column == columns.books_owned.index() or column == columns.books_new.index() or column == columns.books_written.index()
-            or column == columns.last_book_age.index() or column == columns.num_friends.index()
-            or column == columns.books_pirated.index() or column == columns.books_purchased.index()
-            or column == columns.books_new_pirated.index() or column == columns.books_new_purchased.index()) {
-        Glib::Value<size_t> v;
-        v.init(v.value_type());
-        v.set(  column == columns.books_owned.index() ? r.library.size() :
-                column == columns.books_purchased.index() ? r.library_purchased :
-                column == columns.books_pirated.index() ? r.library_pirated :
-                column == columns.books_new.index() ? r.new_books.size() :
-                column == columns.books_new_purchased.index() ? r.library_purchased_new :
-                column == columns.books_new_pirated.index() ? r.library_pirated_new :
-                column == columns.books_written.index() ? r.wrote.size() :
-                column == columns.num_friends.index() ? r.friends.size() :
-                r.wrote.empty() ? state_->t : state_->t - state_->books.at(*r.wrote.crbegin()).created
-             );
-        value.init(v.gobj());
-    }
+// If statement for field with arbitrary value:
+#define IFCOL_V(F, V) if (column == columns.F.index()) copy_value_(value, V)
+// If statement for field with member of same name as the field:
+#define IFCOL(F) IFCOL_V(F, r.F)
+    IFCOL(id);
+    else IFCOL_V(pos_x, r.position[0]);
+    else IFCOL_V(pos_y, r.position[1]);
+    else IFCOL(u);
+    else IFCOL(u_lifetime);
+    else IFCOL_V(pos_str, GUI::pos_to_string(r.position));
+    else IFCOL_V(books_owned, r.library.size());
+    else IFCOL_V(books_purchased, r.library_purchased);
+    else IFCOL_V(books_pirated, r.library_pirated);
+    else IFCOL_V(books_new, r.new_books.size());
+    else IFCOL_V(books_new_purchased, r.library_purchased_new);
+    else IFCOL_V(books_new_pirated, r.library_pirated_new);
+    else IFCOL_V(books_written, r.wrote.size());
+    else IFCOL_V(num_friends, r.friends.size());
+    else IFCOL_V(last_book_age, r.wrote.empty() ? state_->t : state_->t - state_->books.at(*r.wrote.crbegin()).created);
+#undef IFCOL
+#undef IFCOL_V
     else {
         throw std::out_of_range("Invalid column index accessed");
     }

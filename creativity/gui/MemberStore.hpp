@@ -140,6 +140,11 @@ class MemberStore : public virtual Gtk::TreeModel, public virtual Gtk::TreeSorta
          */
         virtual void get_value_vfunc(const iterator &iter, int column, Glib::ValueBase &value) const override = 0;
 
+        /** Helper method for the crap needed in get_value_vfunc(): creates a Glib::Value of the
+         * right type and copies it into the given Glib::ValueBase. */
+        template <typename T>
+        static void copy_value_(Glib::ValueBase &valueobj, const T &val);
+
         /** Accesses the current sort column and order.  Returns true if accessed sort_column_id
          * refers to a specific column (instead of the Gtk magic unsorted and default order
          * constants).
@@ -356,6 +361,13 @@ template <class M> void MemberStore<M>::sort_members(
 
     // If sorting actually changed anything, fire the rows-reordered signal
     if (actual_reordering) rows_reordered(Path(), new_order);
+}
+
+template <class M> template <class T> void MemberStore<M>::copy_value_(Glib::ValueBase &valueobj, const T &val) {
+    Glib::Value<T> v;
+    v.init(v.value_type());
+    v.set(val);
+    valueobj.init(v.gobj());
 }
 
 }}
