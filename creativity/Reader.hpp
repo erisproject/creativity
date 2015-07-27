@@ -442,13 +442,6 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          */
         static double creationEffort(double shape, double scale, double effort);
 
-        /** Called at the end of a period (from BookMarket::intraFinish) to transfer book revenue
-         * earned during a period back to the author.  The author subtracts variable cost (if any)
-         * and keeps the remaining revenue.  Note that fixed costs are incurred at the beginning of
-         * the period, and so this will never attempt to "receive" a negative amount.
-         */
-        void receiveProceeds(const eris::SharedMember<Book> &book, const eris::Bundle &revenue);
-
         /// Read-only access to this reader's profit belief
         const belief::Profit& profitBelief() const;
         /// Read-only access to this reader's profit belief with profit stream extrapolations

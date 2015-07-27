@@ -78,7 +78,13 @@ void BookMarket::buy_(Reservation_ &res) {
 void BookMarket::intraFinish() {
     auto author = book_->author();
     auto lock = writeLock(book_, author);
-    author->receiveProceeds(book_, proceeds_);
+    // First subtract off variable costs incurred
+    Bundle tvc(creativity_->money, book_->currSales() * -creativity_->parameters.cost_unit);
+    tvc.transferApprox(tvc, proceeds_, 1e-8);
+
+    // Transfer profits to the author
+    author->assets() += proceeds_;
+
     proceeds_.clear();
 }
 

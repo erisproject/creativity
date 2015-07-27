@@ -501,12 +501,6 @@ double Reader::penalty(unsigned long n) const {
 
 const std::unordered_map<SharedMember<Book>, BookCopy>& Reader::library() const { return library_; }
 
-void Reader::receiveProceeds(const SharedMember<Book> &book, const Bundle &revenue) {
-    assets() += revenue;
-    Bundle tvc(creativity_->money, book->currSales() * -cost_unit);
-    tvc.transferApprox(tvc, assets(), 1e-8);
-}
-
 const belief::Profit& Reader::profitBelief() const { return *profit_belief_; }
 const belief::Profit& Reader::profitExtrapBelief() const { return *profit_belief_extrap_; }
 bool Reader::profitExtrapBeliefDiffers() const { return profit_belief_ != profit_belief_extrap_; }

@@ -53,7 +53,7 @@ class BookMarket : public eris::Market, public virtual eris::intraopt::Finish {
         /** Returns the Book sold by this market. */
         eris::SharedMember<Book> book();
 
-        /** Transfers all sales generated in the previous period to the author.
+        /** Transfers all sales (less unit costs) generated in the just-ending period to the author.
          */
         virtual void intraFinish() override;
 
