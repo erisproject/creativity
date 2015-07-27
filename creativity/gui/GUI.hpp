@@ -435,7 +435,7 @@ class GUI : eris::noncopyable {
         void handleEvent(const GUI::Event &event);
 
         /** Currently open reader/book dialogs */
-        std::unordered_map<eris::eris_id_t, InfoWindow> info_windows_;
+        std::unordered_map<eris::eris_id_t, std::unique_ptr<InfoWindow>> info_windows_;
 
         typedef boost::geometry::model::point<double, 2, boost::geometry::cs::cartesian> rt_point;
         typedef std::pair<rt_point, eris::eris_id_t> rt_val;

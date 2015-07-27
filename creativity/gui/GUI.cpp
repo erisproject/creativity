@@ -1,6 +1,8 @@
 #include "creativity/gui/GUI.hpp"
 #include "creativity/gui/ReaderStore.hpp"
 #include "creativity/gui/BookStore.hpp"
+#include "creativity/gui/ReaderInfoWindow.hpp"
+#include "creativity/gui/BookInfoWindow.hpp"
 #include "creativity/Creativity.hpp"
 #include "creativity/config.hpp"
 #include "creativity/Reader.hpp"
@@ -543,8 +545,8 @@ void GUI::thr_set_state(unsigned long t) {
     // unordered_map after an .erase() isn't guaranteed to be the same until C++14 (C++11 only
     // guarantees that iterators remain valid, but not necessarily in the same order).
     for (auto &w : info_windows_) {
-        if (w.second.get_visible())
-            w.second.refresh(state);
+        if (w.second->get_visible())
+            w.second->refresh(state);
         else
             del.push_back(w.first);
     }
@@ -655,28 +657,25 @@ void GUI::thr_info_dialog(eris_id_t member_id) {
     auto already_open = info_windows_.find(member_id);
     if (already_open != info_windows_.end()) {
         // If the window is already active, just present it again
-        already_open->second.present();
+        already_open->second->present();
     }
     else {
-        std::shared_ptr<const State> state;
-        {
-            state = (*creativity_->storage().first)[state_curr_];
-        }
+        std::shared_ptr<const State> state((*creativity_->storage().first)[state_curr_]);
 
-        if (state->readers.count(member_id)) {
-            info_windows_.emplace(std::piecewise_construct,
-                    std::tuple<eris_id_t>{member_id},
-                    std::tuple<decltype(state), decltype(main_window_), eris_id_t, std::function<void(eris_id_t)>>{
-                        state, main_window_, member_id, std::bind(&GUI::thr_info_dialog, this, _1)});
-        }
-        else if (state->books.count(member_id)) {
-            info_windows_.emplace(std::piecewise_construct,
-                    std::tuple<eris_id_t>{member_id},
-                    std::tuple<decltype(state), decltype(main_window_), eris_id_t>{state, main_window_, member_id});
-        }
-        else {
+        if (state->readers.count(member_id))
+            info_windows_.emplace(
+                member_id, std::unique_ptr<InfoWindow>(
+                    new ReaderInfoWindow(state, main_window_, member_id, std::bind(&GUI::thr_info_dialog, this, _1))
+                )
+            );
+        else if (state->books.count(member_id))
+            info_windows_.emplace(
+                member_id, std::unique_ptr<InfoWindow>(
+                    new BookInfoWindow(state, main_window_, member_id)
+                )
+            );
+        else
             throw std::out_of_range("thr_info_dialog: requested member id does not exist");
-        }
 
     }
 }
