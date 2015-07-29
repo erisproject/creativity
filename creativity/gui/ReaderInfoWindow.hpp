@@ -3,6 +3,8 @@
 
 namespace creativity { namespace gui {
 
+/** InfoWindow subclass for displaying the details of a reader/author.
+ */
 class ReaderInfoWindow : public InfoWindow {
     public:
         /** Constructs a new InfoWindow displaying reader information.

@@ -3,6 +3,8 @@
 
 namespace creativity { namespace gui {
 
+/** InfoWindow subclass for displaying the details of a book.
+ */
 class BookInfoWindow : public InfoWindow {
     public:
         /** Constructs a new InfoWindow displaying book information.

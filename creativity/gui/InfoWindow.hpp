@@ -95,7 +95,7 @@ class InfoWindow : public Gtk::Window {
          * reference to it.
          */
         Gtk::Grid& new_tab_grid(Gtk::Notebook &notebook, const std::string &title);
-        /* Creates a "value: data" label pair with labels stored in fields_ that can be updated
+        /** Creates a "value: data" label pair with labels stored in fields_ that can be updated
          * later.  The pair of labels is located at (`row`,`col`) and (`row`,`col+1`).
          */
         void data_at(Gtk::Grid &grid, const std::string &code, const std::string &value_name, int row, int col,
@@ -122,10 +122,11 @@ class InfoWindow : public Gtk::Window {
          */
         void matrix_at(Gtk::Grid &grid, const std::string &code, const std::string &name, int row, int col, int nrows, int ncols);
 
-        // The time currently being shown (don't need to do anything in refresh() if this doesn't
-        // change)
+        /** The time currently being shown (don't need to do anything in refresh() if this doesn't
+         * change.
+         */
         unsigned long t_ = (unsigned long) -1;
-        // On the initial refresh, don't replace the book model
+        /// On the initial refresh, don't replace the book model
         bool initial_refresh_ = true;
 };
 
