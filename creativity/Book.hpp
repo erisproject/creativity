@@ -254,16 +254,16 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
 
     private:
         std::shared_ptr<Creativity> creativity_;
-        eris::eris_time_t created_, left_private_market_, public_market_created_;
-        unsigned int copies_private_total_, copies_pirated_total_, copies_public_total_;
-        double revenue_private_total_, revenue_public_total_;
+        eris::eris_time_t created_ = 0, left_private_market_ = 0, public_market_created_ = 0;
+        unsigned int copies_private_total_ = 0, copies_pirated_total_ = 0, copies_public_total_ = 0;
+        double revenue_private_total_ = 0, revenue_public_total_ = 0;
         std::map<eris::eris_time_t, unsigned int> copies_sold_, copies_pirated_;
         std::map<eris::eris_time_t, double> revenue_;
         eris::SharedMember<Reader> author_;
-        const unsigned int order_;
-        bool market_private_;
-        eris::eris_id_t market_;
-        const double quality_;
+        const unsigned int order_ = 0;
+        bool market_private_ = true;
+        eris::eris_id_t market_ = 0;
+        const double quality_ = 0;
         std::function<double(const Book&)> quality_draw_;
 };
 
