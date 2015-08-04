@@ -79,7 +79,7 @@ void BookMarket::intraFinish() {
     auto author = book_->author();
     auto lock = writeLock(book_, author);
     // First subtract off variable costs incurred
-    Bundle tvc(creativity_->money, book_->currSales() * -creativity_->parameters.cost_unit);
+    BundleNegative tvc(creativity_->money, book_->currSales() * -creativity_->parameters.cost_unit);
     tvc.transferApprox(tvc, proceeds_, 1e-8);
 
     // Transfer profits to the author
