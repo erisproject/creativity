@@ -308,7 +308,7 @@ class FileStorage final : public StorageBackend {
                     init_prob_keep = 200, ///< The probability of keeping a book on the market (uninformed beliefs)
                     init_keep_price = 208, ///< If keeping a book on the market, the new price is (p-c)*s+c, where this is s
                     init_belief_threshold = 216, ///< The required n-k value for readers to use beliefs instead of initial behaviour (i32)
-                    state_first_v1 = 224, ///< the first state record in version 1 files
+                    state_first_v1 = 224, ///< the first state record in version 1 files (preceeded by 4 bytes padding)
 
                     // Added in version 2:
                     public_sharing_begins = 220, ///< The period in which the PublicTracker is created (u32)

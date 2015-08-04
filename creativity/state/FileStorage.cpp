@@ -274,13 +274,22 @@ void FileStorage::writeSettings(const CreativitySettings &settings) {
     write_value(settings.initial.prob_keep);
     write_value(settings.initial.keep_price);
     write_value(settings.initial.belief_threshold);
+    if (version_ >= 2) {
+        write_value(settings.public_sharing_begins);
+        write_value(settings.public_sharing_tax);
+        write_value(settings.prior_scale_public_sharing);
+    }
+    else {
+        write_u32(0); // Unused padding value in v1 files
+    }
 
     // Uncommented when padding needed:
-    write_u32(0); // Unused padding value
+    //write_u32(0); // Unused padding value
 
-    if (f_.tellp() != HEADER::pos::state_first) {
+    int64_t expect = version_ >= 2 ? HEADER::pos::state_first : HEADER::pos::state_first_v1;
+    if (f_.tellp() != expect) {
         // If this exception occurs, something in the above sequence is wrong.
-        throw std::runtime_error("Header writing failed: header size != " + std::to_string(HEADER::size) + " bytes");
+        throw std::runtime_error("Header writing failed: header parameter block != " + std::to_string(expect) + " bytes");
     }
 
     // Copy the settings (so that readSettings() will return the right thing)
@@ -477,7 +486,7 @@ void FileStorage::parseMetadata() {
 
     auto version = parse_value<uint32_t>(block[HEADER::pos::filever]);
     if (version < 1 or version > 2)
-        throwParseError("encountered unknown version " + std::to_string(version) + " != {1,2}");
+        throwParseError("encountered unknown version " + std::to_string(version));
     version_ = version;
 
     // Okay, so we've got a CrSt version 1 or 2 file.  The version number lets the file format change
