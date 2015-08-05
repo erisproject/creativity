@@ -134,7 +134,9 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
 #define OPTION_UNBOUNDED_INIT(PARAM, SHORT, LONG, DESC) OPTION_UNBOUNDED_NAME(initial_##PARAM, initial.PARAM, SHORT, LONG, DESC)
 
 // Single-letter options used:
-// b B c C d D e f i j k K m M n N o O p P Q r R s T u U w W x y z Z
+// b B c C d D e f g G i j k K m M n N o O p P Q r R s S T u U w W x y z Z
+// Available:
+// a A E F h H I J l L q t v V X Y
 
         OPTION_LBOUND(readers, "r", "readers", "Number of reader/author agents in the simulation", 1);
         OPTION_LBOUND(dimensions, "D", "dimensions", "Number of dimensions of the simulation", 1);
@@ -156,6 +158,7 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         OPTION_LBOUND_STRICT(income, "i", "income", "Per-period external reader income", 0);
         OPTION_LBOUND(prior_scale, "w", "prior-scale", "The per-period standard deviation scaling factor applied when a previous belief is used as the next period's prior", 1);
         OPTION_LBOUND(prior_scale_piracy, "W", "prior-scale-piracy", "The same as --prior-weight, but applied in the first piracy period", 1);
+        OPTION_LBOUND(prior_scale_public_sharing, "S", "prior-scale-public-sharing", "The same as --prior-weight, but applied in the first public sharing period", 1);
         OPTION_LBOUND(prior_scale_burnin, "U", "prior-scale-burnin", "The same as --prior-weight, but applied in the first `--burnin-periods' periods", 1);
         OPTION_LBOUND(burnin_periods, "u", "burnin-periods", "The number of initial periods during which `--prior-scale-burnin' should be used instead of `--prior-scale'", 0);
         OPTION_LBOUND(prediction_draws, "p", "prediction-draws", "The number of draws agents take from beliefs when using for prediction.  Lower values can be used to introduce deliberate randomness into the simulation", 1);
@@ -171,8 +174,11 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
 
         OPTION_UNBOUNDED(piracy_begins, "P", "piracy-begins", "The period in which piracy becomes available");
 
+        OPTION_LBOUND(public_sharing_tax, "g", "public-sharing-tax", "The per-period, lump sum tax collected from each reader for public sharing", 0);
+        OPTION_UNBOUNDED(public_sharing_begins, "G", "public-sharing-begins", "The period in which public sharing becomes available");
+
         auto periods_constr = RangeConstraint<unsigned int>::GE(0);
-        TCLAP::ValueArg<unsigned int> periods_arg("T", "periods", "Number of simulation periods to run.  Default: 200.", false, 200, &periods_constr, cmd);
+        TCLAP::ValueArg<unsigned int> periods_arg("T", "periods", "Number of simulation periods to run.  Default: 250.", false, 250, &periods_constr, cmd);
 
         std::string default_output("creativity-SEED.crstate");
         TCLAP::ValueArg<std::string> output_file("o", "output", "Output file for simulation results.  If found, SEED will be replaced with the random seed value.  Default: " + default_output, false, default_output, "filename", cmd);

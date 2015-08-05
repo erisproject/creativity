@@ -348,10 +348,12 @@ void GUI::thr_run() {
     GUI_SETUP_VIS_SETTING_AFFECTS_RTREE(reader)
     GUI_SETUP_VIS_SETTING_AFFECTS_RTREE(book_live)
     GUI_SETUP_VIS_SETTING_AFFECTS_RTREE(book_dead)
+    GUI_SETUP_VIS_SETTING_AFFECTS_RTREE(book_public)
     GUI_SETUP_VIS_SETTING(friendship)
     GUI_SETUP_VIS_SETTING(movement)
     GUI_SETUP_VIS_SETTING(author_live)
     GUI_SETUP_VIS_SETTING(author_dead)
+    GUI_SETUP_VIS_SETTING(author_public)
     GUI_SETUP_VIS_SETTING(reading)
     GUI_SETUP_VIS_SETTING(utility_gain)
     GUI_SETUP_VIS_SETTING(utility_loss)
@@ -366,7 +368,7 @@ void GUI::thr_run() {
     // Update the attributes tooltips: only the SpinButtons in the glade file have tooltips, so copy
     // those tooltips into the associated Label as well (which is just left of the spinbutton in the
     // grid)
-    auto attribs_grid = widget<Gtk::Grid>("grid_sim_attribs");
+    auto attribs_grid = widget<Gtk::Grid>("grid_sim_params");
     bool done_copying_tooltips = false;
     for (int c = 1; not done_copying_tooltips; c += 2) {
         for (int r = 1; ; r++) {
@@ -684,24 +686,14 @@ void GUI::thr_update_parameters() {
 #define SET_SB(PARAMETER) widget<Gtk::SpinButton>("set_" #PARAMETER)->set_value(creativity_->parameters.PARAMETER)
     SET_SB(readers);
     widget<Gtk::SpinButton>("set_density")->set_value(creativity_->densityFromBoundary());
+    SET_SB(reader_step_sd);
     SET_SB(book_distance_sd);
     SET_SB(book_quality_sd);
-    SET_SB(reader_step_sd);
     SET_SB(reader_creation_shape);
     SET_SB(reader_creation_scale_min);
     SET_SB(reader_creation_scale_max);
-    SET_SB(piracy_begins);
-    SET_SB(income);
-    SET_SB(cost_fixed);
-    SET_SB(cost_unit);
-    SET_SB(cost_piracy);
-    SET_SB(prior_scale);
-    SET_SB(prior_scale_piracy);
-    SET_SB(prior_scale_burnin);
-    SET_SB(burnin_periods);
-    SET_SB(prediction_draws);
     SET_SB(creation_time);
-    widget<Gtk::SpinButton>("set_piracy_link_proportion")->set_value(creativity_->parameters.piracy_link_proportion * 100.0);
+
 #define SET_INIT_SB(PARAMETER) widget<Gtk::SpinButton>("set_init_" #PARAMETER)->set_value(creativity_->parameters.initial.PARAMETER)
     SET_INIT_SB(prob_write);
     SET_INIT_SB(q_min);
@@ -710,8 +702,26 @@ void GUI::thr_update_parameters() {
     SET_INIT_SB(p_max);
     SET_INIT_SB(prob_keep);
     SET_INIT_SB(keep_price);
-#undef SET_SB
 #undef SET_INIT_SB
+
+    SET_SB(income);
+    SET_SB(cost_fixed);
+    SET_SB(cost_unit);
+    SET_SB(cost_piracy);
+
+    SET_SB(prior_scale);
+    SET_SB(prior_scale_burnin);
+    SET_SB(burnin_periods);
+    SET_SB(prediction_draws);
+
+    SET_SB(piracy_begins);
+    widget<Gtk::SpinButton>("set_piracy_link_proportion")->set_value(creativity_->parameters.piracy_link_proportion * 100.0);
+    SET_SB(prior_scale_piracy);
+
+    SET_SB(public_sharing_begins);
+    SET_SB(public_sharing_tax);
+    SET_SB(prior_scale_public_sharing);
+#undef SET_SB
 }
 
 void GUI::thr_signal() {
@@ -754,12 +764,11 @@ void GUI::thr_signal() {
         widget<Gtk::Notebook>("nb_tabs")->set_current_page(1);
 
         // Disable spin buttons:
-        for (auto &widg : {"set_readers", "set_density", "set_piracy_link_proportion",
-                "set_book_distance_sd", "set_book_quality_sd", "set_piracy_begins", "set_income",
-                "set_cost_fixed", "set_cost_unit", "set_cost_piracy", "set_init_prob_write",
-                "set_init_q_min", "set_init_q_max", "set_init_p_min", "set_init_p_max",
-                "set_init_prob_keep", "set_init_keep_price"})
-            widget<Gtk::SpinButton>(widg)->set_sensitive(false);
+        for (auto &field : widget<Gtk::Grid>("grid_sim_params")->get_children()) {
+            if (auto *sb = dynamic_cast<Gtk::SpinButton*>(field)) {
+                sb->set_sensitive(false);
+            }
+        }
 
         // Update the agent attributes settings with the settings from the creativity object.
         // These may be different from the defaults, particularly when opening a file.

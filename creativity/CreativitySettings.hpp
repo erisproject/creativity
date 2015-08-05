@@ -97,14 +97,14 @@ struct CreativitySettings {
      * is the initial setup (without any actions), set to 1 to having sharing become available
      * immediately).
      */
-    eris::eris_time_t piracy_begins = 100;
+    eris::eris_time_t piracy_begins = 101;
 
     /** The period in which the PublicTracker agent is created.  The public tracker provides
      * marginal cost access to copies of books but taxes all agents a lump sum amount,
      * redistributing the collected tax money to authors proportionally to the number of copies
      * obtained of each author's works.
      */
-    eris::eris_time_t public_sharing_begins = 200;
+    eris::eris_time_t public_sharing_begins = 176;
 
     /** The lump size tax extracted by the public tracker from each agent in each period.
      *

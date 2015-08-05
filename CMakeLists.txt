@@ -4,8 +4,8 @@ project(creativity CXX)
 
 # Creativity package version
 set(CREATIVITY_VERSION_MAJOR "1")
-set(CREATIVITY_VERSION_MINOR "1")
-set(CREATIVITY_VERSION_PATCH "1")
+set(CREATIVITY_VERSION_MINOR "2")
+set(CREATIVITY_VERSION_PATCH "0")
 set(CREATIVITY_VERSION "${CREATIVITY_VERSION_MAJOR}.${CREATIVITY_VERSION_MINOR}.${CREATIVITY_VERSION_PATCH}")
 
 set(creativity_author "Jason Rhinelander <jason@imaginary.ca>")
@@ -65,8 +65,8 @@ foreach(pkg ${creativity_pkgconfig} ${creativity_gui_pkgconfig})
     add_definitions(${${pkg}_CFLAGS_OTHER})
 endforeach()
 
-if(ERIS_VERSION VERSION_LESS "0.3.0")
-    message(FATAL_ERROR "Eris v0.3.0 or above is required, but only v${ERIS_VERSION} was found")
+if(ERIS_VERSION VERSION_LESS "0.3.1")
+    message(FATAL_ERROR "Eris v0.3.1 or above is required, but only v${ERIS_VERSION} was found")
 endif()
 
 find_package(Eigen3 REQUIRED)
