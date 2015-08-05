@@ -94,6 +94,8 @@ class RangeConstraint : public TCLAP::Constraint<T> {
         const std::string lt_str{strict ? "<" : u8"⩽"}, gt_str{strict ? ">" : u8"⩾"};
 };
 
+
+
 /** Contains the command line arguments that aren't carried in the Creativity object */
 struct cmd_args {
     unsigned int periods, max_threads;
@@ -109,7 +111,7 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
 
 // Various macros to help with declaring arguments
 #define ARG(NAME, PARAM, SHORT, LONG, DESC) \
-        TCLAP::ValueArg<decltype(cr.parameters.PARAM)> opt_##NAME##_arg(SHORT, LONG, DESC ".  Default: " + output_string(cr.parameters.PARAM) + ".", \
+        TCLAP::ValueArg<decltype(cr.parameters.PARAM)> opt_##NAME##_arg(SHORT, LONG, DESC ". [" + output_string(cr.parameters.PARAM) + "]", \
                 false, cr.parameters.PARAM, &opt_##NAME##_constr, cmd)
 #define OPTION_UNBOUNDED_NAME(NAME, PARAM, SHORT, LONG, DESC) \
         RangeConstraint<decltype(cr.parameters.PARAM)> opt_##NAME##_constr; \
@@ -178,14 +180,14 @@ cmd_args parseCmdArgs(int argc, char **argv, Creativity &cr) {
         OPTION_UNBOUNDED(public_sharing_begins, "G", "public-sharing-begins", "The period in which public sharing becomes available");
 
         auto periods_constr = RangeConstraint<unsigned int>::GE(0);
-        TCLAP::ValueArg<unsigned int> periods_arg("T", "periods", "Number of simulation periods to run.  Default: 250.", false, 250, &periods_constr, cmd);
+        TCLAP::ValueArg<unsigned int> periods_arg("T", "periods", "Number of simulation periods to run. [250]", false, 250, &periods_constr, cmd);
 
         std::string default_output("creativity-SEED.crstate");
         TCLAP::ValueArg<std::string> output_file("o", "output", "Output file for simulation results.  If found, SEED will be replaced with the random seed value.  Default: " + default_output, false, default_output, "filename", cmd);
 
         TCLAP::ValueArg<std::string> tmpdir("", "tmpdir", "Output directory in which to write the output file while running the simulation.  When "
                 "the simulation finishes, the temporary file is moved to the output location specified by -o.  If this argument is omitted, the "
-                "file is written directly in its final location.", false, "", "directory", cmd);
+                "file is written directly to its final location.", false, "", "directory", cmd);
 
         TCLAP::SwitchArg overwrite_output_file("O", "overwrite", "Allows output file given to -o to be overwritten.  No effect if a database URL is given to -o.", cmd, false);
 
