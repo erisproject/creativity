@@ -9,6 +9,7 @@
 #include "creativity/Book.hpp"
 #include "creativity/BookMarket.hpp"
 #include <eris/Random.hpp>
+#include <boost/filesystem.hpp>
 #include <iostream>
 #include <cstdlib>
 #include <iomanip>
@@ -101,6 +102,8 @@ GUI::~GUI() {
 void GUI::thr_run() {
     main_window_ = std::shared_ptr<Gtk::Window>(widget<Gtk::Window>("window1"));
 
+    main_window_->set_title(main_window_->get_title() + " v" + std::to_string(VERSION[0]) + "." + std::to_string(VERSION[1]) + "." + std::to_string(VERSION[2]));
+
     auto disable_on_load = {"fr_agents", "fr_save", "fr_run", "fr_sim"};
     // When the "load" radio button is activated, disable all the new simulation parameter fields
     widget<Gtk::RadioButton>("radio_load")->signal_clicked().connect([this,disable_on_load] {
@@ -171,6 +174,9 @@ void GUI::thr_run() {
             save_ = "";
         }
         widget<Gtk::Label>("lbl_save")->set_text(save_ == "" ? "(no file selected)" : save_);
+        if (save_ != "") {
+            main_window_->set_title(main_window_->get_title() + " [" + boost::filesystem::path(save_).filename().string() + "]");
+        }
     });
 
     widget<Gtk::Button>("btn_start")->signal_clicked().connect([this] {
@@ -893,6 +899,8 @@ void GUI::loadSim() {
     queueEvent(Event::Type::setup, std::move(params));
 
     widget<Gtk::Label>("lbl_load")->set_text(load_);
+
+    main_window_->set_title(main_window_->get_title() + " [" + boost::filesystem::path(load_).filename().string() + "]");
 
     // Disable and hide the simulation controls (at the top of the window), since loading is read-only
     auto controls = widget<Gtk::Box>("box_controls");

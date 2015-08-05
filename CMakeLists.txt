@@ -72,8 +72,9 @@ endif()
 find_package(Eigen3 REQUIRED)
 include_directories(${EIGEN3_INCLUDE_DIR})
 
-find_package(Boost REQUIRED)
+find_package(Boost REQUIRED COMPONENTS filesystem)
 include_directories(${Boost_INCLUDE_DIRS})
+link_directories(${Boost_LIBRARY_DIRS})
 
 # Find library source/headers
 file(GLOB_RECURSE cr_libsrc creativity/*.cpp)
@@ -139,6 +140,7 @@ if (GUI)
     foreach(pkg ${creativity_gui_pkgconfig})
         target_link_libraries(creativitygui ${${pkg}_LIBRARIES})
     endforeach()
+    target_link_libraries(creativity ${Boost_LIBRARIES})
     list(APPEND creativity_install_targets creativitygui)
 
     target_link_libraries(creativitygui creativity)
