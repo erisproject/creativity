@@ -31,7 +31,7 @@ int main(int argc, char *argv[1]) {
         switch (p.param) {
             case GUI::ParamType::finished:
                 if (not load_from_file) {
-                    if (creativity->parameters.dimensions != 2) throw std::domain_error("Cannot yet handle dimensions ≠ 2");
+                    if (creativity->parameters.dimensions < 1 or creativity->parameters.dimensions > 2) throw std::domain_error(u8"GUI cannot handle dimensions ∉ {1,2}");
                     // setup() will check the other parameters for validity
                     creativity->setup();
                     creativity->sim->maxThreads(max_threads);
@@ -52,7 +52,7 @@ int main(int argc, char *argv[1]) {
                 if (creativity->storage().first->size() == 0)
                     throw std::runtime_error("Unable to load file: file has no states");
                 if (creativity->parameters.dimensions != 2)
-                    throw std::runtime_error("Unable to load file: dimensions != 2");
+                    throw std::runtime_error(u8"Unable to load file: dimensions ∉ {1,2}");
                 if (creativity->parameters.boundary <= 0)
                     throw std::runtime_error("Unable to load file: file has invalid non-positive boundary value");
                 load_from_file = true;
