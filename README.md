@@ -14,6 +14,8 @@ creative output where copies of an original are the marketable good.
 - [gtkmm-3.0](http://www.gtkmm.org) (optional--required for GUI interface)
 - A C++ compiler supporting the C++11 standard, such as
   [clang](http://clang.llvm.org/) (3.3+) or [g++](https://gcc.gnu.org/) (4.9+)
+- [Boost](http://www.boost.org), including the filesystem library component.
+- [TCLAP](http://tclap.sf.net) command-line parsing library.
 
 ## Compiling
 
