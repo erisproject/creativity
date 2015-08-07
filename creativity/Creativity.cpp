@@ -86,8 +86,13 @@ void Creativity::setup() {
     std::uniform_real_distribution<double> unif_pmb(-parameters.boundary, parameters.boundary);
     std::uniform_real_distribution<double> unif_cr_shape(parameters.reader_creation_scale_min, parameters.reader_creation_scale_max);
 
+    Position initpos = Position::zero(parameters.dimensions);
     for (unsigned int i = 0; i < parameters.readers; i++) {
-        auto r = sim->spawn<Reader>(shared_from_this(), Position{unif_pmb(rng), unif_pmb(rng)});
+        // Draw a uniform value for each dimension
+        for (size_t d = 0; d < parameters.dimensions; d++) initpos[d] = unif_pmb(rng);
+
+        auto r = sim->spawn<Reader>(shared_from_this(), initpos);
+
         r->writer_book_sd = parameters.book_distance_sd;
         r->writer_quality_sd = parameters.book_quality_sd;
         r->creation_shape = parameters.reader_creation_shape;

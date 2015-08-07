@@ -633,14 +633,18 @@ void GUI::thr_reset_rtrees() {
 
 void GUI::thr_init_rtree(RTree &rt, const std::shared_ptr<const State> &state) const {
     if (graph_->design.enabled.reader) {
-        for (auto &r : state->readers)
-            rt.insert(std::make_pair(rt_point{r.second.position[0], r.second.position[1]}, r.second.id));
+        for (auto &r : state->readers) {
+            auto gp = graph_->graph_position(r.second.position);
+            rt.insert(std::make_pair(rt_point{gp[0], gp[1]}, r.second.id));
+        }
     }
     if (graph_->design.enabled.book_live or graph_->design.enabled.book_dead) {
         for (auto &b : state->books) {
             if (b.second.market_private ? graph_->design.enabled.book_live :
-                    b.second.market_public() ? graph_->design.enabled.book_public : graph_->design.enabled.book_dead)
-                rt.insert(std::make_pair(rt_point{b.second.position[0], b.second.position[1]}, b.second.id));
+                    b.second.market_public() ? graph_->design.enabled.book_public : graph_->design.enabled.book_dead) {
+                auto gp = graph_->graph_position(b.second.position);
+                rt.insert(std::make_pair(rt_point{gp[0], gp[1]}, b.second.id));
+            }
         }
     }
 }
@@ -690,6 +694,7 @@ void GUI::thr_info_dialog(eris_id_t member_id) {
 
 void GUI::thr_update_parameters() {
 #define SET_SB(PARAMETER) widget<Gtk::SpinButton>("set_" #PARAMETER)->set_value(creativity_->parameters.PARAMETER)
+    SET_SB(dimensions);
     SET_SB(readers);
     widget<Gtk::SpinButton>("set_density")->set_value(creativity_->densityFromBoundary());
     SET_SB(reader_step_sd);
@@ -931,10 +936,11 @@ void GUI::loadSim() {
 void GUI::setupSim() {
     // Set the parameters directly
     auto &set = creativity_->set();
-    set.readers = lround(sb("set_readers"));
-    set.boundary = Creativity::boundaryFromDensity(set.readers, set.dimensions, sb("set_density"));
 #define COPY_SB_D(PARAMETER) set.PARAMETER = sb("set_"#PARAMETER)
 #define COPY_SB_I(PARAMETER) set.PARAMETER = lround(sb("set_"#PARAMETER))
+    COPY_SB_I(dimensions);
+    COPY_SB_I(readers);
+    set.boundary = Creativity::boundaryFromDensity(set.readers, set.dimensions, sb("set_density"));
     COPY_SB_I(piracy_begins);
     COPY_SB_D(piracy_link_proportion) * 0.01; // From percentage
     COPY_SB_D(book_distance_sd);
