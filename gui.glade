@@ -260,7 +260,7 @@
     <property name="title" translatable="yes">Creativity Simulator</property>
     <property name="default_width">1000</property>
     <property name="default_height">880</property>
-    <property name="icon">creativity.svg</property>
+    <property name="icon">creativity-gui.svg</property>
     <child>
       <object class="GtkBox" id="box3">
         <property name="visible">True</property>

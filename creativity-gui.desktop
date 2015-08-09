@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Creativity Simulator
+Exec=creativity-gui %f
+Comment=Create or view Creativity model simulations
+MimeType=application/x-creativity.crstate
+Terminal=false
+Type=Application
+Categories=GTK;Education;Science;Economy
+Icon=creativity-gui

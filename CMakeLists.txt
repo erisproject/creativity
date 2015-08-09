@@ -150,11 +150,22 @@ if (GUI)
     list(APPEND creativity_install_targets creativity-gui)
 
     # Copy the glade and icon to the install datadir
-    install(FILES gui.glade creativity.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/creativity/)
+    install(FILES gui.glade creativity-gui.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/creativity/)
 
     # Also copy them into the build dir (so that running ./creativity-gui from build/ works)
     configure_file(gui.glade ${CMAKE_BINARY_DIR}/gui.glade COPYONLY)
-    configure_file(creativity.svg ${CMAKE_BINARY_DIR}/creativity.svg COPYONLY)
+    configure_file(creativity-gui.svg ${CMAKE_BINARY_DIR}/creativity-gui.svg COPYONLY)
+
+    # Install the desktop file
+    install(FILES creativity-gui.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications/)
+
+    # Mime type registration
+    install(FILES creativity-gui.xml DESTINATION ${CMAKE_INSTALL_DATADIR}/mime/packages/)
+
+    # Also copy the icon into the pixmaps directory so it'll be picked up by things reading the desktop file
+    install(FILES creativity-gui.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/pixmaps/)
+    # And put a copy in for the mime type icon
+    install(FILES creativity-gui.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/pixmaps/ RENAME application-x-creativity.crstate.svg)
 
 endif()
 
