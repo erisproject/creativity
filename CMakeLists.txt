@@ -96,11 +96,11 @@ foreach(h ${cr_headers})
         configure_file("${h}" "${h_processed}" @ONLY)
         list(APPEND creativity_doc_include "${CMAKE_CURRENT_BINARY_DIR}/${h_processed}")
     else()
-        configure_file("${h}" "${h}" COPYONLY)
-        list(APPEND creativity_doc_include "${CMAKE_CURRENT_BINARY_DIR}/${h}")
+        list(APPEND creativity_doc_include "${CMAKE_CURRENT_SOURCE_DIR}/${h}")
     endif()
 endforeach()
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 # Set up compilation flags; put everything before CMAKE_CXX_FLAGS so that these can be overridden
 set(CMAKE_CXX_FLAGS "-std=c++11 -march=native -O3 -Wall -Wextra ${CMAKE_CXX_FLAGS}")
@@ -203,6 +203,11 @@ include(CPack)
 #    DESTINATION "${CMAKE_INSTALL_LIBDIR}"
 #    COMPONENT libs)
 install(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/creativity/"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/creativity/"
+    COMPONENT headers
+    FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h")
+
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/creativity/"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/creativity/"
     COMPONENT headers
     FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h")
