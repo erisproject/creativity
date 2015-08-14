@@ -3,11 +3,13 @@
 #include "creativity/gui/BookStore.hpp"
 #include "creativity/gui/ReaderInfoWindow.hpp"
 #include "creativity/gui/BookInfoWindow.hpp"
+#include "creativity/state/Storage.hpp"
 #include "creativity/Creativity.hpp"
 #include "creativity/config.hpp"
 #include "creativity/Reader.hpp"
 #include "creativity/Book.hpp"
 #include "creativity/BookMarket.hpp"
+#include "creativity/CmdArgs.hpp"
 #include <eris/Random.hpp>
 #include <boost/filesystem.hpp>
 #include <iostream>
@@ -21,7 +23,8 @@ using namespace std::placeholders;
 namespace creativity { namespace gui {
 
 GUI::GUI(std::shared_ptr<Creativity> creativity,
-        std::function<void(Parameter)> setup,
+        std::function<void(Parameter)> configure,
+        std::function<void()> initialize,
         std::function<void(unsigned int count)> run,
         std::function<void()> stop,
         std::function<void()> resume,
@@ -29,15 +32,14 @@ GUI::GUI(std::shared_ptr<Creativity> creativity,
         std::function<void()> quit)
     :
         creativity_{std::move(creativity)},
-        on_setup_{std::move(setup)},
+        on_configure_{std::move(configure)},
+        on_initialize_{std::move(initialize)},
         on_run_{std::move(run)},
         on_stop_{std::move(stop)},
         on_resume_{std::move(resume)},
         on_step_{std::move(step)},
         on_quit_{std::move(quit)}
 {}
-
-GUI::Exception::Exception(const std::string &what) : std::runtime_error(what) {}
 
 double GUI::sb(const std::string &widget_name) {
     return widget<Gtk::SpinButton>(widget_name)->get_value();
@@ -46,12 +48,12 @@ int GUI::sb_int(const std::string &widget_name) {
     return widget<Gtk::SpinButton>(widget_name)->get_value_as_int();
 }
 
-void GUI::start(int argc, char *argv[]) {
+void GUI::start(const CmdArgs &args) {
     if (gui_thread_.joinable())
         throw std::runtime_error("GUI thread can only be started once!");
 
-    app_ = Gtk::Application::create(argc, argv, "ca.imaginary.eris.creativity",
-            Gio::APPLICATION_NON_UNIQUE | Gio::APPLICATION_HANDLES_OPEN);
+    app_ = Gtk::Application::create("ca.imaginary.eris.creativity", Gio::APPLICATION_NON_UNIQUE);
+
     builder_ = Gtk::Builder::create();
 
     std::list<std::string> datadirs;
@@ -80,7 +82,10 @@ void GUI::start(int argc, char *argv[]) {
     // seed() call to affect the main thread, not the GUI thread.
     widget<Gtk::Entry>("set_seed")->set_text(std::to_string(eris::Random::seed()));
 
-    gui_thread_ = std::thread(&GUI::thr_run, this);
+    // Update the number of periods now, so that it has the right value when the GUI comes up
+    widget<Gtk::SpinButton>("set_periods")->set_value(args.parameters.periods);
+
+    gui_thread_ = std::thread(&GUI::thr_run, this, args);
 
     // Wait for the thread to finish its startup before returning
     std::unique_lock<std::mutex> lock(mutex_);
@@ -99,7 +104,7 @@ GUI::~GUI() {
         gui_thread_.join();
 }
 
-void GUI::thr_run() {
+void GUI::thr_run(const CmdArgs &args) {
     main_window_ = std::shared_ptr<Gtk::Window>(widget<Gtk::Window>("window1"));
 
     main_window_->set_title(main_window_->get_title() + " v" + std::to_string(VERSION[0]) + "." + std::to_string(VERSION[1]) + "." + std::to_string(VERSION[2]));
@@ -139,14 +144,6 @@ void GUI::thr_run() {
         }
     });
 
-    // Set up a signal handler that is invoked if the application is started up with a filename
-    app_->signal_open().connect_notify([this](const std::vector<Glib::RefPtr<Gio::File>> &files, const Glib::ustring&) -> void {
-        if (files.size() != 1) throw std::runtime_error("Unable to open multiple files!");
-        load_ = files[0]->get_path();
-        app_->add_window(*main_window_);
-        main_window_->show_all();
-    }, true);
-
     // Clicking the save file chooser likewise fires the save radio, then also starts up the file
     // chooser dialog.
     widget<Gtk::Button>("btn_choose_save")->signal_clicked().connect([this] {
@@ -180,12 +177,12 @@ void GUI::thr_run() {
     });
 
     widget<Gtk::Button>("btn_start")->signal_clicked().connect([this] {
-        setupSim();
+        initializeSim();
         runSim();
     });
 
     widget<Gtk::Button>("btn_init")->signal_clicked().connect([this] {
-        setupSim();
+        initializeSim();
     });
 
     widget<Gtk::Button>("btn_run")->signal_clicked().connect([this] {
@@ -205,36 +202,54 @@ void GUI::thr_run() {
     });
 
     auto thrbox = widget<Gtk::ComboBoxText>("combo_threads");
-    auto active = thrbox->get_active_row_number();
     // The gui setup has two entries: no threads, and 1 thread.  The latter is pointless (except for
     // eris debugging), so remove it, but first check to see if it was selected; if it was, we'll
     // update the default selection to the maximum number of threads; otherwise we'll leave it on no
     // threads.
     thrbox->remove_text(1);
     unsigned int last = 1;
+    bool added_requested_threads = args.parameters.threads == 0;
+    // List common number of threads by going up by increasing amounts so that the increment is
+    // always greater than 25% and at most 50%, so we get:
+    // 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, ...
+    // But stop that, of course, at the maximum number of hardware threads supported.
     for (unsigned int i = 2, incr = 1; i <= std::thread::hardware_concurrency(); i += incr) {
+        // If the user requested some oddball number that we skip with the next one, we need to add it
+        if (not added_requested_threads and i >= args.parameters.threads) {
+            if (i > args.parameters.threads) {
+                // We're about to skip over it, so add it
+                thrbox->append(std::to_string(args.parameters.threads), std::to_string(args.parameters.threads) +
+                        (args.parameters.threads > 1 ? " threads" : " thread"));
+            }
+            // Otherwise it's equal, which means we're about to add it
+            added_requested_threads = true;
+        }
+
         thrbox->append(std::to_string(i), std::to_string(i) + " threads");
         if (i >= 4*incr) incr *= 2;
         last = i;
     }
-    if (last < std::thread::hardware_concurrency()) {
-        // In case the processor has some weird number of max concurrency (such as 5,
-        // 7, 9-11, 13-15, 17-23, etc.) that doesn't get added above, add it.
-        std::string num = std::to_string(std::thread::hardware_concurrency());
-        thrbox->append(num, num + " threads");
+    // We might also need to add the hardware value and the requested value; the former if it is
+    // some oddball amount not caught above; the latter similarly, or if it exceeds the number of
+    // hardware threads.
+    unsigned int more[] = {std::thread::hardware_concurrency(), args.parameters.threads};
+    if (more[1] < more[0]) std::swap(more[0], more[1]);
+
+    for (auto &t : more) {
+        if (t > last) {
+            std::string num = std::to_string(t);
+            thrbox->append(num, num + " threads");
+            last = t;
+        }
     }
-    // If the GUI's default was the 1 thread option, update it to max threads
-    if (active > 0 and std::thread::hardware_concurrency() > 1)
-        thrbox->set_active_id(std::to_string(std::thread::hardware_concurrency()));
+
+    // Select the requested (or default) number of threads
+    thrbox->set_active_id(std::to_string(args.parameters.threads));
 
     thrbox->signal_changed().connect([this] {
-        int threads = widget<Gtk::ComboBoxText>("combo_threads")->get_active_row_number();
-
-        std::vector<Parameter> params;
-        Parameter p;
-        p.param = ParamType::threads;
-        p.ul = threads;
-        queueEvent(Event::Type::setup, std::move(params));
+        Parameter th;
+        th.param = ParamType::threads; th.ul = std::stoul(widget<Gtk::ComboBoxText>("combo_threads")->get_active_id());
+        queueEvent(th);
     });
 
     widget<Gtk::Entry>("set_seed")->signal_icon_press().connect([this](Gtk::EntryIconPosition icon_position, const GdkEventButton*) -> void {
@@ -401,11 +416,39 @@ void GUI::thr_run() {
     vis->add(*graph_);
     graph_->show();
 
-    Glib::signal_idle().connect_once([this,&lock] {
+    Glib::signal_idle().connect_once([this,&lock,&args] {
+            if (not args.parameters.input.empty()) {
+                load_ = args.parameters.input;
+            }
+            if (not args.parameters.output.empty()) {
+                save_ = args.parameters.output;
+                widget<Gtk::Label>("lbl_save")->set_text(save_);
+                main_window_->set_title(main_window_->get_title() + " [" + boost::filesystem::path(save_).filename().string() + "]");
+            }
+            bool init = false, run = false;
+            if (args.parameters.start) {
+                init = run = true;
+            }
+            else if (args.parameters.initialize) {
+                init = true;
+            }
+
+            // Have to do this *after* doing everything we want with args: GUI::start() waits on
+            // this lock, and our args reference isn't guaranteed to survive once start() returns.
+            // The actual calls to initializeSim() etc. can't be above, however, because they send a
+            // signal which would deadlock before releasing the thread startup lock:
             thread_running_ = true;
             lock.unlock();
             cv_.notify_all();
-            if (not load_.empty()) loadSim();
+
+            if (not load_.empty())
+                loadSim();
+            if (init) {
+                initializeSim();
+                if (run)
+                    runSim();
+            }
+
     });
 
     app_->run(*main_window_);
@@ -899,9 +942,7 @@ void GUI::loadSim() {
     Parameter load;
     load.param = ParamType::load;
     load.ptr = &load_;
-    params.push_back(load);
-
-    queueEvent(Event::Type::setup, std::move(params));
+    queueEvent(load);
 
     widget<Gtk::Label>("lbl_load")->set_text(load_);
 
@@ -932,8 +973,8 @@ void GUI::loadSim() {
     widget<Gtk::Expander>("ex_vis")->set_expanded(true);
 }
 
-// Start a new simulation:
-void GUI::setupSim() {
+// Initialize a new simulation:
+void GUI::initializeSim() {
     // Set the parameters directly
     auto &set = creativity_->set();
 #define COPY_SB_D(PARAMETER) set.PARAMETER = sb("set_"#PARAMETER)
@@ -969,18 +1010,20 @@ void GUI::setupSim() {
     COPY_SB_INIT_D(keep_price);
 #undef COPY_SB_D
 #undef SET_INIT_SB
-    std::vector<Parameter> params;
+
+    // Other non-simulation options need to be queued via a configure event:
     Parameter p;
-    p.param = ParamType::seed; p.ul = std::stoul(widget<Gtk::Entry>("set_seed")->get_text()); params.push_back(p);
-    int threads = widget<Gtk::ComboBoxText>("combo_threads")->get_active_row_number();
-    if (threads < 0) threads = 0; // -1 means no item selected (shouldn't be possible, but just in case)
-    p.param = ParamType::threads; p.ul = (unsigned long)threads; params.push_back(p);
+    p.param = ParamType::seed; p.ul = std::stoul(widget<Gtk::Entry>("set_seed")->get_text());
+    queueEvent(p);
+    p.param = ParamType::threads; p.ul = std::stoul(widget<Gtk::ComboBoxText>("combo_threads")->get_active_id());
+    queueEvent(p);
 
     if (save_ != "") {
-        p.param = ParamType::save_as; p.ptr = &save_; params.push_back(p);
+        p.param = ParamType::save_as; p.ptr = &save_;
+        queueEvent(p);
     }
 
-    queueEvent(Event::Type::setup, std::move(params));
+    queueEvent(Event::Type::initialize);
 }
 
 void GUI::runSim() {
@@ -1012,10 +1055,8 @@ void GUI::stopped(bool manual) { queueSignal({Signal::Type::stopped, manual}); }
 void GUI::error(std::string message) { queueSignal({ Signal::Type::error, message }); }
 
 GUI::Event::Event(Event::Type t) : type{t} {}
-GUI::Event::Event(Event::Type t, std::vector<Parameter> &&p)
-    : type{t}, parameters{std::move(p)} {}
-GUI::Event::Event(Event::Type t, unsigned long ulval)
-    : type{t}, ul{ulval} {}
+GUI::Event::Event(const Parameter &p) : type{Event::Type::configure}, parameter(p) {}
+GUI::Event::Event(Event::Type t, unsigned long ulval): type{t}, ul{ulval} {}
 GUI::Event::operator bool() { return type != Type::none; }
 
 void GUI::checkEvents() {
@@ -1056,19 +1097,18 @@ void GUI::handleEvent(const Event &event) {
     std::vector<std::string> setup_errors;
     try {
         switch (event.type) {
-            case Event::Type::setup:
-                if (on_setup_ and not event.parameters.empty()) {
-                    on_setup_({ParamType::begin, {0}});
-                    for (auto &p : event.parameters) {
-                        try {
-                            on_setup_(p);
-                        }
-                        catch (std::exception &e) {
-                            setup_errors.push_back(e.what());
-                        }
+            case Event::Type::configure:
+                if (on_configure_) {
+                    try {
+                        on_configure_(event.parameter);
                     }
-                    on_setup_({ setup_errors.empty() ? ParamType::finished : ParamType::erred, {0} });
+                    catch (const std::exception &e) {
+                        setup_errors.push_back(e.what());
+                    }
                 }
+                break;
+            case Event::Type::initialize:
+                if (on_initialize_) on_initialize_();
                 break;
             case Event::Type::run:
                 if (on_run_) on_run_(event.ul);
@@ -1085,8 +1125,8 @@ void GUI::handleEvent(const Event &event) {
             case Event::Type::quit:
                 if (on_quit_) on_quit_();
                 break;
-            default: // Ignore anything else
-                break;
+            case Event::Type::none:
+                break; // no op
         }
     } catch (std::exception &e) {
         queueSignal({ Signal::Type::error, std::string{"An exception has occured: "} + e.what() });

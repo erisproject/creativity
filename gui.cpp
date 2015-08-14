@@ -1,4 +1,6 @@
 #include "creativity/Creativity.hpp"
+#include "creativity/CmdArgs.hpp"
+#include "creativity/state/Storage.hpp"
 #include "creativity/gui/GUI.hpp"
 #include <eris/Simulation.hpp>
 #include <eris/Random.hpp>
@@ -17,6 +19,12 @@ int main(int argc, char *argv[1]) {
     Eigen::initParallel();
     auto creativity = Creativity::create();
 
+    // Handle any command line arguments.  These set things in creativity->set(), which form the
+    // defaults for the GUI, and have a few extra leftovers that the GUI code handles itself.
+    CmdArgs cmd(creativity->set());
+    cmd.addGuiOptions();
+    cmd.parse(argc, argv);
+
     std::cerr << std::setprecision(16);
     std::cout << std::setprecision(16);
 
@@ -24,35 +32,23 @@ int main(int argc, char *argv[1]) {
     eris_time_t run_start = 0, run_end = 0;
     std::chrono::milliseconds sync_speed{50};
     bool save_to_file = false, load_from_file = false;
-    unsigned int max_threads = 0;
+    unsigned int max_threads = cmd.parameters.threads;
 
     // Set up handlers for user actions in the GUI
-    auto on_setup = [&](GUI::Parameter p) { // Setup
+    auto on_configure = [&](GUI::Parameter p) { // Parameter
         switch (p.param) {
-            case GUI::ParamType::finished:
-                if (not load_from_file) {
-                    if (creativity->parameters.dimensions < 1) throw std::domain_error(u8"Invalid simulation file: dimensions < 1");
-                    // setup() will check the other parameters for validity
-                    creativity->setup();
-                    creativity->sim->maxThreads(max_threads);
-                }
-                setup = true;
-                break;
-            case GUI::ParamType::begin:
-            case GUI::ParamType::erred:
-                break;
             case GUI::ParamType::seed:
-                if (setup) throw std::runtime_error("Cannot change seed after initial setup");
+                if (setup or load_from_file) throw std::runtime_error("Cannot change seed after initial setup");
                 eris::Random::seed(p.ul);
                 break;
             case GUI::ParamType::load:
                 if (setup) throw std::runtime_error("Cannot load after initial setup");
-                if (save_to_file) throw std::runtime_error("Error: setup specified both load and save file");
+                if (save_to_file) throw std::runtime_error("Error: cannot load and save at the same time");
                 creativity->fileRead(*reinterpret_cast<std::string*>(p.ptr));
                 if (creativity->storage().first->size() == 0)
                     throw std::runtime_error("Unable to load file: file has no states");
                 if (creativity->parameters.dimensions < 1)
-                    throw std::runtime_error(u8"Unable to load file: invalid dimensions < 1");
+                    throw std::runtime_error("Unable to load file: invalid dimensions < 1");
                 if (creativity->parameters.boundary <= 0)
                     throw std::runtime_error("Unable to load file: file has invalid non-positive boundary value");
                 load_from_file = true;
@@ -61,7 +57,7 @@ int main(int argc, char *argv[1]) {
                 // TODO: this could actually be handled when already setup: it should be possible
                 // to copy the current Storage object into the new FileStorage.
                 if (setup) throw std::runtime_error("Cannot change file after initial setup");
-                if (load_from_file) throw std::runtime_error("Error: setup specified both load and save file");
+                if (load_from_file) throw std::runtime_error("Error: cannot load and save at the same time");
                 creativity->fileWrite(*reinterpret_cast<std::string*>(p.ptr));
                 save_to_file = true;
                 break;
@@ -73,6 +69,19 @@ int main(int argc, char *argv[1]) {
                 else max_threads = p.ul;
                 break;
         }
+    };
+
+    auto on_initialize = [&]() {
+        if (load_from_file)
+            throw std::logic_error("Cannot initialize a new simulation after loading one from a file");
+        if (setup)
+            throw std::logic_error("Cannot initialize: initialization already done!");
+        if (creativity->parameters.dimensions < 1) throw std::domain_error(u8"Invalid simulation file: dimensions < 1");
+        // setup() will check the other parameters for validity
+        creativity->setup();
+        creativity->sim->maxThreads(max_threads);
+        setup = true;
+        std::cerr << "init done!\n";
     };
 
     auto on_run = [&](eris_time_t periods) { // Run
@@ -89,10 +98,10 @@ int main(int argc, char *argv[1]) {
     auto on_resume = [&]() { stopped = false; };
     auto on_quit = [&]() { quit = true; };
 
-    GUI gui(creativity, on_setup, on_run, on_stop, on_resume, on_step, on_quit);
+    GUI gui(creativity, on_configure, on_initialize, on_run, on_stop, on_resume, on_step, on_quit);
 
     try {
-        gui.start(argc, argv);
+        gui.start(cmd);
     }
     catch (Glib::Error &e) {
         std::cerr << "Unable to start gui: " << e.what() << "\n";

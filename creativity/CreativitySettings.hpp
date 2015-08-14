@@ -12,6 +12,9 @@ struct CreativitySettings {
     uint32_t dimensions = 2;
 
     /** The boundary in each dimension to use for simulation members.  Must be a positive value.
+     * The the exact boundary is calculated from the simulation density at the initialization of the
+     * simulation as the density could theoretically change during the simulation, but the boundary
+     * defines the world and so is fixed forever.
      */
     double boundary = 5.0;
 

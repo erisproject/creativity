@@ -1,5 +1,6 @@
 #include "creativity/gui/GraphArea.hpp"
 #include "creativity/gui/GUI.hpp"
+#include "creativity/state/Storage.hpp"
 #include "creativity/Creativity.hpp"
 #include "creativity/Reader.hpp"
 #include "creativity/Book.hpp"
@@ -56,7 +57,6 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
     Gtk::Allocation allocation = get_allocation();
     const int width = allocation.get_width();
     const int height = allocation.get_height();
-    const double boundary = gui_.creativity_->parameters.boundary;
 
     if (gui_.state_num_ == 0) {
         // No states at all: just draw a blank screen

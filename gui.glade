@@ -1139,31 +1139,7 @@ For example, if this is set to 0.6 and, the previous market price was 6, and mar
                                               </object>
                                               <packing>
                                                 <property name="left_attach">6</property>
-                                                <property name="top_attach">2</property>
-                                              </packing>
-                                            </child>
-                                            <child>
-                                              <object class="GtkLabel" id="label37">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">False</property>
-                                                <property name="label" translatable="yes">Burn-in periods</property>
-                                                <property name="xalign">0</property>
-                                              </object>
-                                              <packing>
-                                                <property name="left_attach">6</property>
                                                 <property name="top_attach">3</property>
-                                              </packing>
-                                            </child>
-                                            <child>
-                                              <object class="GtkLabel" id="label38">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">False</property>
-                                                <property name="label" translatable="yes">Prediction draws</property>
-                                                <property name="xalign">0</property>
-                                              </object>
-                                              <packing>
-                                                <property name="left_attach">6</property>
-                                                <property name="top_attach">4</property>
                                               </packing>
                                             </child>
                                             <child>
@@ -1182,7 +1158,7 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                                               </object>
                                               <packing>
                                                 <property name="left_attach">7</property>
-                                                <property name="top_attach">2</property>
+                                                <property name="top_attach">3</property>
                                               </packing>
                                             </child>
                                             <child>
@@ -1200,7 +1176,7 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                                               </object>
                                               <packing>
                                                 <property name="left_attach">7</property>
-                                                <property name="top_attach">3</property>
+                                                <property name="top_attach">4</property>
                                               </packing>
                                             </child>
                                             <child>
@@ -1218,7 +1194,7 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                                               </object>
                                               <packing>
                                                 <property name="left_attach">7</property>
-                                                <property name="top_attach">4</property>
+                                                <property name="top_attach">2</property>
                                               </packing>
                                             </child>
                                             <child>
@@ -1888,6 +1864,30 @@ The value given here is &lt;b&gt;&lt;i&gt;β&lt;/i&gt;&lt;/b&gt;.  Note that &lt
                                               <packing>
                                                 <property name="left_attach">1</property>
                                                 <property name="top_attach">1</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label37">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">False</property>
+                                                <property name="label" translatable="yes">Burn-in periods</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left_attach">6</property>
+                                                <property name="top_attach">4</property>
+                                              </packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="label38">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">False</property>
+                                                <property name="label" translatable="yes">Prediction draws</property>
+                                                <property name="xalign">0</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left_attach">6</property>
+                                                <property name="top_attach">2</property>
                                               </packing>
                                             </child>
                                           </object>

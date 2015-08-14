@@ -16,11 +16,13 @@
 #include "creativity/gui/GraphArea.hpp"
 #include "creativity/gui/InfoWindow.hpp"
 #include "creativity/state/State.hpp"
-#include "creativity/state/Storage.hpp"
 
 namespace sigc { SIGC_FUNCTORS_DEDUCE_RESULT_TYPE_WITH_DECLTYPE }
 
-namespace creativity { namespace gui {
+namespace creativity {
+// Forward declarations
+class CmdArgs;
+namespace gui {
 
 // Forward declarations
 class ReaderStore;
@@ -43,17 +45,25 @@ class GUI : eris::noncopyable {
                  */
                 std::shared_ptr<Creativity> creativity,
 
-                /** A function to call with the GUI simulation parameters (in a series of
-                 * GUI.Parameter structs) when the user configures the simulation via the GUI.  This
-                 * function should set up the simulation but not start it: it will be followed
-                 * immediately followed by a `run` call (assuming no error occurs).
+                /** A function to call with GUI simulation parameters when the user configures the
+                 * simulation via the GUI.  Note that this doesn't include simulation settings (like
+                 * the number of readers)--those are set directly in the settings object.
                  *
                  * If the simulation cannot be started (for example, because some parameters are
-                 * invalid) the function should throw a GUI::Exception; the .what() value of the
-                 * exception will be displayed to the user as an error message. */
-                std::function<void(Parameter param)> setup,
+                 * invalid) the function should throw an exception derived from std::exception; the
+                 * .what() value of the exception will be displayed to the user as an error message.
+                 */
+                std::function<void(Parameter param)> configure,
 
-                /** Called to run the simulation for `rounds` periods. */
+                /** A function to call to initialize the simulation.  If something goes wrong, this
+                 * should throw an exception derived from std::exception: the `.what()` value of the
+                 * exception will be displayed to the user as an error message.
+                 */
+                std::function<void()> initialize,
+
+                /** Called to run the simulation for `rounds` periods. `initialize` will be called
+                 * before the first call to this.
+                 */
                 std::function<void(eris::eris_time_t rounds)> run,
 
                 /** Called when the user hits the stop button in the GUI. This should pause the
@@ -77,14 +87,7 @@ class GUI : eris::noncopyable {
 
         /** Starts the GUI, reading the glade file and starting the GUI thread.
          */
-        void start(int argc, char *argv[]);
-
-        /// Simple wrapper around std::runtime_error used to send error messages back to the user.
-        class Exception : public std::runtime_error {
-            public:
-                /** Constructor: takes an exception message to display to the user. */
-                Exception(const std::string &what);
-        };
+        void start(const CmdArgs &args);
 
         /** Checks whether the GUI has generated any events and, if so, processes them.  If there
          * are no pending events, this returns immediately.
@@ -140,10 +143,7 @@ class GUI : eris::noncopyable {
             save_as, ///< The file to save simulation data to (will be overwritten)
             load, ///< The file to load existing simulation data from
             seed, ///< Sets the seed value for eris::Random::seed in `.ul`
-            threads, ///< Number of threads to use in `.ul`
-            begin, ///< Sent by the GUI to indicate that some parameters are being changed.
-            erred, ///< Fired when setup ends unsuccessfully because when one or more setup parameters threw exceptions
-            finished ///< Fired when setup ends successfully (no setup parameter threw an exception)
+            threads ///< Number of threads to use in `.ul`
         };
         /** The parameter struct for passing a configured value back from the GUI.  The GUI always
          * sends a `begin` followed by zero or more settings then either `erred` or `finished` (the
@@ -172,7 +172,8 @@ class GUI : eris::noncopyable {
             public:
                 /// The types of events that the GUI thread can send to the main thread
                 enum class Type {
-                    setup, ///< An event triggered when the user hits "begin" with configuration data
+                    configure, ///< An event that configures a Parameter
+                    initialize, ///< An event triggered when the user hits "begin" with configuration data
                     run, ///< An event triggered when starting a new or resuming a stopped simulation
                     stop, ///< The user hit the "stop" button to pause the simulation.
                     resume, ///< The user hit the "resume" button to unpause the simulation.
@@ -192,7 +193,7 @@ class GUI : eris::noncopyable {
                 /** Will be set to a list of configured GUI::Parameters if this is a setup event.
                  * The `begin` and `finished` GUI::Parameter meta-values are *not* included.
                  */
-                std::vector<Parameter> parameters;
+                Parameter parameter;
 
                 /** unsigned long integer value associated with the event.  Used by Event::Type::run
                  * to send the number of iterations to run.
@@ -205,9 +206,8 @@ class GUI : eris::noncopyable {
                 Event() = default;
                 /// Constructs an event with no parameters or value
                 Event(Type t);
-                /// Constructs an event with Parameters.  The vector should not contain
-                /// begin/finished parameter events; these will be sent appropriately.
-                Event(Type t, std::vector<Parameter> &&p);
+                /// Constructs a parameter event with the given Parameter.
+                Event(const Parameter &p);
                 /// Constructs an event with an unsigned long value
                 Event(Type t, unsigned long ul);
         };
@@ -341,8 +341,11 @@ class GUI : eris::noncopyable {
         /** Started in a thread; sets up the various graphical stuff and starts the main loop.
          * `app_` and `builder_` must be set up in the main thread (so that builder errors happen
          * *before* starting the thread).
+         *
+         * The given CmdArgs object should be a parsed CmdArgs object from provided command line
+         * arguments; the `.parameters` fields will be applied.
          */
-        void thr_run();
+        void thr_run(const CmdArgs &args);
 
         /** When called, this updates the simulation parameters displayed in the GUI to match the
          * current creativity_->parameters values.
@@ -376,10 +379,10 @@ class GUI : eris::noncopyable {
 
         /** Sets up a new simulation based on the current GUI parameter values.
          */
-        void setupSim();
+        void initializeSim();
 
         /** Starts the simulation (for however many periods specified in the "set_periods" GUI
-         * configuration option).  Must be preceeded by a call to setupSim();
+         * configuration option).  Must be preceeded by a call to initializeSim();
          */
         void runSim();
 
@@ -424,7 +427,8 @@ class GUI : eris::noncopyable {
         decltype(ff_) fileFilter() const;
 
         // The callbacks for GUI thread events
-        std::function<void(GUI::Parameter)> on_setup_;
+        std::function<void(GUI::Parameter)> on_configure_;
+        std::function<void()> on_initialize_;
         std::function<void(unsigned int count)> on_run_;
         std::function<void()> on_stop_;
         std::function<void()> on_resume_;
