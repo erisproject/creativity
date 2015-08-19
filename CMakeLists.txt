@@ -9,7 +9,7 @@ set(CREATIVITY_VERSION_PATCH "0")
 set(CREATIVITY_VERSION "${CREATIVITY_VERSION_MAJOR}.${CREATIVITY_VERSION_MINOR}.${CREATIVITY_VERSION_PATCH}")
 
 set(creativity_author "Jason Rhinelander <jason@imaginary.ca>")
-set(creativity_url "https://github.com/erisproject/creativity")
+set(creativity_url "https://imaginary.ca/eris/creativity")
 set(creativity_description "Agent-based model of creativity and piracy")
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/Modules)
