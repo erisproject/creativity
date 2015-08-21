@@ -31,7 +31,8 @@ void PublicTracker::interAdvance() {
     // Create new markets for off-market books
     for (auto &b : simulation()->goods<Book>()) {
         if (not b->hasAnyMarket()) { // The author decided not to put the book on the market for the upcoming period, so we'll take over
-            simulation()->spawn<PublicTrackerMarket>(creativity_, b);
+            auto ptm = simulation()->spawn<PublicTrackerMarket>(creativity_, b);
+            b->setMarket(ptm);
         }
     }
     // FIXME

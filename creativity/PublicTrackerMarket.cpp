@@ -8,7 +8,9 @@ namespace creativity {
 using namespace eris;
 
 PublicTrackerMarket::PublicTrackerMarket(std::shared_ptr<Creativity> creativity, SharedMember<Book> b)
-    : BookMarket(creativity, b, 0.0) {
+    : BookMarket(creativity, b, 0.0) {}
+
+void PublicTrackerMarket::added() {
     updatePrice();
 }
 
