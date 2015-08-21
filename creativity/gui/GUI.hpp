@@ -441,8 +441,8 @@ class GUI : eris::noncopyable {
         /** Currently open reader/book dialogs */
         std::unordered_map<eris::eris_id_t, std::unique_ptr<InfoWindow>> info_windows_;
 
-        typedef boost::geometry::model::point<double, 2, boost::geometry::cs::cartesian> rt_point;
-        typedef std::pair<rt_point, eris::eris_id_t> rt_val;
+        using rt_point = boost::geometry::model::point<double, 2, boost::geometry::cs::cartesian>;
+        using rt_val = std::pair<rt_point, eris::eris_id_t>;
         using RTree = boost::geometry::index::rtree<rt_val, boost::geometry::index::rstar<16>>;
         /** rtrees of reader/book points for each state. */
         std::vector<std::unique_ptr<RTree>> rtrees_;
