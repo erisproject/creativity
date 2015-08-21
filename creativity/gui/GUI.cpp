@@ -321,12 +321,24 @@ void GUI::thr_run(const CmdArgs &args) {
     });
 
     graph_->add_events(Gdk::EventMask::SCROLL_MASK);
-    graph_->signal_scroll_event().connect([this](GdkEventScroll *event) -> bool {
-        if (event->direction == GdkScrollDirection::GDK_SCROLL_UP) {
+    // Gtk 3.16.1 reversed the scroll direction of the mousewheel on horizontal scales; having the
+    // scale above the graph scroll in the opposite direction as scrolling on the graph itself is
+    // really weird, so go with the flow for scrolling on the graph itself
+    const GdkScrollDirection scroll_back =
+        (::gtk_get_major_version() > 3 or (::gtk_get_major_version() == 3 and
+             (::gtk_get_minor_version() > 16 or (::gtk_get_minor_version() == 16 and ::gtk_get_micro_version() >= 1))))
+        ? /* >= 3.16.1 */ GdkScrollDirection::GDK_SCROLL_DOWN
+        : /* < 3.16.1 */ GdkScrollDirection::GDK_SCROLL_UP;
+    const GdkScrollDirection scroll_fwd = scroll_back == GdkScrollDirection::GDK_SCROLL_DOWN
+        ? GdkScrollDirection::GDK_SCROLL_UP
+        : GdkScrollDirection::GDK_SCROLL_DOWN;
+
+    graph_->signal_scroll_event().connect([this,scroll_back,scroll_fwd](GdkEventScroll *event) -> bool {
+        if (event->direction == scroll_back) {
             if (state_curr_ > 0) thr_set_state(state_curr_ - 1);
             return true;
         }
-        if (event->direction == GdkScrollDirection::GDK_SCROLL_DOWN) {
+        else if (event->direction == scroll_fwd) {
             if (state_curr_ + 1 < state_num_) thr_set_state(state_curr_ + 1);
             return true;
         }
