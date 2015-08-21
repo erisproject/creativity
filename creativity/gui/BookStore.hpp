@@ -87,7 +87,7 @@ class BookStore : public MemberStore<state::BookState>, public virtual Glib::Obj
                     add(id); add(author);
                     add(pos_x); add(pos_y); add(quality); add(price); add(revenue); add(revenue_lifetime);
                     add(pos_str);
-                    add(market_private); add(market_public); add(market_any);
+                    add(market_private); add(market_public); add(market_any); add(market_str);
                     add(age); add(created); add(sales); add(sales_lifetime_private); add(sales_lifetime_public);
                     add(sales_lifetime); add(pirated); add(pirated_lifetime); add(copies); add(lifetime_private);
                 }

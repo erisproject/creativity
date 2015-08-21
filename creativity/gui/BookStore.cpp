@@ -77,7 +77,7 @@ void BookStore::get_value_vfunc(const iterator &iter, int column, Glib::ValueBas
     else IFCOL(revenue);
     else IFCOL(revenue_lifetime);
     else IFCOL_V(pos_str, GUI::pos_to_string(b.position));
-    else IFCOL_V(market_str, b.market_private ? "Priv." : b.market_any() ? "Pub." : "No");
+    else IFCOL_V(market_str, std::string(b.market_private ? "Priv." : b.market_any() ? "Pub." : "No"));
     else IFCOL_M(market_any);
     else IFCOL(market_private);
     else IFCOL_M(market_public);
