@@ -58,6 +58,20 @@ else()
     add_definitions("-DCREATIVITY_DISABLE_THREADED_STORAGE")
 endif()
 
+# Look for include-what-you-use, if requested
+option(IWYU "Enable include-what-you-use support" OFF)
+if (IWYU)
+    cmake_minimum_required(VERSION 3.3)
+    find_program(IWYU_PATH NAMES "iwyu" "include-what-you-use")
+    if (NOT IWYU_PATH)
+        message(FATAL_ERROR "Could not find executable for include-what-you-use support")
+    endif()
+    set(IWYU_ARGS ${IWYU_PATH} "--transitive_includes_only")
+    message(STATUS "include-what-you-use support enabled (-DIWYU=1 to disable)")
+else()
+    message(STATUS "include-what-you-use support disabled (-DIWYU=1 to enable)")
+endif()
+
 foreach(pkg ${creativity_pkgconfig} ${creativity_gui_pkgconfig})
     pkg_check_modules(${pkg} REQUIRED ${creativity_pkgconfig_${pkg}})
     include_directories(${${pkg}_INCLUDE_DIRS})
@@ -167,6 +181,12 @@ if (GUI)
     # And put a copy in for the mime type icon
     install(FILES creativity-gui.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/pixmaps/ RENAME application-x-creativity.crstate.svg)
 
+endif()
+
+if (IWYU)
+    foreach(tgt ${creativity_install_targets})
+        set_property(TARGET ${tgt} PROPERTY CXX_INCLUDE_WHAT_YOU_USE ${IWYU_PATH})
+    endforeach()
 endif()
 
 add_subdirectory(doc)
