@@ -1,9 +1,8 @@
 #include "creativity/CmdArgs.hpp"
 #include "creativity/config.hpp"
-#include <eris/Random.hpp>
 #include <string>
-#include <regex>
 #include <cstdlib>
+#include <sstream>
 
 namespace po = boost::program_options;
 
@@ -19,59 +18,23 @@ std::string CmdArgs::output_string(double v) {
             "");
 }
 
-// Single-letter options used:
-// b B c C d D e f g G i j k K m M n N o O p P Q r R s S T u U w W x y z Z
-// Available:
-// a A E F H I J l L q t v V X Y
-
-void CmdArgs::addCliOptions() {
-    parameters.output = "creativity-SEED.crstate";
-    parameters.threads = 0;
-
-    addCommonOptions();
-
-    sim_desc_.add_options()
-        ("output,o", value(parameters.output), "Output file for simulation results.  If this contains the characters 'SEED', they will be replaced with the random seed value used for the simulation.")
-        ("tmpdir", value(parameters.tmpdir), "Output directory in which to write the output file while running the simulation.  When "
-            "the simulation finishes, the temporary file is moved to the output location specified by -o.  If this argument is omitted, the "
-            "file is written directly to its final location.")
-        ("overwrite,O", "Allows output file given to -o to be overwritten.")
-        ;
-    desc_.add(sim_desc_);
-}
-
-void CmdArgs::addGuiOptions() {
-    parameters.threads = std::thread::hardware_concurrency();
-    if (parameters.threads == 1) parameters.threads = 0;
-
-    addCommonOptions();
-
-    sim_desc_.add_options()
-        ("output,o", value(parameters.output), "Output file for simulation results.  If this contains the characters 'SEED', they will be replaced with the random seed value used for the simulation.  If omitted, the simulation is not written to disk.")
-        ("initialize", "If specified, initialize the simulation using the given settings, but do no start it.  Otherwise the GUI starts uninitialized, but ready-to-run with the given settings.  Ignored if --start is specified.")
-        ("start", "If specified, start running immediately using the given settings.  Otherwise the GUI starts uninitialized, but ready-to-run with the given settings.")
-        ;
-    desc_.add(sim_desc_);
-
-    // FIXME: could add colour settings here
-
-    po::options_description input_desc("Input file");
-    input_desc.add_options()
-        ("input-file", value(parameters.input), "Previous simulation to load instead of configuring a new simulation.")
-        ;
-    invisible_.add(input_desc);
-    pos_.add("input-file", -1);
-}
-
-void CmdArgs::addCommonOptions() {
-    po::options_description help("About"), structure("Structure"), initial("Initial Behaviour"),
-        costs("Costs"), beliefs("Beliefs"), piracy("Piracy"), publicprov("Public Provisioning");
+void CmdArgs::addOptions() {
+    po::options_description help("About");
 
     help.add_options()
         ("help,h", "Displays usage information.")
         ("version", "Displays version information.")
         ;
-    desc_.add(help);
+
+    options_.add(help);
+}
+
+void CmdArgs::postParse(boost::program_options::variables_map&) {}
+
+void CmdArgs::Simulation::addOptions() {
+    CmdArgs::addOptions();
+    po::options_description structure("Structure"), initial("Initial Behaviour"),
+        costs("Costs"), beliefs("Beliefs"), piracy("Piracy"), publicprov("Public Provisioning");
 
     structure.add_options()
         ("dimensions,D", min<1>(s_.dimensions), "Number of dimensions of the simulation")
@@ -85,7 +48,7 @@ void CmdArgs::addCommonOptions() {
         ("reader-creation-scale-max,Z", min<0>(s_.reader_creation_scale_max), u8"Maximum support of scale parameter α ~ U[a,b] for the creator effort function: q(ℓ) = (α/β)[(ℓ+1)^β - 1]")
         ("creation-time,e", value(s_.creation_time), u8"The number of periods that elapse between the creation decision and the book being ready")
         ;
-    desc_.add(structure);
+    options_.add(structure);
 
     initial.add_options()
         ("initial-prob-write,x", range<0, 1>(s_.initial.prob_write), "The probability of writing in initial periods")
@@ -96,7 +59,7 @@ void CmdArgs::addCommonOptions() {
         ("initial-prob-keep,k", range<0, 1>(s_.initial.prob_keep), "The probability of keeping a previously-written book on the market for another period")
         ("initial-keep-price,K", range<0, 1>(s_.initial.keep_price), "The  price-above-marginal-cost level (relative to current P-MC) for a book left on the market for another period")
         ;
-    desc_.add(initial);
+    options_.add(initial);
 
     costs.add_options()
         ("income,i", above<0>(s_.income), "Per-period external reader income")
@@ -104,7 +67,7 @@ void CmdArgs::addCommonOptions() {
         ("cost-unit,c", min<0>(s_.cost_unit), "Unit cost of making a copy of a book")
         ("cost-piracy,y", min<0>(s_.cost_piracy), "Cost of receiving a pirated copy of a book")
         ;
-    desc_.add(costs);
+    options_.add(costs);
 
     beliefs.add_options()
         ("prior-scale,w", min<1>(s_.prior_scale), "The per-period standard deviation scaling factor applied when a previous belief is used as the next period's prior")
@@ -113,64 +76,141 @@ void CmdArgs::addCommonOptions() {
         ("belief-threshold,b", value(s_.initial.belief_threshold), "The minimum n-k value at which a readers bases decision on beliefs instead of initial parameters")
         ("prior-scale-burnin,U", min<1>(s_.prior_scale_burnin), "The same as --prior-weight, but applied in the first `--burnin-periods' periods")
         ;
-    desc_.add(beliefs);
+    options_.add(beliefs);
 
     piracy.add_options()
         ("piracy-begins,P", value(s_.piracy_begins), "The period in which piracy becomes available")
         ("piracy-link-proportion,f", range<0, 1>(s_.piracy_link_proportion), "Proportion of potential sharing links between readers that are created")
         ("prior-scale-piracy,W", min<1>(s_.prior_scale_piracy), "The same as --prior-weight, but applied in the first piracy period")
         ;
-    desc_.add(piracy);
+    options_.add(piracy);
 
     publicprov.add_options()
         ("public-sharing-begins,G", value(s_.public_sharing_begins), "The period in which public sharing becomes available")
         ("public-sharing-tax,g", min<0>(s_.public_sharing_tax), "The per-period, lump sum tax collected from each reader for public sharing")
         ("prior-scale-public-sharing,S", min<1>(s_.prior_scale_public_sharing), "The same as --prior-weight, but applied in the first public sharing period")
         ;
-    desc_.add(publicprov);
+    options_.add(publicprov);
 
     // This one is an object variable because the cli/gui need to add to it
-    sim_desc_.add_options()
-        ("periods,T", value(parameters.periods), "Number of simulation periods to run.")
-        ("seed", value(parameters.seed), "Random seed to use.  If omitted, a random seed is obtained from the operating system's random source.")
-        ("threads,j", value(parameters.threads), "Maximum number of threads to use for the simulation.  0 (the default) disables simulation threading entirely.")
+    sim_controls_.add_options()
+        ("periods,T", value(periods), "Number of simulation periods to run.")
+        ("seed", value(seed), "Random seed to use.  If omitted, a random seed is obtained from the operating system's random source.")
+        ("threads,j", value(threads), "Maximum number of threads to use for the simulation.  0 (the default) disables simulation threading entirely.")
         ;
-    // Don't add this here: the caller has to do that (after adding to it, if necessary)
-    //desc_.add(sim_desc_);
+    // Don't add this here: the caller has to do that (after adding to it, if necessary): boost
+    // *copies* the argument to add(), so we can't add and then change it later.
+    //options_.add(sim_options_);
 }
 
-void CmdArgs::parse(int argc, char *argv[]) {
-    po::options_description all_opts;
-    all_opts.add(desc_);
-    all_opts.add(invisible_);
+CmdArgs::CLI::CLI(CreativitySettings &s) : Simulation(s) {}
+CmdArgs::GUI::GUI(CreativitySettings &s) : Simulation(s) {}
 
-    // The variable map storing specified options; we don't keep this: everything gets set directly
-    boost::program_options::variables_map vars;
-    store(po::command_line_parser(argc, argv).options(all_opts).positional(pos_).run(), vars);
-    notify(vars);
+// Single-letter options used:
+// b B c C d D e f g G i j k K m M n N o O p P Q r R s S T u U w W x y z Z
+// Available:
+// a A E F H I J l L q t v V X Y
 
-    bool help = vars.count("help") > 0, version = vars.count("version") > 0;
-    if (help or version) {
-        std::cout << "Creativity simulator v" << VERSION[0] << "." << VERSION[1] << "." << VERSION[2] << "\n\n";
-        if (help)
-            std::cout << desc_ << "\n";
-        std::exit(0);
-    }
-    parameters.start = vars.count("start") > 0;
-    parameters.initialize = vars.count("initialize") > 0;
-    parameters.overwrite = vars.count("overwrite") > 0;
+void CmdArgs::CLI::addOptions() {
+    output = "creativity-SEED.crstate";
+    threads = 0;
 
+    Simulation::addOptions();
+
+    sim_controls_.add_options()
+        ("output,o", value(output), "Output file for simulation results.  If this contains the characters 'SEED', they will be replaced with the random seed value used for the simulation.")
+        ("tmpdir", value(tmpdir), "Output directory in which to write the output file while running the simulation.  When "
+            "the simulation finishes, the temporary file is moved to the output location specified by -o.  If this argument is omitted, the "
+            "file is written directly to its final location.")
+        ("overwrite,O", "Allows output file given to -o to be overwritten.")
+        ;
+    options_.add(sim_controls_);
+}
+
+void CmdArgs::GUI::addOptions() {
+    threads = std::thread::hardware_concurrency();
+    if (threads == 1) threads = 0;
+
+    Simulation::addOptions();
+
+    sim_controls_.add_options()
+        ("output,o", value(output), "Output file for simulation results.  If this contains the characters 'SEED', they will be replaced with the random seed value used for the simulation.  If omitted, the simulation is not written to disk.")
+        ("initialize", "If specified, initialize the simulation using the given settings, but do no start it.  Otherwise the GUI starts uninitialized, but ready-to-run with the given settings.  Ignored if --start is specified.")
+        ("start", "If specified, start running immediately using the given settings.  Otherwise the GUI starts uninitialized, but ready-to-run with the given settings.")
+        ;
+    options_.add(sim_controls_);
+
+    // FIXME: could add colour settings here
+
+    po::options_description input_desc("Input file");
+    input_desc.add_options()
+        ("input-file", value(input), "Previous simulation to load instead of configuring a new simulation.")
+        ;
+    invisible_.add(input_desc);
+    positional_.add("input-file", -1);
+}
+
+void CmdArgs::Simulation::postParse(boost::program_options::variables_map &) {
     // If the user didn't give a seed, .seed won't have changed from seed, but we still don't want
     // to set it because explicitly setting a seed resets the RNG.
-    if (eris::Random::seed() != parameters.seed) {
-        eris::Random::seed(parameters.seed);
+    if (eris::Random::seed() != seed) {
+        eris::Random::seed(seed);
     }
 
-    if (not parameters.output.empty()) {
-        parameters.output = std::regex_replace(parameters.output, std::regex("SEED"), std::to_string(eris::Random::seed()));
+    if (not output.empty()) {
+        output = std::regex_replace(output, std::regex("SEED"), std::to_string(eris::Random::seed()));
     }
 
     s_.boundary = Creativity::boundaryFromDensity(s_.readers, s_.dimensions, density_);
 }
 
+void CmdArgs::CLI::postParse(boost::program_options::variables_map &vars) {
+    Simulation::postParse(vars);
+    overwrite = vars.count("overwrite") > 0;
+}
+
+void CmdArgs::GUI::postParse(boost::program_options::variables_map &vars) {
+    Simulation::postParse(vars);
+    start = vars.count("start") > 0;
+    initialize = vars.count("initialize") > 0;
+}
+
+
+void CmdArgs::parse(int argc, char *argv[]) {
+    if (options_.options().empty()) addOptions();
+
+    po::options_description all_opts;
+    all_opts.add(options_);
+    all_opts.add(invisible_);
+
+    // The variable map storing specified options; we don't keep this: everything gets set directly
+    boost::program_options::variables_map vars;
+    store(po::command_line_parser(argc, argv).options(all_opts).positional(positional_).run(), vars);
+    notify(vars);
+
+    bool need_help = vars.count("help") > 0, need_version = vars.count("version") > 0;
+    if (need_help) {
+        std::cout << version() << "\n\n" << help();
+        std::exit(0);
+    }
+    else if (need_version) {
+        std::cout << version() << "\n\n";
+        std::exit(0);
+    }
+
+    postParse(vars);
+
+}
+
+std::string CmdArgs::version() const {
+    std::ostringstream version;
+    version << "Creativity simulator v" << VERSION[0] << "." << VERSION[1] << "." + VERSION[2];
+    return version.str();
+}
+
+std::string CmdArgs::help() const {
+    std::ostringstream help;
+    help << options_ << "\n";
+    return help.str();
+}
 }

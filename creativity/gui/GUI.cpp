@@ -9,7 +9,6 @@
 #include "creativity/Reader.hpp"
 #include "creativity/Book.hpp"
 #include "creativity/BookMarket.hpp"
-#include "creativity/CmdArgs.hpp"
 #include <eris/Random.hpp>
 #include <boost/filesystem.hpp>
 #include <iostream>
@@ -48,7 +47,7 @@ int GUI::sb_int(const std::string &widget_name) {
     return widget<Gtk::SpinButton>(widget_name)->get_value_as_int();
 }
 
-void GUI::start(const CmdArgs &args) {
+void GUI::start(const CmdArgs::GUI &args) {
     if (gui_thread_.joinable())
         throw std::runtime_error("GUI thread can only be started once!");
 
@@ -83,7 +82,7 @@ void GUI::start(const CmdArgs &args) {
     widget<Gtk::Entry>("set_seed")->set_text(std::to_string(eris::Random::seed()));
 
     // Update the number of periods now, so that it has the right value when the GUI comes up
-    widget<Gtk::SpinButton>("set_periods")->set_value(args.parameters.periods);
+    widget<Gtk::SpinButton>("set_periods")->set_value(args.periods);
 
     gui_thread_ = std::thread(&GUI::thr_run, this, args);
 
@@ -104,7 +103,7 @@ GUI::~GUI() {
         gui_thread_.join();
 }
 
-void GUI::thr_run(const CmdArgs &args) {
+void GUI::thr_run(const CmdArgs::GUI &args) {
     main_window_ = std::shared_ptr<Gtk::Window>(widget<Gtk::Window>("window1"));
 
     main_window_->set_title(main_window_->get_title() + " v" + std::to_string(VERSION[0]) + "." + std::to_string(VERSION[1]) + "." + std::to_string(VERSION[2]));
@@ -208,18 +207,18 @@ void GUI::thr_run(const CmdArgs &args) {
     // threads.
     thrbox->remove_text(1);
     unsigned int last = 1;
-    bool added_requested_threads = args.parameters.threads == 0;
+    bool added_requested_threads = args.threads == 0;
     // List common number of threads by going up by increasing amounts so that the increment is
     // always greater than 25% and at most 50%, so we get:
     // 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, ...
     // But stop that, of course, at the maximum number of hardware threads supported.
     for (unsigned int i = 2, incr = 1; i <= std::thread::hardware_concurrency(); i += incr) {
         // If the user requested some oddball number that we skip with the next one, we need to add it
-        if (not added_requested_threads and i >= args.parameters.threads) {
-            if (i > args.parameters.threads) {
+        if (not added_requested_threads and i >= args.threads) {
+            if (i > args.threads) {
                 // We're about to skip over it, so add it
-                thrbox->append(std::to_string(args.parameters.threads), std::to_string(args.parameters.threads) +
-                        (args.parameters.threads > 1 ? " threads" : " thread"));
+                thrbox->append(std::to_string(args.threads), std::to_string(args.threads) +
+                        (args.threads > 1 ? " threads" : " thread"));
             }
             // Otherwise it's equal, which means we're about to add it
             added_requested_threads = true;
@@ -232,7 +231,7 @@ void GUI::thr_run(const CmdArgs &args) {
     // We might also need to add the hardware value and the requested value; the former if it is
     // some oddball amount not caught above; the latter similarly, or if it exceeds the number of
     // hardware threads.
-    unsigned int more[] = {std::thread::hardware_concurrency(), args.parameters.threads};
+    unsigned int more[] = {std::thread::hardware_concurrency(), args.threads};
     if (more[1] < more[0]) std::swap(more[0], more[1]);
 
     for (auto &t : more) {
@@ -244,7 +243,7 @@ void GUI::thr_run(const CmdArgs &args) {
     }
 
     // Select the requested (or default) number of threads
-    thrbox->set_active_id(std::to_string(args.parameters.threads));
+    thrbox->set_active_id(std::to_string(args.threads));
 
     thrbox->signal_changed().connect([this] {
         Parameter th;
@@ -429,19 +428,19 @@ void GUI::thr_run(const CmdArgs &args) {
     graph_->show();
 
     Glib::signal_idle().connect_once([this,&lock,&args] {
-            if (not args.parameters.input.empty()) {
-                load_ = args.parameters.input;
+            if (not args.input.empty()) {
+                load_ = args.input;
             }
-            if (not args.parameters.output.empty()) {
-                save_ = args.parameters.output;
+            if (not args.output.empty()) {
+                save_ = args.output;
                 widget<Gtk::Label>("lbl_save")->set_text(save_);
                 main_window_->set_title(main_window_->get_title() + " [" + boost::filesystem::path(save_).filename().string() + "]");
             }
             bool init = false, run = false;
-            if (args.parameters.start) {
+            if (args.start) {
                 init = run = true;
             }
-            else if (args.parameters.initialize) {
+            else if (args.initialize) {
                 init = true;
             }
 

@@ -1,6 +1,5 @@
 #pragma once
 #include <boost/program_options.hpp>
-#include <list>
 #include <limits>
 #include <regex>
 #include <eris/Random.hpp>
@@ -23,27 +22,16 @@ template <typename T> constexpr T neginf_or_lowest() { return std::numeric_limit
  */
 class CmdArgs {
 
+    protected:
+        /// Default constructor is protected; use a suitable subclass.
+        CmdArgs() = default;
+
     public:
-        /// No default constructor.
-        CmdArgs() = delete;
-
-        /// Constructs a CmdArgs object that will use and adjust the given CreativitySettings.
-        CmdArgs(CreativitySettings &s) : s_{s} {}
-
-        /** Returns a value converted to a string; in most cases this just passes the value to
-         * std::to_string for conversion.
-         * 
-         * A specialization of this for doubles converts the double to a string via
-         * std::to_string(), then trims off trailing 0's and, possibly, a trailing `.`.
-         */
-        template <typename T, typename = typename std::enable_if<std::is_arithmetic<T>::value>::type>
-        static std::string output_string(T v);
-
         /** Parses options and verifies them.  Throws an std::exception-derived exception for
          * various errors (such as invalid arguments or invalid argument types).
          *
-         * Either addCliOptions() or addGuiOptions() must have been called first: otherwise there
-         * will be no recognized options to parse.
+         * A suitable method such as addCliOptions() or addGuiOptions() must have been called first:
+         * otherwise there will be no recognized options to parse.
          *
          * Options that can be stored directly in the CreativitySettings object passed to the
          * constructor are assigned directly; other variable are accessible in the `variables`
@@ -57,49 +45,14 @@ class CmdArgs {
          */
         void parse(int argc, char *argv[]);
 
-        /** These are the variables that can be set by a call to parse().  Whether or not they are
-         * actually set depends on the command-line options made available: for example, `.start` is
-         * only set if addGuiOptions() was called, while `.tmpdir` is only for addCliOptions().
+        /** Returns a value converted to a string; in most cases this just passes the value to
+         * std::to_string for conversion.
          *
-         * Note that simulation-specific settings are set directly into the CreativitySettings
-         * object given during construction.
+         * A specialization of this for doubles converts the double to a string via
+         * std::to_string(), then trims off trailing 0's and, possibly, a trailing `.`.
          */
-        struct {
-            /** The number of periods to run the simulation.  Before calling addCliOptions() or
-             * addGuiOptions(), this is the default value; after calling parse this will be updated
-             * to whatever the user specified.
-             */
-            unsigned int periods = 250;
-            /// Whether to start running the simulation in the GUI right away
-            bool start = false;
-            /** Whether to initialize (but not start) the simulation in the GUI right away.  Has no
-             * effect if start is true.
-             */
-            bool initialize = false;
-            /// The output file for simulation results; has a default for the CLI, not for the GUI
-            std::string output;
-            /// The temporary directory for results (supported by CLI only)
-            std::string tmpdir;
-            /// Whether `output' can be overwritten (supported by CLI only)
-            bool overwrite = false;
-            /// The input file (for the GUI)
-            std::string input;
-            /** The number of threads to use.  The default is 0 for CLI, number of CPU threads for
-             * the GUI.
-             */
-            unsigned int threads = 0;
-            /** The seed.  The default is whatever eris::Random::seed() returns, which is random
-             * (unless overridden with ERIS_RNG_SEED).  This value can be ignored: it is handled by
-             * parse().
-             */
-            typename eris::Random::rng_t::result_type seed = eris::Random::seed();
-        } parameters;
-
-        /// Adds CLI command-line options into the option descriptions
-        void addCliOptions();
-
-        /// Adds GUI command-line options into the option descriptions
-        void addGuiOptions();
+        template <typename T, typename = typename std::enable_if<std::is_arithmetic<T>::value>::type>
+        static std::string output_string(T v);
 
         /** Validation tag; any Validation class must (ultimately) inherit from this class.  This
          * class does nothing.
@@ -298,26 +251,28 @@ class CmdArgs {
         template <long upper, long denom = 1, typename T>
         static boost::program_options::typed_value<Below<T, upper, denom>>* below(T &store) { return value<Below<T, upper, denom>>(store); }
 
+        /// Returns a version string.
+        virtual std::string version() const;
+
+        /// Returns a argument help message.
+        virtual std::string help() const;
+
     protected:
-
-        /** Adds common options into the options descriptions.  Called by
-         * addCliOptions()/addGuiOptions().
+        /** Adds options.  This method is called automatically by parse() before parsing arguments
+         * if nothing has been set in the options_ object; the default implementation adds --help
+         * and --version options.  Subclasses should override to also populate `options_`
+         * appropriately.
          */
-        void addCommonOptions();
+        virtual void addOptions();
 
-        /// The options descriptions variable for visible options
-        boost::program_options::options_description desc_;
+        /// The options descriptions variable for all options.
+        boost::program_options::options_description options_;
 
-        /** The options (which will be added to the end of desc_) containing simulator settings,
-         * some of which differ between the CLI and the GUI.
-         */
-        boost::program_options::options_description sim_desc_{"Simulator settings"};
-
-        /// The options descriptions variable for invisible options
+        /// Like options_, but for hidden options that aren't to be displayed in --help output.
         boost::program_options::options_description invisible_;
 
-        /// Positional options
-        boost::program_options::positional_options_description pos_;
+        /// Positional options object
+        boost::program_options::positional_options_description positional_;
 
         /** Returns an argument name for T.  For numeric types, this is one of 𝑹 (for floating point
          * values), 𝑵 (for unsigned integer types), or 𝒁 (for signed integer types).  For other
@@ -325,14 +280,121 @@ class CmdArgs {
          */
         template <typename T> static std::string typeString();
 
+        /** Does nothing; subclasses should override if needed to deal with argument values.  This
+         * is called after checking for and handling --help or --version flags.
+         *
+         * \param vars the parsed variables
+         */
+        virtual void postParse(boost::program_options::variables_map &vars);
 
-    private:
-        CreativitySettings &s_;
-
-        // Density pseudo-parameter: the stored value is actually boundary
-        double density_ = Creativity::densityFromBoundary(s_.readers, s_.dimensions, s_.boundary);
+    protected:
+        class Simulation; // forward declaration
+    public:
+        class CLI; // forward declaration
+        class GUI; // forward declaration
 };
 
+/** Common base class for CLI and GUI argument handling for running a simulation. */
+class CmdArgs::Simulation : public CmdArgs {
+    protected:
+        /// Default constructor deleted
+        Simulation() = delete;
+
+        /// Constructs a Simulation object that stores values in the given CreativitySettings object.
+        Simulation(CreativitySettings &cs) : s_(cs) {}
+
+    public:
+        // Variables which can't be stored directly in CreativitySettings:
+        /** The number of periods to run the simulation.  Before calling addCliOptions() or
+         * addGuiOptions(), this is the default value; after calling parse this will be updated
+         * to whatever the user specified.
+         */
+        unsigned int periods = 250;
+
+        /** The output file for simulation results; default is "creativity-SEED.crstate" for the
+         * CLI, unset for the GUI.
+         */
+        std::string output;
+
+        /** The number of threads to use.  The default is number of hardware threads for the
+         * GUI, 0 for the CLI.
+         */
+        unsigned int threads = 0;
+
+        /** The seed.  The default is whatever eris::Random::seed() returns, which is random
+         * (unless overridden with ERIS_RNG_SEED).  This value can be ignored: it is handled by
+         * parse().
+         */
+        typename eris::Random::rng_t::result_type seed = eris::Random::seed();
+
+    protected:
+        /** Adds common options into the options descriptions.  Called by
+         * CLI::addOptions()/GUI::addOptions().
+         */
+        void addOptions() override;
+
+        /// Overridden to handle output, seed, and and boundary settings
+        virtual void postParse(boost::program_options::variables_map &vars) override;
+
+        /** The options (which will be added to the end of options_) containing simulator settings,
+         * some of which differ between the CLI and the GUI.
+         */
+        boost::program_options::options_description sim_controls_{"Simulator controls"};
+
+        /** The settings reference in which to store given values */
+        CreativitySettings &s_;
+
+        /// Density pseudo-parameter: the stored value is actually boundary
+        double density_ = Creativity::densityFromBoundary(s_.readers, s_.dimensions, s_.boundary);
+
+};
+
+/** CmdArgs subclass for command-line interface simulator arguments. */
+class CmdArgs::CLI : public Simulation {
+    public:
+        /// Constructor for cli simulation arguments; takes the settings object
+        CLI(CreativitySettings &s);
+
+        /// The temporary directory for results
+        std::string tmpdir;
+
+        /// Whether `output' can be overwritten
+        bool overwrite = false;
+
+    protected:
+        /// Adds CLI command-line options into the option descriptions
+        virtual void addOptions() override;
+
+        /// Overridden to handle --overwrite option
+        virtual void postParse(boost::program_options::variables_map &vars) override;
+
+};
+
+/** CmdArgs subclass for graphical interface command-line arguments. */
+class CmdArgs::GUI : public Simulation {
+    public:
+        /// Constructor for gui simulation arguments; takes the settings object
+        GUI(CreativitySettings &s);
+
+        /// Whether to start running the simulation in the GUI right away
+        bool start = false;
+
+        /** Whether to initialize (but not start) the simulation in the GUI right away.  Has no
+         * effect if `start` is true.
+         */
+        bool initialize = false;
+
+        /// The input file (for the GUI)
+        std::string input;
+
+    protected:
+        /// Adds GUI command-line options into the option descriptions
+        virtual void addOptions() override;
+
+        /// Overridden to handle --initialize and --start options
+        virtual void postParse(boost::program_options::variables_map &vars) override;
+
+};
 
 template <typename T, typename>
 std::string CmdArgs::output_string(T v) {

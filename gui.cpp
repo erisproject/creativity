@@ -21,8 +21,7 @@ int main(int argc, char *argv[1]) {
 
     // Handle any command line arguments.  These set things in creativity->set(), which form the
     // defaults for the GUI, and have a few extra leftovers that the GUI code handles itself.
-    CmdArgs cmd(creativity->set());
-    cmd.addGuiOptions();
+    CmdArgs::GUI cmd(creativity->set());
     cmd.parse(argc, argv);
 
     std::cerr << std::setprecision(16);
@@ -32,7 +31,7 @@ int main(int argc, char *argv[1]) {
     eris_time_t run_start = 0, run_end = 0;
     std::chrono::milliseconds sync_speed{50};
     bool save_to_file = false, load_from_file = false;
-    unsigned int max_threads = cmd.parameters.threads;
+    unsigned int max_threads = cmd.threads;
 
     // Set up handlers for user actions in the GUI
     auto on_configure = [&](GUI::Parameter p) { // Parameter
@@ -81,7 +80,6 @@ int main(int argc, char *argv[1]) {
         creativity->setup();
         creativity->sim->maxThreads(max_threads);
         setup = true;
-        std::cerr << "init done!\n";
     };
 
     auto on_run = [&](eris_time_t periods) { // Run

@@ -16,13 +16,11 @@
 #include "creativity/gui/GraphArea.hpp"
 #include "creativity/gui/InfoWindow.hpp"
 #include "creativity/state/State.hpp"
+#include "creativity/CmdArgs.hpp"
 
 namespace sigc { SIGC_FUNCTORS_DEDUCE_RESULT_TYPE_WITH_DECLTYPE }
 
-namespace creativity {
-// Forward declarations
-class CmdArgs;
-namespace gui {
+namespace creativity { namespace gui {
 
 // Forward declarations
 class ReaderStore;
@@ -87,7 +85,7 @@ class GUI : eris::noncopyable {
 
         /** Starts the GUI, reading the glade file and starting the GUI thread.
          */
-        void start(const CmdArgs &args);
+        void start(const CmdArgs::GUI &args);
 
         /** Checks whether the GUI has generated any events and, if so, processes them.  If there
          * are no pending events, this returns immediately.
@@ -345,7 +343,7 @@ class GUI : eris::noncopyable {
          * The given CmdArgs object should be a parsed CmdArgs object from provided command line
          * arguments; the `.parameters` fields will be applied.
          */
-        void thr_run(const CmdArgs &args);
+        void thr_run(const CmdArgs::GUI &args);
 
         /** When called, this updates the simulation parameters displayed in the GUI to match the
          * current creativity_->parameters values.

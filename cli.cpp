@@ -45,14 +45,12 @@ int main(int argc, char *argv[]) {
     std::cout << std::setprecision(16);
     auto creativity = Creativity::create();
 
-    CmdArgs cmd(creativity->set());
-    cmd.addCliOptions();
+    CmdArgs::CLI cmd(creativity->set());
     cmd.parse(argc, argv);
 
-    std::cerr << "getting output\n";
-    std::string results_out = cmd.parameters.output;
+    std::string results_out = cmd.output;
     std::string args_out = results_out;
-    bool overwrite = cmd.parameters.overwrite;
+    bool overwrite = cmd.overwrite;
     bool need_copy = false; // Whether we need to copy from args_out to results_out (if using --tmpdir)
 
     // Filename output
@@ -84,7 +82,7 @@ int main(int argc, char *argv[]) {
         // default, that file is in the same directory as the output file, but the user might
         // want to put it somewhere else (e.g. if local storage is much faster than remote
         // storage, but the final result should be copied to the remote storage.)
-        const auto &tmpdir = cmd.parameters.tmpdir;
+        const auto &tmpdir = cmd.tmpdir;
         if (not tmpdir.empty()) {
             // First check and make sure that the parent of the requested output file exists
             if (not exists_dir(tmpdir))
@@ -118,8 +116,8 @@ int main(int argc, char *argv[]) {
     // Copy the initial state into the storage object
     creativity->storage().first->emplace_back(sim);
 
-    if (cmd.parameters.threads > 0) Eigen::initParallel();
-    sim->maxThreads(cmd.parameters.threads);
+    if (cmd.threads > 0) Eigen::initParallel();
+    sim->maxThreads(cmd.threads);
 
     constexpr size_t avg_times = 5;
     std::chrono::time_point<std::chrono::high_resolution_clock> started = std::chrono::high_resolution_clock::now();
@@ -128,7 +126,7 @@ int main(int argc, char *argv[]) {
     unsigned int max_bnew_digits = 0;
     auto count_bnew = [](const Book &b) -> bool { return b.age() == 0; };
 
-    unsigned int periods = cmd.parameters.periods;
+    unsigned int periods = cmd.periods;
 
     while (sim->t() < periods) {
         creativity->run();
