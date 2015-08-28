@@ -1,11 +1,17 @@
 #pragma once
-#include <vector>
+#include <set>
 #include <unordered_set>
+#include <map>
 #include <unordered_map>
 #include <eris/types.hpp>
 #include <eris/Position.hpp>
-#include <eris/noncopyable.hpp>
-#include "creativity/Reader.hpp"
+#include "creativity/BookCopy.hpp" // IWYU pragma: keep
+#include "creativity/belief/Demand.hpp"
+#include "creativity/belief/Profit.hpp"
+#include "creativity/belief/ProfitStream.hpp"
+#include "creativity/belief/Quality.hpp"
+
+namespace creativity { class Reader; }
 
 namespace creativity { namespace state {
 

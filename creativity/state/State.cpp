@@ -1,7 +1,10 @@
 #include "creativity/state/State.hpp"
 #include "creativity/Reader.hpp"
 #include "creativity/Book.hpp"
-#include "creativity/Creativity.hpp"
+#include <cmath>
+#include <eris/Position.hpp>
+#include <tuple>
+#include <utility>
 
 using namespace eris;
 

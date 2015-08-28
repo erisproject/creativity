@@ -1,6 +1,5 @@
 #include "creativity/belief/Quality.hpp"
 #include "creativity/Book.hpp"
-#include "creativity/BookMarket.hpp"
 
 using Eigen::RowVectorXd;
 

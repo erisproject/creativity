@@ -1,8 +1,13 @@
 #include "creativity/Creativity.hpp"
 #include "creativity/data/Data.hpp"
+#include "creativity/state/State.hpp"
+#include "creativity/state/Storage.hpp"
 #include <tclap/CmdLine.h>
 #include <cstdio>
+#include <cstddef>
+#include <cstring>
 #include <algorithm>
+#include <iostream>
 
 using namespace creativity;
 using namespace creativity::state;

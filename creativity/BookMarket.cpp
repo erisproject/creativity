@@ -1,7 +1,10 @@
 #include "creativity/BookMarket.hpp"
+#include "creativity/Book.hpp"
 #include "creativity/Reader.hpp"
 #include "creativity/Creativity.hpp"
-#include <random>
+#include <cmath>
+#include <algorithm>
+#include <stdexcept>
 
 using eris::agent::AssetAgent;
 using namespace eris;

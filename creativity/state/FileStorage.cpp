@@ -1,7 +1,16 @@
 #include "creativity/state/FileStorage.hpp"
-#include "creativity/Creativity.hpp"
-#include <cmath>
+#include <cerrno>
+#include <cstring>
 #include <sys/stat.h>
+#include <limits>
+#include <map>
+#include <unordered_set>
+#include <algorithm>
+#include <eris/Position.hpp>
+#include "creativity/belief/Demand.hpp"
+#include "creativity/belief/Profit.hpp"
+#include "creativity/belief/ProfitStream.hpp"
+#include "creativity/belief/Quality.hpp"
 
 #ifdef ERIS_DEBUG
 #define FILESTORAGE_DEBUG_WRITE_START \

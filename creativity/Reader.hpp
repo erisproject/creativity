@@ -1,22 +1,26 @@
 #pragma once
+#include <eris/Optimize.hpp>
 #include <eris/WrappedPositional.hpp>
 #include <eris/agent/AssetAgent.hpp>
 #include <eris/Market.hpp>
-#include <Eigen/Core>
-#include "creativity/belief/Profit.hpp"
+#include "creativity/BookCopy.hpp" // IWYU pragma: keep
 #include "creativity/belief/ProfitStream.hpp"
 #include "creativity/belief/Demand.hpp"
 #include "creativity/belief/Quality.hpp"
-#include "creativity/BookCopy.hpp"
-#include <string>
 #include <vector>
 #include <unordered_set>
+#include <forward_list>
+#include <functional>
+#include <map>
+#include <unordered_map>
+#include <set>
+#include <type_traits>
 
 namespace creativity {
 
 class Book;
-class BookMarket;
 class Creativity;
+namespace belief { class Profit; }
 
 /** A Reader is an agent that both consumes previously unread books and potentially writes new books
  * and sells copies of those books.  The Reader's utility is determined by books read and an outside

@@ -1,7 +1,6 @@
 #pragma once
 #include <eris/Position.hpp>
 #include <eris/SharedMember.hpp>
-#include <eris/noncopyable.hpp>
 #include <cmath>
 
 namespace creativity {

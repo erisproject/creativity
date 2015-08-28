@@ -1,8 +1,15 @@
 #include "creativity/Book.hpp"
 #include "creativity/BookMarket.hpp"
-#include "creativity/PublicTrackerMarket.hpp"
 #include "creativity/Reader.hpp"
 #include "creativity/Creativity.hpp"
+#include <algorithm>
+#include <iterator>
+#include <limits>
+#include <stdexcept>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
 
 using namespace eris;
 

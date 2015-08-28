@@ -1,5 +1,24 @@
 #include "creativity/gui/ReaderStore.hpp"
 #include "creativity/gui/GUI.hpp"
+#include <eris/Position.hpp>
+#include <functional>
+#include <iterator>
+#include <set>
+#include <stdexcept>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <vector>
+#include <glibmm/objectbase.h>
+#include <glibmm/value.h> // IWYU pragma: keep
+#include <glibmm/refptr.h>
+#include <gtkmm/enums.h>
+#include <gtkmm/treesortable.h>
+#include <gtkmm/treemodel.h>
+#include <gtkmm/treemodelcolumn.h>
+#include <gtkmm/treeview.h> // IWYU pragma: keep
+#include <gtkmm/treepath.h>
+
 
 using namespace eris;
 using namespace creativity::state;

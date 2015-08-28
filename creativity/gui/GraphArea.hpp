@@ -1,16 +1,17 @@
 #pragma once
 #include <eris/noncopyable.hpp>
-#include <eris/Position.hpp>
 #include <eris/WrappedPositional.hpp>
 #include <gtkmm/drawingarea.h>
+#include <cairomm/matrix.h>
+#include <cairomm/pattern.h>
+#include <cairomm/refptr.h>
+#include <cairomm/surface.h>
+#include <cstddef>
+#include <vector>
 
-namespace creativity {
+namespace Cairo { class Context; }
 
-// forward declarations
-class Reader;
-class Book;
-
-namespace gui {
+namespace creativity { namespace gui {
 
 class GUI;
 

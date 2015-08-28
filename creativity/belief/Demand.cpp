@@ -1,7 +1,7 @@
+#include <eris/Simulation.hpp>
 #include "creativity/belief/Demand.hpp"
 #include "creativity/Book.hpp"
-#include "creativity/BookMarket.hpp"
-#include "creativity/Reader.hpp"
+#include <stdexcept>
 
 using namespace Eigen;
 using namespace eris;

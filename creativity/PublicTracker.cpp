@@ -1,7 +1,11 @@
 #include "creativity/PublicTracker.hpp"
-#include "creativity/Reader.hpp"
-#include "creativity/Creativity.hpp"
 #include "creativity/PublicTrackerMarket.hpp"
+#include "creativity/Creativity.hpp"
+#include "creativity/Reader.hpp"
+#include "creativity/Book.hpp"
+#include <stdexcept>
+#include <unordered_map>
+#include <utility>
 
 namespace creativity {
 

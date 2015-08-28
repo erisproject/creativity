@@ -1,8 +1,12 @@
 #include "creativity/gui/InfoWindow.hpp"
-#include "creativity/gui/GUI.hpp"
-#include <iomanip>
-#include <gtkmm/box.h>
-#include <gtkmm/treemodelcolumn.h>
+#include <cstddef>
+#include <ostream>
+#include <gtkmm/notebook.h>
+#include <gtkmm/grid.h>
+#include <gtkmm/label.h>
+#include <gtkmm/scrolledwindow.h>
+#include <gtkmm/window.h> // IWYU pragma: keep
+#include <glibmm/propertyproxy.h>
 #include <Eigen/Core>
 
 using namespace eris;

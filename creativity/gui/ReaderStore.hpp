@@ -1,6 +1,18 @@
 #pragma once
+#include <eris/types.hpp>
 #include "creativity/gui/MemberStore.hpp"
 #include "creativity/state/State.hpp"
+#include <memory>
+#include <cstddef>
+#include <string>
+#include <glibmm/object.h>
+#include <glibmm/refptr.h>
+#include <gtkmm/enums.h>
+#include <gtkmm/treemodel.h>
+#include <gtkmm/treemodelcolumn.h>
+#include <gtkmm/treepath.h>
+namespace Glib { class ValueBase; }
+namespace Gtk { class TreeView; }
 
 namespace creativity { namespace gui {
 

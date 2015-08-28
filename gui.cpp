@@ -4,10 +4,20 @@
 #include "creativity/gui/GUI.hpp"
 #include <eris/Simulation.hpp>
 #include <eris/Random.hpp>
+#include <Eigen/Core>
 #include <functional>
 #include <iostream>
 #include <iomanip>
-#include <Eigen/Core>
+#include <cstddef>
+#include <algorithm>
+#include <chrono>
+#include <ratio>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <glibmm/error.h>
+#include <glibmm/ustring.h>
+
 
 using namespace creativity;
 using namespace creativity::gui;

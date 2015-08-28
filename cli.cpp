@@ -1,16 +1,32 @@
 #include "creativity/Creativity.hpp"
+#include "creativity/Reader.hpp"
+#include "creativity/Book.hpp"
 #include "creativity/state/Storage.hpp"
+#include "creativity/state/StorageBackend.hpp"
 #include "creativity/CmdArgs.hpp"
 #include <eris/Simulation.hpp>
+#include <Eigen/Core>
+#include <cerrno>
+#include <cstddef>
+#include <cstdlib>
+#include <cstring>
+#include <cmath>
+#include <algorithm>
+#include <chrono>
+#include <exception>
+#include <queue>
+#include <random>
+#include <ratio>
+#include <stdexcept>
+#include <string>
+#include <thread>
+#include <utility>
 #include <iostream>
 #include <fstream>
 #include <iomanip>
 #include <cstdio>
-#include <regex>
-#include <boost/filesystem.hpp>
-extern "C" {
+#include <boost/filesystem/path.hpp>
 #include <sys/stat.h>
-}
 
 using namespace creativity;
 using namespace creativity::state;

@@ -1,10 +1,11 @@
 #pragma once
-#include <eris/Position.hpp>
 #include <eris/Simulation.hpp>
-#include <eris/noncopyable.hpp>
 #include "creativity/state/ReaderState.hpp"
 #include "creativity/state/BookState.hpp"
 #include "creativity/state/PublicTrackerState.hpp"
+#include <cstdint>
+#include <limits>
+#include <unordered_map>
 
 namespace creativity { namespace state {
 

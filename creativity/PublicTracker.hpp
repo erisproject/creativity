@@ -1,15 +1,10 @@
 #pragma once
 #include <eris/agent/AssetAgent.hpp>
-#include "creativity/belief/Profit.hpp"
-#include "creativity/belief/ProfitStream.hpp"
-#include "creativity/belief/Demand.hpp"
-#include "creativity/belief/Quality.hpp"
-#include "creativity/BookCopy.hpp"
-#include <string>
-#include <vector>
-#include <unordered_set>
+#include <eris/Optimize.hpp>
 
 namespace creativity {
+
+class Creativity;
 
 /** This class represents a public provider of book copies that pays author based on the number of
  * downloads in a period.  In particular, it collects a lump sum tax amount just after each agent

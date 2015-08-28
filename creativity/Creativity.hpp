@@ -1,17 +1,17 @@
 #pragma once
-#include <eris/Simulation.hpp>
 #include <eris/Good.hpp>
-#include <eris/Optimize.hpp>
-#include <Eigen/Core>
-#include "creativity/Book.hpp"
+#include <eris/noncopyable.hpp>
 #include "creativity/CreativitySettings.hpp"
+#include <cstdint>
+#include <mutex>
+#include <string>
+#include <utility>
+#include <vector>
+
+namespace creativity { class Book; }
+namespace creativity { namespace state { class Storage; } }
 
 namespace creativity {
-
-namespace state {
-// Forward declaration
-class Storage;
-}
 
 /** Central class for a creativity simulation; this class handles setting up the simulation
  * according to configured parameters and running the simulation.

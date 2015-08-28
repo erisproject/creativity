@@ -1,14 +1,26 @@
 #pragma once
-#include "creativity/state/Storage.hpp"
+#include "creativity/state/StorageBackend.hpp"
+#include "creativity/BookCopy.hpp"
+#include "creativity/CreativitySettings.hpp"
+#include <eris/types.hpp>
+#include <Eigen/Core>
+#include <boost/detail/endian.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
 #include <vector>
 #include <fstream>
-#include <boost/detail/endian.hpp>
+#include <memory>
+#include <mutex>
+#include <set>
+#include <stdexcept>
+#include <string>
+#include <unordered_map>
+#include <utility>
 
-namespace creativity {
+namespace eris { namespace belief { class BayesianLinear; } }
 
-class Creativity;
-
-namespace state {
+namespace creativity { namespace state {
 
 /** Class for file-based storage.  Note that most of the methods of this class will throw errors
  * when the underlying file stream encounters an error.  You should not attempt to use the
@@ -639,9 +651,9 @@ class FileStorage final : public StorageBackend {
 };
 
 #if defined(BOOST_BIG_ENDIAN)
-#include "creativity/state/FileStorage-BE.hpp"
+#include "creativity/state/FileStorage-BE.hpp" // IWYU pragma: keep
 #elif defined(BOOST_LITTLE_ENDIAN)
-#include "creativity/state/FileStorage-LE.hpp"
+#include "creativity/state/FileStorage-LE.hpp" // IWYU pragma: keep
 #else
 #error System endianness not supported (neither big-byte nor little-byte endianness detected)!
 #endif

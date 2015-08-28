@@ -5,6 +5,11 @@
 #include <sstream>
 #include <iomanip>
 #include <iostream>
+#include <limits>
+#include <stdexcept>
+#include <utility>
+#include <vector>
+#include <cmath>
 #include <cstring>
 #include <cerrno>
 #include <cstdlib>

@@ -1,9 +1,16 @@
 #pragma once
-#include <iterator>
 #include <boost/iterator/iterator_facade.hpp>
-#include "creativity/state/State.hpp"
-#include "creativity/CreativitySettings.hpp"
 #include "creativity/state/StorageBackend.hpp"
+#include <eris/types.hpp>
+#include <algorithm>
+#include <cstddef>
+#include <memory>
+#include <type_traits>
+#include <vector>
+
+namespace boost { namespace iterators { struct random_access_traversal_tag; } }
+
+namespace creativity { struct CreativitySettings; }
 
 namespace creativity { namespace state {
 

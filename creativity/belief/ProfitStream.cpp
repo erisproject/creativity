@@ -1,4 +1,7 @@
 #include "creativity/belief/ProfitStream.hpp"
+#include "creativity/Book.hpp"
+#include <Eigen/Core>
+#include <cstddef>
 
 using namespace eris;
 using Eigen::RowVectorXd;

@@ -1,5 +1,16 @@
 #pragma once
 #include "creativity/gui/InfoWindow.hpp"
+#include "creativity/gui/BookStore.hpp"
+#include "creativity/gui/LibraryStore.hpp"
+#include <eris/types.hpp>
+#include <gtkmm/treeview.h>
+#include "glibmm/refptr.h"
+#include <memory>
+#include <functional>
+
+namespace Gtk { class Window; }
+
+namespace creativity { namespace state { class State; } }
 
 namespace creativity { namespace gui {
 

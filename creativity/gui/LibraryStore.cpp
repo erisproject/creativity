@@ -1,5 +1,20 @@
 #include "creativity/gui/LibraryStore.hpp"
 #include "creativity/state/BookState.hpp"
+#include "creativity/BookCopy.hpp"
+#include "creativity/state/State.hpp"
+#include <glibmm/objectbase.h>
+#include <glibmm/value.h> // IWYU pragma: keep
+#include <glibmm/refptr.h>
+#include <gtkmm/enums.h>
+#include <gtkmm/treemodel.h>
+#include <gtkmm/treemodelcolumn.h>
+#include <gtkmm/treepath.h>
+#include <gtkmm/treeview.h> // IWYU pragma: keep
+#include <cstddef>
+#include <functional>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 namespace creativity { namespace gui {
 

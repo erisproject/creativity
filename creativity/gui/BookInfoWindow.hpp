@@ -1,5 +1,10 @@
 #pragma once
 #include "creativity/gui/InfoWindow.hpp"
+#include <eris/types.hpp>
+#include <memory>
+
+namespace Gtk { class Window; }
+namespace creativity { namespace state { class State; } }
 
 namespace creativity { namespace gui {
 

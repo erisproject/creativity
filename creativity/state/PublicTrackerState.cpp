@@ -1,4 +1,5 @@
 #include "creativity/state/PublicTrackerState.hpp"
+#include "creativity/PublicTracker.hpp"
 
 namespace creativity { namespace state {
 

@@ -1,6 +1,36 @@
 #include "creativity/gui/ReaderInfoWindow.hpp"
 #include "creativity/gui/GUI.hpp"
+#include "creativity/gui/BookStore.hpp"
+#include "creativity/gui/LibraryStore.hpp"
+#include "creativity/Reader.hpp"
+#include "creativity/belief/Demand.hpp"
+#include "creativity/belief/Profit.hpp"
+#include "creativity/belief/ProfitStream.hpp"
+#include "creativity/belief/Quality.hpp"
+#include "creativity/state/State.hpp"
+#include <Eigen/Core>
 #include <Eigen/QR>
+#include <glibmm/signalproxy.h>
+#include <gtkmm/enums.h>
+#include <gtkmm/label.h>
+#include <gtkmm/notebook.h>
+#include <gtkmm/scrolledwindow.h>
+#include <gtkmm/treemodel.h>
+#include <gtkmm/treemodelcolumn.h>
+#include <gtkmm/treeview.h>
+#include <gtkmm/treeviewcolumn.h> // IWYU pragma: keep
+#include <cstddef>
+#include <iterator>
+#include <list>
+#include <map>
+#include <set>
+#include <stdexcept>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <vector>
+
 
 namespace creativity { namespace gui {
 

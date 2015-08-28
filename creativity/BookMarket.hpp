@@ -1,9 +1,12 @@
 #pragma once
 #include <eris/Market.hpp>
-#include "creativity/Book.hpp"
 #include <eris/Optimize.hpp>
+#include <limits>
 
 namespace creativity {
+// Forward declarations:
+class Book;
+class Creativity;
 
 /** A BookMarket is very simple: it has an exogenously determined price and can supply infinite
  * copies of a Book at that price.

@@ -1,6 +1,5 @@
 #include "creativity/PublicTrackerMarket.hpp"
 #include "creativity/Creativity.hpp"
-#include "creativity/CreativitySettings.hpp"
 #include <algorithm>
 
 namespace creativity {

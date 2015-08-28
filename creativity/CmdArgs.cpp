@@ -1,9 +1,14 @@
 #include "creativity/CmdArgs.hpp"
 #include "creativity/config.hpp"
-#include <string>
+#include <boost/program_options/variables_map.hpp>
+#include <boost/program_options/parsers.hpp>
+#include <eris/types.hpp>
+#include <cstdint>
 #include <cstdlib>
+#include <string>
 #include <sstream>
 #include <iostream>
+#include <thread>
 
 namespace po = boost::program_options;
 

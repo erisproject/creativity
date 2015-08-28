@@ -1,5 +1,11 @@
 #include "creativity/gui/BookInfoWindow.hpp"
 #include "creativity/gui/GUI.hpp"
+#include "creativity/state/State.hpp"
+#include <gdkmm/rgba.h>
+#include <gtkmm/grid.h>
+#include <algorithm>
+#include <string>
+#include <unordered_map>
 
 namespace creativity { namespace gui {
 

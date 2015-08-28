@@ -1,11 +1,24 @@
 #include "creativity/gui/GraphArea.hpp"
 #include "creativity/gui/GUI.hpp"
 #include "creativity/state/Storage.hpp"
+#include "creativity/state/State.hpp"
 #include "creativity/Creativity.hpp"
-#include "creativity/Reader.hpp"
-#include "creativity/Book.hpp"
-#include <cmath>
+#include <eris/types.hpp>
 #include <boost/math/constants/constants.hpp>
+#include <cairomm/context.h>
+#include <cairomm/matrix.h>
+#include <cairomm/pattern.h>
+#include <cairomm/refptr.h>
+#include <cairomm/surface.h>
+#include <cairomm/enums.h>
+#include <gtkmm/widget.h>
+#include <cmath>
+#include <algorithm>
+#include <iostream>
+#include <unordered_map>
+#include <utility>
+#include <memory>
+
 
 using namespace eris;
 using namespace creativity::state;

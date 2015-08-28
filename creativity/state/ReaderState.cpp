@@ -1,4 +1,8 @@
 #include "creativity/state/ReaderState.hpp"
+#include <eris/Simulation.hpp>
+#include <utility>
+#include "creativity/Book.hpp"
+#include "creativity/BookCopy.hpp"
 #include "creativity/Reader.hpp"
 
 namespace creativity { namespace state {

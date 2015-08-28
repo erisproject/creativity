@@ -2,11 +2,17 @@
 #include "creativity/Reader.hpp"
 #include "creativity/Book.hpp"
 #include "creativity/BookMarket.hpp"
+#include "creativity/belief/Profit.hpp"
 #include <eris/Random.hpp>
+#include <Eigen/Core>
 #include <algorithm>
+#include <cstddef>
+#include <limits>
+#include <stdexcept>
+#include <string>
+#include <utility>
 #include <map>
 #include <list>
-#include <random>
 #include <cmath>
 
 using namespace eris;

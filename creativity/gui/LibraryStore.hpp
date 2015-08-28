@@ -1,5 +1,17 @@
 #pragma once
 #include "creativity/gui/BookStore.hpp"
+#include "creativity/state/BookState.hpp"
+#include <eris/types.hpp>
+#include <glibmm/object.h>
+#include <glibmm/refptr.h>
+#include <gtkmm/enums.h>
+#include <gtkmm/treemodel.h>
+#include <gtkmm/treemodelcolumn.h>
+#include <memory>
+
+namespace Glib { class ValueBase; }
+namespace Gtk { class TreeView; }
+namespace creativity { namespace state { class State; } }
 
 namespace creativity { namespace gui {
 

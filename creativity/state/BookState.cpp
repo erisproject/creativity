@@ -1,6 +1,8 @@
 #include "creativity/state/BookState.hpp"
 #include "creativity/Book.hpp"
 #include "creativity/Reader.hpp"
+#include <eris/Position.hpp>
+#include <eris/SharedMember.hpp>
 
 namespace creativity { namespace state {
 

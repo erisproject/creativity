@@ -1,14 +1,17 @@
 #pragma once
+#include <string>
+#include <functional>
+#include <vector>
+#include <algorithm>
+#include <type_traits>
+#include <eris/types.hpp>
+
 /** \file
  * Various routines for generating data from stored creativity results.
  */
 
-#include <string>
-#include <functional>
-#include <vector>
-#include "creativity/CreativitySettings.hpp"
-#include "creativity/state/Storage.hpp"
-#include <eris/types.hpp>
+namespace creativity { struct CreativitySettings; }
+namespace creativity { namespace state { class Storage; } }
 
 namespace creativity { namespace data {
 

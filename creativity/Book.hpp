@@ -2,6 +2,7 @@
 #include <eris/WrappedPositional.hpp>
 #include <eris/Good.hpp>
 #include <map>
+#include <functional>
 
 namespace creativity {
 

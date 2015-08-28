@@ -1,10 +1,26 @@
 #include "creativity/gui/BookStore.hpp"
 #include "creativity/gui/GUI.hpp"
+#include "creativity/state/State.hpp"
+#include <glibmm/objectbase.h>
+#include <glibmm/refptr.h>
+#include <gtkmm/enums.h>
+#include <gtkmm/treemodel.h>
+#include <gtkmm/treemodelcolumn.h>
 #include <gtkmm/treepath.h>
+#include <gtkmm/treesortable.h>
 #include <algorithm>
+#include <cstddef>
+#include <eris/Position.hpp>
+#include <functional>
+#include <limits>
+#include <set>
+#include <stdexcept>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
 
 using namespace eris;
-using namespace std::placeholders;
 using namespace creativity::state;
 
 namespace creativity { namespace gui {

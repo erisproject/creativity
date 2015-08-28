@@ -1,8 +1,9 @@
 #pragma once
 #include <eris/belief/BayesianLinear.hpp>
-#include "creativity/Book.hpp"
-#include <eris/algorithms.hpp>
-#include <unordered_set>
+#include <eris/SharedMember.hpp>
+#include <string>
+
+namespace creativity { class Book; }
 
 namespace creativity { namespace belief {
 

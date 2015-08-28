@@ -1,6 +1,18 @@
 #include "creativity/data/Data.hpp"
+#include "creativity/state/State.hpp"
 #include "creativity/Creativity.hpp"
-#include <boost/algorithm/string.hpp>
+#include "creativity/Reader.hpp"
+#include "creativity/state/Storage.hpp"
+#include <boost/algorithm/string/erase.hpp>
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/replace.hpp>
+#include <boost/iterator/iterator_traits.hpp>
+#include <limits>
+#include <memory>
+#include <stdexcept>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
 
 using namespace creativity::state;
 using namespace eris;

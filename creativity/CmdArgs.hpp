@@ -1,9 +1,17 @@
 #pragma once
-#include <boost/program_options.hpp>
+#include "creativity/Creativity.hpp"
+#include <boost/program_options/errors.hpp>
+#include <boost/program_options/options_description.hpp>
+#include <boost/program_options/positional_options.hpp>
+#include <boost/program_options/value_semantic.hpp>
+#include <eris/Random.hpp>
+#include <string>
 #include <limits>
 #include <regex>
-#include <eris/Random.hpp>
-#include "creativity/Creativity.hpp"
+#include <type_traits>
+#include <vector>
+
+namespace boost { namespace program_options { class variables_map; } }
 
 namespace creativity {
 
@@ -329,7 +337,7 @@ class CmdArgs::Simulation : public CmdArgs {
 
     protected:
         /** Adds common options into the options descriptions.  Called by
-         * CLI::addOptions()/GUI::addOptions().
+         * CLI::addOptions() and GUI::addOptions().
          */
         void addOptions() override;
 

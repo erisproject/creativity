@@ -1,5 +1,6 @@
 #pragma once
 #include <eris/types.hpp>
+#include <cstdint>
 
 namespace creativity {
 

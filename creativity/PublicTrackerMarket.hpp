@@ -1,10 +1,12 @@
 #pragma once
 #include <eris/Market.hpp>
 #include <eris/Optimize.hpp>
-#include "creativity/Book.hpp"
 #include "creativity/BookMarket.hpp"
 
 namespace creativity {
+
+class Book;
+class Creativity;
 
 /** This class extends BookMarket by always pricing the book at marginal cost (and thus never has
  * any profits).  It is created by PublicTracker for books that are taken off (or are never placed

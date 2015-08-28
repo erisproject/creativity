@@ -1,30 +1,22 @@
 #pragma once
-#include <eris/noncopyable.hpp>
-#include <eris/Position.hpp>
+#include <eris/types.hpp>
 #include <gtkmm/window.h>
 #include <gtkmm/notebook.h>
 #include <gtkmm/grid.h>
 #include <gtkmm/label.h>
-#include <gtkmm/button.h>
-#include <gtkmm/liststore.h>
-#include <gtkmm/treeview.h>
 #include <gtkmm/scrolledwindow.h>
-#include <mutex>
+#include <list>
+#include <string>
+#include <type_traits>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 #include <memory>
 #include <Eigen/Core>
-#include "creativity/gui/BookStore.hpp"
-#include "creativity/gui/LibraryStore.hpp"
-#include "creativity/state/State.hpp"
 
-namespace creativity {
+namespace creativity { namespace state { class State; } }
 
-// forward declarations
-class Reader;
-class Book;
-
-namespace gui {
-
-class GUI;
+namespace creativity { namespace gui {
 
 /** Gtk dialog for showing reader or book info.  Base class; see ReaderInfoWindow and
  * BookInfoWindow. */

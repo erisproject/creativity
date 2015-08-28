@@ -1,23 +1,22 @@
 #include "creativity/Creativity.hpp"
 #include "creativity/state/FileStorage.hpp"
 #include "creativity/state/MemoryStorage.hpp"
-#include "creativity/belief/Demand.hpp"
-#include "creativity/belief/Quality.hpp"
-#include "creativity/belief/Profit.hpp"
 #include "creativity/PublicTracker.hpp"
+#include "creativity/state/Storage.hpp"
+#include "creativity/Reader.hpp"
+#include "creativity/BookMarket.hpp"
 #include <eris/Random.hpp>
+#include <eris/Position.hpp>
 #include <eris/interopt/Callback.hpp>
 #include <eris/intraopt/Callback.hpp>
-#include <Eigen/Core>
+#include <cstddef>
 #include <cmath>
-#include <algorithm>
-#include <regex>
+#include <stdexcept>
 
 namespace creativity {
 
 using namespace creativity::state;
 using namespace eris;
-using namespace Eigen;
 
 CreativitySettings& Creativity::set() {
     if (setup_sim_) throw std::logic_error("Cannot change creativity settings after setup()");

@@ -1,30 +1,47 @@
 #pragma once
+#include "creativity/CmdArgs.hpp"
+#include <eris/noncopyable.hpp>
+#include <eris/Position.hpp>
+#include <eris/types.hpp>
+#include <glibmm/refptr.h>
+#include <sigc++/connection.h>
+#include <gtkmm/widget.h>
+#include <gtkmm/builder.h> // IWYU pragma: keep
+#include <boost/geometry/core/cs.hpp>
+#include <boost/geometry/geometries/point.hpp>
+#include <boost/geometry/index/rtree.hpp>
+#include <unordered_map>
+#include <list>
+#include <chrono>
+#include <functional>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 #include <thread>
 #include <mutex>
 #include <condition_variable>
 #include <memory>
-#include <glibmm/dispatcher.h>
-#include <gtkmm.h>
-#include <eris/noncopyable.hpp>
-#include <unordered_map>
-#include <array>
-#include <list>
-#include <boost/geometry.hpp>
-#include <boost/geometry/geometries/point.hpp>
-#include <boost/geometry/geometries/box.hpp>
-#include <boost/geometry/index/rtree.hpp>
-#include "creativity/gui/GraphArea.hpp"
-#include "creativity/gui/InfoWindow.hpp"
-#include "creativity/state/State.hpp"
-#include "creativity/CmdArgs.hpp"
 
 namespace sigc { SIGC_FUNCTORS_DEDUCE_RESULT_TYPE_WITH_DECLTYPE }
+
+namespace Gdk { class Cursor; }
+namespace Glib { class Dispatcher; }
+namespace Gtk { class Application; }
+namespace Gtk { class FileFilter; }
+namespace Gtk { class ScrolledWindow; }
+namespace Gtk { class TreeView; }
+namespace Gtk { class Window; }
+namespace creativity { class Creativity; }
+namespace creativity { namespace state { class State; } }
 
 namespace creativity { namespace gui {
 
 // Forward declarations
 class ReaderStore;
 class BookStore;
+class InfoWindow;
+class GraphArea;
 
 /** Class that runs a GUI in a thread, collecting its events into a queue to be processed
  * periodically (e.g. between iterations) via GUIShim.

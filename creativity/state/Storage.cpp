@@ -1,4 +1,6 @@
 #include "creativity/state/Storage.hpp"
+#include "creativity/CreativitySettings.hpp"
+#include <stdexcept>
 
 using namespace eris;
 

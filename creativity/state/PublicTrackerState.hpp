@@ -1,5 +1,7 @@
 #pragma once
-#include "creativity/PublicTracker.hpp"
+#include <eris/types.hpp>
+
+namespace creativity { class PublicTracker; }
 
 namespace creativity { namespace state {
 
