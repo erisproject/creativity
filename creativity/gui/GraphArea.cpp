@@ -14,7 +14,6 @@
 #include <gtkmm/widget.h>
 #include <cmath>
 #include <algorithm>
-#include <iostream>
 #include <unordered_map>
 #include <utility>
 #include <memory>
