@@ -105,7 +105,7 @@ int GUI::sb_int(const std::string &widget_name) {
     return widget<Gtk::SpinButton>(widget_name)->get_value_as_int();
 }
 
-void GUI::start(const CmdArgs::GUI &args) {
+void GUI::start(const cmdargs::GUI &args) {
     if (gui_thread_.joinable())
         throw std::runtime_error("GUI thread can only be started once!");
 
@@ -161,7 +161,7 @@ GUI::~GUI() {
         gui_thread_.join();
 }
 
-void GUI::thr_run(const CmdArgs::GUI &args) {
+void GUI::thr_run(const cmdargs::GUI &args) {
     main_window_ = std::shared_ptr<Gtk::Window>(widget<Gtk::Window>("window1"));
 
     main_window_->set_title(main_window_->get_title() + " v" + std::to_string(VERSION[0]) + "." + std::to_string(VERSION[1]) + "." + std::to_string(VERSION[2]));

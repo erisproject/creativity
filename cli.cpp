@@ -3,7 +3,7 @@
 #include "creativity/Book.hpp"
 #include "creativity/state/Storage.hpp"
 #include "creativity/state/StorageBackend.hpp"
-#include "creativity/CmdArgs.hpp"
+#include "creativity/cmdargs/CLI.hpp"
 #include <eris/Simulation.hpp>
 #include <Eigen/Core>
 #include <cerrno>
@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
     std::cout << std::setprecision(16);
     auto creativity = Creativity::create();
 
-    CmdArgs::CLI cmd(creativity->set());
+    cmdargs::CLI cmd(creativity->set());
     cmd.parse(argc, argv);
 
     std::string results_out = cmd.output;

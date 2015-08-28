@@ -1,43 +1,20 @@
-#include "creativity/CmdArgs.hpp"
-#include "creativity/config.hpp"
-#include <boost/program_options/variables_map.hpp>
-#include <boost/program_options/parsers.hpp>
+#include "creativity/cmdargs/Simulator.hpp"
+#include "creativity/cmdargs/strings.hpp"
 #include <eris/types.hpp>
+#include <boost/program_options/options_description.hpp>
+#include <boost/program_options/errors.hpp>
+#include <boost/program_options/value_semantic.hpp>
 #include <cstdint>
-#include <cstdlib>
-#include <string>
+#include <regex>
 #include <sstream>
-#include <iostream>
-#include <thread>
+namespace boost { namespace program_options { class variables_map; } }
+
+
+namespace creativity { namespace cmdargs {
 
 namespace po = boost::program_options;
 
-namespace creativity {
-
-template <>
-std::string CmdArgs::output_string(double v) {
-    return std::regex_replace(
-            std::regex_replace(std::to_string(v),
-                std::regex("(\\.\\d*?)0+$"),
-                "$1"),
-            std::regex("\\.$"),
-            "");
-}
-
-void CmdArgs::addOptions() {
-    po::options_description help("About");
-
-    help.add_options()
-        ("help,h", "Displays usage information.")
-        ("version", "Displays version information.")
-        ;
-
-    options_.add(help);
-}
-
-void CmdArgs::postParse(boost::program_options::variables_map&) {}
-
-void CmdArgs::Simulation::addOptions() {
+void Simulator::addOptions() {
     CmdArgs::addOptions();
     po::options_description structure("Structure"), initial("Initial Behaviour"),
         costs("Costs"), beliefs("Beliefs"), piracy("Piracy"), publicprov("Public Provisioning");
@@ -109,54 +86,8 @@ void CmdArgs::Simulation::addOptions() {
     //options_.add(sim_options_);
 }
 
-CmdArgs::CLI::CLI(CreativitySettings &s) : Simulation(s) {}
-CmdArgs::GUI::GUI(CreativitySettings &s) : Simulation(s) {}
 
-// Single-letter options used:
-// b B c C d D e f g G i j k K m M n N o O p P Q r R s S T u U w W x y z Z
-// Available:
-// a A E F H I J l L q t v V X Y
-
-void CmdArgs::CLI::addOptions() {
-    output = "creativity-SEED.crstate";
-    threads = 0;
-
-    Simulation::addOptions();
-
-    sim_controls_.add_options()
-        ("output,o", value(output), "Output file for simulation results.  If this contains the characters 'SEED', they will be replaced with the random seed value used for the simulation.")
-        ("tmpdir", value(tmpdir), "Output directory in which to write the output file while running the simulation.  When "
-            "the simulation finishes, the temporary file is moved to the output location specified by -o.  If this argument is omitted, the "
-            "file is written directly to its final location.")
-        ("overwrite,O", "Allows output file given to -o to be overwritten.")
-        ;
-    options_.add(sim_controls_);
-}
-
-void CmdArgs::GUI::addOptions() {
-    threads = std::thread::hardware_concurrency();
-    if (threads == 1) threads = 0;
-
-    Simulation::addOptions();
-
-    sim_controls_.add_options()
-        ("output,o", value(output), "Output file for simulation results.  If this contains the characters 'SEED', they will be replaced with the random seed value used for the simulation.  If omitted, the simulation is not written to disk.")
-        ("initialize", "If specified, initialize the simulation using the given settings, but do no start it.  Otherwise the GUI starts uninitialized, but ready-to-run with the given settings.  Ignored if --start is specified.")
-        ("start", "If specified, start running immediately using the given settings.  Otherwise the GUI starts uninitialized, but ready-to-run with the given settings.")
-        ;
-    options_.add(sim_controls_);
-
-    // FIXME: could add colour settings here
-
-    po::options_description input_desc("Input file");
-    input_desc.add_options()
-        ("input-file", value(input), "Previous simulation to load instead of configuring a new simulation.")
-        ;
-    invisible_.add(input_desc);
-    positional_.add("input-file", -1);
-}
-
-void CmdArgs::Simulation::postParse(boost::program_options::variables_map &) {
+void Simulator::postParse(boost::program_options::variables_map &) {
     // If the user didn't give a seed, .seed won't have changed from seed, but we still don't want
     // to set it because explicitly setting a seed resets the RNG.
     if (eris::Random::seed() != seed) {
@@ -170,53 +101,4 @@ void CmdArgs::Simulation::postParse(boost::program_options::variables_map &) {
     s_.boundary = Creativity::boundaryFromDensity(s_.readers, s_.dimensions, density_);
 }
 
-void CmdArgs::CLI::postParse(boost::program_options::variables_map &vars) {
-    Simulation::postParse(vars);
-    overwrite = vars.count("overwrite") > 0;
-}
-
-void CmdArgs::GUI::postParse(boost::program_options::variables_map &vars) {
-    Simulation::postParse(vars);
-    start = vars.count("start") > 0;
-    initialize = vars.count("initialize") > 0;
-}
-
-
-void CmdArgs::parse(int argc, char *argv[]) {
-    if (options_.options().empty()) addOptions();
-
-    po::options_description all_opts;
-    all_opts.add(options_);
-    all_opts.add(invisible_);
-
-    // The variable map storing specified options; we don't keep this: everything gets set directly
-    boost::program_options::variables_map vars;
-    store(po::command_line_parser(argc, argv).options(all_opts).positional(positional_).run(), vars);
-    notify(vars);
-
-    bool need_help = vars.count("help") > 0, need_version = vars.count("version") > 0;
-    if (need_help) {
-        std::cout << version() << "\n\n" << help();
-        std::exit(0);
-    }
-    else if (need_version) {
-        std::cout << version() << "\n\n";
-        std::exit(0);
-    }
-
-    postParse(vars);
-
-}
-
-std::string CmdArgs::version() const {
-    std::ostringstream version;
-    version << "Creativity simulator v" << VERSION[0] << "." << VERSION[1] << "." + VERSION[2];
-    return version.str();
-}
-
-std::string CmdArgs::help() const {
-    std::ostringstream help;
-    help << options_ << "\n";
-    return help.str();
-}
-}
+}}

@@ -1,5 +1,5 @@
 #pragma once
-#include "creativity/CmdArgs.hpp"
+#include "creativity/cmdargs/GUI.hpp"
 #include <eris/noncopyable.hpp>
 #include <eris/Position.hpp>
 #include <eris/types.hpp>
@@ -102,7 +102,7 @@ class GUI : eris::noncopyable {
 
         /** Starts the GUI, reading the glade file and starting the GUI thread.
          */
-        void start(const CmdArgs::GUI &args);
+        void start(const cmdargs::GUI &args);
 
         /** Checks whether the GUI has generated any events and, if so, processes them.  If there
          * are no pending events, this returns immediately.
@@ -357,10 +357,9 @@ class GUI : eris::noncopyable {
          * `app_` and `builder_` must be set up in the main thread (so that builder errors happen
          * *before* starting the thread).
          *
-         * The given CmdArgs object should be a parsed CmdArgs object from provided command line
-         * arguments; the `.parameters` fields will be applied.
+         * The given cmdargs::GUI object should have already parsed command-line arguments.
          */
-        void thr_run(const CmdArgs::GUI &args);
+        void thr_run(const cmdargs::GUI &args);
 
         /** When called, this updates the simulation parameters displayed in the GUI to match the
          * current creativity_->parameters values.

@@ -1,5 +1,5 @@
 #include "creativity/Creativity.hpp"
-#include "creativity/CmdArgs.hpp"
+#include "creativity/cmdargs/GUI.hpp"
 #include "creativity/state/Storage.hpp"
 #include "creativity/gui/GUI.hpp"
 #include <eris/Simulation.hpp>
@@ -31,7 +31,7 @@ int main(int argc, char *argv[1]) {
 
     // Handle any command line arguments.  These set things in creativity->set(), which form the
     // defaults for the GUI, and have a few extra leftovers that the GUI code handles itself.
-    CmdArgs::GUI cmd(creativity->set());
+    cmdargs::GUI cmd(creativity->set());
     cmd.parse(argc, argv);
 
     std::cerr << std::setprecision(16);
