@@ -1,6 +1,7 @@
 #pragma once
 #include <eris/Market.hpp>
 #include "creativity/Book.hpp"
+#include <eris/Optimize.hpp>
 
 namespace creativity {
 
@@ -46,7 +47,7 @@ class BookMarket : public eris::Market, public virtual eris::intraopt::Finish {
          * will actually purchase floor(q) units.
          */
         virtual Reservation reserve(
-                eris::SharedMember<eris::AssetAgent> agent,
+                eris::SharedMember<eris::agent::AssetAgent> agent,
                 double q,
                 double p_max = std::numeric_limits<double>::infinity()) override;
 
@@ -62,14 +63,15 @@ class BookMarket : public eris::Market, public virtual eris::intraopt::Finish {
          */
         virtual bool isPublic() const { return false; }
 
-    protected:
         /** We override reservation completion to transfer the payment to the author and put the
          * book into the b_ bundle.
          *
          * \todo this is simple: eventually it would probably be better to have a firm (perhaps
          * created when the Book is created?) that accepts payments, mitigating this override.
          */
-        virtual void buy_(Reservation_ &res) override;
+        virtual void buy(Reservation &res) override;
+
+    protected:
 
         /// The creativity object pointer
         std::shared_ptr<Creativity> creativity_;

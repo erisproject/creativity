@@ -957,7 +957,7 @@ void Reader::intraApply() {
     auto lock = writeLock();
     // Apply the reserved transactions (i.e. pay for book copies and receive the book)
     for (auto &res : reservations_) {
-        res->buy();
+        res.buy();
     }
     // Also remove any cost associated with obtaining pirated copies of books:
     assets()[creativity_->money] -= reserved_piracy_cost_;

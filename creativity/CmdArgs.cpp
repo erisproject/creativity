@@ -3,6 +3,7 @@
 #include <string>
 #include <cstdlib>
 #include <sstream>
+#include <iostream>
 
 namespace po = boost::program_options;
 

@@ -59,7 +59,7 @@ RowVectorXd Demand::bookRow(SharedMember<Book> book, double quality, unsigned in
     if (false and lag_market_books) {} // silence unused var warning
     RowVectorXd row(parameters());
 
-    if (book->simulation()->runStage() != RunStage::inter_Optimize) throw std::logic_error("Demand::bookRow() must be called during inter-optimization stage");
+    if (book->simulation()->runStage() != Simulation::RunStage::inter_Optimize) throw std::logic_error("Demand::bookRow() must be called during inter-optimization stage");
 
     if (not book->hasPrivateMarket()) throw std::logic_error("Demand::bookRow() cannot be called for off-market book");
 

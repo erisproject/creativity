@@ -3,6 +3,7 @@
 #include "creativity/Creativity.hpp"
 #include <random>
 
+using eris::agent::AssetAgent;
 using namespace eris;
 
 namespace creativity {
@@ -55,9 +56,9 @@ Market::Reservation BookMarket::reserve(
     return createReservation(agent, ql, total_p);
 }
 
-void BookMarket::buy_(Reservation_ &res) {
+void BookMarket::buy(Reservation &res) {
     if (res.state != ReservationState::pending)
-        throw Reservation_::non_pending_exception();
+        throw Reservation::non_pending_exception();
 
     auto lock = writeLock(book_);
     Bundle &b = reservationBundle_(res);
@@ -72,7 +73,7 @@ void BookMarket::buy_(Reservation_ &res) {
     b.set(book_, res.quantity);
 
     // Complete the reservation
-    Market::buy_(res);
+    Market::buy(res);
 }
 
 void BookMarket::intraFinish() {
