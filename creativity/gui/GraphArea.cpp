@@ -575,8 +575,6 @@ void GraphArea::drawCircularAxis(const Cairo::RefPtr<Cairo::Context> &cr, const 
     cr->set_line_width(design.stroke_width.axes);
     cr->set_source(design.colour.axes);
 
-    std::cerr << "Here come the ticks; center is " << zero_x << ", " << zero_y << "\n";
-
     // Tick marks
     int tick_num = 0;
     for (double tick = 0; tick <= boundary; tick += design.style.tick_every) {
