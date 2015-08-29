@@ -58,7 +58,9 @@ class BookState final {
         /// The cumulative lifetime revenue of this book, up to and including the current period.
         double revenue_lifetime;
 
-        /// The number of sales of copies of this book in the current period.
+        /** The number of sales of copies of this book in the current period.  The sales are private
+         * sales if `.market_private` is true and public sales if `.market_public()` is true.
+         */
         unsigned int sales;
 
         /// The cumulative lifetime private market sales of this book, up to and including the current period.

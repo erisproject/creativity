@@ -24,6 +24,12 @@ class GUI : public Simulator {
         /// The input file (for the GUI)
         std::string input;
 
+        /// Overridden to add " [FILE-TO-LOAD]"
+        virtual std::string usage() const override;
+
+        /// Overridden to add information about FILE-TO-LOAD
+        virtual std::string help() const override;
+
     protected:
         /// Adds GUI command-line options into the option descriptions
         virtual void addOptions() override;

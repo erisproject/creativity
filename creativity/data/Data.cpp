@@ -267,7 +267,7 @@ double books_written(const Storage &cs, eris_time_t from, eris_time_t to) {
     return count / (double) (to-from+1);
 }
 
-/** Average number of books purchased per period (aggregate, not per-reader)
+/** Average number of books purchased privately per period (aggregate, not per-reader)
  */
 double books_bought(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (from > to) throw std::logic_error("from > to");
@@ -277,7 +277,8 @@ double books_bought(const Storage &cs, eris_time_t from, eris_time_t to) {
         for (auto &bp : cst->books) {
             auto &b = bp.second;
 
-            count += b.sales;
+            if (b.market_private)
+                count += b.sales;
         }
     }
 
@@ -296,6 +297,24 @@ double books_pirated(const Storage &cs, eris_time_t from, eris_time_t to) {
             auto &b = bp.second;
 
             count += b.pirated;
+        }
+    }
+
+    return count / (double) (to-from+1);
+}
+
+/** Average number of public copies of books provided per period (aggreate, not per-reader).
+ */
+double books_public_copies(const Storage &cs, eris_time_t from, eris_time_t to) {
+    if (from > to) throw std::logic_error("from > to");
+    unsigned long count = 0;
+    for (eris_time_t t = from; t <= to; t++) {
+        auto cst = cs[t];
+        for (auto &bp : cst->books) {
+            auto &b = bp.second;
+
+            if (b.market_public())
+                count += b.sales;
         }
     }
 
@@ -322,6 +341,8 @@ std::vector<initial_datum> initial_data_fields() {
     ADD_SETTING(income);
     ADD_SETTING(piracy_begins);
     ADD_SETTING(piracy_link_proportion);
+    ADD_SETTING(public_sharing_begins);
+    ADD_SETTING(public_sharing_tax);
     ADD_SETTING(prior_scale);
     ADD_SETTING(prior_scale_piracy);
     ADD_SETTING(prior_scale_burnin);
@@ -343,7 +364,7 @@ std::vector<initial_datum> initial_data_fields() {
 std::vector<datum> data_fields() {
     std::vector<datum> data;
 
-#define ADD_DATUM(D) data.emplace_back(#D, D)
+#define ADD_DATUM(D, ...) data.emplace_back(#D, D, ##__VA_ARGS__)
     ADD_DATUM(net_u);
     ADD_DATUM(book_market_periods);
     ADD_DATUM(book_p0);
@@ -356,7 +377,8 @@ std::vector<datum> data_fields() {
     ADD_DATUM(book_quality);
     ADD_DATUM(books_written);
     ADD_DATUM(books_bought);
-    data.emplace_back("books_pirated", books_pirated, true);
+    ADD_DATUM(books_pirated, false, true, true);
+    ADD_DATUM(books_public_copies, false, false, true);
 #undef ADD_DATUM
 
     return data;

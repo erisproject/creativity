@@ -1,7 +1,11 @@
 #pragma once
 #include "creativity/cmdargs/strings.hpp"
 #include <boost/program_options/errors.hpp>
+#include <boost/program_options/options_description.hpp>
+#include <boost/program_options/positional_options.hpp>
+#include <boost/program_options/value_semantic.hpp>
 #include <string>
+#include <regex>
 
 namespace creativity { namespace cmdargs {
 
@@ -144,5 +148,34 @@ class Below : public virtual Validation<T> {
         /// Returns string representation of this validation
         static std::string validationString() { return type_string<T>() + u8"<" + (denom == 1 ? output_string(upper) : output_string(upper / (double) denom)); }
 };
+
+/** Overload of validate for boost to convert from string to a validated data type.  Mostly this
+ * just checks that the validation object can be constructed (which will fail if the validation
+ * fails), but this also makes sure signed types aren't provided with a leading minus sign.
+ */
+template <class V, typename = typename std::enable_if<std::is_base_of<ValidationTag, V>::value>::type>
+void validate(boost::any &v, const std::vector<std::string> &values, V*, int) {
+    using namespace boost::program_options;
+
+    // Check that this value hasn't already been assigned:
+    validators::check_first_occurrence(v);
+    // Check that only a single value was given, and get it:
+    std::string s(validators::get_single_string(values));
+
+    if (std::is_unsigned<typename V::value_type>::value and std::regex_search(s, std::regex("^\\s*-")))
+        throw invalid_option_value(s);
+
+    try {
+        // First convert to the appropriate type (this will throw if that can't be done):
+        auto val = boost::lexical_cast<typename V::value_type>(s);
+
+        // The constructor here will throw if validation fails:
+        v = boost::any(V(val));
+    }
+    catch (...) {
+        throw invalid_option_value(s);
+    }
+}
+
 
 }}

@@ -47,4 +47,14 @@ void GUI::postParse(boost::program_options::variables_map &vars) {
     initialize = vars.count("initialize") > 0;
 }
 
+std::string GUI::usage() const {
+    return Simulator::usage() + " [FILE-TO-LOAD]";
+}
+
+std::string GUI::help() const {
+    return Simulator::help() + "Loading an existing simulation:\n" +
+        "  FILE-TO-LOAD                          An existing crstate file to display\n" +
+        "                                        instead of configuring a new simulation.\n\n";
+}
+
 }}

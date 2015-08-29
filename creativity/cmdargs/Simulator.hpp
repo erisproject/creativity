@@ -15,7 +15,7 @@ class Simulator : public CmdArgs {
         Simulator() = delete;
 
         /// Constructs a Simulator object that stores values in the given CreativitySettings object.
-        Simulator(CreativitySettings &cs) : s_(cs) {}
+        Simulator(CreativitySettings &cs);
 
     public:
         // Variables which can't be stored directly in CreativitySettings:
