@@ -1,3 +1,4 @@
+#pragma once
 /** \file
  *
  * This file contains the inline read_value, write_value, and parse_value implementations for a
@@ -6,7 +7,8 @@
  *
  * This file is loaded automatically on big-endian systems from FileStorage.hpp.
  */
-#pragma once
+
+namespace creativity { namespace state {
 
 // These are documented in FileStorage.hpp, so tell doxygen to ignore:
 /// \cond
@@ -46,3 +48,4 @@ inline void FileStorage::store_value(const F &from, T &to) {
 
 /// \endcond
 
+}}

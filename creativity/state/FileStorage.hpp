@@ -650,6 +650,8 @@ class FileStorage final : public StorageBackend {
         void writePublicTracker(const PublicTrackerState &pt);
 };
 
+}}
+
 #if defined(BOOST_BIG_ENDIAN)
 #include "creativity/state/FileStorage-BE.hpp" // IWYU pragma: keep
 #elif defined(BOOST_LITTLE_ENDIAN)
@@ -657,5 +659,3 @@ class FileStorage final : public StorageBackend {
 #else
 #error System endianness not supported (neither big-byte nor little-byte endianness detected)!
 #endif
-
-}}
