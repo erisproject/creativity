@@ -2,6 +2,7 @@
 #include "creativity/state/StorageBackend.hpp"
 #include "creativity/BookCopy.hpp"
 #include "creativity/CreativitySettings.hpp"
+#include <eris/belief/BayesianLinearRestricted.hpp>
 #include <eris/types.hpp>
 #include <Eigen/Core>
 #include <boost/detail/endian.hpp>
@@ -17,8 +18,6 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
-
-namespace eris { namespace belief { class BayesianLinear; } }
 
 namespace creativity { namespace state {
 
@@ -553,13 +552,13 @@ class FileStorage final : public StorageBackend {
 
         /// Structure holding parsed belief data
         typedef struct {
-            uint32_t K; ///< Number of parameters; K=0 for a default constructed (invalid) model (the remaining values will be uninitialized)
-            bool noninformative; ///< True if this is a noninformative model (in which case the following are not set)
+            uint32_t K = 0; ///< Number of parameters; K=0 for a default constructed (invalid) model (the remaining values will be uninitialized)
+            bool noninformative = true; ///< True if this is a noninformative model (in which case the following are not set)
             Eigen::VectorXd beta; ///< eris::belief::BayesianLinear beta vector
             double s2; ///< eris::belief::BayesianLinear s2 value
             double n; ///< eris::belief::BayesianLinear n value
             Eigen::MatrixXd Vinv; ///< eris::belief::BayesianLinear Vinv matrix
-            bool draw_gibbs; ///< If true, the last draw from this belief used Gibbs sampling (false = no draws, or rejection sampling)
+            eris::belief::BayesianLinearRestricted::DrawMode last_draw_mode; ///< The last draw mode from this belief (for restricted models)
             uint32_t draw_success_cumulative, ///< For a restricted belief, the number of successful draws
                      draw_discards_cumulative; ///< For a restricted belief, the number of discarded draws
         } belief_data;
@@ -591,11 +590,15 @@ class FileStorage final : public StorageBackend {
          * - lowest bit (bit & 1): the model is a LinearRestricted model, and thus carries extra
          *   LinearRestricted data (the two u32's above).  If not set, the u32s are not present in
          *   the record.
-         * - bit 2 (bit & 2): the last draw from this model used Gibbs sampling (only applicable to
-         *   restricted models)
+         * - bit 2 (bit & 2): if set on a restricted model, this indicates the last draw from this
+         *   model used Gibbs sampling (if not a restricted model, this bit is unused).
          * - bit 3 (bit & 4): the model is noninformative.  If this bit is set, then instead of
          *   beta/V/etc. data the record contains non-informative data that hasn't been loaded yet;
          *   otherwise the beta/V/n/s2 data follows.
+         * - bit 4 (bit & 8): if set on a restricted model, this indicates the last draw from this
+         *   model used rejection sampling (if not a restricted model, this bit is unused).  If
+         *   neither this bit nor bit 2 are set, the last draw mode was Auto (which means no draw
+         *   took place).
          * - other bits are currently unused.
          */
         belief_data readBelief() const;

@@ -31,6 +31,7 @@ using namespace eris;
 using namespace eris::belief;
 using namespace creativity::belief;
 using namespace Eigen;
+using DrawMode = BayesianLinearRestricted::DrawMode;
 
 /// Member definitions for header/cblock constants
 constexpr unsigned int
@@ -731,6 +732,7 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
         r.profit = belief.noninformative
             ? Profit(belief.K)
             : Profit(belief.beta, belief.s2, belief.Vinv, belief.n);
+        r.profit.last_draw_mode = belief.last_draw_mode;
         r.profit.draw_rejection_success = belief.draw_success_cumulative;
         r.profit.draw_rejection_discards = belief.draw_discards_cumulative;
     }
@@ -740,6 +742,7 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
         r.profit_extrap = belief.noninformative
             ? Profit(belief.K)
             : Profit(belief.beta, belief.s2, belief.Vinv, belief.n);
+        r.profit_extrap.last_draw_mode = belief.last_draw_mode;
         r.profit_extrap.draw_rejection_success = belief.draw_success_cumulative;
         r.profit_extrap.draw_rejection_discards = belief.draw_discards_cumulative;
     }
@@ -749,6 +752,7 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
         r.demand = belief.noninformative
             ? Demand(belief.K)
             : Demand(belief.beta, belief.s2, belief.Vinv, belief.n);
+        r.demand.last_draw_mode = belief.last_draw_mode;
         r.demand.draw_rejection_success = belief.draw_success_cumulative;
         r.demand.draw_rejection_discards = belief.draw_discards_cumulative;
     }
@@ -798,8 +802,13 @@ FileStorage::belief_data FileStorage::readBelief() const {
     // The lowest-value bit indicates this is a restricted belief
     // information)
     bool restricted_model = status & 1;
-    bool last_draw_was_gibbs = status & 2;
     belief.noninformative = status & 4;
+    belief.last_draw_mode =
+        (restricted_model) ?
+            (status & 2) ? DrawMode::Gibbs :
+            (status & 8) ? DrawMode::Rejection :
+            DrawMode::Auto
+        : DrawMode::Auto;
 
     if (not belief.noninformative) {
         // The first K elements are beta values
@@ -825,7 +834,6 @@ FileStorage::belief_data FileStorage::readBelief() const {
         if (restricted_model) {
             belief.draw_success_cumulative = read_u32();
             belief.draw_discards_cumulative = read_u32();
-            belief.draw_gibbs = last_draw_was_gibbs;
         }
     }
 
@@ -944,15 +952,19 @@ void FileStorage::writeBelief(const BayesianLinear &m) {
     write_i8(k);
 
     bool restricted_model = false;
-    // First up is the status field.  Currently we have one status bit for a restricted model, and
-    // one for the last draw mode
+    // First up is the status field.  Currently we have:
+    // 1 - restricted
+    // 2 - (if restricted) last draw was gibbs
+    // 4 - noninformative
+    // 8 - (if restricted) last draw was rejection sampling
     const BayesianLinearRestricted *lr = dynamic_cast<const BayesianLinearRestricted*>(&m);
     if (lr) restricted_model = true;
 
     uint8_t status = 0;
     if (restricted_model) {
         status |= 1;
-        if (lr->last_draw_mode == BayesianLinearRestricted::DrawMode::Gibbs) status |= 2;
+        if (lr->last_draw_mode == DrawMode::Gibbs) status |= 2;
+        else if (lr->last_draw_mode == DrawMode::Rejection) status |= 8;
     }
     if (m.noninformative()) {
         status |= 4;
