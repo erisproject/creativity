@@ -18,7 +18,7 @@ void Data::addOptions() {
 
     options_.add_options()
         ("human-readable,H", value(human_readable), "Produce output in human-readable format.  The default (when this is not specified) outputs comma-separated values.  This also changes the default value for --precision to 8.")
-        ("precision", range<3,std::numeric_limits<double>::digits10>(double_precision), "      Specifies the precision level for floating point values.  The default is the minimum required to exactly represent all possible double values without any loss of precision.")
+        ("precision", range<3,std::numeric_limits<double>::max_digits10>(double_precision), "      Specifies the precision level for floating point values.  The default is the minimum required to exactly represent all possible double values without any loss of precision.")
         ("periods,t", min<1>(data_periods), "    Specifies the number of periods to use for calculating pre, new, and post-piracy data")
         ("skip-piracy", value(skip.piracy), "If specified, do not produce data for piracy periods.  Required for simulation data that does not contain pre-public sharing piracy periods.")
         ("skip-public-sharing", value(skip.public_sharing), "If specified, do not produce data for public sharing periods.  Required for simulation data that does not contain public sharing periods.")

@@ -40,7 +40,7 @@ class Data : public CmdArgs {
         unsigned int data_periods = 25;
 
         /// The precision of double values.  The default is full double precision.
-        unsigned int double_precision = std::numeric_limits<double>::digits10;
+        unsigned int double_precision = std::numeric_limits<double>::max_digits10;
 
         /// The input files to load data from
         std::vector<std::string> input;
