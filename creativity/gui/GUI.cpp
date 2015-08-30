@@ -164,9 +164,10 @@ GUI::~GUI() {
 void GUI::thr_run(const cmdargs::GUI &args) {
     main_window_ = std::shared_ptr<Gtk::Window>(widget<Gtk::Window>("window1"));
 
-    main_window_->set_title(main_window_->get_title() + " v" + std::to_string(VERSION[0]) + "." + std::to_string(VERSION[1]) + "." + std::to_string(VERSION[2]));
+    main_window_title_ = main_window_->get_title() + " v" + std::to_string(VERSION[0]) + "." + std::to_string(VERSION[1]) + "." + std::to_string(VERSION[2]);
+    main_window_->set_title(main_window_title_);
 
-    auto disable_on_load = {"fr_agents", "fr_save", "fr_run", "fr_sim"};
+    auto disable_on_load = {"fr_agents", "fr_run", "fr_sim"};
     // When the "load" radio button is activated, disable all the new simulation parameter fields
     widget<Gtk::RadioButton>("radio_load")->signal_clicked().connect([this,disable_on_load] {
         for (const auto &fr : disable_on_load) widget<Gtk::Frame>(fr)->set_sensitive(false);
@@ -223,13 +224,10 @@ void GUI::thr_run(const cmdargs::GUI &args) {
         auto result = fdlg.run();
         if (result == Gtk::RESPONSE_ACCEPT) {
             save_ = fdlg.get_filename();
+            saveSim();
         }
         else {
             save_ = "";
-        }
-        widget<Gtk::Label>("lbl_save")->set_text(save_ == "" ? "(no file selected)" : save_);
-        if (save_ != "") {
-            main_window_->set_title(main_window_->get_title() + " [" + boost::filesystem::path(save_).filename().string() + "]");
         }
     });
 
@@ -492,7 +490,7 @@ void GUI::thr_run(const cmdargs::GUI &args) {
             if (not args.output.empty()) {
                 save_ = args.output;
                 widget<Gtk::Label>("lbl_save")->set_text(save_);
-                main_window_->set_title(main_window_->get_title() + " [" + boost::filesystem::path(save_).filename().string() + "]");
+                main_window_->set_title(main_window_title_ + " [" + boost::filesystem::path(save_).filename().string() + "]");
             }
             bool init = false, run = false;
             if (args.start) {
@@ -1015,7 +1013,7 @@ void GUI::loadSim() {
 
     widget<Gtk::Label>("lbl_load")->set_text(load_);
 
-    main_window_->set_title(main_window_->get_title() + " [" + boost::filesystem::path(load_).filename().string() + "]");
+    main_window_->set_title(main_window_title_ + " [" + boost::filesystem::path(load_).filename().string() + "]");
 
     // Disable and hide the simulation controls (at the top of the window), since loading is read-only
     auto controls = widget<Gtk::Box>("box_controls");
@@ -1027,12 +1025,12 @@ void GUI::loadSim() {
         widget<Gtk::Label>(l)->set_visible(false);
 
     // Disable all the settings items that aren't modifiable anymore (basically everything except
-    // the visualization settings):
-    for (const auto &disable : {"fr_new", "fr_agents", "fr_sim", "fr_save", "fr_run"})
+    // the visualization settings and save button):
+    for (const auto &disable : {"fr_new", "fr_agents", "fr_sim", "fr_run"})
         widget<Gtk::Frame>(disable)->set_sensitive(false);
 
     // Completely disable and hide the expanders for settings that are totally irrelevant
-    for (const auto &kill : {"ex_sim", "ex_save", "ex_run"}) {
+    for (const auto &kill : {"ex_sim", "ex_run"}) {
         auto ex = widget<Gtk::Expander>(kill);
         ex->set_expanded(false);
         ex->set_sensitive(false);
@@ -1040,6 +1038,25 @@ void GUI::loadSim() {
     }
     // Open the visualization settings (it's the only thing that's actually useful on the page)
     widget<Gtk::Expander>("ex_vis")->set_expanded(true);
+}
+
+// Save a simulation to a file.  This copies the current simulation states (if any) and keeps the
+// file open for any future states.
+void GUI::saveSim() {
+    if (save_ == "") throw std::runtime_error("saveSim() called without save_ set to file to write");
+
+    Parameter save;
+    save.param = ParamType::save_as;
+    save.ptr = &save_;
+    queueEvent(save);
+
+    widget<Gtk::Label>("lbl_save")->set_text(save_);
+
+    main_window_->set_title(main_window_title_ + " [" + boost::filesystem::path(save_).filename().string() + "]");
+
+    widget<Gtk::Button>("btn_load")->set_sensitive(false);
+    widget<Gtk::RadioButton>("radio_load")->set_sensitive(false);
+    widget<Gtk::RadioButton>("radio_memory")->set_sensitive(false);
 }
 
 // Initialize a new simulation:
@@ -1086,11 +1103,6 @@ void GUI::initializeSim() {
     queueEvent(p);
     p.param = ParamType::threads; p.ul = std::stoul(widget<Gtk::ComboBoxText>("combo_threads")->get_active_id());
     queueEvent(p);
-
-    if (save_ != "") {
-        p.param = ParamType::save_as; p.ptr = &save_;
-        queueEvent(p);
-    }
 
     queueEvent(Event::Type::initialize);
 }

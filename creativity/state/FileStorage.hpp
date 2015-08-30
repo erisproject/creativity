@@ -16,7 +16,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
-#include <unordered_map>
+#include <map>
 #include <utility>
 
 namespace creativity { namespace state {
@@ -419,14 +419,14 @@ class FileStorage final : public StorageBackend {
             int64_t pos_next; // Next library row position
             unsigned int records_remaining; // How many library rows are remaining (0 = need a new block)
             // book id to BookCopy
-            std::unordered_map<uint32_t, BookCopy> library;
+            std::map<uint32_t, BookCopy> library;
             // library, but sorted by acquired date (for fast retrieval)
             std::multiset<std::reference_wrapper<std::pair<const uint32_t, BookCopy>>, lib_comp_less> library_acq_sorted;
             lib_data(int64_t pos_next) : pos_next(pos_next), records_remaining(LIBRARY::block_records) {}
         };
 
         /** Reader library data.  Key is the reader id, value is the data. */
-        std::unordered_map<unsigned int, lib_data> reader_lib_;
+        std::map<unsigned int, lib_data> reader_lib_;
 
         /** Read the reader library pointer block, which immediately follows the header.
          *
@@ -446,7 +446,7 @@ class FileStorage final : public StorageBackend {
          * added to a new file, and as a result will end up putting the reader pointer block
          * immediately after the header.  The keys of the given map are used to write the locations.
          */
-        void writeLibraryPointerBlock(const std::unordered_map<eris::eris_id_t, ReaderState> &readers);
+        void writeLibraryPointerBlock(const std::map<eris::eris_id_t, ReaderState> &readers);
 
         /** Ensures that the library block for reader `r` has all of the reader's library books in
          * it.  If any are missing, they are added to disk and to reader_lib_.

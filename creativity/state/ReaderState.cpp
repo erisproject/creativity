@@ -27,16 +27,13 @@ ReaderState::ReaderState(const Reader &r) :
 {
     if (r.profitExtrapBeliefDiffers()) profit_extrap = r.profitExtrapBelief();
 
-    library.reserve(r.library().size());
     for (const auto &bq : r.library())
         library.emplace(bq.first->id(), bq.second);
 
     updateLibraryCounts(r.simulation()->t());
 
-    friends.reserve(r.friends().size());
     for (const auto &m : r.friends()) friends.insert(m);
 
-    new_books.reserve(r.newBooks().size());
     for (const auto &nb : r.newBooks()) new_books.insert(nb.first);
 
     for (const auto &b : r.wrote()) wrote.emplace_hint(wrote.end(), b->id());

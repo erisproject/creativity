@@ -256,6 +256,9 @@ class GUI : eris::noncopyable {
         /** The main window. */
         std::shared_ptr<Gtk::Window> main_window_;
 
+        /** The main window title; this comes from the glade file, but appends the version. */
+        std::string main_window_title_;
+
         /// Will be true once the thread has finished setting itself up and started its mainloop.
         bool thread_running_{false};
 
@@ -390,6 +393,10 @@ class GUI : eris::noncopyable {
         /** Loads a previously-run simulation from the currently selected file.
          */
         void loadSim();
+
+        /** Writes the current simulation and any future simulation states to the selected file.
+         */
+        void saveSim();
 
         /** Sets up a new simulation based on the current GUI parameter values.
          */

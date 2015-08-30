@@ -4,7 +4,6 @@
 #include <sys/stat.h>
 #include <limits>
 #include <map>
-#include <unordered_set>
 #include <algorithm>
 #include <eris/Position.hpp>
 #include "creativity/belief/Demand.hpp"
@@ -374,7 +373,7 @@ int64_t FileStorage::newBlock() {
     return location;
 }
 
-void FileStorage::writeLibraryPointerBlock(const std::unordered_map<eris_id_t, ReaderState> &readers) {
+void FileStorage::writeLibraryPointerBlock(const std::map<eris_id_t, ReaderState> &readers) {
     f_.seekp(0, f_.end);
     if (f_.tellp() != HEADER::size)
         throwParseError("writing library pointer block failed: file is not just the header");
@@ -635,14 +634,12 @@ std::shared_ptr<const State> FileStorage::readState() const {
             case TYPE_READERS:
                 {
                     auto num = read_u32();
-                    state.readers.reserve(state.readers.size() + num);
                     for (uint32_t i = 0; i < num; i++) state.readers.insert(readReader(state.t));
                     break;
                 }
             case TYPE_BOOKS:
                 {
                     auto num = read_u32();
-                    state.books.reserve(state.books.size() + num);
                     for (uint32_t i = 0; i < num; i++) state.books.insert(readBook());
                     break;
                 }
@@ -670,11 +667,9 @@ std::shared_ptr<const State> FileStorage::readState_v1() const {
     state.boundary = settings_.boundary;
 
     auto num = read_u32();
-    state.readers.reserve(num);
     for (uint32_t i = 0; i < num; i++) state.readers.insert(readReader(state.t));
 
     num = read_u32();
-    state.books.reserve(num);
     for (uint32_t i = 0; i < num; i++) state.books.insert(readBook());
 
     return shst;
@@ -695,7 +690,6 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
 
     // Friends
     auto num_friends = read_u32();
-    r.friends.reserve(num_friends);
     for (uint32_t i = 0; i < num_friends; i++)
         r.friends.insert(read_u32());
 
@@ -849,7 +843,8 @@ void FileStorage::writeState(const State &state) {
     // First the state's `t`:
     write_u32(state.t);
 
-    // NB: The order of these doesn't matter
+    // NB: The order of these doesn't technically matter, but state.readers is an ordered map so
+    // that we order by eris_id_t and thus get reproducible files for identical state data.
     if (not state.readers.empty()) {
         write_u8(TYPE_READERS);
         write_u32(state.readers.size());

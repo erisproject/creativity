@@ -63,10 +63,6 @@ int main(int argc, char *argv[1]) {
                 load_from_file = true;
                 break;
             case GUI::ParamType::save_as:
-                // TODO: this could actually be handled when already setup: it should be possible
-                // to copy the current Storage object into the new FileStorage.
-                if (setup) throw std::runtime_error("Cannot change file after initial setup");
-                if (load_from_file) throw std::runtime_error("Error: cannot load and save at the same time");
                 creativity->fileWrite(*reinterpret_cast<std::string*>(p.ptr));
                 save_to_file = true;
                 break;

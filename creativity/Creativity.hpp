@@ -44,18 +44,17 @@ class Creativity : private eris::noncopyable, public std::enable_shared_from_thi
         CreativitySettings& set();
 
         /** Store the creativity simulation results in the given file, overwriting any content the
-         * file may already have.  The existing Storage object is released (and destroyed, unless
+         * file may already have.  Any existing simulation states are copied from the current
+         * Storage object, then the existing Storage object is released (and destroyed, unless
          * something else has copied its shared_ptr).  After calling this method, `.storage` will be
          * set to the new FileStorage object.
-         *
-         * This must be called before calling setup().
          *
          * The default simulation storage is an in-memory storage.
          */
         void fileWrite(const std::string &filename);
 
-        /** Reads a creativity simulation storage file into storage().  The file is opened readonly,
-         * and so any attempt to manipulate the simulation will fail.
+        /** Opens a creativity simulation storage file for reading via storage().  The file is
+         * opened readonly, and so any attempt to manipulate the simulation will fail.
          *
          * This method is typically called instead of calling setup() when loading a creativity
          * simulation record from disk.
