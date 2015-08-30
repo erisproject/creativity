@@ -1051,7 +1051,7 @@ void FileStorage::writeBook(const BookState &b) {
     write_dbl(b.quality);
     if (version_ >= 2) {
         uint8_t status = 0;
-        if (b.market_private) status &= 1;
+        if (b.market_private) status |= 1;
         write_u8(status);
     }
     else {
