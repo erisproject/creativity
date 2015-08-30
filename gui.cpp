@@ -116,7 +116,7 @@ int main(int argc, char *argv[1]) {
         throw;
     }
 
-    while (!setup) {
+    while (not setup and not load_from_file) {
         gui.waitEvents();
         if (quit) return 0;
     }
