@@ -36,7 +36,7 @@ void Data::addOptions() {
 }
 
 void Data::postParse(boost::program_options::variables_map &vars) {
-    if (human_readable and not vars.count("precision")) {
+    if (human_readable and vars["precision"].defaulted()) {
         double_precision = 8;
     }
 }
