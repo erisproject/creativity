@@ -1100,9 +1100,11 @@ void GUI::runSim() {
 }
 
 void GUI::newStates(unsigned long switch_to) {
-    queueSignal((switch_to == (unsigned long)-1)
+    queueSignal(
+            (switch_to == (unsigned long)-1)
             ? Signal::Type::new_states
-            : Signal(Signal::Type::new_states, switch_to));
+            : Signal(Signal::Type::new_states, switch_to)
+            );
 }
 
 void GUI::initialized() {
