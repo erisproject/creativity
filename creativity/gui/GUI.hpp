@@ -265,6 +265,9 @@ class GUI : eris::noncopyable {
         /// Whether the piracy tick has been added to the period slider
         bool piracy_tick_added_ = false;
 
+        /// Whether the public tick has been added to the period slider
+        bool public_tick_added_ = false;
+
         /// Command-line parameters can override the gui.glade default values for settings
         std::unordered_map<std::string, double> default_override_;
 

@@ -947,6 +947,10 @@ void GUI::thr_signal() {
             widget<Gtk::Scale>("scale_state")->add_mark(creativity_->parameters.piracy_begins, Gtk::POS_BOTTOM, "");
             piracy_tick_added_ = true;
         }
+        if (not public_tick_added_ and last_progress.uls[1] >= creativity_->parameters.public_sharing_begins) {
+            widget<Gtk::Scale>("scale_state")->add_mark(creativity_->parameters.public_sharing_begins, Gtk::POS_BOTTOM, "");
+            public_tick_added_ = true;
+        }
 
         widget<Gtk::Label>("lbl_total")->set_text(std::to_string(last_progress.uls[1]));
         scale->set_fill_level(last_progress.uls[0]);
