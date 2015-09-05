@@ -15,6 +15,7 @@ std::string to_string(double d) {
 }
 
 VectorXd Variable::values(unsigned int rows, unsigned int offset, unsigned int trim) const {
+    if (rows == 0) rows = size();
     VectorXd col(rows);
     populate(col, offset, trim);
     return col;
@@ -52,5 +53,7 @@ void SimpleVariable::populate(Ref<VectorXd> column, unsigned int offset, unsigne
 
 std::string SimpleVariable::name() const { return name_; }
 
+unsigned int SimpleVariable::size() const { return col_.size(); }
+unsigned int ConstantVariable::size() const { throw SizeError("Cannot call size() on a ConstantVariable"); }
 
 }}

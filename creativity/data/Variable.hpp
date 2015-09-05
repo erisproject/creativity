@@ -46,11 +46,21 @@ class Variable {
 
         /** Shortcut wrapper around populate that creates a new column of the given size, calls
          * populate() with it, then returns it.
+         *
+         * If rows equals 0 (the default if not specified), the size is determined by a call to
+         * size().  Note, however, that size() will throw an exception if called on a Variable
+         * without an implied size, typically a ConstantVariable.
          */
-        Eigen::VectorXd values(unsigned int rows, unsigned int offset = 0, unsigned int trim = 0) const;
+        Eigen::VectorXd values(unsigned int rows = 0, unsigned int offset = 0, unsigned int trim = 0) const;
+
+        /** Returns the intrinsic size of this data.  If this Variable has no such intrinsic size,
+         * such as a ConstantVariable, this throws a SizeError exception.  If this variable is an
+         * expression with multiple sizes, this method return can return any of the sizes.
+         */
+        virtual unsigned int size() const = 0;
 
         /** Exception class thrown when attempting to populate a column from a source of an
-         * incompatible size.
+         * incompatible or unknown size.
          */
         class SizeError : public std::logic_error {
             public:
@@ -85,6 +95,10 @@ class ConstantVariable final : public Variable {
 
         /// Accesses the constant value
         const double& value() const;
+
+        /// Throws a SizeError exception (a ConstantVariable has no intrinsic size)
+        unsigned int size() const override;
+
     private:
         /// The actual constant value
         double c_ = 1.0;
@@ -103,6 +117,8 @@ class SimpleVariable : public Variable {
         virtual std::string name() const override;
         /// Overridden to not bracket the name
         virtual std::string nameBracketed(const std::string& = "(", const std::string& = ")") const override;
+        /// Returns the size of the underlying data column
+        unsigned int size() const override;
 
     protected:
         /// The name of this variable
@@ -193,6 +209,18 @@ class Multiplication : public MultiplicationBase {
 
             return left + op + right;
         }
+
+        /// Examines the data set to attempt to find and return a data size.
+        unsigned int size() const override {
+            try { return left_.size(); }
+            catch (SizeError&) {
+                // If both sides throw, we're a complex operation of just constants (so we want to
+                // throw):
+                return right_.size();
+            }
+        }
+
+
     protected:
         /// The left-hand Variable
         Left left_;
@@ -247,6 +275,17 @@ class Addition : public AdditionBase {
          * side operands.
          */
         virtual std::string name() const override { return left_.name() + "+" + right_.name(); }
+
+        /// Examines the data set to attempt to find and return a data size.
+        unsigned int size() const override {
+            try { return left_.size(); }
+            catch (SizeError&) {
+                // If both sides throw, we're a complex operation of just constants (so we want to
+                // throw):
+                return right_.size();
+            }
+        }
+
     protected:
         /// The left-hand Variable
         Left left_;
@@ -347,6 +386,16 @@ class Division : public DivisionBase {
             return left + op + right;
         }
 
+        /// Examines the data set to attempt to find and return a data size.
+        unsigned int size() const override {
+            try { return top_.size(); }
+            catch (SizeError&) {
+                // If both sides throw, we're a complex operation of just constants (so we want to
+                // throw):
+                return bottom_.size();
+            }
+        }
+
     protected:
         /// The left-hand Variable
         Top top_;
@@ -389,15 +438,15 @@ class Power : public PowerBase {
         virtual void populate(Eigen::Ref<Eigen::VectorXd> column, unsigned int offset = 0, unsigned int trim = 0) const override {
             var_.populate(column, offset, trim);
             if (power_ == 2)
-                column = column.cwiseProduct(column);
+                column = column.array().square();
             else if (power_ == 3)
-                column.unaryExpr([](double c) { return c*c*c; });
+                column = column.array().cube();
             else if (power_ == 0.5)
-                column = column.cwiseSqrt();
+                column = column.array().sqrt();
             else if (power_ == -1)
-                column = column.cwiseInverse();
+                column = column.array().inverse();
             else if (power_ != 1)
-                column = column.array().pow(power_).matrix();
+                column = column.array().pow(power_);
         }
 
         /** Returns the concatenation the underlying Variable name() with "^" and the power.  If V
@@ -405,6 +454,9 @@ class Power : public PowerBase {
          * surrounded by parentheses.
          */
         virtual std::string name() const override { return var_.nameBracketed() + "^" + to_string(power_); }
+
+        /// Examines the data set to attempt to find and return a data size.
+        unsigned int size() const override { return var_.size(); }
 
     protected:
         /// The Variable subclass with values to be inverted
@@ -446,9 +498,9 @@ class Exponential : public ExponentialBase {
             if (base_ == std::exp(1))
                 column = column.array().exp().matrix();
             else if (base_ == 2)
-                column.unaryExpr([](double c) { return std::exp2(c); });
+                column = column.unaryExpr([](double c) { return std::exp2(c); });
             else
-                column.unaryExpr([this](double c) { return std::pow(base_, c); });
+                column = column.unaryExpr([this](double c) { return std::pow(base_, c); });
         }
 
         /** Returns a string representation of the variable.  If the base equals `std::exp(1)`, this
@@ -460,10 +512,14 @@ class Exponential : public ExponentialBase {
             else return to_string(base_) + "^" + var_.nameBracketed();
         }
 
+        /// Returns the name of the variable such as '{2^name}' or 'exp(name)' or '{2^log(name)}'
         virtual std::string nameBracketed(const std::string &bracketL = "(", const std::string &bracketR = ")") const override {
             if (base_ == std::exp(1)) return "exp(" + var_.name() + ")";
             else return bracketL + to_string(base_) + "^" + var_.nameBracketed() + bracketR;
         }
+
+        /// Examines the data set to attempt to find and return a data size.
+        unsigned int size() const override { return var_.size(); }
 
     protected:
         /// The Variable subclass with values to be inverted
@@ -497,9 +553,8 @@ class Logarithm : public LogarithmBase {
             column = column.array().log().matrix();
         }
 
-        /** Returns a string representation of the variable.  If the base equals `std::exp(1)`, this
-         * is "exp(name)"; otherwise the name is "base^name", with parentheses added to name if it
-         * is a complex variable.
+        /** Returns a string representation of the variable, which is `log(name)`, where name is the
+         * name of the variable being log'ed.
          */
         virtual std::string name() const override {
             return "log(" + var_.name() + ")";
@@ -509,8 +564,11 @@ class Logarithm : public LogarithmBase {
             return name();
         }
 
+        /// Examines the data set to attempt to find and return a data size.
+        unsigned int size() const override { return var_.size(); }
+
     protected:
-        /// The Variable subclass with values to be inverted
+        /// The Variable subclass with values to be log'ed
         V var_;
 };
 
