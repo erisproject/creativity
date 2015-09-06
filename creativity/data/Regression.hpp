@@ -8,6 +8,7 @@ namespace creativity { namespace data {
  */
 class RankError : public std::runtime_error {
     public:
+        /// Constructor; takes an exception message
         RankError(const std::string &message) : std::runtime_error(message) {}
 };
 

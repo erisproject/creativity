@@ -4,6 +4,7 @@
 
 namespace creativity { namespace data {
 
+/** Class for running a basic OLS regression. */
 class OLS {
     public:
         /// No default constructor
@@ -42,7 +43,7 @@ class OLS {
         /// Returns the covariance estimate of the beta estimators
         const Eigen::MatrixXd& covariance();
 
-        /// Returns the regression standard error, \fs^2\f
+        /// Returns the regression standard error, \f$^2\f$
         const double& s2();
 
         /// Returns the residuals

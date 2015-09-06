@@ -121,7 +121,7 @@ class Equation::Proxy final {
         /// Appends another variable to the model; see Equation::operator<<
         template <class V, typename = typename std::enable_if<
             std::is_base_of<Variable, V>::value and std::is_move_constructible<V>::value>::type>
-        Proxy& operator + (V &&var);
+        Proxy& operator + (V &&var) { eq_.addVar(std::move(var)); return *this; }
     private:
         Equation &eq_;
         Proxy(Equation &eq);
@@ -143,12 +143,6 @@ template <class V, typename>
 Equation::Proxy Equation::operator % (V &&var) {
     addVar(std::move(var));
     return Proxy(*this);
-}
-
-template <class V, typename>
-Equation::Proxy& Equation::Proxy::operator + (V &&var) {
-    eq_.addVar(std::move(var));
-    return *this;
 }
 
 /// Specialization for a ConstantVariable
