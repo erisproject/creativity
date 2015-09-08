@@ -1,14 +1,76 @@
 #include "creativity/gui/GUI.hpp"
 #include "creativity/gui/ReaderStore.hpp"
 #include "creativity/gui/BookStore.hpp"
+#include "creativity/gui/ReaderInfoWindow.hpp"
+#include "creativity/gui/BookInfoWindow.hpp"
+#include "creativity/gui/GraphArea.hpp"
+#include "creativity/gui/InfoWindow.hpp"
+#include "creativity/state/State.hpp"
+#include "creativity/state/Storage.hpp"
 #include "creativity/Creativity.hpp"
 #include "creativity/config.hpp"
-#include "creativity/Reader.hpp"
-#include "creativity/Book.hpp"
-#include "creativity/BookMarket.hpp"
 #include <eris/Random.hpp>
+#include <boost/filesystem/path.hpp>
+#include <cairomm/matrix.h>
+#include <cairomm/pattern.h>
+#include <cairomm/refptr.h>
+#include <gdkmm/cursor.h>
+#include <gdkmm/device.h>
+#include <gdkmm/rgba.h>
+#include <gdkmm/window.h>
+#include <giomm/application.h>
+#include <glibmm/dispatcher.h>
+#include <glibmm/fileutils.h>
+#include <glibmm/main.h>
+#include <glibmm/refptr.h>
+#include <glibmm/signalproxy.h>
+#include <glibmm/ustring.h>
+#include <gtkmm/application.h>
+#include <gtkmm/box.h>
+#include <gtkmm/builder.h>
+#include <gtkmm/button.h>
+#include <gtkmm/checkbutton.h>
+#include <gtkmm/colorbutton.h>
+#include <gtkmm/combobox.h>
+#include <gtkmm/comboboxtext.h>
+#include <gtkmm/dialog.h>
+#include <gtkmm/entry.h>
+#include <gtkmm/enums.h>
+#include <gtkmm/expander.h>
+#include <gtkmm/filechooser.h>
+#include <gtkmm/filechooserdialog.h>
+#include <gtkmm/filefilter.h>
+#include <gtkmm/frame.h>
+#include <gtkmm/grid.h>
+#include <gtkmm/label.h>
+#include <gtkmm/main.h>
+#include <gtkmm/messagedialog.h>
+#include <gtkmm/notebook.h>
+#include <gtkmm/radiobutton.h>
+#include <gtkmm/scale.h>
+#include <gtkmm/scrolledwindow.h>
+#include <gtkmm/spinbutton.h>
+#include <gtkmm/stock.h>
+#include <gtkmm/treeiter.h>
+#include <gtkmm/treemodel.h>
+#include <gtkmm/treemodelcolumn.h>
+#include <gtkmm/treepath.h>
+#include <gtkmm/treeselection.h>
+#include <gtkmm/treeview.h>
+#include <gtkmm/treeviewcolumn.h> // IWYU pragma: keep
+#include <gtkmm/viewport.h>
+#include <gtkmm/widget.h>
+#include <gtkmm/window.h>
+#include <sigc++/connection.h>
+#include <cstddef>
+#include <exception>
+#include <iterator>
+#include <set>
+#include <stdexcept>
+#include <algorithm>
 #include <iostream>
 #include <cstdlib>
+#include <cmath>
 #include <iomanip>
 
 using namespace eris;
@@ -18,7 +80,8 @@ using namespace std::placeholders;
 namespace creativity { namespace gui {
 
 GUI::GUI(std::shared_ptr<Creativity> creativity,
-        std::function<void(Parameter)> setup,
+        std::function<void(Parameter)> configure,
+        std::function<void()> initialize,
         std::function<void(unsigned int count)> run,
         std::function<void()> stop,
         std::function<void()> resume,
@@ -26,15 +89,14 @@ GUI::GUI(std::shared_ptr<Creativity> creativity,
         std::function<void()> quit)
     :
         creativity_{std::move(creativity)},
-        on_setup_{std::move(setup)},
+        on_configure_{std::move(configure)},
+        on_initialize_{std::move(initialize)},
         on_run_{std::move(run)},
         on_stop_{std::move(stop)},
         on_resume_{std::move(resume)},
         on_step_{std::move(step)},
         on_quit_{std::move(quit)}
 {}
-
-GUI::Exception::Exception(const std::string &what) : std::runtime_error(what) {}
 
 double GUI::sb(const std::string &widget_name) {
     return widget<Gtk::SpinButton>(widget_name)->get_value();
@@ -43,12 +105,12 @@ int GUI::sb_int(const std::string &widget_name) {
     return widget<Gtk::SpinButton>(widget_name)->get_value_as_int();
 }
 
-void GUI::start(int argc, char *argv[]) {
+void GUI::start(const cmdargs::GUI &args) {
     if (gui_thread_.joinable())
         throw std::runtime_error("GUI thread can only be started once!");
 
-    app_ = Gtk::Application::create(argc, argv, "ca.imaginary.eris.creativity",
-            Gio::APPLICATION_NON_UNIQUE | Gio::APPLICATION_HANDLES_OPEN);
+    app_ = Gtk::Application::create("ca.imaginary.eris.creativity", Gio::APPLICATION_NON_UNIQUE);
+
     builder_ = Gtk::Builder::create();
 
     std::list<std::string> datadirs;
@@ -77,7 +139,10 @@ void GUI::start(int argc, char *argv[]) {
     // seed() call to affect the main thread, not the GUI thread.
     widget<Gtk::Entry>("set_seed")->set_text(std::to_string(eris::Random::seed()));
 
-    gui_thread_ = std::thread(&GUI::thr_run, this);
+    // Update the number of periods now, so that it has the right value when the GUI comes up
+    widget<Gtk::SpinButton>("set_periods")->set_value(args.periods);
+
+    gui_thread_ = std::thread(&GUI::thr_run, this, args);
 
     // Wait for the thread to finish its startup before returning
     std::unique_lock<std::mutex> lock(mutex_);
@@ -96,10 +161,13 @@ GUI::~GUI() {
         gui_thread_.join();
 }
 
-void GUI::thr_run() {
+void GUI::thr_run(const cmdargs::GUI &args) {
     main_window_ = std::shared_ptr<Gtk::Window>(widget<Gtk::Window>("window1"));
 
-    auto disable_on_load = {"fr_agents", "fr_save", "fr_run", "fr_sim"};
+    main_window_title_ = main_window_->get_title() + " v" + std::to_string(VERSION[0]) + "." + std::to_string(VERSION[1]) + "." + std::to_string(VERSION[2]);
+    main_window_->set_title(main_window_title_);
+
+    auto disable_on_load = {"fr_agents", "fr_run", "fr_sim"};
     // When the "load" radio button is activated, disable all the new simulation parameter fields
     widget<Gtk::RadioButton>("radio_load")->signal_clicked().connect([this,disable_on_load] {
         for (const auto &fr : disable_on_load) widget<Gtk::Frame>(fr)->set_sensitive(false);
@@ -134,14 +202,6 @@ void GUI::thr_run() {
         }
     });
 
-    // Set up a signal handler that is invoked if the application is started up with a filename
-    app_->signal_open().connect_notify([this](const std::vector<Glib::RefPtr<Gio::File>> &files, const Glib::ustring&) -> void {
-        if (files.size() != 1) throw std::runtime_error("Unable to open multiple files!");
-        load_ = files[0]->get_path();
-        app_->add_window(*main_window_);
-        main_window_->show_all();
-    }, true);
-
     // Clicking the save file chooser likewise fires the save radio, then also starts up the file
     // chooser dialog.
     widget<Gtk::Button>("btn_choose_save")->signal_clicked().connect([this] {
@@ -164,20 +224,20 @@ void GUI::thr_run() {
         auto result = fdlg.run();
         if (result == Gtk::RESPONSE_ACCEPT) {
             save_ = fdlg.get_filename();
+            saveSim();
         }
         else {
             save_ = "";
         }
-        widget<Gtk::Label>("lbl_save")->set_text(save_ == "" ? "(no file selected)" : save_);
     });
 
     widget<Gtk::Button>("btn_start")->signal_clicked().connect([this] {
-        setupSim();
+        initializeSim();
         runSim();
     });
 
     widget<Gtk::Button>("btn_init")->signal_clicked().connect([this] {
-        setupSim();
+        initializeSim();
     });
 
     widget<Gtk::Button>("btn_run")->signal_clicked().connect([this] {
@@ -197,36 +257,54 @@ void GUI::thr_run() {
     });
 
     auto thrbox = widget<Gtk::ComboBoxText>("combo_threads");
-    auto active = thrbox->get_active_row_number();
     // The gui setup has two entries: no threads, and 1 thread.  The latter is pointless (except for
     // eris debugging), so remove it, but first check to see if it was selected; if it was, we'll
     // update the default selection to the maximum number of threads; otherwise we'll leave it on no
     // threads.
     thrbox->remove_text(1);
     unsigned int last = 1;
+    bool added_requested_threads = args.threads == 0;
+    // List common number of threads by going up by increasing amounts so that the increment is
+    // always greater than 25% and at most 50%, so we get:
+    // 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, ...
+    // But stop that, of course, at the maximum number of hardware threads supported.
     for (unsigned int i = 2, incr = 1; i <= std::thread::hardware_concurrency(); i += incr) {
+        // If the user requested some oddball number that we skip with the next one, we need to add it
+        if (not added_requested_threads and i >= args.threads) {
+            if (i > args.threads) {
+                // We're about to skip over it, so add it
+                thrbox->append(std::to_string(args.threads), std::to_string(args.threads) +
+                        (args.threads > 1 ? " threads" : " thread"));
+            }
+            // Otherwise it's equal, which means we're about to add it
+            added_requested_threads = true;
+        }
+
         thrbox->append(std::to_string(i), std::to_string(i) + " threads");
         if (i >= 4*incr) incr *= 2;
         last = i;
     }
-    if (last < std::thread::hardware_concurrency()) {
-        // In case the processor has some weird number of max concurrency (such as 5,
-        // 7, 9-11, 13-15, 17-23, etc.) that doesn't get added above, add it.
-        std::string num = std::to_string(std::thread::hardware_concurrency());
-        thrbox->append(num, num + " threads");
+    // We might also need to add the hardware value and the requested value; the former if it is
+    // some oddball amount not caught above; the latter similarly, or if it exceeds the number of
+    // hardware threads.
+    unsigned int more[] = {std::thread::hardware_concurrency(), args.threads};
+    if (more[1] < more[0]) std::swap(more[0], more[1]);
+
+    for (auto &t : more) {
+        if (t > last) {
+            std::string num = std::to_string(t);
+            thrbox->append(num, num + " threads");
+            last = t;
+        }
     }
-    // If the GUI's default was the 1 thread option, update it to max threads
-    if (active > 0 and std::thread::hardware_concurrency() > 1)
-        thrbox->set_active_id(std::to_string(std::thread::hardware_concurrency()));
+
+    // Select the requested (or default) number of threads
+    thrbox->set_active_id(std::to_string(args.threads));
 
     thrbox->signal_changed().connect([this] {
-        int threads = widget<Gtk::ComboBoxText>("combo_threads")->get_active_row_number();
-
-        std::vector<Parameter> params;
-        Parameter p;
-        p.param = ParamType::threads;
-        p.ul = threads;
-        queueEvent(Event::Type::setup, std::move(params));
+        Parameter th;
+        th.param = ParamType::threads; th.ul = std::stoul(widget<Gtk::ComboBoxText>("combo_threads")->get_active_id());
+        queueEvent(th);
     });
 
     widget<Gtk::Entry>("set_seed")->signal_icon_press().connect([this](Gtk::EntryIconPosition icon_position, const GdkEventButton*) -> void {
@@ -298,12 +376,24 @@ void GUI::thr_run() {
     });
 
     graph_->add_events(Gdk::EventMask::SCROLL_MASK);
-    graph_->signal_scroll_event().connect([this](GdkEventScroll *event) -> bool {
-        if (event->direction == GdkScrollDirection::GDK_SCROLL_UP) {
+    // Gtk 3.16.1 reversed the scroll direction of the mousewheel on horizontal scales; having the
+    // scale above the graph scroll in the opposite direction as scrolling on the graph itself is
+    // really weird, so go with the flow for scrolling on the graph itself
+    const GdkScrollDirection scroll_back =
+        (::gtk_get_major_version() > 3 or (::gtk_get_major_version() == 3 and
+             (::gtk_get_minor_version() > 16 or (::gtk_get_minor_version() == 16 and ::gtk_get_micro_version() >= 1))))
+        ? /* >= 3.16.1 */ GdkScrollDirection::GDK_SCROLL_DOWN
+        : /* < 3.16.1 */ GdkScrollDirection::GDK_SCROLL_UP;
+    const GdkScrollDirection scroll_fwd = scroll_back == GdkScrollDirection::GDK_SCROLL_DOWN
+        ? GdkScrollDirection::GDK_SCROLL_UP
+        : GdkScrollDirection::GDK_SCROLL_DOWN;
+
+    graph_->signal_scroll_event().connect([this,scroll_back,scroll_fwd](GdkEventScroll *event) -> bool {
+        if (event->direction == scroll_back) {
             if (state_curr_ > 0) thr_set_state(state_curr_ - 1);
             return true;
         }
-        if (event->direction == GdkScrollDirection::GDK_SCROLL_DOWN) {
+        else if (event->direction == scroll_fwd) {
             if (state_curr_ + 1 < state_num_) thr_set_state(state_curr_ + 1);
             return true;
         }
@@ -346,10 +436,12 @@ void GUI::thr_run() {
     GUI_SETUP_VIS_SETTING_AFFECTS_RTREE(reader)
     GUI_SETUP_VIS_SETTING_AFFECTS_RTREE(book_live)
     GUI_SETUP_VIS_SETTING_AFFECTS_RTREE(book_dead)
+    GUI_SETUP_VIS_SETTING_AFFECTS_RTREE(book_public)
     GUI_SETUP_VIS_SETTING(friendship)
     GUI_SETUP_VIS_SETTING(movement)
     GUI_SETUP_VIS_SETTING(author_live)
     GUI_SETUP_VIS_SETTING(author_dead)
+    GUI_SETUP_VIS_SETTING(author_public)
     GUI_SETUP_VIS_SETTING(reading)
     GUI_SETUP_VIS_SETTING(utility_gain)
     GUI_SETUP_VIS_SETTING(utility_loss)
@@ -364,7 +456,7 @@ void GUI::thr_run() {
     // Update the attributes tooltips: only the SpinButtons in the glade file have tooltips, so copy
     // those tooltips into the associated Label as well (which is just left of the spinbutton in the
     // grid)
-    auto attribs_grid = widget<Gtk::Grid>("grid_sim_attribs");
+    auto attribs_grid = widget<Gtk::Grid>("grid_sim_params");
     bool done_copying_tooltips = false;
     for (int c = 1; not done_copying_tooltips; c += 2) {
         for (int r = 1; ; r++) {
@@ -391,11 +483,39 @@ void GUI::thr_run() {
     vis->add(*graph_);
     graph_->show();
 
-    Glib::signal_idle().connect_once([this,&lock] {
+    Glib::signal_idle().connect_once([this,&lock,&args] {
+            if (not args.input.empty()) {
+                load_ = args.input;
+            }
+            if (not args.output.empty()) {
+                save_ = args.output;
+                widget<Gtk::Label>("lbl_save")->set_text(save_);
+                main_window_->set_title(main_window_title_ + " [" + boost::filesystem::path(save_).filename().string() + "]");
+            }
+            bool init = false, run = false;
+            if (args.start) {
+                init = run = true;
+            }
+            else if (args.initialize) {
+                init = true;
+            }
+
+            // Have to do this *after* doing everything we want with args: GUI::start() waits on
+            // this lock, and our args reference isn't guaranteed to survive once start() returns.
+            // The actual calls to initializeSim() etc. can't be above, however, because they send a
+            // signal which would deadlock before releasing the thread startup lock:
             thread_running_ = true;
             lock.unlock();
             cv_.notify_all();
-            if (not load_.empty()) loadSim();
+
+            if (not load_.empty())
+                loadSim();
+            if (init) {
+                initializeSim();
+                if (run)
+                    runSim();
+            }
+
     });
 
     app_->run(*main_window_);
@@ -543,8 +663,8 @@ void GUI::thr_set_state(unsigned long t) {
     // unordered_map after an .erase() isn't guaranteed to be the same until C++14 (C++11 only
     // guarantees that iterators remain valid, but not necessarily in the same order).
     for (auto &w : info_windows_) {
-        if (w.second.get_visible())
-            w.second.refresh(state);
+        if (w.second->get_visible())
+            w.second->refresh(state);
         else
             del.push_back(w.first);
     }
@@ -581,7 +701,8 @@ void GUI::thr_set_state(unsigned long t) {
     for (auto &bp : state->books) {
         auto &b = bp.second;
         if (b.created == t) { books_new++; }
-        if (b.market()) { books_market++; book_sales += b.sales; book_price += b.price; book_revenue += b.revenue; book_quality += b.quality; }
+        // FIXME: what about distinguishing public/private sales?
+        if (b.market_private) { books_market++; book_sales += b.sales; book_price += b.price; book_revenue += b.revenue; book_quality += b.quality; }
         if (b.sales > 0) { books_w_sales++; }
         if (b.pirated > 0) { books_pirated++; book_pirated += b.pirated; }
     }
@@ -622,13 +743,18 @@ void GUI::thr_reset_rtrees() {
 
 void GUI::thr_init_rtree(RTree &rt, const std::shared_ptr<const State> &state) const {
     if (graph_->design.enabled.reader) {
-        for (auto &r : state->readers)
-            rt.insert(std::make_pair(rt_point{r.second.position[0], r.second.position[1]}, r.second.id));
+        for (auto &r : state->readers) {
+            auto gp = graph_->graph_position(r.second.position);
+            rt.insert(std::make_pair(rt_point{gp[0], gp[1]}, r.second.id));
+        }
     }
     if (graph_->design.enabled.book_live or graph_->design.enabled.book_dead) {
         for (auto &b : state->books) {
-            if (b.second.market() ? graph_->design.enabled.book_live : graph_->design.enabled.book_dead)
-                rt.insert(std::make_pair(rt_point{b.second.position[0], b.second.position[1]}, b.second.id));
+            if (b.second.market_private ? graph_->design.enabled.book_live :
+                    b.second.market_public() ? graph_->design.enabled.book_public : graph_->design.enabled.book_dead) {
+                auto gp = graph_->graph_position(b.second.position);
+                rt.insert(std::make_pair(rt_point{gp[0], gp[1]}, b.second.id));
+            }
         }
     }
 }
@@ -653,54 +779,42 @@ void GUI::thr_info_dialog(eris_id_t member_id) {
     auto already_open = info_windows_.find(member_id);
     if (already_open != info_windows_.end()) {
         // If the window is already active, just present it again
-        already_open->second.present();
+        already_open->second->present();
     }
     else {
-        std::shared_ptr<const State> state;
-        {
-            state = (*creativity_->storage().first)[state_curr_];
-        }
+        std::shared_ptr<const State> state((*creativity_->storage().first)[state_curr_]);
 
-        if (state->readers.count(member_id)) {
-            info_windows_.emplace(std::piecewise_construct,
-                    std::tuple<eris_id_t>{member_id},
-                    std::tuple<decltype(state), decltype(main_window_), eris_id_t, std::function<void(eris_id_t)>>{
-                        state, main_window_, member_id, std::bind(&GUI::thr_info_dialog, this, _1)});
-        }
-        else if (state->books.count(member_id)) {
-            info_windows_.emplace(std::piecewise_construct,
-                    std::tuple<eris_id_t>{member_id},
-                    std::tuple<decltype(state), decltype(main_window_), eris_id_t>{state, main_window_, member_id});
-        }
-        else {
+        if (state->readers.count(member_id))
+            info_windows_.emplace(
+                member_id, std::unique_ptr<InfoWindow>(
+                    new ReaderInfoWindow(state, main_window_, member_id, std::bind(&GUI::thr_info_dialog, this, _1))
+                )
+            );
+        else if (state->books.count(member_id))
+            info_windows_.emplace(
+                member_id, std::unique_ptr<InfoWindow>(
+                    new BookInfoWindow(state, main_window_, member_id)
+                )
+            );
+        else
             throw std::out_of_range("thr_info_dialog: requested member id does not exist");
-        }
 
     }
 }
 
 void GUI::thr_update_parameters() {
 #define SET_SB(PARAMETER) widget<Gtk::SpinButton>("set_" #PARAMETER)->set_value(creativity_->parameters.PARAMETER)
+    SET_SB(dimensions);
     SET_SB(readers);
     widget<Gtk::SpinButton>("set_density")->set_value(creativity_->densityFromBoundary());
+    SET_SB(reader_step_sd);
     SET_SB(book_distance_sd);
     SET_SB(book_quality_sd);
-    SET_SB(reader_step_sd);
     SET_SB(reader_creation_shape);
     SET_SB(reader_creation_scale_min);
     SET_SB(reader_creation_scale_max);
-    SET_SB(piracy_begins);
-    SET_SB(income);
-    SET_SB(cost_fixed);
-    SET_SB(cost_unit);
-    SET_SB(cost_piracy);
-    SET_SB(prior_scale);
-    SET_SB(prior_scale_piracy);
-    SET_SB(prior_scale_burnin);
-    SET_SB(burnin_periods);
-    SET_SB(prediction_draws);
     SET_SB(creation_time);
-    widget<Gtk::SpinButton>("set_piracy_link_proportion")->set_value(creativity_->parameters.piracy_link_proportion * 100.0);
+
 #define SET_INIT_SB(PARAMETER) widget<Gtk::SpinButton>("set_init_" #PARAMETER)->set_value(creativity_->parameters.initial.PARAMETER)
     SET_INIT_SB(prob_write);
     SET_INIT_SB(q_min);
@@ -709,8 +823,26 @@ void GUI::thr_update_parameters() {
     SET_INIT_SB(p_max);
     SET_INIT_SB(prob_keep);
     SET_INIT_SB(keep_price);
-#undef SET_SB
 #undef SET_INIT_SB
+
+    SET_SB(income);
+    SET_SB(cost_fixed);
+    SET_SB(cost_unit);
+    SET_SB(cost_piracy);
+
+    SET_SB(prior_scale);
+    SET_SB(prior_scale_burnin);
+    SET_SB(burnin_periods);
+    SET_SB(prediction_draws);
+
+    SET_SB(piracy_begins);
+    widget<Gtk::SpinButton>("set_piracy_link_proportion")->set_value(creativity_->parameters.piracy_link_proportion * 100.0);
+    SET_SB(prior_scale_piracy);
+
+    SET_SB(public_sharing_begins);
+    SET_SB(public_sharing_tax);
+    SET_SB(prior_scale_public_sharing);
+#undef SET_SB
 }
 
 void GUI::thr_signal() {
@@ -753,12 +885,11 @@ void GUI::thr_signal() {
         widget<Gtk::Notebook>("nb_tabs")->set_current_page(1);
 
         // Disable spin buttons:
-        for (auto &widg : {"set_readers", "set_density", "set_piracy_link_proportion",
-                "set_book_distance_sd", "set_book_quality_sd", "set_piracy_begins", "set_income",
-                "set_cost_fixed", "set_cost_unit", "set_cost_piracy", "set_init_prob_write",
-                "set_init_q_min", "set_init_q_max", "set_init_p_min", "set_init_p_max",
-                "set_init_prob_keep", "set_init_keep_price"})
-            widget<Gtk::SpinButton>(widg)->set_sensitive(false);
+        for (auto &field : widget<Gtk::Grid>("grid_sim_params")->get_children()) {
+            if (auto *sb = dynamic_cast<Gtk::SpinButton*>(field)) {
+                sb->set_sensitive(false);
+            }
+        }
 
         // Update the agent attributes settings with the settings from the creativity object.
         // These may be different from the defaults, particularly when opening a file.
@@ -815,6 +946,10 @@ void GUI::thr_signal() {
         if (not piracy_tick_added_ and last_progress.uls[1] >= creativity_->parameters.piracy_begins) {
             widget<Gtk::Scale>("scale_state")->add_mark(creativity_->parameters.piracy_begins, Gtk::POS_BOTTOM, "");
             piracy_tick_added_ = true;
+        }
+        if (not public_tick_added_ and last_progress.uls[1] >= creativity_->parameters.public_sharing_begins) {
+            widget<Gtk::Scale>("scale_state")->add_mark(creativity_->parameters.public_sharing_begins, Gtk::POS_BOTTOM, "");
+            public_tick_added_ = true;
         }
 
         widget<Gtk::Label>("lbl_total")->set_text(std::to_string(last_progress.uls[1]));
@@ -878,11 +1013,11 @@ void GUI::loadSim() {
     Parameter load;
     load.param = ParamType::load;
     load.ptr = &load_;
-    params.push_back(load);
-
-    queueEvent(Event::Type::setup, std::move(params));
+    queueEvent(load);
 
     widget<Gtk::Label>("lbl_load")->set_text(load_);
+
+    main_window_->set_title(main_window_title_ + " [" + boost::filesystem::path(load_).filename().string() + "]");
 
     // Disable and hide the simulation controls (at the top of the window), since loading is read-only
     auto controls = widget<Gtk::Box>("box_controls");
@@ -894,12 +1029,12 @@ void GUI::loadSim() {
         widget<Gtk::Label>(l)->set_visible(false);
 
     // Disable all the settings items that aren't modifiable anymore (basically everything except
-    // the visualization settings):
-    for (const auto &disable : {"fr_new", "fr_agents", "fr_sim", "fr_save", "fr_run"})
+    // the visualization settings and save button):
+    for (const auto &disable : {"fr_new", "fr_agents", "fr_sim", "fr_run"})
         widget<Gtk::Frame>(disable)->set_sensitive(false);
 
     // Completely disable and hide the expanders for settings that are totally irrelevant
-    for (const auto &kill : {"ex_sim", "ex_save", "ex_run"}) {
+    for (const auto &kill : {"ex_sim", "ex_run"}) {
         auto ex = widget<Gtk::Expander>(kill);
         ex->set_expanded(false);
         ex->set_sensitive(false);
@@ -909,14 +1044,34 @@ void GUI::loadSim() {
     widget<Gtk::Expander>("ex_vis")->set_expanded(true);
 }
 
-// Start a new simulation:
-void GUI::setupSim() {
+// Save a simulation to a file.  This copies the current simulation states (if any) and keeps the
+// file open for any future states.
+void GUI::saveSim() {
+    if (save_ == "") throw std::runtime_error("saveSim() called without save_ set to file to write");
+
+    Parameter save;
+    save.param = ParamType::save_as;
+    save.ptr = &save_;
+    queueEvent(save);
+
+    widget<Gtk::Label>("lbl_save")->set_text(save_);
+
+    main_window_->set_title(main_window_title_ + " [" + boost::filesystem::path(save_).filename().string() + "]");
+
+    widget<Gtk::Button>("btn_load")->set_sensitive(false);
+    widget<Gtk::RadioButton>("radio_load")->set_sensitive(false);
+    widget<Gtk::RadioButton>("radio_memory")->set_sensitive(false);
+}
+
+// Initialize a new simulation:
+void GUI::initializeSim() {
     // Set the parameters directly
     auto &set = creativity_->set();
-    set.readers = lround(sb("set_readers"));
-    set.boundary = Creativity::boundaryFromDensity(set.readers, set.dimensions, sb("set_density"));
 #define COPY_SB_D(PARAMETER) set.PARAMETER = sb("set_"#PARAMETER)
 #define COPY_SB_I(PARAMETER) set.PARAMETER = lround(sb("set_"#PARAMETER))
+    COPY_SB_I(dimensions);
+    COPY_SB_I(readers);
+    set.boundary = Creativity::boundaryFromDensity(set.readers, set.dimensions, sb("set_density"));
     COPY_SB_I(piracy_begins);
     COPY_SB_D(piracy_link_proportion) * 0.01; // From percentage
     COPY_SB_D(book_distance_sd);
@@ -945,18 +1100,15 @@ void GUI::setupSim() {
     COPY_SB_INIT_D(keep_price);
 #undef COPY_SB_D
 #undef SET_INIT_SB
-    std::vector<Parameter> params;
+
+    // Other non-simulation options need to be queued via a configure event:
     Parameter p;
-    p.param = ParamType::seed; p.ul = std::stoul(widget<Gtk::Entry>("set_seed")->get_text()); params.push_back(p);
-    int threads = widget<Gtk::ComboBoxText>("combo_threads")->get_active_row_number();
-    if (threads < 0) threads = 0; // -1 means no item selected (shouldn't be possible, but just in case)
-    p.param = ParamType::threads; p.ul = (unsigned long)threads; params.push_back(p);
+    p.param = ParamType::seed; p.ul = std::stoul(widget<Gtk::Entry>("set_seed")->get_text());
+    queueEvent(p);
+    p.param = ParamType::threads; p.ul = std::stoul(widget<Gtk::ComboBoxText>("combo_threads")->get_active_id());
+    queueEvent(p);
 
-    if (save_ != "") {
-        p.param = ParamType::save_as; p.ptr = &save_; params.push_back(p);
-    }
-
-    queueEvent(Event::Type::setup, std::move(params));
+    queueEvent(Event::Type::initialize);
 }
 
 void GUI::runSim() {
@@ -964,9 +1116,11 @@ void GUI::runSim() {
 }
 
 void GUI::newStates(unsigned long switch_to) {
-    queueSignal((switch_to == (unsigned long)-1)
+    queueSignal(
+            (switch_to == (unsigned long)-1)
             ? Signal::Type::new_states
-            : Signal(Signal::Type::new_states, switch_to));
+            : Signal(Signal::Type::new_states, switch_to)
+            );
 }
 
 void GUI::initialized() {
@@ -988,10 +1142,8 @@ void GUI::stopped(bool manual) { queueSignal({Signal::Type::stopped, manual}); }
 void GUI::error(std::string message) { queueSignal({ Signal::Type::error, message }); }
 
 GUI::Event::Event(Event::Type t) : type{t} {}
-GUI::Event::Event(Event::Type t, std::vector<Parameter> &&p)
-    : type{t}, parameters{std::move(p)} {}
-GUI::Event::Event(Event::Type t, unsigned long ulval)
-    : type{t}, ul{ulval} {}
+GUI::Event::Event(const Parameter &p) : type{Event::Type::configure}, parameter(p) {}
+GUI::Event::Event(Event::Type t, unsigned long ulval): type{t}, ul{ulval} {}
 GUI::Event::operator bool() { return type != Type::none; }
 
 void GUI::checkEvents() {
@@ -1032,19 +1184,18 @@ void GUI::handleEvent(const Event &event) {
     std::vector<std::string> setup_errors;
     try {
         switch (event.type) {
-            case Event::Type::setup:
-                if (on_setup_ and not event.parameters.empty()) {
-                    on_setup_({ParamType::begin, {0}});
-                    for (auto &p : event.parameters) {
-                        try {
-                            on_setup_(p);
-                        }
-                        catch (std::exception &e) {
-                            setup_errors.push_back(e.what());
-                        }
+            case Event::Type::configure:
+                if (on_configure_) {
+                    try {
+                        on_configure_(event.parameter);
                     }
-                    on_setup_({ setup_errors.empty() ? ParamType::finished : ParamType::erred, {0} });
+                    catch (const std::exception &e) {
+                        setup_errors.push_back(e.what());
+                    }
                 }
+                break;
+            case Event::Type::initialize:
+                if (on_initialize_) on_initialize_();
                 break;
             case Event::Type::run:
                 if (on_run_) on_run_(event.ul);
@@ -1061,8 +1212,8 @@ void GUI::handleEvent(const Event &event) {
             case Event::Type::quit:
                 if (on_quit_) on_quit_();
                 break;
-            default: // Ignore anything else
-                break;
+            case Event::Type::none:
+                break; // no op
         }
     } catch (std::exception &e) {
         queueSignal({ Signal::Type::error, std::string{"An exception has occured: "} + e.what() });

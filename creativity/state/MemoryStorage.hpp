@@ -1,9 +1,15 @@
 #pragma once
-#include "creativity/state/Storage.hpp"
 #include "creativity/state/StorageBackend.hpp"
+#include <eris/types.hpp>
+#include <cstddef>
+#include <memory>
 #include <vector>
 
+namespace creativity { struct CreativitySettings; }
+
 namespace creativity { namespace state {
+
+class Storage;
 
 /** Class for in-memory storage (using an underlying std::vector).  All States are stored in memory
  * (via std::shared_ptr) for immediate retrieval.

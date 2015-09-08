@@ -2,6 +2,14 @@
 #include "creativity/BookMarket.hpp"
 #include "creativity/Reader.hpp"
 #include "creativity/Creativity.hpp"
+#include <algorithm>
+#include <iterator>
+#include <limits>
+#include <stdexcept>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
 
 using namespace eris;
 
@@ -12,14 +20,12 @@ Book::Book(
         const Position &p,
         SharedMember<Reader> author,
         unsigned int order,
-        double initial_price,
         double quality,
         std::function<double(const Book&)> qDraw)
     : WrappedPositional<Good::Discrete>(p, author->wrapLowerBound(), author->wrapUpperBound()),
         creativity_{std::move(creativity)},
         author_{std::move(author)},
         order_{order},
-        init_price_{initial_price},
         quality_{quality},
         quality_draw_{std::move(qDraw)}
 {}
@@ -27,25 +33,37 @@ Book::Book(
 void Book::added() {
     auto sim = simulation();
     created_ = sim->t();
+    left_private_market_ = created_;
 
     // These shouldn't be doing anything, but clear everything just in case a Book is removed and reintroduced:
-    copies_sold_total_ = 0;
+    copies_public_total_ = copies_private_total_ = copies_pirated_total_ = 0;
     copies_sold_.clear();
-    copies_pirated_total_ = 0;
     copies_pirated_.clear();
-    revenue_total_ = 0;
+    revenue_public_total_ = revenue_private_total_ = 0;
     revenue_.clear();
 
-    auto mkt = sim->spawn<BookMarket>(creativity_, sharedSelf(), init_price_);
     creativity_->newBooks().first.push_back(sharedSelf());
-    market_ = mkt;
-    dependsWeaklyOn(mkt);
 }
 
-void Book::weakDepRemoved(SharedMember<Member>, eris_id_t old) {
+void Book::setMarket(SharedMember<BookMarket> market) {
+    if (market_) throw std::runtime_error("Attempt to set a market for a book that already has a market");
+    if (market->isPublic()) {
+        market_private_ = false;
+        if (public_market_created_ == 0)
+            public_market_created_ = simulation()->t();
+    }
+    else {
+        market_private_ = true;
+    }
+    market_ = market;
+    dependsWeaklyOn(market);
+}
+
+void Book::weakDepRemoved(SharedMember<Member> mkt, eris_id_t old) {
     if (old == market_) {
         market_ = 0;
-        out_of_print_ = simulation()->t();
+        if (not SharedMember<BookMarket>(mkt)->isPublic())
+            left_private_market_ = simulation()->t();
     }
 }
 
@@ -57,14 +75,19 @@ const eris_time_t& Book::created() const {
     return created_;
 }
 
-const eris_time_t& Book::outOfPrint() const {
-    return out_of_print_;
+const eris_time_t& Book::leftPrivateMarket() const {
+    return left_private_market_;
 }
 
-unsigned int Book::marketPeriods() const {
-    return hasMarket()
+const eris_time_t& Book::publicMarketCreated() const {
+    return public_market_created_;
+}
+
+unsigned int Book::privateMarketPeriods() const {
+    auto lock = readLock();
+    return hasPrivateMarket()
         ? age() + 1 // Plus 1 to count the current period
-        : outOfPrint() - created();
+        : leftPrivateMarket() - created();
 }
 
 const unsigned int& Book::order() const {
@@ -73,7 +96,14 @@ const unsigned int& Book::order() const {
 
 unsigned int Book::lifeSales() const {
     auto lock = readLock();
-    return copies_sold_total_;
+    return lifeSalesPrivate() + lifeSalesPublic();
+}
+
+unsigned int Book::lifeSalesPrivate() const {
+    return copies_private_total_;
+}
+unsigned int Book::lifeSalesPublic() const {
+    return copies_public_total_;
 }
 
 unsigned int Book::currSales() const {
@@ -113,8 +143,17 @@ unsigned int Book::pirated(eris_time_t t) const {
 
 void Book::recordSale(unsigned int count, double revenue) {
     auto lock = writeLock();
-    copies_sold_total_ += count;
-    revenue_total_ += revenue;
+    if (not hasAnyMarket())
+        throw std::runtime_error("Book: cannot record sales for a book without a market");
+
+    if (hasPrivateMarket()) {
+        copies_private_total_ += count;
+        revenue_private_total_ += revenue;
+    }
+    else {
+        copies_public_total_ += count;
+        revenue_public_total_ += revenue;
+    }
     auto t = simulation()->t();
     copies_sold_[t] += count;
     revenue_[t] += revenue;
@@ -126,9 +165,23 @@ void Book::recordPiracy(unsigned int new_copies) {
     copies_pirated_[simulation()->t()] += new_copies;
 }
 
+double Book::lifeRevenuePrivate() const {
+    return revenue_private_total_;
+}
+
+double Book::lifeRevenuePublic() const {
+    return revenue_public_total_;
+}
+
 double Book::lifeRevenue() const {
     auto lock = readLock();
-    return revenue_total_;
+    return revenue_public_total_ + revenue_private_total_;
+}
+
+double Book::lifeProfitPrivate() const {
+    return lifeRevenuePrivate()
+        - privateMarketPeriods() * creativity_->parameters.cost_fixed
+        - lifeSalesPrivate() * creativity_->parameters.cost_unit;
 }
 
 double Book::currRevenue() const {
@@ -166,8 +219,18 @@ SharedMember<Reader> Book::author() const {
     return author_;
 }
 
-bool Book::hasMarket() const {
+bool Book::hasAnyMarket() const {
     return market_ != 0;
+}
+
+bool Book::hasPrivateMarket() const {
+    auto lock = readLock();
+    return market_private_ and market_ != 0;
+}
+
+bool Book::hasPublicMarket() const {
+    auto lock = readLock();
+    return not market_private_ and market_ != 0;
 }
 
 SharedMember<BookMarket> Book::market() const {
@@ -175,7 +238,7 @@ SharedMember<BookMarket> Book::market() const {
 }
 
 double Book::price() const {
-    return hasMarket()
+    return hasAnyMarket()
         ? market()->price()
         : std::numeric_limits<double>::quiet_NaN();
 }

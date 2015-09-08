@@ -1,6 +1,8 @@
 #include "creativity/state/BookState.hpp"
 #include "creativity/Book.hpp"
 #include "creativity/Reader.hpp"
+#include <eris/Position.hpp>
+#include <eris/SharedMember.hpp>
 
 namespace creativity { namespace state {
 
@@ -15,15 +17,17 @@ BookState::BookState(const Book &b) :
     author{b.author()->id()},
     position{b.position()},
     quality{b.quality()},
+    market_private{b.hasPrivateMarket()},
     price{b.price()},
     revenue{b.currRevenue()},
     revenue_lifetime{b.lifeRevenue()},
     sales{b.currSales()},
-    sales_lifetime{b.lifeSales()},
+    sales_lifetime_private{b.lifeSalesPrivate()},
+    sales_lifetime_public{b.lifeSalesPublic()},
     pirated{b.currPirated()},
     pirated_lifetime{b.lifePirated()},
     created{b.created()},
-    lifetime{b.marketPeriods()}
+    lifetime_private{b.privateMarketPeriods()}
 {}
 
 }}

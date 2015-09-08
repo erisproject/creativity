@@ -1,7 +1,15 @@
 #include "creativity/state/FileStorage.hpp"
-#include "creativity/Creativity.hpp"
-#include <cmath>
+#include <cerrno>
+#include <cstring>
 #include <sys/stat.h>
+#include <limits>
+#include <map>
+#include <algorithm>
+#include <eris/Position.hpp>
+#include "creativity/belief/Demand.hpp"
+#include "creativity/belief/Profit.hpp"
+#include "creativity/belief/ProfitStream.hpp"
+#include "creativity/belief/Quality.hpp"
 
 #ifdef ERIS_DEBUG
 #define FILESTORAGE_DEBUG_WRITE_START \
@@ -22,12 +30,14 @@ using namespace eris;
 using namespace eris::belief;
 using namespace creativity::belief;
 using namespace Eigen;
+using DrawMode = BayesianLinearRestricted::DrawMode;
 
 /// Member definitions for header/cblock constants
 constexpr unsigned int
         FileStorage::BLOCK_SIZE,
         FileStorage::HEADER::size,
         FileStorage::HEADER::states,
+        FileStorage::HEADER::states_v1,
         FileStorage::CBLOCK::states,
         FileStorage::CBLOCK::next_cblock,
         FileStorage::LIBRARY::record_size,
@@ -37,6 +47,10 @@ constexpr char
         FileStorage::HEADER::test_value[],
         FileStorage::ZERO_BLOCK[];
 constexpr uint64_t FileStorage::HEADER::u64_test;
+constexpr  int64_t FileStorage::HEADER::i64_test;
+constexpr uint32_t FileStorage::HEADER::u32_test;
+constexpr  int32_t FileStorage::HEADER::i32_test;
+constexpr double FileStorage::HEADER::dbl_test;
 constexpr int64_t
         FileStorage::HEADER::pos::fileid,
         FileStorage::HEADER::pos::filever,
@@ -69,13 +83,14 @@ constexpr int64_t
         FileStorage::HEADER::pos::init_p_max,
         FileStorage::HEADER::pos::init_prob_keep,
         FileStorage::HEADER::pos::init_keep_price,
+        FileStorage::HEADER::pos::public_sharing_begins,
+        FileStorage::HEADER::pos::public_sharing_tax,
+        FileStorage::HEADER::pos::prior_scale_public_sharing,
         FileStorage::HEADER::pos::state_first,
+        FileStorage::HEADER::pos::state_first_v1,
         FileStorage::HEADER::pos::state_last,
-        FileStorage::HEADER::pos::continuation,
-        FileStorage::HEADER::i64_test;
-constexpr uint32_t FileStorage::HEADER::u32_test;
-constexpr int32_t FileStorage::HEADER::i32_test;
-constexpr double FileStorage::HEADER::dbl_test;
+        FileStorage::HEADER::pos::continuation;
+
 constexpr std::ios_base::openmode FileStorage::open_readonly, FileStorage::open_overwrite, FileStorage::open_readwrite;
 
 FileStorage::ParseError::ParseError(const std::string &message) : std::runtime_error(message) {}
@@ -215,7 +230,7 @@ void FileStorage::flush() {
 void FileStorage::writeEmptyHeader() {
     f_.seekp(0);
     f_.write(HEADER::fileid, sizeof HEADER::fileid); // 'CrSt' file signature
-    write_u32(1); // file version
+    write_u32(version_); // file version
     f_.write(HEADER::test_value, sizeof HEADER::test_value); // All test values squished into one
 
     // Write out 0s for everything else:
@@ -268,13 +283,22 @@ void FileStorage::writeSettings(const CreativitySettings &settings) {
     write_value(settings.initial.prob_keep);
     write_value(settings.initial.keep_price);
     write_value(settings.initial.belief_threshold);
+    if (version_ >= 2) {
+        write_value(settings.public_sharing_begins);
+        write_value(settings.public_sharing_tax);
+        write_value(settings.prior_scale_public_sharing);
+    }
+    else {
+        write_u32(0); // Unused padding value in v1 files
+    }
 
     // Uncommented when padding needed:
-    write_u32(0); // Unused padding value
+    //write_u32(0); // Unused padding value
 
-    if (f_.tellp() != HEADER::pos::state_first) {
+    int64_t expect = version_ >= 2 ? HEADER::pos::state_first : HEADER::pos::state_first_v1;
+    if (f_.tellp() != expect) {
         // If this exception occurs, something in the above sequence is wrong.
-        throw std::runtime_error("Header writing failed: header size != " + std::to_string(HEADER::size) + " bytes");
+        throw std::runtime_error("Header writing failed: header parameter block != " + std::to_string(expect) + " bytes");
     }
 
     // Copy the settings (so that readSettings() will return the right thing)
@@ -349,7 +373,7 @@ int64_t FileStorage::newBlock() {
     return location;
 }
 
-void FileStorage::writeLibraryPointerBlock(const std::unordered_map<eris_id_t, ReaderState> &readers) {
+void FileStorage::writeLibraryPointerBlock(const std::map<eris_id_t, ReaderState> &readers) {
     f_.seekp(0, f_.end);
     if (f_.tellp() != HEADER::size)
         throwParseError("writing library pointer block failed: file is not just the header");
@@ -463,16 +487,21 @@ void FileStorage::parseMetadata() {
     f_.seekg(0);
     f_.read(block, HEADER::size);
 
-    if (block[0] != 'C' or block[1] != 'r' or block[2] != 'S' or block[3] != 't')
-        throwParseError("'CrSt' file signature not found");
+    // Make sure the CrSt file signature is found:
+    for (unsigned int i = 0; i < 4; i++) {
+        if (block[HEADER::pos::fileid+i] != HEADER::fileid[i])
+            throwParseError("'CrSt' file signature not found");
+    }
 
-    auto version = parse_value<uint32_t>(block[4]);
-    if (version != 1)
-        throwParseError("encountered unknown version " + std::to_string(version) + " != 1");
+    auto version = parse_value<uint32_t>(block[HEADER::pos::filever]);
+    if (version < 1 or version > 2)
+        throwParseError("encountered unknown version " + std::to_string(version));
+    version_ = version;
 
-    // Okay, so we've got a CrSt version 1 file.  The version number lets the file format change
+    // Okay, so we've got a CrSt version 1 or 2 file.  The version number lets the file format change
     // later, if necessary, in which case this code will need to handle the different versions.  For
-    // now there is one and only one version, 1.
+    // now there are v1 and v2 files: v2 files don't include the per-user cost and income variables,
+    // and adds PublicTracker settings and an agent.
 
     // Sanity check: make sure these types are the size we expect
 #define CHECK_SIZE(TYPE, SIZE) if (sizeof(TYPE) != SIZE) throwParseError("sizeof(" #TYPE ") != " #SIZE)
@@ -499,34 +528,43 @@ void FileStorage::parseMetadata() {
     // number of states:
     auto num_states = parse_value<uint32_t>(block[HEADER::pos::num_states]);
 
-    parse_value(block[HEADER::pos::dimensions], settings_.dimensions);
-    parse_value(block[HEADER::pos::readers], settings_.readers);
-    parse_value(block[HEADER::pos::boundary], settings_.boundary);
-    parse_value(block[HEADER::pos::book_distance_sd], settings_.book_distance_sd);
-    parse_value(block[HEADER::pos::book_quality_sd], settings_.book_quality_sd);
-    parse_value(block[HEADER::pos::reader_step_sd], settings_.reader_step_sd);
-    parse_value(block[HEADER::pos::reader_creation_shape], settings_.reader_creation_shape);
-    parse_value(block[HEADER::pos::reader_creation_scale_min], settings_.reader_creation_scale_min);
-    parse_value(block[HEADER::pos::reader_creation_scale_max], settings_.reader_creation_scale_max);
-    parse_value(block[HEADER::pos::creation_time], settings_.creation_time);
-    parse_value(block[HEADER::pos::cost_fixed], settings_.cost_fixed);
-    parse_value(block[HEADER::pos::cost_unit], settings_.cost_unit);
-    parse_value(block[HEADER::pos::cost_piracy], settings_.cost_piracy);
-    parse_value(block[HEADER::pos::income], settings_.income);
-    parse_value(block[HEADER::pos::piracy_begins], settings_.piracy_begins);
-    parse_value(block[HEADER::pos::piracy_link_proportion], settings_.piracy_link_proportion);
-    parse_value(block[HEADER::pos::prior_scale], settings_.prior_scale);
-    parse_value(block[HEADER::pos::prior_scale_piracy], settings_.prior_scale_piracy);
-    parse_value(block[HEADER::pos::prior_scale_burnin], settings_.prior_scale_burnin);
-    parse_value(block[HEADER::pos::burnin_periods], settings_.burnin_periods);
-    parse_value(block[HEADER::pos::init_prob_write], settings_.initial.prob_write);
-    parse_value(block[HEADER::pos::init_q_min], settings_.initial.q_min);
-    parse_value(block[HEADER::pos::init_q_max], settings_.initial.q_max);
-    parse_value(block[HEADER::pos::init_p_min], settings_.initial.p_min);
-    parse_value(block[HEADER::pos::init_p_max], settings_.initial.p_max);
-    parse_value(block[HEADER::pos::init_prob_keep], settings_.initial.prob_keep);
-    parse_value(block[HEADER::pos::init_keep_price], settings_.initial.keep_price);
-    parse_value(block[HEADER::pos::init_belief_threshold], settings_.initial.belief_threshold);
+#define PARSE_VALUE(FIELD) parse_value(block[HEADER::pos::FIELD], settings_.FIELD)
+#define PARSE_VALUE_INIT(FIELD) parse_value(block[HEADER::pos::init_##FIELD], settings_.initial.FIELD)
+    PARSE_VALUE(dimensions);
+    PARSE_VALUE(readers);
+    PARSE_VALUE(boundary);
+    PARSE_VALUE(book_distance_sd);
+    PARSE_VALUE(book_quality_sd);
+    PARSE_VALUE(reader_step_sd);
+    PARSE_VALUE(reader_creation_shape);
+    PARSE_VALUE(reader_creation_scale_min);
+    PARSE_VALUE(reader_creation_scale_max);
+    PARSE_VALUE(creation_time);
+    PARSE_VALUE(cost_fixed);
+    PARSE_VALUE(cost_unit);
+    PARSE_VALUE(cost_piracy);
+    PARSE_VALUE(income);
+    PARSE_VALUE(piracy_begins);
+    PARSE_VALUE(piracy_link_proportion);
+    PARSE_VALUE(prior_scale);
+    PARSE_VALUE(prior_scale_piracy);
+    PARSE_VALUE(prior_scale_burnin);
+    PARSE_VALUE(burnin_periods);
+    PARSE_VALUE_INIT(prob_write);
+    PARSE_VALUE_INIT(q_min);
+    PARSE_VALUE_INIT(q_max);
+    PARSE_VALUE_INIT(p_min);
+    PARSE_VALUE_INIT(p_max);
+    PARSE_VALUE_INIT(prob_keep);
+    PARSE_VALUE_INIT(keep_price);
+    PARSE_VALUE_INIT(belief_threshold);
+    if (version_ >= 2) {
+        PARSE_VALUE(public_sharing_begins);
+        PARSE_VALUE(public_sharing_tax);
+        PARSE_VALUE(prior_scale_public_sharing);
+    }
+#undef PARSE_VALUE
+#undef PARSE_VALUE_INIT
 
     if (settings_.dimensions == 0) throwParseError("found invalid dimensions == 0");
     if (settings_.readers == 0) throwParseError("found invalid readers == 0");
@@ -542,8 +580,8 @@ void FileStorage::parseMetadata() {
 
     state_pos_.reserve(num_states);
 
-    size_t header_states = std::min(num_states, HEADER::states);
-    parseStateLocations(block[HEADER::pos::state_first], header_states, file_size);
+    size_t header_states = std::min(num_states, version_ == 1 ? HEADER::states_v1 : HEADER::states);
+    parseStateLocations(block[version_ == 1 ? HEADER::pos::state_first_v1 : HEADER::pos::state_first], header_states, file_size);
 
     uint32_t remaining = num_states - header_states;
     while (remaining > 0) {
@@ -581,6 +619,8 @@ void FileStorage::parseStateLocations(const char &from, const size_t count, cons
 }
 
 std::shared_ptr<const State> FileStorage::readState() const {
+    if (version_ == 1) return readState_v1();
+
     State *st_ptr = new State();
     State &state = *st_ptr;
     std::shared_ptr<const State> shst(st_ptr);
@@ -589,20 +629,52 @@ std::shared_ptr<const State> FileStorage::readState() const {
     state.dimensions = settings_.dimensions;
     state.boundary = settings_.boundary;
 
-    auto num_readers = read_u32();
-    state.readers.reserve(num_readers);
-    for (uint32_t i = 0; i < num_readers; i++) {
-        state.readers.insert(readReader(state.t));
-    }
-
-    auto num_books = read_u32();
-    state.books.reserve(num_books);
-    for (uint32_t i = 0; i < num_books; i++) {
-        state.books.insert(readBook());
+    for (uint8_t type = read_u8(); type != TYPE_DONE; type = read_u8()) {
+        switch (type) {
+            case TYPE_READERS:
+                {
+                    auto num = read_u32();
+                    for (uint32_t i = 0; i < num; i++) state.readers.insert(readReader(state.t));
+                    break;
+                }
+            case TYPE_BOOKS:
+                {
+                    auto num = read_u32();
+                    for (uint32_t i = 0; i < num; i++) state.books.insert(readBook());
+                    break;
+                }
+            case TYPE_PUBLIC_TRACKER:
+                {
+                    if (state.publictracker) throw std::runtime_error("File error: found multiple public trackers");
+                    state.publictracker = readPublicTracker();
+                    break;
+                }
+            default:
+                throw std::runtime_error("File error: found invalid/unsupported record type `" + std::to_string(type) + "'");
+        }
     }
 
     return shst;
 }
+
+std::shared_ptr<const State> FileStorage::readState_v1() const {
+    State *st_ptr = new State();
+    State &state = *st_ptr;
+    std::shared_ptr<const State> shst(st_ptr);
+
+    state.t = read_u32();
+    state.dimensions = settings_.dimensions;
+    state.boundary = settings_.boundary;
+
+    auto num = read_u32();
+    for (uint32_t i = 0; i < num; i++) state.readers.insert(readReader(state.t));
+
+    num = read_u32();
+    for (uint32_t i = 0; i < num; i++) state.books.insert(readBook());
+
+    return shst;
+}
+
 
 std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
     auto pair = std::make_pair<eris_id_t, ReaderState>(
@@ -618,7 +690,6 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
 
     // Friends
     auto num_friends = read_u32();
-    r.friends.reserve(num_friends);
     for (uint32_t i = 0; i < num_friends; i++)
         r.friends.insert(read_u32());
 
@@ -639,11 +710,13 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
     // Utility
     r.u = read_dbl();
     r.u_lifetime = read_dbl();
-    // Costs
-    r.cost_fixed = read_dbl();
-    r.cost_unit = read_dbl();
-    r.cost_piracy = read_dbl();
-    r.income = read_dbl();
+    if (version_ == 1) {
+        // Skip old fields (no longer used or supported)
+        read_dbl(); // cost_fixed
+        read_dbl(); // cost_unit
+        read_dbl(); // cost_piracy
+        read_dbl(); // income
+    }
     r.creation_shape = read_dbl();
     r.creation_scale = read_dbl();
 
@@ -653,6 +726,7 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
         r.profit = belief.noninformative
             ? Profit(belief.K)
             : Profit(belief.beta, belief.s2, belief.Vinv, belief.n);
+        r.profit.last_draw_mode = belief.last_draw_mode;
         r.profit.draw_rejection_success = belief.draw_success_cumulative;
         r.profit.draw_rejection_discards = belief.draw_discards_cumulative;
     }
@@ -662,6 +736,7 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
         r.profit_extrap = belief.noninformative
             ? Profit(belief.K)
             : Profit(belief.beta, belief.s2, belief.Vinv, belief.n);
+        r.profit_extrap.last_draw_mode = belief.last_draw_mode;
         r.profit_extrap.draw_rejection_success = belief.draw_success_cumulative;
         r.profit_extrap.draw_rejection_discards = belief.draw_discards_cumulative;
     }
@@ -671,6 +746,7 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
         r.demand = belief.noninformative
             ? Demand(belief.K)
             : Demand(belief.beta, belief.s2, belief.Vinv, belief.n);
+        r.demand.last_draw_mode = belief.last_draw_mode;
         r.demand.draw_rejection_success = belief.draw_success_cumulative;
         r.demand.draw_rejection_discards = belief.draw_discards_cumulative;
     }
@@ -720,8 +796,13 @@ FileStorage::belief_data FileStorage::readBelief() const {
     // The lowest-value bit indicates this is a restricted belief
     // information)
     bool restricted_model = status & 1;
-    bool last_draw_was_gibbs = status & 2;
     belief.noninformative = status & 4;
+    belief.last_draw_mode =
+        (restricted_model) ?
+            (status & 2) ? DrawMode::Gibbs :
+            (status & 8) ? DrawMode::Rejection :
+            DrawMode::Auto
+        : DrawMode::Auto;
 
     if (not belief.noninformative) {
         // The first K elements are beta values
@@ -747,7 +828,6 @@ FileStorage::belief_data FileStorage::readBelief() const {
         if (restricted_model) {
             belief.draw_success_cumulative = read_u32();
             belief.draw_discards_cumulative = read_u32();
-            belief.draw_gibbs = last_draw_was_gibbs;
         }
     }
 
@@ -755,20 +835,50 @@ FileStorage::belief_data FileStorage::readBelief() const {
 }
 
 void FileStorage::writeState(const State &state) {
-
-    // Now write the state:
-    write_u32(state.t);
     if (state.readers.size() != settings_.readers)
         throw std::runtime_error("FileStorage error: cannot write a simulation where the number of readers changes");
 
+    if (version_ == 1) return writeState_v1(state);
+
+    // First the state's `t`:
+    write_u32(state.t);
+
+    // NB: The order of these doesn't technically matter, but state.readers is an ordered map so
+    // that we order by eris_id_t and thus get reproducible files for identical state data.
+    if (not state.readers.empty()) {
+        write_u8(TYPE_READERS);
+        write_u32(state.readers.size());
+        for (auto &r : state.readers) writeReader(r.second);
+    }
+
+    if (not state.books.empty()) {
+        write_u8(TYPE_BOOKS);
+        write_u32(state.books.size());
+        for (auto &b : state.books) writeBook(b.second);
+    }
+
+    if (state.publictracker and state.publictracker->id != 0) {
+        write_u8(TYPE_PUBLIC_TRACKER);
+        writePublicTracker(*state.publictracker);
+    }
+
+    write_u8(TYPE_DONE);
+}
+
+void FileStorage::writeState_v1(const State &state) {
+    if (state.publictracker and state.publictracker->id != 0)
+        throw std::runtime_error("FileStorage error: cannot write a simulation state that contains a public tracker to a v1 crstate file.");
+
+    // First the state's `t`:
+    write_u32(state.t);
+
+    // Now an array of readers:
     write_u32(state.readers.size());
-    for (auto &r : state.readers) {
-        writeReader(r.second);
-    }
+    for (auto &r : state.readers) writeReader(r.second);
+
+    // and finally an array of books:
     write_u32(state.books.size());
-    for (auto &b : state.books) {
-        writeBook(b.second);
-    }
+    for (auto &b : state.books) writeBook(b.second);
 }
 
 void FileStorage::writeReader(const ReaderState &r) {
@@ -789,16 +899,19 @@ void FileStorage::writeReader(const ReaderState &r) {
     // Utility
     write_value(r.u);
     write_value(r.u_lifetime);
-    // Costs
-    write_value(r.cost_fixed);
-    write_value(r.cost_unit);
-    write_value(r.cost_piracy);
-    write_value(r.income);
+    if (version_ == 1) {
+        // If we're writing a v1 file (which can only happen if we're appending to a v1 file rather
+        // than creating a new file), we need 4 fields for costs/income
+        write_value(settings_.cost_fixed);
+        write_value(settings_.cost_unit);
+        write_value(settings_.cost_piracy);
+        write_value(settings_.income);
+    }
     // Creation parameters
     write_value(r.creation_shape);
     write_value(r.creation_scale);
 
-    FILESTORAGE_DEBUG_WRITE_CHECK(4*(1+2*settings_.dimensions+1+r.friends.size()+2+2+2+2+2+2+2+2))
+    FILESTORAGE_DEBUG_WRITE_CHECK(4*(1+2*settings_.dimensions+1+r.friends.size()+2+2+(version_ == 1 ? 2+2+2+2 : 0)+2+2))
 
     // Beliefs
     writeBelief(r.profit);
@@ -834,15 +947,19 @@ void FileStorage::writeBelief(const BayesianLinear &m) {
     write_i8(k);
 
     bool restricted_model = false;
-    // First up is the status field.  Currently we have one status bit for a restricted model, and
-    // one for the last draw mode
+    // First up is the status field.  Currently we have:
+    // 1 - restricted
+    // 2 - (if restricted) last draw was gibbs
+    // 4 - noninformative
+    // 8 - (if restricted) last draw was rejection sampling
     const BayesianLinearRestricted *lr = dynamic_cast<const BayesianLinearRestricted*>(&m);
     if (lr) restricted_model = true;
 
     uint8_t status = 0;
     if (restricted_model) {
         status |= 1;
-        if (lr->last_draw_mode == BayesianLinearRestricted::DrawMode::Gibbs) status |= 2;
+        if (lr->last_draw_mode == DrawMode::Gibbs) status |= 2;
+        else if (lr->last_draw_mode == DrawMode::Rejection) status |= 8;
     }
     if (m.noninformative()) {
         status |= 4;
@@ -896,15 +1013,28 @@ std::pair<eris_id_t, BookState> FileStorage::readBook() const {
     }
 
     b.quality = read_dbl();
+    if (version_ >= 2) {
+        auto stat = read_u8();
+        b.market_private = stat & 1;
+        stat &= ~1;
+        if (stat != 0) throw std::runtime_error("FileStorage error: found invalid/unknown book status bit");
+    }
+    else {
+        b.market_private = true;
+    }
     b.price = read_dbl();
     b.revenue = read_dbl();
     b.revenue_lifetime = read_dbl();
     b.sales = read_u32();
-    b.sales_lifetime = read_u32();
+    b.sales_lifetime_private = read_u32();
+    if (version_ >= 2)
+        b.sales_lifetime_public = read_u32();
+    else
+        b.sales_lifetime_public = 0;
     b.pirated = read_u32();
     b.pirated_lifetime = read_u32();
     b.created = read_u32();
-    b.lifetime = read_u32();
+    b.lifetime_private = read_u32();
 
     return pair;
 }
@@ -919,15 +1049,45 @@ void FileStorage::writeBook(const BookState &b) {
         write_dbl(b.position[i]);
 
     write_dbl(b.quality);
+    if (version_ >= 2) {
+        uint8_t status = 0;
+        if (b.market_private) status |= 1;
+        write_u8(status);
+    }
+    else {
+        if (b.market_public())
+            throw std::runtime_error("FileStorage error: unable to write a public market book to a v1 crstate file");
+    }
     write_dbl(b.price);
     write_dbl(b.revenue);
     write_dbl(b.revenue_lifetime);
     write_u32(b.sales);
-    write_u32(b.sales_lifetime);
+    write_u32(b.sales_lifetime_private);
+    if (version_ >= 2) {
+        write_u32(b.sales_lifetime_public);
+    }
+    else if (b.sales_lifetime_public > 0)
+        throw std::runtime_error("FileStorage error: unable to write a public market book to a v1 crstate file");
     write_u32(b.pirated);
     write_u32(b.pirated_lifetime);
     write_u32(b.created);
-    write_u32(b.lifetime);
+    write_u32(b.lifetime_private);
+}
+
+std::unique_ptr<PublicTrackerState> FileStorage::readPublicTracker() const {
+    std::unique_ptr<PublicTrackerState> pts(new PublicTrackerState);
+    pts->id = read_u32();
+    pts->tax = read_dbl();
+    pts->unspent = read_dbl();
+    return pts;
+}
+
+void FileStorage::writePublicTracker(const PublicTrackerState &pt) {
+    if (pt.id > std::numeric_limits<uint32_t>::max())
+        throw std::runtime_error("FileStorage error: cannot handle eris ids > 32 bits");
+    write_u32(pt.id);
+    write_dbl(pt.tax);
+    write_dbl(pt.unspent);
 }
 
 }}

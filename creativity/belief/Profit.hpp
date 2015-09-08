@@ -1,6 +1,10 @@
 #pragma once
-#include "creativity/Book.hpp"
+#include <eris/belief/BayesianLinear.hpp>
 #include <eris/belief/BayesianLinearRestricted.hpp>
+#include <Eigen/Core>
+#include <algorithm>
+#include <functional>
+#include <string>
 
 namespace creativity { namespace belief {
 

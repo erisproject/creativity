@@ -1,5 +1,6 @@
 #pragma once
 #include <eris/types.hpp>
+#include <cstdint>
 
 namespace creativity {
 
@@ -12,6 +13,9 @@ struct CreativitySettings {
     uint32_t dimensions = 2;
 
     /** The boundary in each dimension to use for simulation members.  Must be a positive value.
+     * The the exact boundary is calculated from the simulation density at the initialization of the
+     * simulation as the density could theoretically change during the simulation, but the boundary
+     * defines the world and so is fixed forever.
      */
     double boundary = 5.0;
 
@@ -90,9 +94,6 @@ struct CreativitySettings {
 
     /** The per-period external income readers receive.  Effort spent creating a book in a period is
      * subtracted from this amount.
-     *
-     * Like `cost_fixed` and `cost_unit` this only specifies the default reader income: reader
-     * income can be updated on a individual reader level.
      */
     double income = 1000.0;
 
@@ -100,7 +101,21 @@ struct CreativitySettings {
      * is the initial setup (without any actions), set to 1 to having sharing become available
      * immediately).
      */
-    eris::eris_time_t piracy_begins = 100;
+    eris::eris_time_t piracy_begins = 101;
+
+    /** The period in which the PublicTracker agent is created.  The public tracker provides
+     * marginal cost access to copies of books but taxes all agents a lump sum amount,
+     * redistributing the collected tax money to authors proportionally to the number of copies
+     * obtained of each author's works.
+     */
+    eris::eris_time_t public_sharing_begins = 176;
+
+    /** The lump size tax extracted by the public tracker from each agent in each period.
+     *
+     * Currently this is fixed, but future versions of this code may interpret this value as a
+     * starting value and attempt to adjust it to maximize long-term utility.
+     */
+    double public_sharing_tax = 10.0;
 
     /** The number of sharing/friendship links as a proportion of the maxinum number of sharing
      * links possible (which is \f$\frac{R(R-1)}{2}\f$, where \f$R\f$ is the number of readers).
@@ -124,6 +139,11 @@ struct CreativitySettings {
      * overrides `prior_scale` in the `piracy_begins` period.
      */
     double prior_scale_piracy = 2;
+
+    /** The factor by which to multiply standard deviations in the first public sharing period.
+     * This value overrides `prior_scale` in the `public_sharing_begins` period.
+     */
+    double prior_scale_public_sharing = 2;
 
     /** The prior weight to use during the burn-in period; typically much larger than prior_scale
      * so that the simulation results of pre-belief initial parameters have significantly less

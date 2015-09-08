@@ -1,5 +1,20 @@
 #pragma once
 #include "creativity/gui/MemberStore.hpp"
+#include "creativity/state/BookState.hpp"
+#include <eris/types.hpp>
+#include <glibmm/object.h>
+#include <glibmm/refptr.h>
+#include <gtkmm/enums.h>
+#include <gtkmm/treemodel.h>
+#include <gtkmm/treemodelcolumn.h>
+#include <gtkmm/treepath.h>
+#include <memory>
+#include <string>
+
+namespace Glib { class ValueBase; }
+namespace Gtk { class TreeView; }
+namespace creativity { namespace state { class State; } }
+
 
 namespace creativity { namespace gui {
 
@@ -13,21 +28,26 @@ class BookStore : public MemberStore<state::BookState>, public virtual Glib::Obj
         /** Interface class between a simulation's Books and a Gtk::TreeView.  This internally
          * stores a vector of Books which can be updated (if needed) by calling the update method.
          *
-         * This exposes 9 columns:
+         * This exposes the following columns:
          * - ID
+         * - author ID
          * - x position
          * - y position
          * - position string (made from x position and y position)
-         * - author ID
          * - quality (reader-perceived quality may diff)
          * - price (NaN if not on market)
          * - revenue
-         * - revenueLifetime
-         * - market (true if on market, false otherwise)
+         * - revenue_lifetime
+         * - market_private (true if on private market, false otherwise)
+         * - market_public (true if on public market, false otherwise)
+         * - market_any (true if on any market, false otherwise)
+         * - market_str (string: "Priv.", "Pub.", or "No")
          * - age (in simulation periods)
          * - creation date (i.e. simulation period)
          * - current sales
-         * - lifetime sales
+         * - lifetime private sales
+         * - lifetime public sales
+         * - lifetime sales (private + public)
          * - current pirated copies
          * - lifetime pirated copies
          * - lifetime copies (= lifetime pirated copies + lifetime sales)
@@ -56,25 +76,35 @@ class BookStore : public MemberStore<state::BookState>, public virtual Glib::Obj
                     revenue, ///< revenue of the book in the current period
                     revenue_lifetime; ///< Cumulative revenue of the book since its creation
 
-                Gtk::TreeModelColumn<std::string> pos_str; ///< position of the book as a string such as `(-7.16,0.440)`
-                Gtk::TreeModelColumn<bool> market; ///< True if the book is currently on the market
+                Gtk::TreeModelColumn<std::string>
+                    pos_str, ///< position of the book as a string such as `(-7.16,0.440)`
+                    market_str; ///< market type string ("Priv.", "Pub.", or "No")
+
+                Gtk::TreeModelColumn<bool>
+                    market_private, ///< True if on the market and that market is private
+                    market_public, ///< True if on the market and that market is public
+                    market_any; ///< True if the book is currently on either market
+
                 Gtk::TreeModelColumn<unsigned int>
                     age, ///< Age of the book in simulation periods since it was written
                     created, ///< Age of the book in simulation periods since it was written
                     sales, ///< Copies sold in the current period
-                    sales_lifetime, ///< Lifetime copies sold
+                    sales_lifetime_private, ///< Lifetime copies sold on the private market
+                    sales_lifetime_public, ///< Lifetime copies sold on the public market
+                    sales_lifetime, ///< Lifetime copies sold (both private/public)
                     pirated, ///< Copies sold in the current period
                     pirated_lifetime, ///< Lifetime copies sold
                     copies, ///< Lifetime copies (sold + pirated)
-                    lifetime; ///< Number of periods the book has been or was on the market
+                    lifetime_private; ///< Number of periods the book has been or was on the private market
 
             protected:
                 ColRec() {
-                    add(id); add(author); add(market); add(pos_x); add(pos_y); add(pos_str);
-                    add(quality); add(price); add(revenue); add(revenue_lifetime);
-                    add(age); add(created);
-                    add(sales); add(sales_lifetime); add(pirated); add(pirated_lifetime);
-                    add(copies); add(lifetime);
+                    add(id); add(author);
+                    add(pos_x); add(pos_y); add(quality); add(price); add(revenue); add(revenue_lifetime);
+                    add(pos_str);
+                    add(market_private); add(market_public); add(market_any); add(market_str);
+                    add(age); add(created); add(sales); add(sales_lifetime_private); add(sales_lifetime_public);
+                    add(sales_lifetime); add(pirated); add(pirated_lifetime); add(copies); add(lifetime_private);
                 }
                 friend class BookStore;
         };
@@ -153,22 +183,27 @@ class BookStore : public MemberStore<state::BookState>, public virtual Glib::Obj
         static bool greater_##col(const state::BookState &a, const state::BookState &b);
         LESS_GREATER_METHODS(id)
         LESS_GREATER_METHODS(author)
-        LESS_GREATER_METHODS(market)
         LESS_GREATER_METHODS(pos_x)
         LESS_GREATER_METHODS(pos_y)
-        LESS_GREATER_METHODS(pos_str)
         LESS_GREATER_METHODS(quality)
         LESS_GREATER_METHODS(price)
         LESS_GREATER_METHODS(revenue)
         LESS_GREATER_METHODS(revenue_lifetime)
+        LESS_GREATER_METHODS(pos_str)
+        LESS_GREATER_METHODS(market_str)
+        LESS_GREATER_METHODS(market_private)
+        LESS_GREATER_METHODS(market_public)
+        LESS_GREATER_METHODS(market_any)
         LESS_GREATER_METHODS(age)
         LESS_GREATER_METHODS(created)
         LESS_GREATER_METHODS(sales)
+        LESS_GREATER_METHODS(sales_lifetime_private)
+        LESS_GREATER_METHODS(sales_lifetime_public)
         LESS_GREATER_METHODS(sales_lifetime)
         LESS_GREATER_METHODS(pirated)
         LESS_GREATER_METHODS(pirated_lifetime)
-        LESS_GREATER_METHODS(lifetime)
         LESS_GREATER_METHODS(copies)
+        LESS_GREATER_METHODS(lifetime_private)
 #undef LESS_GREATER_METHODS
 };
 

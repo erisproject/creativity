@@ -1,11 +1,15 @@
 #pragma once
-#include <vector>
-#include <unordered_set>
-#include <unordered_map>
+#include <set>
+#include <map>
 #include <eris/types.hpp>
 #include <eris/Position.hpp>
-#include <eris/noncopyable.hpp>
-#include "creativity/Reader.hpp"
+#include "creativity/BookCopy.hpp" // IWYU pragma: keep
+#include "creativity/belief/Demand.hpp"
+#include "creativity/belief/Profit.hpp"
+#include "creativity/belief/ProfitStream.hpp"
+#include "creativity/belief/Quality.hpp"
+
+namespace creativity { class Reader; }
 
 namespace creativity { namespace state {
 
@@ -32,7 +36,7 @@ class ReaderState final {
         /** The reader's library: the keys are the book IDs of owned books, the values are the
          * per-reader specific BookCopy values.
          */
-        std::unordered_map<eris::eris_id_t, BookCopy> library;
+        std::map<eris::eris_id_t, BookCopy> library;
 
         /** The number of purchased books in the reader's library.  When loading/modifying a
          * ReaderState object you should call updateLibraryCounts() to recalculate this, or else set
@@ -54,7 +58,7 @@ class ReaderState final {
          * updateLibraryCounts() to recalculate this, or else set it yourself. */
         unsigned int library_pirated_new;
 
-        std::unordered_set<eris::eris_id_t>
+        std::set<eris::eris_id_t>
             friends, ///< Friends of the reader
             new_books; ///< The set of book IDs that were newly obtained in the period, not including self-authored books.
 
@@ -67,18 +71,6 @@ class ReaderState final {
 
         /// Lifetime cumulative utility up to and including the current period.
         double u_lifetime;
-
-        /// Fixed cost of keeping a book on the market
-        double cost_fixed;
-
-        /// Unit cost of creating a copy of a book
-        double cost_unit;
-
-        /// Unit cost of obtaining a pirated copy of a book
-        double cost_piracy;
-
-        /// Per-period (external) income
-        double income;
 
         /// Creation shape coefficient
         double creation_shape;

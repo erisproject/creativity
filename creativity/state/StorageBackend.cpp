@@ -1,4 +1,6 @@
 #include "creativity/state/StorageBackend.hpp"
+#include <algorithm>
+#include <stdexcept>
 
 using namespace eris;
 

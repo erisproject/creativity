@@ -1,10 +1,15 @@
 #pragma once
 #include <queue>
-#include <iterator>
-#include <boost/iterator/iterator_facade.hpp>
+#include <condition_variable>
+#include <cstddef>
+#include <eris/types.hpp>
+#include <memory>
+#include <mutex>
+#include <thread>
 #include <eris/noncopyable.hpp>
 #include "creativity/state/State.hpp"
-#include "creativity/CreativitySettings.hpp"
+
+namespace creativity { struct CreativitySettings; }
 
 namespace creativity { namespace state {
 

@@ -1,14 +1,17 @@
 #pragma once
+#include <string>
+#include <functional>
+#include <vector>
+#include <algorithm>
+#include <type_traits>
+#include <eris/types.hpp>
+
 /** \file
  * Various routines for generating data from stored creativity results.
  */
 
-#include <string>
-#include <functional>
-#include <vector>
-#include "creativity/CreativitySettings.hpp"
-#include "creativity/state/Storage.hpp"
-#include <eris/types.hpp>
+namespace creativity { struct CreativitySettings; }
+namespace creativity { namespace state { class Storage; } }
 
 namespace creativity { namespace data {
 
@@ -42,8 +45,12 @@ struct datum {
      * calculate the statistic for the period from `from` to `to`, inclusive.
      */
     const std::function<double(const state::Storage&, eris::eris_time_t, eris::eris_time_t)> calculate;
-    /// If true, this statistic is not included in the pre-piracy data
-    const bool piracy_only;
+    /// If true, this statistic is included in the pre-piracy data
+    struct {
+        bool pre; ///< True if this field applies to pre-piracy periods
+        bool piracy; ///< True if this field applies to piracy periods
+        bool public_sharing; ///< True if this field applies to public sharing periods
+    } applies_to;
 
     /// Default constructor deleted
     datum() = delete;
@@ -53,11 +60,12 @@ struct datum {
      * included in the output data.  "pre_" is for the pre-piracy period; "new_" is for the
      * periods just after piracy is introduced; and "post_" is for the final simulation periods.
      * \param calc the callable object to store in `calculate`.
-     * \param piracy_only specified whether this data field only applies to the piracy periods.
-     * Optional: defaults to false.
+     * \param pre specifies whether this data field applies to pre-piracy periods (default true)
+     * \param piracy specifies whether this data field applies to piracy periods (default true)
+     * \param public_sharing specifies whether this data field applies to public sharing periods (default true)
      */
-    datum(std::string &&name, decltype(calculate) calc, bool piracy_only = false)
-        : name(std::move(name)), calculate(std::move(calc)), piracy_only(piracy_only) {}
+    datum(std::string &&name, decltype(calculate) calc, bool pre = true, bool piracy = true, bool public_sharing = true)
+        : name(std::move(name)), calculate(std::move(calc)), applies_to{pre, piracy, public_sharing} {}
 };
 
 /** Calculates the average net utility over the given period.  Net utility is a reader's utility
@@ -145,6 +153,10 @@ double books_bought(const state::Storage &cs, eris::eris_time_t from, eris::eris
  * of books that left the market before `from` are still included.
  */
 double books_pirated(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+
+/** Average number of books obtained from the public provider.
+ */
+double books_public_copies(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
 
 /** Returns a vector of all supported initial datum values. */
 std::vector<initial_datum> initial_data_fields();

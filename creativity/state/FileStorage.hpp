@@ -1,14 +1,25 @@
 #pragma once
-#include "creativity/state/Storage.hpp"
+#include "creativity/state/StorageBackend.hpp"
+#include "creativity/BookCopy.hpp"
+#include "creativity/CreativitySettings.hpp"
+#include <eris/belief/BayesianLinearRestricted.hpp>
+#include <eris/types.hpp>
+#include <Eigen/Core>
+#include <boost/detail/endian.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
 #include <vector>
 #include <fstream>
-#include <boost/detail/endian.hpp>
+#include <memory>
+#include <mutex>
+#include <set>
+#include <stdexcept>
+#include <string>
+#include <map>
+#include <utility>
 
-namespace creativity {
-
-class Creativity;
-
-namespace state {
+namespace creativity { namespace state {
 
 /** Class for file-based storage.  Note that most of the methods of this class will throw errors
  * when the underlying file stream encounters an error.  You should not attempt to use the
@@ -47,6 +58,14 @@ class FileStorage final : public StorageBackend {
              * always treated as an empty file and reinitialized).
              */
             OVERWRITE
+        };
+
+        /** The supported record types within a state. */
+        enum TYPE : uint8_t {
+            TYPE_DONE = 0, ///< Psuedo-type indicating the end of the record list
+            TYPE_READERS = 1, ///< An array of readers
+            TYPE_BOOKS = 2, ///< An array of books
+            TYPE_PUBLIC_TRACKER = 3 ///< A PublicTracker state
         };
 
         /** Constructs and returns a FileStorage object that uses the given file for reading and
@@ -103,12 +122,17 @@ class FileStorage final : public StorageBackend {
          */
         virtual void flush() override;
 
-    protected:
+    private:
+
+        /** The file version.  The default is 2, but we can read and write v1 files as well (v1
+         * files have per-user costs and income, but those never differed from the creativity
+         * setting; v2 files don't include them).
+         */
+        uint32_t version_ = 2;
 
         /// Called from the queue thread to write the given State to the file.
         virtual void thread_insert(std::shared_ptr<const State> &&s) override;
 
-    private:
         /** The file buffer object. Mutable because we need to read from it in const methods. */
         mutable std::fstream f_;
 
@@ -252,6 +276,14 @@ class FileStorage final : public StorageBackend {
             static constexpr char fileid[4] = {'C', 'r', 'S', 't'};
             /// The test value bytes, which should be interpreted as the various test values below
             static constexpr char test_value[8] = {20,106,10,-50,0,24,69,-64};
+            static constexpr uint32_t u32_test = 3456789012; ///< unsigned 32-bit integer test value
+            static constexpr int32_t  i32_test = -838178284; ///< signed 32-bit integer test value
+            static constexpr uint64_t u64_test = 13854506220411054612ul; ///< unsigned 64-bit integer test value
+            static constexpr int64_t  i64_test = -4592237853298497004; ///< signed 64-bit integer test value
+            // The following constant is exactly representable in a 64-bit double (in fact it is the
+            // exact value of the test_value characters above, interpreted as a little-endian stored
+            // IEEE754 double).
+            static constexpr double dbl_test = -42.187524561963215319337905384600162506103515625; ///< double test value
             /// Header positions of various fields
             struct pos {
                 static constexpr int64_t
@@ -273,7 +305,7 @@ class FileStorage final : public StorageBackend {
                     cost_unit = 96, ///< Unit cost of an author creating a copy of a book (dbl)
                     cost_piracy = 104, ///< Unit cost of getting a copy of a book via piracy (dbl)
                     income = 112, ///< Per-period reader external income (before incurring authorship costs or receiving book profits) (dbl)
-                    piracy_begins = 120, ///< the sharing start period (eris_time_t = u32)
+                    piracy_begins = 120, ///< the sharing start period (u32)
                     piracy_link_proportion = 124, ///< The proportion of potential friendship links that exist
                     prior_scale = 132, ///< The prior 'n' multiplier (usually 0-1)
                     prior_scale_piracy = 140, ///< The prior 'n' multiplier in the first piracy period
@@ -287,11 +319,17 @@ class FileStorage final : public StorageBackend {
                     init_prob_keep = 200, ///< The probability of keeping a book on the market (uninformed beliefs)
                     init_keep_price = 208, ///< If keeping a book on the market, the new price is (p-c)*s+c, where this is s
                     init_belief_threshold = 216, ///< The required n-k value for readers to use beliefs instead of initial behaviour (i32)
+                    state_first_v1 = 224, ///< the first state record in version 1 files (preceeded by 4 bytes padding)
+
+                    // Added in version 2:
+                    public_sharing_begins = 220, ///< The period in which the PublicTracker is created (u32)
+                    public_sharing_tax = 224, ///< The lump sum tax the PublicTracker collects (dbl)
+                    prior_scale_public_sharing = 232, ///< The prior scale for the period the PublicTracker first becomes available (dbl)
                     // NB: this next one should be an integer multiple of 8 (so that states+cont
                     // location go to the end, and so the `states` division below has no remainder)
                     //
                     // padding, if needed, here.
-                    state_first = 224, ///< the first state record
+                    state_first = 240, ///< the first state record
                     state_last = size - 16, ///< the last state record
                     continuation = size - 8; ///< the header continuation block pointer (used once header state blocks fill up)
             };
@@ -299,14 +337,7 @@ class FileStorage final : public StorageBackend {
              * requires using continuation blocks.
              */
             static constexpr unsigned int states = (pos::state_last - pos::state_first) / 8 + 1;
-            static constexpr uint32_t u32_test = 3456789012; ///< unsigned 32-bit integer test value
-            static constexpr int32_t  i32_test = -838178284; ///< signed 32-bit integer test value
-            static constexpr uint64_t u64_test = 13854506220411054612ul; ///< unsigned 64-bit integer test value
-            static constexpr int64_t  i64_test = -4592237853298497004; ///< signed 64-bit integer test value
-            // The following constant is exactly representable in a 64-bit double (in fact it is the
-            // exact value of the test_value characters above, interpreted as a little-endian stored
-            // IEEE754 double).
-            static constexpr double dbl_test = -42.187524561963215319337905384600162506103515625; ///< double test value
+            static constexpr unsigned int states_v1 = (pos::state_last - pos::state_first_v1) / 8 + 1;
         };
 
         /// Constants for continuation blocks
@@ -388,14 +419,14 @@ class FileStorage final : public StorageBackend {
             int64_t pos_next; // Next library row position
             unsigned int records_remaining; // How many library rows are remaining (0 = need a new block)
             // book id to BookCopy
-            std::unordered_map<uint32_t, BookCopy> library;
+            std::map<uint32_t, BookCopy> library;
             // library, but sorted by acquired date (for fast retrieval)
             std::multiset<std::reference_wrapper<std::pair<const uint32_t, BookCopy>>, lib_comp_less> library_acq_sorted;
             lib_data(int64_t pos_next) : pos_next(pos_next), records_remaining(LIBRARY::block_records) {}
         };
 
         /** Reader library data.  Key is the reader id, value is the data. */
-        std::unordered_map<unsigned int, lib_data> reader_lib_;
+        std::map<unsigned int, lib_data> reader_lib_;
 
         /** Read the reader library pointer block, which immediately follows the header.
          *
@@ -415,7 +446,7 @@ class FileStorage final : public StorageBackend {
          * added to a new file, and as a result will end up putting the reader pointer block
          * immediately after the header.  The keys of the given map are used to write the locations.
          */
-        void writeLibraryPointerBlock(const std::unordered_map<eris::eris_id_t, ReaderState> &readers);
+        void writeLibraryPointerBlock(const std::map<eris::eris_id_t, ReaderState> &readers);
 
         /** Ensures that the library block for reader `r` has all of the reader's library books in
          * it.  If any are missing, they are added to disk and to reader_lib_.
@@ -434,20 +465,38 @@ class FileStorage final : public StorageBackend {
          * follows:
          *
          *     u32      t (simulation time period)
-         *     READER[] readers array
-         *     BOOK[]   books
          *
-         * where type[] indicates an array structured as:
-         *     u32          length
-         *     type*length  sequential type records
+         * followed by any number of:
+         *     u8       TYPE != 0
+         *     DATA     specific to TYPE
          *
-         * \see readReader() for the structure of READER
-         * \see readBook() for the structure of BOOK
+         * and finally a terminating u8 value of TYPE = 0.  Typically there is at least a reader
+         * array (TYPE_READERS) and (except in the first states) a book array (TYPE_BOOKS).
+         *
+         * \see TYPE for the different TYPE values supported.
          */
         std::shared_ptr<const State> readState() const;
 
+        /** Called by readState() when reading from a v1 file.  In version 1 files the state data
+         * structure is:
+         *
+         *     u32      t (simulation time period)
+         *     READER[] readers array
+         *     BOOK[]   books array
+         *
+         * where X[] indicates an array structured as:
+         *     u32          length
+         *     type*length  sequential X records
+         */
+        std::shared_ptr<const State> readState_v1() const;
+
         /// Writes the given state at the current file position.
         void writeState(const State &state);
+
+        /** Writes the given state to a v1 file.  Will throw an exception if the state contains data
+         * not representable in a v1 file, such as a PublicTracker.
+         */
+        void writeState_v1(const State &state);
 
         /** Reads a ReaderState record from the current file position and returns it in an
          * {eris_id_t, ReaderState} pair, where `.first` is the id.  Such a record consists of:
@@ -457,10 +506,6 @@ class FileStorage final : public StorageBackend {
          *     u32[]            friend ids
          *     dbl              u
          *     dbl              u_lifetime
-         *     dbl              cost_fixed
-         *     dbl              cost_unit
-         *     dbl              cost_piracy
-         *     dbl              income
          *     dbl              creation_shape
          *     dbl              creation_scale
          *     BELIEF           profit belief
@@ -487,6 +532,18 @@ class FileStorage final : public StorageBackend {
          * profit stream beliefs may not be placeholder beliefs (i.e. default constructed objects);
          * such objects should simply be omitted when writing the data.  Each profit stream belief K
          * value must also be unique.
+         *
+         * Version 1 state files additionally include the following fields after u_lifetime but
+         * before creation_shape:
+         *
+         *     dbl              cost_fixed
+         *     dbl              cost_unit
+         *     dbl              cost_piracy
+         *     dbl              income
+         *
+         * Version 2 files omit these because per-user costs/income were never entirely supported,
+         * tested, or used: all users simple use the values in the creativity parameters block.
+         * When loading a v1 file, these fields are ignored.
          */
         std::pair<eris::eris_id_t, ReaderState> readReader(eris::eris_time_t t) const;
 
@@ -495,13 +552,13 @@ class FileStorage final : public StorageBackend {
 
         /// Structure holding parsed belief data
         typedef struct {
-            uint32_t K; ///< Number of parameters; K=0 for a default constructed (invalid) model (the remaining values will be uninitialized)
-            bool noninformative; ///< True if this is a noninformative model (in which case the following are not set)
+            uint32_t K = 0; ///< Number of parameters; K=0 for a default constructed (invalid) model (the remaining values will be uninitialized)
+            bool noninformative = true; ///< True if this is a noninformative model (in which case the following are not set)
             Eigen::VectorXd beta; ///< eris::belief::BayesianLinear beta vector
             double s2; ///< eris::belief::BayesianLinear s2 value
             double n; ///< eris::belief::BayesianLinear n value
             Eigen::MatrixXd Vinv; ///< eris::belief::BayesianLinear Vinv matrix
-            bool draw_gibbs; ///< If true, the last draw from this belief used Gibbs sampling (false = no draws, or rejection sampling)
+            eris::belief::BayesianLinearRestricted::DrawMode last_draw_mode; ///< The last draw mode from this belief (for restricted models)
             uint32_t draw_success_cumulative, ///< For a restricted belief, the number of successful draws
                      draw_discards_cumulative; ///< For a restricted belief, the number of discarded draws
         } belief_data;
@@ -533,11 +590,15 @@ class FileStorage final : public StorageBackend {
          * - lowest bit (bit & 1): the model is a LinearRestricted model, and thus carries extra
          *   LinearRestricted data (the two u32's above).  If not set, the u32s are not present in
          *   the record.
-         * - bit 2 (bit & 2): the last draw from this model used Gibbs sampling (only applicable to
-         *   restricted models)
+         * - bit 2 (bit & 2): if set on a restricted model, this indicates the last draw from this
+         *   model used Gibbs sampling (if not a restricted model, this bit is unused).
          * - bit 3 (bit & 4): the model is noninformative.  If this bit is set, then instead of
          *   beta/V/etc. data the record contains non-informative data that hasn't been loaded yet;
          *   otherwise the beta/V/n/s2 data follows.
+         * - bit 4 (bit & 8): if set on a restricted model, this indicates the last draw from this
+         *   model used rejection sampling (if not a restricted model, this bit is unused).  If
+         *   neither this bit nor bit 2 are set, the last draw mode was Auto (which means no draw
+         *   took place).
          * - other bits are currently unused.
          */
         belief_data readBelief() const;
@@ -562,29 +623,42 @@ class FileStorage final : public StorageBackend {
          *     u32          author id
          *     dbl*DIM      position (DIM = dimensions)
          *     dbl          quality
+         *     u8           status fields (current just 1 for private market) -- added in v2
          *     dbl          price (market is derived from this: market=true unless price is NaN)
          *     dbl          revenue
-         *     dbl          revenueLifetime
+         *     dbl          revenue_lifetime
          *     u32          sales
-         *     u32          salesLifetime
+         *     u32          sales_lifetime_private
+         *     u32          sales_lifetime_public -- added in v2
          *     u32          pirated
          *     u32          piratedLifetime
          *     u32          created
-         *     u32          lifetime
+         *     u32          lifetime_private
          */
         std::pair<eris::eris_id_t, BookState> readBook() const;
 
         /** Writes a book at the current file position.  See readBook() for data layout. */
         void writeBook(const BookState &book);
 
+        /** Reads public tracker state data from the current file position and returns it in a
+         * PublicTrackerState unique pointer.  The data is:
+         *
+         *     u32          id
+         *     dbl          tax (per-user lump sum tax)
+         *     dbl          unspent (!= 0 only if the previous period had no publid downloads)
+         */
+        std::unique_ptr<PublicTrackerState> readPublicTracker() const;
+
+        /// Writes a public tracker to the current file position.
+        void writePublicTracker(const PublicTrackerState &pt);
 };
 
+}}
+
 #if defined(BOOST_BIG_ENDIAN)
-#include "creativity/state/FileStorage-BE.hpp"
+#include "creativity/state/FileStorage-BE.hpp" // IWYU pragma: keep
 #elif defined(BOOST_LITTLE_ENDIAN)
-#include "creativity/state/FileStorage-LE.hpp"
+#include "creativity/state/FileStorage-LE.hpp" // IWYU pragma: keep
 #else
 #error System endianness not supported (neither big-byte nor little-byte endianness detected)!
 #endif
-
-}}

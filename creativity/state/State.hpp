@@ -1,9 +1,11 @@
 #pragma once
-#include <eris/Position.hpp>
 #include <eris/Simulation.hpp>
-#include <eris/noncopyable.hpp>
 #include "creativity/state/ReaderState.hpp"
 #include "creativity/state/BookState.hpp"
+#include "creativity/state/PublicTrackerState.hpp"
+#include <cstdint>
+#include <limits>
+#include <map>
 
 namespace creativity { namespace state {
 
@@ -34,10 +36,13 @@ class State final {
         uint32_t dimensions = 0;
 
         /// The readers at the given state
-        std::unordered_map<eris::eris_id_t, ReaderState> readers;
+        std::map<eris::eris_id_t, ReaderState> readers;
 
         /// The books at the given state
-        std::unordered_map<eris::eris_id_t, BookState> books;
+        std::map<eris::eris_id_t, BookState> books;
+
+        /// The public tracker, if it exists.
+        std::unique_ptr<PublicTrackerState> publictracker;
 };
 
 }}

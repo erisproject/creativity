@@ -1,13 +1,14 @@
 #pragma once
+#include <eris/belief/BayesianLinear.hpp>
 #include <eris/belief/BayesianLinearRestricted.hpp>
-#include <eris/algorithms.hpp>
 #include <eris/SharedMember.hpp>
+#include <Eigen/Core>
+#include <string>
+#include <utility>
 
-#include <eris/debug.hpp>
+namespace creativity { class Book; }
 
-namespace creativity {
-class Book;
-namespace belief {
+namespace creativity { namespace belief {
 
 /** This class represents an author's belief about the per-period demand for books.  The model is of
  * the form:

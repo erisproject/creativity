@@ -1,4 +1,8 @@
 #include "creativity/state/ReaderState.hpp"
+#include <eris/Simulation.hpp>
+#include <utility>
+#include "creativity/Book.hpp"
+#include "creativity/BookCopy.hpp"
 #include "creativity/Reader.hpp"
 
 namespace creativity { namespace state {
@@ -14,10 +18,6 @@ ReaderState::ReaderState(const Reader &r) :
     position{r.position()},
     u{r.u()},
     u_lifetime{r.uLifetime()},
-    cost_fixed{r.cost_fixed},
-    cost_unit{r.cost_unit},
-    cost_piracy{r.cost_piracy},
-    income{r.income},
     creation_shape{r.creation_shape},
     creation_scale{r.creation_scale},
     profit{r.profitBelief()},
@@ -27,16 +27,13 @@ ReaderState::ReaderState(const Reader &r) :
 {
     if (r.profitExtrapBeliefDiffers()) profit_extrap = r.profitExtrapBelief();
 
-    library.reserve(r.library().size());
     for (const auto &bq : r.library())
         library.emplace(bq.first->id(), bq.second);
 
     updateLibraryCounts(r.simulation()->t());
 
-    friends.reserve(r.friends().size());
     for (const auto &m : r.friends()) friends.insert(m);
 
-    new_books.reserve(r.newBooks().size());
     for (const auto &nb : r.newBooks()) new_books.insert(nb.first);
 
     for (const auto &b : r.wrote()) wrote.emplace_hint(wrote.end(), b->id());

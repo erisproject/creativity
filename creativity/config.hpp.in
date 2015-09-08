@@ -1,6 +1,10 @@
+#pragma once
 #include <string>
 
 namespace creativity {
+
+/// The application version.  Element 0 is the major version, 1 is the minor version, 2 is the patch version.
+constexpr unsigned int VERSION[] = {@CREATIVITY_VERSION_MAJOR@, @CREATIVITY_VERSION_MINOR@, @CREATIVITY_VERSION_PATCH@};
 
 /// The location where data files (such as gui.glade) are located.
 constexpr char DATADIR[][100] = {"/usr/@CMAKE_INSTALL_DATADIR@/creativity", "@CMAKE_INSTALL_FULL_DATADIR@/creativity"};

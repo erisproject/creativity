@@ -4,12 +4,12 @@ project(creativity CXX)
 
 # Creativity package version
 set(CREATIVITY_VERSION_MAJOR "1")
-set(CREATIVITY_VERSION_MINOR "1")
-set(CREATIVITY_VERSION_PATCH "2")
+set(CREATIVITY_VERSION_MINOR "2")
+set(CREATIVITY_VERSION_PATCH "0")
 set(CREATIVITY_VERSION "${CREATIVITY_VERSION_MAJOR}.${CREATIVITY_VERSION_MINOR}.${CREATIVITY_VERSION_PATCH}")
 
 set(creativity_author "Jason Rhinelander <jason@imaginary.ca>")
-set(creativity_url "https://github.com/erisproject/creativity")
+set(creativity_url "https://imaginary.ca/eris/creativity")
 set(creativity_description "Agent-based model of creativity and piracy")
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/Modules)
@@ -58,6 +58,20 @@ else()
     add_definitions("-DCREATIVITY_DISABLE_THREADED_STORAGE")
 endif()
 
+# Look for include-what-you-use, if requested
+option(IWYU "Enable include-what-you-use header debugging support" OFF)
+if (IWYU)
+    cmake_minimum_required(VERSION 3.3)
+    find_program(IWYU_PATH NAMES "iwyu" "include-what-you-use")
+    if (NOT IWYU_PATH)
+        message(FATAL_ERROR "Could not find executable for include-what-you-use support")
+    endif()
+    set(IWYU_ARGS ${IWYU_PATH} "-Xiwyu" "--mapping_file=${CMAKE_SOURCE_DIR}/creativity.imp")
+    message(STATUS "include-what-you-use header debugging support enabled (-DIWYU=0 to disable)")
+else()
+    message(STATUS "include-what-you-use header debugging support disabled (-DIWYU=1 to enable)")
+endif()
+
 foreach(pkg ${creativity_pkgconfig} ${creativity_gui_pkgconfig})
     pkg_check_modules(${pkg} REQUIRED ${creativity_pkgconfig_${pkg}})
     include_directories(${${pkg}_INCLUDE_DIRS})
@@ -65,15 +79,16 @@ foreach(pkg ${creativity_pkgconfig} ${creativity_gui_pkgconfig})
     add_definitions(${${pkg}_CFLAGS_OTHER})
 endforeach()
 
-if(ERIS_VERSION VERSION_LESS "0.3.1")
-    message(FATAL_ERROR "Eris v0.3.1 or above is required, but only v${ERIS_VERSION} was found")
+if(ERIS_VERSION VERSION_LESS "0.3.2")
+    message(FATAL_ERROR "Eris v0.3.2 or above is required, but only v${ERIS_VERSION} was found")
 endif()
 
 find_package(Eigen3 REQUIRED)
 include_directories(${EIGEN3_INCLUDE_DIR})
 
-find_package(Boost REQUIRED)
+find_package(Boost REQUIRED COMPONENTS filesystem program_options system)
 include_directories(${Boost_INCLUDE_DIRS})
+link_directories(${Boost_LIBRARY_DIRS})
 
 # Find library source/headers
 file(GLOB_RECURSE cr_libsrc creativity/*.cpp)
@@ -88,18 +103,17 @@ if (NOT GUI)
     list(REMOVE_ITEM cr_headers ${cr_gui_headers})
 endif()
 
-#include_directories("${CMAKE_CURRENT_BINARY_DIR}/include")
 foreach(h ${cr_headers})
     if(h MATCHES "\\.in$")
         string(REGEX REPLACE "\\.in$" "" h_processed "${h}")
         configure_file("${h}" "${h_processed}" @ONLY)
         list(APPEND creativity_doc_include "${CMAKE_CURRENT_BINARY_DIR}/${h_processed}")
     else()
-        configure_file("${h}" "${h}" COPYONLY)
-        list(APPEND creativity_doc_include "${CMAKE_CURRENT_BINARY_DIR}/${h}")
+        list(APPEND creativity_doc_include "${CMAKE_CURRENT_SOURCE_DIR}/${h}")
     endif()
 endforeach()
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 # Set up compilation flags; put everything before CMAKE_CXX_FLAGS so that these can be overridden
 set(CMAKE_CXX_FLAGS "-std=c++11 -march=native -O3 -Wall -Wextra ${CMAKE_CXX_FLAGS}")
@@ -115,6 +129,7 @@ add_library(creativity SHARED ${cr_libsrc})
 foreach(pkg ${creativity_pkgconfig})
     target_link_libraries(creativity ${${pkg}_LIBRARIES})
 endforeach()
+target_link_libraries(creativity ${Boost_LIBRARIES})
 list(APPEND creativity_install_targets creativity)
 
 add_executable(creativity-cli cli.cpp)
@@ -148,12 +163,29 @@ if (GUI)
     list(APPEND creativity_install_targets creativity-gui)
 
     # Copy the glade and icon to the install datadir
-    install(FILES gui.glade creativity.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/creativity/)
+    install(FILES gui.glade creativity-gui.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/creativity/)
 
     # Also copy them into the build dir (so that running ./creativity-gui from build/ works)
     configure_file(gui.glade ${CMAKE_BINARY_DIR}/gui.glade COPYONLY)
-    configure_file(creativity.svg ${CMAKE_BINARY_DIR}/creativity.svg COPYONLY)
+    configure_file(creativity-gui.svg ${CMAKE_BINARY_DIR}/creativity-gui.svg COPYONLY)
 
+    # Install the desktop file
+    install(FILES creativity-gui.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications/)
+
+    # Mime type registration
+    install(FILES creativity-gui.xml DESTINATION ${CMAKE_INSTALL_DATADIR}/mime/packages/)
+
+    # Also copy the icon into the pixmaps directory so it'll be picked up by things reading the desktop file
+    install(FILES creativity-gui.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/pixmaps/)
+    # And put a copy in for the mime type icon
+    install(FILES creativity-gui.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/pixmaps/ RENAME application-x-creativity.crstate.svg)
+
+endif()
+
+if (IWYU)
+    foreach(tgt ${creativity_install_targets})
+        set_property(TARGET ${tgt} PROPERTY CXX_INCLUDE_WHAT_YOU_USE ${IWYU_ARGS})
+    endforeach()
 endif()
 
 add_subdirectory(doc)
@@ -190,6 +222,11 @@ include(CPack)
 #    DESTINATION "${CMAKE_INSTALL_LIBDIR}"
 #    COMPONENT libs)
 install(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/creativity/"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/creativity/"
+    COMPONENT headers
+    FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h")
+
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/creativity/"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/creativity/"
     COMPONENT headers
     FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h")

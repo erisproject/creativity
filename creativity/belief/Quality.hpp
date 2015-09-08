@@ -1,15 +1,14 @@
 #pragma once
 #include "creativity/Book.hpp"
-#include "creativity/BookMarket.hpp"
 #include <eris/belief/BayesianLinear.hpp>
-#include <eris/algorithms.hpp>
 #include <eris/SharedMember.hpp>
+#include <Eigen/Core>
+#include <algorithm>
+#include <cstddef>
+#include <string>
+#include <type_traits>
 
-namespace creativity {
-
-class Book; // forward declaration
-
-namespace belief {
+namespace creativity { namespace belief {
 
 /** This class represents a reader's belief about the quality of an unread book.  The model is:
  *

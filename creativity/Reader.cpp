@@ -2,11 +2,17 @@
 #include "creativity/Reader.hpp"
 #include "creativity/Book.hpp"
 #include "creativity/BookMarket.hpp"
+#include "creativity/belief/Profit.hpp"
 #include <eris/Random.hpp>
+#include <Eigen/Core>
 #include <algorithm>
+#include <cstddef>
+#include <limits>
+#include <stdexcept>
+#include <string>
+#include <utility>
 #include <map>
 #include <list>
-#include <random>
 #include <cmath>
 
 using namespace eris;
@@ -20,14 +26,10 @@ const std::vector<double> Reader::default_polynomial{{4., -1.}};
 const std::vector<double> Reader::default_penalty_polynomial{{0, 0, 0.25}};
 const std::vector<unsigned int> Reader::profit_stream_ages{{1,2,4,8}};
 
-Reader::Reader(
-        std::shared_ptr<Creativity> creativity,
-        const Position &pos,
-        double cFixed, double cUnit, double cPiracy, double inc
-        )
+Reader::Reader(std::shared_ptr<Creativity> creativity, const Position &pos)
     : WrappedPositional<agent::AssetAgent>(pos, creativity->parameters.boundary, -creativity->parameters.boundary),
-    cost_fixed{cFixed}, cost_unit{cUnit}, cost_piracy{cPiracy}, income{inc},
     creativity_{std::move(creativity)},
+    cost_unit{creativity_->parameters.cost_unit}, cost_fixed{creativity_->parameters.cost_fixed}, income{creativity_->parameters.income},
     profit_belief_{new Profit()}, profit_belief_extrap_{profit_belief_}
 {
     profit_stream_beliefs_.emplace(1, ProfitStream(1));
@@ -406,14 +408,19 @@ void Reader::interApply() {
             assets()[creativity_->money] -= cost_fixed;
 
             auto qdraw = [this] (const Book &book) -> double {
-                // Truncated normal.  Since book.quality() > 0, this should return a valid draw 50% of
-                // the time, so this loop shouldn't run that much, usually.
                 double x;
+                // Truncated normal.  Since book.quality() > 0, this should return a valid draw more
+                // than 50% of the time, so this loop shouldn't run that much, usually.
                 do { x = book.quality() + writer_quality_sd * Random::rstdnorm(); }
                 while (x < 0);
                 return x;
             };
-            newbook = sim->spawn<Book>(creativity_, create_position_, sharedSelf(), wrote_.size(), create_price_, create_quality_, qdraw);
+            newbook = sim->spawn<Book>(creativity_, create_position_, sharedSelf(), wrote_.size(), create_quality_, qdraw);
+            // FIXME: authors can choose to not put this book on the market at all and instead
+            // release directly to the public market (if available).
+            newbook->setMarket(
+                    sim->spawn<BookMarket>(creativity_, newbook, create_price_)
+            );
 
             /// If enabled, add some noise in a random direction to the position
             if (writer_book_sd > 0) {
@@ -499,12 +506,6 @@ double Reader::penalty(unsigned long n) const {
 
 const std::unordered_map<SharedMember<Book>, BookCopy>& Reader::library() const { return library_; }
 
-void Reader::receiveProceeds(const SharedMember<Book> &book, const Bundle &revenue) {
-    assets() += revenue;
-    BundleNegative tvc(creativity_->money, book->currSales() * -cost_unit);
-    tvc.transferApprox(tvc, assets(), 1e-8);
-}
-
 const belief::Profit& Reader::profitBelief() const { return *profit_belief_; }
 const belief::Profit& Reader::profitExtrapBelief() const { return *profit_belief_extrap_; }
 bool Reader::profitExtrapBeliefDiffers() const { return profit_belief_ != profit_belief_extrap_; }
@@ -542,7 +543,7 @@ void Reader::updateBeliefs() {
     // incorporated into the beliefs above.
     std::vector<SharedMember<Book>> remove;
     for (auto &book : library_on_market_) {
-        if (not book.first->hasMarket())
+        if (not book.first->hasPrivateMarket())
             remove.push_back(book.first);
     }
     for (auto &book : remove)
@@ -550,7 +551,7 @@ void Reader::updateBeliefs() {
 
     remove.clear();
     for (auto &book : book_cache_market_) {
-        if (not book->hasMarket())
+        if (not book->hasPrivateMarket())
             remove.push_back(book);
     }
     for (auto &book : remove)
@@ -594,10 +595,10 @@ void Reader::updateDemandBelief() {
     // Figure out which books might yield usable data: i.e. those on the market
     std::list<SharedMember<Book>> mktbooks;
     for (auto &bu : library_on_market_) {
-        if (bu.first->hasMarket()) mktbooks.push_back(bu.first);
+        if (bu.first->hasPrivateMarket()) mktbooks.push_back(bu.first);
     }
     for (auto &b : book_cache_market_) {
-        if (b->hasMarket()) mktbooks.push_back(b);
+        if (b->hasPrivateMarket()) mktbooks.push_back(b);
     }
 
     if (not mktbooks.empty()) {
@@ -618,7 +619,11 @@ void Reader::updateDemandBelief() {
         demand_belief_ = std::move(demand_belief_).weaken(weaken);
 }
 void Reader::updateProfitStreamBelief() {
+    // FIXME: before re-enabling this, the belief needs to be updated somehow to track public prize
+    // money
+    throw std::runtime_error("Profit stream beliefs are not available");
 
+    /*
     // Figure out which books might yield usable data
     std::list<SharedMember<Book>> potential;
     for (auto &bu : library_on_market_) {
@@ -734,9 +739,12 @@ void Reader::updateProfitStreamBelief() {
         // Update the belief (existing or just-created) with the new data
         profit_stream_beliefs_.at(age) = profit_stream_beliefs_.at(age).update(y, X);
     }
+*/
 }
 
 void Reader::updateProfitBelief() {
+    // FIXME: need to handle private/public markets
+
     // If we aren't starting simulation period t=3 or later, don't do anything: we can't
     // incorporated books into the belief because we need the lagged market book count
     if (simulation()->t() < 3) return;
@@ -744,7 +752,7 @@ void Reader::updateProfitBelief() {
     std::vector<std::pair<SharedMember<Book>, double>> new_prof_books, extrap_books;
 
     for (auto &bc : library_on_market_) {
-        if (bc.first->hasMarket()) {
+        if (bc.first->hasPrivateMarket()) {
             // The book is still on the market, so we'll have to extrapolate using profit stream
             // beliefs
             extrap_books.push_back(std::make_pair(bc.first, bc.second.get().quality));
@@ -757,7 +765,7 @@ void Reader::updateProfitBelief() {
 
     // Also need to go through books that we don't own, using predicted quality
     for (auto &b : book_cache_market_) {
-        if (b->hasMarket())
+        if (b->hasPrivateMarket())
             extrap_books.push_back(std::make_pair(b, quality(b)));
         else
             new_prof_books.push_back(std::make_pair(b, quality(b)));
@@ -772,8 +780,8 @@ void Reader::updateProfitBelief() {
         size_t i = 0;
         for (auto &bq : new_prof_books) {
             auto &book = bq.first;
-            // Calculate the book's total profit
-            y[i] = book->lifeRevenue() - book->marketPeriods() * cost_fixed - book->lifeSales() * cost_unit;
+            // Calculate the book's total (private) profit
+            y[i] = book->lifeProfitPrivate();
             X.row(i) = Profit::profitRow(bq.second, bq.first->order(), creativity_->market_books_lagged);
             i++;
         }
@@ -798,7 +806,7 @@ void Reader::updateProfitBelief() {
         for (auto &bq : extrap_books) {
             auto &book = bq.first;
             // Calculate the book's total profit (ignoring initial creation cost)
-            y[i] = book->lifeRevenue() - book->marketPeriods() * cost_fixed - book->lifeSales() * cost_unit;
+            y[i] = book->lifeProfitPrivate();
             X.row(i) = Profit::profitRow(bq.second, bq.first->order(), creativity_->market_books_lagged);
             i++;
         }
@@ -839,17 +847,15 @@ void Reader::intraOptimize() {
         // - If it's on the market, can buy at its current price
         // - If piracy has been invented and one of my friends has it, I can get a copy from the friend
 
-        bool for_sale = book->hasMarket();
+        bool for_sale = book->hasAnyMarket();
         bool shared = false;
-        if (creativity_->sharing()) {
-            for (auto &f : friends()) {
-                if (f->library().count(book) > 0) {
-                    // My friend owns the book
-                    if (book->author() != f or not book->hasMarket()) {
-                        // ... and either isn't the author, or is (and the book has left the market)
-                        shared = true;
-                        break;
-                    }
+        for (auto &f : friends()) {
+            if (f->library().count(book) > 0) {
+                // My friend owns the book
+                if (book->author() != f or not book->hasPrivateMarket()) {
+                    // ... and either isn't the author, or is (and the book has left the market)
+                    shared = true;
+                    break;
                 }
             }
         }
@@ -957,7 +963,7 @@ void Reader::intraApply() {
     auto lock = writeLock();
     // Apply the reserved transactions (i.e. pay for book copies and receive the book)
     for (auto &res : reservations_) {
-        res->buy();
+        res.buy();
     }
     // Also remove any cost associated with obtaining pirated copies of books:
     assets()[creativity_->money] -= reserved_piracy_cost_;
@@ -975,10 +981,10 @@ void Reader::intraApply() {
                 SharedMember<Book>(book),
                 BookCopy(book->qualityDraw(), pirated ? BookCopy::Status::pirated : BookCopy::Status::purchased, simulation()->t()));
 
-        // If the book is still on the market (which it must be if we just bought it, and might be
-        // if we just pirated it), stash a copy in library_no_market_ so that it will (eventually)
-        // get incorporated into profit stream beliefs.
-        if (book->hasMarket())
+        // If the book is still on the private market (which it must be if we just bought it from a
+        // private source, and might be if we just pirated it), stash a copy in library_on_market_
+        // so that it will (eventually) get incorporated into profit stream beliefs.
+        if (book->hasPrivateMarket())
             library_on_market_.emplace(book, std::ref(inserted.first->second));
 
         // And it's always considered a "new" (to us) book, so stash it there:

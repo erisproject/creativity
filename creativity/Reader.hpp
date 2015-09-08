@@ -1,22 +1,26 @@
 #pragma once
+#include <eris/Optimize.hpp>
 #include <eris/WrappedPositional.hpp>
 #include <eris/agent/AssetAgent.hpp>
 #include <eris/Market.hpp>
-#include <Eigen/Core>
-#include "creativity/belief/Profit.hpp"
+#include "creativity/BookCopy.hpp" // IWYU pragma: keep
 #include "creativity/belief/ProfitStream.hpp"
 #include "creativity/belief/Demand.hpp"
 #include "creativity/belief/Quality.hpp"
-#include "creativity/BookCopy.hpp"
-#include <string>
 #include <vector>
 #include <unordered_set>
+#include <forward_list>
+#include <functional>
+#include <map>
+#include <unordered_map>
+#include <set>
+#include <type_traits>
 
 namespace creativity {
 
 class Book;
-class BookMarket;
 class Creativity;
+namespace belief { class Profit; }
 
 /** A Reader is an agent that both consumes previously unread books and potentially writes new books
  * and sells copies of those books.  The Reader's utility is determined by books read and an outside
@@ -146,21 +150,16 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
     public:
         Reader() = delete; ///< Not default constructible
 
-        /** Constructor takes the reader position and various reader properties.
+        /** Constructs a new Reader at the given position.
          *
          * Beliefs start off non-informative.
          *
          * \param creativity the Creativity object owning the simulation this reader is created in
          * \param pos the initial position of the reader
-         * \param cFixed the fixed cost of keeping a book on the market
-         * \param cUnit the per-unit cost of producing copies of a book
-         * \param cPiracy the per-unit cost of obtaining a pirated copy of a book
-         * \param income the per-period income of the agent
          */
         Reader(
                 std::shared_ptr<Creativity> creativity,
-                const eris::Position &pos,
-                double cFixed, double cUnit, double cPiracy, double income
+                const eris::Position &pos
               );
 
         /** Takes a money value and a container of SharedMember<Book> objects and returns the
@@ -370,23 +369,6 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          */
         double writer_quality_sd{1.0};
 
-        /// The fixed cost of keeping a book on the market for a period.
-        double cost_fixed{0};
-
-        /** The unit cost of producing a copy of a book on the market.  Copies are produced
-         * instantly as required; no preallocated number of copies is performed.
-         */
-        double cost_unit{0};
-
-        /** The unit cost of obtaining a pirated copy of the work from a friend.  This cost is
-         * incurred by the recipient when making the copy, not the source.  Like purchased copies,
-         * pirated copies are created instantly as required.
-         */
-        double cost_piracy{0};
-
-        /// The per-period income the reader receives.
-        double income{0};
-
         /** The reader's creation function shape coefficient.  This reader can exhert effort \f$\ell
          * \geq 0\f$ to create a book of quality \f$q(\ell) = \alpha \frac{(\ell+1)^\beta -
          * 1}{\beta}\f$, where \f$\beta\f$ is this value.
@@ -463,13 +445,6 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * \sa creationEffort
          */
         static double creationEffort(double shape, double scale, double effort);
-
-        /** Called at the end of a period (from BookMarket::intraFinish) to transfer book revenue
-         * earned during a period back to the author.  The author subtracts variable cost (if any)
-         * and keeps the remaining revenue.  Note that fixed costs are incurred at the beginning of
-         * the period, and so this will never attempt to "receive" a negative amount.
-         */
-        void receiveProceeds(const eris::SharedMember<Book> &book, const eris::Bundle &revenue);
 
         /// Read-only access to this reader's profit belief
         const belief::Profit& profitBelief() const;
@@ -604,6 +579,10 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
     protected:
         /// The Creativity object that owns the simulation this reader belongs to
         std::shared_ptr<Creativity> creativity_;
+        const double &cost_unit, ///< Alias for creativity_->parameters.cost_unit
+            &cost_fixed, ///< Alias for creativity_->parameters.cost_fixed
+            &income; ///< Alias for creativity_->parameters.income
+
         std::shared_ptr<belief::Profit> profit_belief_, ///< Belief about lifetime book profits
             profit_belief_extrap_; ///< Beliefs about lifetime book profits using profit stream expectations
         belief::Demand demand_belief_; ///< Belief about per-period demand
@@ -677,6 +656,9 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          *
          * The current belief is used as a prior, suitably weakened if
          * CreativitySettings.prior_weight is not equal to 1.
+         *
+         * This method is currently disabled; attempting to call it will result in a
+         * std::runtime_error exception.
          */
         void updateProfitStreamBelief();
 

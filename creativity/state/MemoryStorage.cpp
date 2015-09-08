@@ -1,4 +1,6 @@
 #include "creativity/state/MemoryStorage.hpp"
+#include "creativity/state/Storage.hpp"
+#include <algorithm>
 
 using namespace eris;
 

@@ -1,17 +1,17 @@
 #pragma once
-#include <eris/Simulation.hpp>
 #include <eris/Good.hpp>
-#include <eris/Optimize.hpp>
-#include <Eigen/Core>
-#include "creativity/Book.hpp"
+#include <eris/noncopyable.hpp>
 #include "creativity/CreativitySettings.hpp"
+#include <cstdint>
+#include <mutex>
+#include <string>
+#include <utility>
+#include <vector>
+
+namespace creativity { class Book; }
+namespace creativity { namespace state { class Storage; } }
 
 namespace creativity {
-
-namespace state {
-// Forward declaration
-class Storage;
-}
 
 /** Central class for a creativity simulation; this class handles setting up the simulation
  * according to configured parameters and running the simulation.
@@ -44,18 +44,17 @@ class Creativity : private eris::noncopyable, public std::enable_shared_from_thi
         CreativitySettings& set();
 
         /** Store the creativity simulation results in the given file, overwriting any content the
-         * file may already have.  The existing Storage object is released (and destroyed, unless
+         * file may already have.  Any existing simulation states are copied from the current
+         * Storage object, then the existing Storage object is released (and destroyed, unless
          * something else has copied its shared_ptr).  After calling this method, `.storage` will be
          * set to the new FileStorage object.
-         *
-         * This must be called before calling setup().
          *
          * The default simulation storage is an in-memory storage.
          */
         void fileWrite(const std::string &filename);
 
-        /** Reads a creativity simulation storage file into storage().  The file is opened readonly,
-         * and so any attempt to manipulate the simulation will fail.
+        /** Opens a creativity simulation storage file for reading via storage().  The file is
+         * opened readonly, and so any attempt to manipulate the simulation will fail.
          *
          * This method is typically called instead of calling setup() when loading a creativity
          * simulation record from disk.
@@ -82,6 +81,12 @@ class Creativity : private eris::noncopyable, public std::enable_shared_from_thi
          * \throws std::domain_error (via checkParameters()) if any parameters are invalid.
          */
         void setup();
+
+        /** Runs one iteration of the simulation.  This calls simulation()->run(), but also takes
+         * care of other details (such as setting up the piracy network at the right time, creating
+         * a public tracker agent when appropriate, and updating stored simulation state data).
+         */
+        void run();
 
         /** Static method that calculates a boundary given a number of readers, dimensions, and a
          * desired density.
@@ -145,8 +150,13 @@ class Creativity : private eris::noncopyable, public std::enable_shared_from_thi
         unsigned long market_books_lagged = 0;
 
     protected:
-        /* Default constructor is protected; construct by calling create(). */
+        /** Default constructor is protected; construct by calling create(). */
         Creativity() = default;
+
+        /** Sets up the piracy network.  Called automatically by run() just before the
+         * `piracy_begins` period.
+         */
+        void createPiracyNetwork();
 
     private:
         // True if this is a live simulation.  Exclusive of setup_read_.

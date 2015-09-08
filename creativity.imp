@@ -1,0 +1,45 @@
+# include-what-you-use mapping for for creativity
+[
+    { ref: "eris.imp" },
+    { include: ["<eris/Market.hpp>", "public", "<creativity/BookMarket.hpp>", "public"] },
+    { include: ["\"creativity/CreativitySettings.hpp\"", "public", "\"creativity/Creativity.hpp\"", "public"] },
+    { include: ["\"creativity/state/BookState.hpp\"", "public", "\"creativity/state/State.hpp\"", "public"] },
+    { include: ["\"creativity/state/ReaderState.hpp\"", "public", "\"creativity/state/State.hpp\"", "public"] },
+    { include: ["\"creativity/state/PublicTrackerState.hpp\"", "public", "\"creativity/state/State.hpp\"", "public"] },
+    { include: ["\"creativity/state/State.hpp\"", "public", "\"creativity/state/StorageBackend.hpp\"", "public"] },
+    { include: ["<eris/belief/BayesianLinearRestricted.hpp>", "public", "\"creativity/belief/Demand.hpp\"", "public"] },
+    { include: ["<eris/belief/BayesianLinearRestricted.hpp>", "public", "\"creativity/belief/Profit.hpp\"", "public"] },
+    { include: ["<eris/belief/BayesianLinear.hpp>", "public", "\"creativity/belief/ProfitStream.hpp\"", "public"] },
+    { include: ["<eris/belief/BayesianLinear.hpp>", "public", "\"creativity/belief/Quality.hpp\"", "public"] },
+
+    { include: ["<boost/iterator/iterator_facade.hpp>", "public", "\"creativity/state/Storage.hpp\"", "public"] },
+
+# Boost IWYU hacks:
+    { include: ["<boost/predef/detail/endian_compat.h>", "private", "<boost/detail/endian.hpp>", "public"] },
+    { include: ["<boost/program_options/detail/value_semantic.hpp>", "private", "<boost/program_options/value_semantic.hpp>", "public"] },
+    { include: ["<boost/lexical_cast.hpp>", "public", "<boost/program_options/value_semantic.hpp>", "public"] },
+    { include: ["<boost/lexical_cast/bad_lexical_cast.hpp>", "private", "<boost/lexical_cast.hpp>", "public"] },
+    { include: ["<boost/program_options/detail/parsers.hpp>", "private", "<boost/program_options/parsers.hpp>", "public"] },
+    { include: ["<boost/any.hpp>", "public", "<boost/program_options/value_semantic.hpp>", "public"] },
+    { include: ["<boost/cstdint.hpp>", "public", "<cstdint>", "public"] },
+    { include: ["<boost/detail/basic_pointerbuf.hpp>", "private", "<boost/lexical_cast.hpp>", "public"] },
+    { include: ["<boost/geometry/index/parameters.hpp>", "private", "<boost/geometry/index/rtree.hpp>", "public"] },
+    { include: ["<boost/geometry/index/detail/predicates.hpp>", "private", "<boost/geometry/index/predicates.hpp>", "public"] },
+    { include: ["<boost/geometry/index/predicates.hpp>", "public", "<boost/geometry/index/rtree.hpp>", "public"] },
+    { include: ["<boost/move/utility_core.hpp>", "public", "<boost/geometry/index/rtree.hpp>", "public"] },
+    { include: ["<boost/variant/detail/apply_visitor_unary.hpp>", "public", "<boost/geometry/index/rtree.hpp>", "public"] },
+
+
+# gtkmm and related:
+    { include: ["<glibmm/propertyproxy.h>", "private", "<gtkmm/container.h>", "public"] },
+    { include: ["\"gtk/gtktreemodel.h\"", "private", "<gtkmm/treemodel.h>", "public"] },
+    { include: ["<glib-object.h>", "private", "<gtkmm/treemodelcolumn.h>", "public"] },
+    { include: ["\"gobject/gtype.h\"", "private", "<gtkmm/treemodelcolumn.h>", "public"] },
+    { include: ["\"gtk/gtkmain.h\"", "private", "<gtkmm/main.h>", "public"] },
+    { include: ["<gtk/gtkmain.h>", "private", "<gtkmm/main.h>", "public"] },
+    { symbol: ["GdkEventMotion", "private", "<gtkmm/widget.h>", "public"] },
+    { symbol: ["GdkEventScroll", "private", "<gtkmm/widget.h>", "public"] },
+    { symbol: ["GdkEventButton", "private", "<gtkmm/widget.h>", "public"] },
+    { symbol: ["GdkScrollDirection", "private", "<gtkmm/widget.h>", "public"] },
+    { include: ["\"sigc++/functors/functor_trait.h\"", "private", "<sigc++/connection.h>", "public"] },
+]

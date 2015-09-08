@@ -1,6 +1,18 @@
 #include "creativity/data/Data.hpp"
+#include "creativity/state/State.hpp"
 #include "creativity/Creativity.hpp"
-#include <boost/algorithm/string.hpp>
+#include "creativity/Reader.hpp"
+#include "creativity/state/Storage.hpp"
+#include <boost/algorithm/string/erase.hpp>
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/replace.hpp>
+#include <boost/iterator/iterator_traits.hpp>
+#include <limits>
+#include <memory>
+#include <stdexcept>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
 
 using namespace creativity::state;
 using namespace eris;
@@ -17,15 +29,15 @@ double net_u(const Storage &cs, eris_time_t from, eris_time_t to) {
     for (eris_time_t t = from; t <= to; t++) {
         auto cst = cs[t];
         for (auto &r : cst->readers) {
-            net_u_total += r.second.u - r.second.income;
+            net_u_total += r.second.u - cs.settings.income;
         }
     }
     return net_u_total / (cs[from]->readers.size() * (to-from+1));
 }
 
-/** Calculates the average market life of books written between `from` and `to`, in simulation
- * periods.  Books still on the market in period `to` aren't included (because they might stay on
- * the market).
+/** Calculates the average (private) market life of books written between `from` and `to`, in
+ * simulation periods.  Books still on the market in period `to` aren't included (because they might
+ * stay on the market).
  */
 double book_market_periods(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (from > to) throw std::logic_error("from > to");
@@ -34,8 +46,8 @@ double book_market_periods(const Storage &cs, eris_time_t from, eris_time_t to) 
     auto csto = cs[to];
     for (auto &bp : csto->books) {
         auto &b = bp.second;
-        if (b.created >= from and not b.market()) {
-            total += b.lifetime;
+        if (b.created >= from and not b.market_private) {
+            total += b.lifetime_private;
             count++;
         }
     }
@@ -54,7 +66,7 @@ double book_p0(const Storage &cs, eris_time_t from, eris_time_t to) {
         auto cst = cs[t];
         for (auto &bp : cst->books) {
             auto &b = bp.second;
-            if (b.created == t and b.market()) {
+            if (b.created == t and b.market_private) {
                 p_total += b.price;
                 count++;
             }
@@ -79,7 +91,7 @@ double book_p1(const Storage &cs, eris_time_t from, eris_time_t to) {
         auto cst = cs[t];
         for (auto &bp : cst->books) {
             auto &b = bp.second;
-            if (b.created == t-1 and b.market()) {
+            if (b.created == t-1 and b.market_private) {
                 p_total += b.price;
                 count++;
             }
@@ -104,7 +116,7 @@ double book_p2(const Storage &cs, eris_time_t from, eris_time_t to) {
         auto cst = cs[t];
         for (auto &bp : cst->books) {
             auto &b = bp.second;
-            if (b.created == t-2 and b.market()) {
+            if (b.created == t-2 and b.market_private) {
                 p_total += b.price;
                 count++;
             }
@@ -114,8 +126,8 @@ double book_p2(const Storage &cs, eris_time_t from, eris_time_t to) {
     return p_total / count;
 }
 
-/** Average copies sold per book.  All books on the market in the given range are included.  The
- * average is per book seen in the period, not per simulation period.
+/** Average private copies sold per book.  All books on the private market in the given range are
+ * included.  The average is per book seen in the period, not per simulation period.
  */
 double book_sales(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (from > to) throw std::logic_error("from > to");
@@ -125,7 +137,7 @@ double book_sales(const Storage &cs, eris_time_t from, eris_time_t to) {
         auto cst = cs[t];
         for (auto &bp : cst->books) {
             auto &b = bp.second;
-            if (b.market()) {
+            if (b.market_private) {
                 sales_total += b.sales;
                 seen.insert(b.id);
             }
@@ -150,7 +162,7 @@ double book_revenue(const Storage &cs, eris_time_t from, eris_time_t to) {
         auto cst = cs[t];
         for (auto &bp : cst->books) {
             auto &b = bp.second;
-            if (b.market()) {
+            if (b.market_private) {
                 revenue_total += b.revenue;
                 seen.insert(b.id);
             }
@@ -175,9 +187,8 @@ double book_gross_margin(const Storage &cs, eris_time_t from, eris_time_t to) {
         auto cst = cs[t];
         for (const auto &bp : cst->books) {
             auto &b = bp.second;
-            if (b.market()) {
-                auto &r = cst->readers.at(b.author);
-                margin_total += b.revenue - r.cost_unit * b.sales;
+            if (b.market_private) {
+                margin_total += b.revenue -  cs.settings.cost_unit * b.sales;
                 seen.insert(b.id);
             }
         }
@@ -202,13 +213,13 @@ double book_profit(const Storage &cs, eris_time_t from, eris_time_t to) {
         auto period = cs[t];
         for (const auto &bp : period->books) {
             auto &b = bp.second;
-            if (b.market()) {
+            if (b.market_private) {
                 seen.insert(b.id);
-                auto &r = period->readers.at(b.author);
-                profit_total += b.revenue - r.cost_unit * b.sales - r.cost_fixed;
+                profit_total += b.revenue - cs.settings.cost_unit * b.sales - cs.settings.cost_fixed;
                 if (b.created == t) {
                     // In the creation period, subtract the effort that had to be expended to write
                     // the book
+                    auto &r = period->readers.at(b.author);
                     profit_total -= Reader::creationEffort(r.creation_shape, r.creation_scale, b.quality);
                 }
             }
@@ -256,7 +267,7 @@ double books_written(const Storage &cs, eris_time_t from, eris_time_t to) {
     return count / (double) (to-from+1);
 }
 
-/** Average number of books purchased per period (aggregate, not per-reader)
+/** Average number of books purchased privately per period (aggregate, not per-reader)
  */
 double books_bought(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (from > to) throw std::logic_error("from > to");
@@ -266,7 +277,8 @@ double books_bought(const Storage &cs, eris_time_t from, eris_time_t to) {
         for (auto &bp : cst->books) {
             auto &b = bp.second;
 
-            count += b.sales;
+            if (b.market_private)
+                count += b.sales;
         }
     }
 
@@ -285,6 +297,24 @@ double books_pirated(const Storage &cs, eris_time_t from, eris_time_t to) {
             auto &b = bp.second;
 
             count += b.pirated;
+        }
+    }
+
+    return count / (double) (to-from+1);
+}
+
+/** Average number of public copies of books provided per period (aggreate, not per-reader).
+ */
+double books_public_copies(const Storage &cs, eris_time_t from, eris_time_t to) {
+    if (from > to) throw std::logic_error("from > to");
+    unsigned long count = 0;
+    for (eris_time_t t = from; t <= to; t++) {
+        auto cst = cs[t];
+        for (auto &bp : cst->books) {
+            auto &b = bp.second;
+
+            if (b.market_public())
+                count += b.sales;
         }
     }
 
@@ -311,6 +341,8 @@ std::vector<initial_datum> initial_data_fields() {
     ADD_SETTING(income);
     ADD_SETTING(piracy_begins);
     ADD_SETTING(piracy_link_proportion);
+    ADD_SETTING(public_sharing_begins);
+    ADD_SETTING(public_sharing_tax);
     ADD_SETTING(prior_scale);
     ADD_SETTING(prior_scale_piracy);
     ADD_SETTING(prior_scale_burnin);
@@ -332,7 +364,7 @@ std::vector<initial_datum> initial_data_fields() {
 std::vector<datum> data_fields() {
     std::vector<datum> data;
 
-#define ADD_DATUM(D) data.emplace_back(#D, D)
+#define ADD_DATUM(D, ...) data.emplace_back(#D, D, ##__VA_ARGS__)
     ADD_DATUM(net_u);
     ADD_DATUM(book_market_periods);
     ADD_DATUM(book_p0);
@@ -345,7 +377,8 @@ std::vector<datum> data_fields() {
     ADD_DATUM(book_quality);
     ADD_DATUM(books_written);
     ADD_DATUM(books_bought);
-    data.emplace_back("books_pirated", books_pirated, true);
+    ADD_DATUM(books_pirated, false, true, true);
+    ADD_DATUM(books_public_copies, false, false, true);
 #undef ADD_DATUM
 
     return data;

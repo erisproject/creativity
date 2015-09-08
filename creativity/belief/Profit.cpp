@@ -1,8 +1,6 @@
 #include "creativity/belief/Profit.hpp"
-#include "creativity/BookMarket.hpp"
 #include <eris/algorithms.hpp>
-
-#include <eris/debug.hpp>
+#include <stdexcept>
 
 namespace creativity { namespace belief {
 

@@ -1,8 +1,12 @@
 #include "creativity/BookMarket.hpp"
+#include "creativity/Book.hpp"
 #include "creativity/Reader.hpp"
 #include "creativity/Creativity.hpp"
-#include <random>
+#include <cmath>
+#include <algorithm>
+#include <stdexcept>
 
+using eris::agent::AssetAgent;
 using namespace eris;
 
 namespace creativity {
@@ -55,9 +59,9 @@ Market::Reservation BookMarket::reserve(
     return createReservation(agent, ql, total_p);
 }
 
-void BookMarket::buy_(Reservation_ &res) {
+void BookMarket::buy(Reservation &res) {
     if (res.state != ReservationState::pending)
-        throw Reservation_::non_pending_exception();
+        throw Reservation::non_pending_exception();
 
     auto lock = writeLock(book_);
     Bundle &b = reservationBundle_(res);
@@ -72,13 +76,19 @@ void BookMarket::buy_(Reservation_ &res) {
     b.set(book_, res.quantity);
 
     // Complete the reservation
-    Market::buy_(res);
+    Market::buy(res);
 }
 
 void BookMarket::intraFinish() {
     auto author = book_->author();
     auto lock = writeLock(book_, author);
-    author->receiveProceeds(book_, proceeds_);
+    // First subtract off variable costs incurred
+    BundleNegative tvc(creativity_->money, book_->currSales() * -creativity_->parameters.cost_unit);
+    tvc.transferApprox(tvc, proceeds_, 1e-8);
+
+    // Transfer profits to the author
+    author->assets() += proceeds_;
+
     proceeds_.clear();
 }
 
