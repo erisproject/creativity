@@ -14,6 +14,8 @@ set(creativity_description "Agent-based model of creativity and piracy")
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/Modules)
 
+set(ERIS_VERSION_REQUIRED "0.3.2")
+
 # No in-source building
 include(MacroEnsureOutOfSourceBuild)
 macro_ensure_out_of_source_build("${PROJECT_NAME} requires an out-of-source build.  Create a build directory and run 'cmake ${CMAKE_SOURCE_DIR} [options]'.")
@@ -79,8 +81,8 @@ foreach(pkg ${creativity_pkgconfig} ${creativity_gui_pkgconfig})
     add_definitions(${${pkg}_CFLAGS_OTHER})
 endforeach()
 
-if(ERIS_VERSION VERSION_LESS "0.3.2")
-    message(FATAL_ERROR "Eris v0.3.2 or above is required, but only v${ERIS_VERSION} was found")
+if(ERIS_VERSION VERSION_LESS "${ERIS_VERSION_REQUIRED}")
+    message(FATAL_ERROR "Eris v${ERIS_VERSION_REQUIRED} or above is required, but only v${ERIS_VERSION} was found")
 endif()
 
 find_package(Eigen3 REQUIRED)
