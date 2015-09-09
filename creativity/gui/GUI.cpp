@@ -66,6 +66,7 @@
 #include <exception>
 #include <iterator>
 #include <set>
+#include <map>
 #include <stdexcept>
 #include <algorithm>
 #include <iostream>

@@ -90,6 +90,8 @@
  { include: ["@\"Eigen/src/Cholesky/.*\"", "private", "<Eigen/Cholesky>", "public"] },
  { include: ["@\"Eigen/src/QR/.*\"", "private", "<Eigen/QR>", "public"] },
  { include: ["@\"Eigen/src/SVD/.*\"", "private", "<Eigen/SVD>", "public"] },
+ { include: ["@\"Eigen/src/Jacobi/.*\"", "private", "<Eigen/Jacobi>", "public"] },
  { include: ["@\"Eigen/src/Householder/.*\"", "private", "<Eigen/Householder>", "public"] },
  { include: ["\"Eigen/Householder\"", "public", "<Eigen/QR>", "public"] },
+ { include: ["\"Eigen/Jacobi\"", "public", "<Eigen/JacobiSVD>", "public"] },
 ]

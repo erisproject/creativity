@@ -1,5 +1,8 @@
 #pragma once
+#include <cmath>
+#include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <Eigen/Core>
 
 namespace creativity { namespace data {

@@ -12,7 +12,7 @@
 #include <gtkmm/treeview.h> // IWYU pragma: keep
 #include <cstddef>
 #include <functional>
-#include <unordered_map>
+#include <map>
 #include <utility>
 #include <vector>
 

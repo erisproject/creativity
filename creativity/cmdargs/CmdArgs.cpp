@@ -2,13 +2,10 @@
 #include "creativity/config.hpp"
 #include <boost/program_options/variables_map.hpp>
 #include <boost/program_options/parsers.hpp>
-#include <eris/types.hpp>
-#include <cstdint>
+#include <boost/program_options/errors.hpp>
 #include <cstdlib>
 #include <string>
-#include <sstream>
 #include <iostream>
-#include <thread>
 
 namespace po = boost::program_options;
 

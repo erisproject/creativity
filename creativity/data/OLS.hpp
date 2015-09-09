@@ -1,6 +1,7 @@
 #pragma once
 #include "creativity/data/Equation.hpp"
 #include <Eigen/Core>
+#include <ostream>
 
 namespace creativity { namespace data {
 

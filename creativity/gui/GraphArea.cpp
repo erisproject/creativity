@@ -3,7 +3,6 @@
 #include "creativity/state/Storage.hpp"
 #include "creativity/state/State.hpp"
 #include "creativity/Creativity.hpp"
-#include <eris/types.hpp>
 #include <boost/math/constants/constants.hpp>
 #include <cairomm/context.h>
 #include <cairomm/matrix.h>
@@ -14,7 +13,7 @@
 #include <gtkmm/widget.h>
 #include <cmath>
 #include <algorithm>
-#include <unordered_map>
+#include <map>
 #include <utility>
 #include <memory>
 

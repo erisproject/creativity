@@ -4,6 +4,9 @@
 #include <functional>
 #include <utility>
 #include <ostream>
+#include <string>
+#include <type_traits>
+#include <vector>
 #include "creativity/data/Variable.hpp"
 
 namespace creativity { namespace data {

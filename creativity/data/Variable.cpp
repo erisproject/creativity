@@ -1,5 +1,6 @@
 #include "creativity/data/Variable.hpp"
 #include <regex>
+#include <sstream>
 
 using namespace Eigen;
 

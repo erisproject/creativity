@@ -1,8 +1,11 @@
 #include "creativity/data/OLS.hpp"
+#include "creativity/data/Variable.hpp"
 #include "creativity/data/Regression.hpp"
 #include <Eigen/SVD>
+#include <algorithm>
+#include <limits>
+#include <string>
 #include <ostream>
-#include <iostream>
 
 using namespace Eigen;
 namespace creativity { namespace data {
