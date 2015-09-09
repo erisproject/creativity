@@ -11,9 +11,16 @@ namespace creativity { namespace data {
 /** Class to store a equation.  The class is constructed with the dependent variable, then has an
  * equation added to it using the % operator.  For example:
  *
- *     OLS model(depvar);
+ *     // Constructing a single equation
+ *     Equation model(depvar);
  *     model % 1 + var1 + var2;
  *     model % var3;
+ *
+ *     // Building on another equation:
+ *     Equation model2 = model1 + var4;
+ *
+ *     // rvalue construction
+ *     Equation(depvar) + 1 + var1 + var2;
  *
  * NB: The left-shift operator (<<) would make more logical sense than %, but has the unfortunately
  * pitfall of being of lower precedence than +, which means, in the above example, the `1+var1+var2`
@@ -50,6 +57,36 @@ class Equation {
 
         /// `% d` for double d is equivalent to `% ConstantVariable(d)`.
         Proxy operator % (double c);
+
+        /** The addition operator duplicates the called-upon Equation an adds a new term to the
+         * duplicate, then returns it.
+         */
+        Equation operator + (const Variable &var) const &;
+
+        /** The addition operator called on a temporary adds a new term to the temporary, then
+         * returns it.
+         */
+        Equation operator + (const Variable &var) &&;
+
+        /// Adding a double constant (typically 0 or 1) converts the constant to a ConstantVariable
+        Equation operator + (double c) const &;
+
+        /// Adding a double constant (typically 0 or 1) converts the constant to a ConstantVariable
+        Equation operator + (double c) &&;
+
+        /** Adds a temporary Variable subclass to an Equation, returning the new equation. */
+        template <class V, typename = typename std::enable_if<
+            std::is_base_of<Variable, V>::value and std::is_move_constructible<V>::value>::type>
+        Equation operator + (V &&var) const &;
+
+        /** Adds a temporary Variable subclass to an Equation, returning the new equation. */
+        template <class V, typename = typename std::enable_if<
+            std::is_base_of<Variable, V>::value and std::is_move_constructible<V>::value>::type>
+        Equation operator + (V &&var) &&;
+
+        /** The addition operator, when called on a temporary, simply adds a new term to temporary
+         * object and returns itself.
+         */
 
         /// Accesses the dependent variable
         const Variable& depVar() const;
@@ -143,6 +180,19 @@ template <class V, typename>
 Equation::Proxy Equation::operator % (V &&var) {
     addVar(std::move(var));
     return Proxy(*this);
+}
+
+template <class V, typename>
+Equation Equation::operator + (V &&var) const & {
+    Equation copy(*this);
+    copy.addVar(std::move(var));
+    return copy;
+}
+
+template <class V, typename>
+Equation Equation::operator + (V &&var) && {
+    addVar(std::move(var));
+    return std::move(*this);
 }
 
 /// Specialization for a ConstantVariable

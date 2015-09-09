@@ -10,6 +10,11 @@ Equation::Proxy& Equation::Proxy::operator+(const Variable &var) { eq_.addVar(va
 Equation::Proxy Equation::operator%(const Variable &var) { addVar(var); return Proxy(*this); }
 Equation::Proxy Equation::operator%(double c) { return *this % ConstantVariable(c); }
 
+Equation Equation::operator+(const Variable &var) const & { Equation copy(*this); copy.addVar(var); return copy; }
+Equation Equation::operator+(const Variable &var) && { addVar(var); return std::move(*this); }
+Equation Equation::operator+(double c) const & { return *this + ConstantVariable(c); }
+Equation Equation::operator+(double c) && { return std::move(*this) + ConstantVariable(c); }
+
 void Equation::addVar(const Variable &var) {
     indep_vars_.emplace_back(var);
 }
