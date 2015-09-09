@@ -1,6 +1,7 @@
 #include "creativity/data/Variable.hpp"
 #include "creativity/data/Equation.hpp"
 #include "creativity/data/OLS.hpp"
+#include "creativity/data/SUR.hpp"
 
 #include <Eigen/Core>
 #include <iostream>
@@ -62,4 +63,12 @@ int main(int, char **) {
     OLS ols4(model4);
     ols4.solve();
     std::cout << ols4 << "\n";
+
+    SUR sur4(model4);
+    sur4.solve();
+    std::cout << sur4 << "\n";
+
+    SUR sur9(model4, Equation(c1) + 0 + c2);
+    sur9.solve();
+    std::cout << sur9 << "\n";
 }
