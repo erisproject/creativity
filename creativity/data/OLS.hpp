@@ -14,7 +14,7 @@ class OLS {
          */
         OLS(const Equation &model);
 
-        /** Constructs an OLS solve, taking over the given model.
+        /** Constructs an OLS solver, taking over the given model.
          */
         OLS(Equation &&model);
 
