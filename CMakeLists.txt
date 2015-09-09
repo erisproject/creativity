@@ -74,6 +74,13 @@ else()
     message(STATUS "include-what-you-use header debugging support disabled (-DIWYU=1 to enable)")
 endif()
 
+option(API_DOCS "Enable creativity API documentation generation (requires doxygen)" ON)
+if (API_DOCS)
+    message(STATUS "API documentation generation enabled (-DAPI_DOCS=off to disable)")
+else()
+    message(STATUS "API documentation generation disabled (-DAPI_DOCS=on to enable)")
+endif()
+
 foreach(pkg ${creativity_pkgconfig} ${creativity_gui_pkgconfig})
     pkg_check_modules(${pkg} REQUIRED ${creativity_pkgconfig_${pkg}})
     include_directories(${${pkg}_INCLUDE_DIRS})
@@ -190,7 +197,9 @@ if (IWYU)
     endforeach()
 endif()
 
-add_subdirectory(doc)
+if (API_DOCS)
+    add_subdirectory(doc)
+endif()
 
 add_subdirectory(scratch)
 
