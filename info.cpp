@@ -1,6 +1,7 @@
 #include "creativity/Creativity.hpp"
 #include "creativity/state/State.hpp"
 #include "creativity/state/Storage.hpp"
+#include "creativity/cmdargs/Info.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <exception>
@@ -9,6 +10,7 @@
 #include <map>
 #include <utility>
 #include <iostream>
+#include <iomanip>
 
 using namespace creativity;
 using namespace creativity::state;
@@ -16,28 +18,25 @@ using namespace eris;
 using namespace Eigen;
 
 int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        std::cerr << "Usage: " << argv[0] << " DATASOURCE -- print simulation summary information\n\n";
-        std::cerr << "DATASOURCE should be a filename (typically a .crstate file)\n";
-        exit(1);
-    }
+    cmdargs::Info args;
+    args.parse(argc, argv);
 
-    std::string source(argv[1]);
     auto creativity = Creativity::create();
     // Filename input
     try {
-        creativity->fileRead(argv[1]);
+        creativity->fileRead(args.input);
     }
     catch (std::exception &e) {
-        std::cerr << "Unable to read `" << argv[1] << "': " << e.what() << "\n\n";
+        std::cerr << "Unable to read `" << args.input << "': " << e.what() << "\n\n";
         exit(1);
     }
 
-    std::cout << "Initial settings:\n=================\n";
-#define PRINT_SETTING(S) do { printf("%-30s", #S); std::cout << creativity->parameters.S << "\n"; } while (0)
+    std::cout << "Initial settings:\n=================\n" << std::left << std::setprecision(args.output_precision);
+#define PRINT_FIELD(N, V) do { std::cout << std::setw(30) << N << V << "\n"; } while (0)
+#define PRINT_SETTING(S) PRINT_FIELD(#S, creativity->parameters.S)
     PRINT_SETTING(readers);
     PRINT_SETTING(dimensions);
-    printf("%-30s", "densityFromBoundary()"); std::cout << creativity->densityFromBoundary() << "\n";
+    PRINT_FIELD("densityFromBoundary()", creativity->densityFromBoundary());
     PRINT_SETTING(boundary);
     PRINT_SETTING(book_distance_sd);
     PRINT_SETTING(book_quality_sd);
@@ -74,11 +73,11 @@ int main(int argc, char *argv[]) {
     std::cout << "Periods: " << disp_size << "\n";
     if (st.size() > 0) {
         std::cout << "Period summary:\n";
-        auto h1 =  "             Total                              Average                     \n";
-        auto h2 =  "       -----------------   -------------------------------------------------\n";
-        auto h3 =  "   t   Rdrs  Books  BNew   Net.Util.  NewBuys  NewPiracy  TotBuys  TotPiracy\n";
-        auto h4 =  "  ---  ----  -----  ----   ---------  -------  ---------  -------  ---------\n";
-        auto fmt = "  %3d  %4d  %5d  %4d   %+9.3f  %7.3f  %9.3f  %7.2f  %9.2f\n";
+        auto h1 =  "             Total                                         Average                                \n";
+        auto h2 =  "       -----------------   -----------------------------------------------------------------------\n";
+        auto h3 =  "   t   Rdrs  Books  BNew   Net.Util.  NewBuys  NewPiracy  NewPublic  TotBuys  TotPiracy  TotPublic\n";
+        auto h4 =  "  ---  ----  -----  ----   ---------  -------  ---------  ---------  -------  ---------  ---------\n";
+        auto fmt = "  %3d  %4d  %5d  %4d   %+9.3f  %7.3f  %9.3f  %9.3f  %7.2f  %9.2f  %9.2f\n";
 
         std::cout << h1 << h2;
 
@@ -87,15 +86,21 @@ int main(int argc, char *argv[]) {
             if (s->t % 25 == 1) { if (s->t > 1) std::cout << h4; std::cout << h3 << h4; }
             if (s->t == creativity->parameters.piracy_begins)
                 std::cout <<
-                   "  ============================  PIRACY BEGINS  =============================\n";
+                   "  =======================================  PIRACY BEGINS  ========================================\n";
+            if (s->t == creativity->parameters.public_sharing_begins)
+                std::cout <<
+                   "  ===================================  PUBLIC SHARING BEGINS  ====================================\n";
+
             double net_u = 0;
-            unsigned long books_new = 0, bought = 0, pirated = 0, bought_new = 0, pirated_new = 0;
+            unsigned long books_new = 0, bought = 0, publicb = 0, pirated = 0, bought_new = 0, pirated_new = 0, public_new = 0;
             for (auto &rp : s->readers) {
                 auto &r = rp.second;
                 net_u += r.u - 1000;
 
                 bought += r.library_purchased;
                 bought_new += r.library_purchased_new;
+                publicb += r.library_public;
+                public_new += r.library_public_new;
                 pirated += r.library_pirated;
                 pirated_new += r.library_pirated_new;
             }
@@ -113,8 +118,10 @@ int main(int argc, char *argv[]) {
                     net_u / R,
                     bought_new / R,
                     pirated_new / R,
+                    public_new / R,
                     bought / R,
-                    pirated / R);
+                    pirated / R,
+                    publicb / R);
         }
     }
     std::cout << "\n\n\n";
