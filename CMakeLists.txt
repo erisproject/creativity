@@ -52,6 +52,13 @@ else()
     add_definitions("-DCREATIVITY_SKIP_GUI")
 endif()
 
+option(DATA "Enable data parsing and results library and binaries" ON)
+if (DATA)
+    message(STATUS "Data libraries and binaries enabled (-DDATA=off to disable)")
+else()
+    message(STATUS "Data libraries and binaries disabled (-DDATA=on to enable)")
+endif()
+
 option(STORAGE_THREAD "Enable threaded storage system" ON)
 if (STORAGE_THREAD)
     message(STATUS "Threaded storage enabled (-DSTORAGE_THREAD=off to disable)")
@@ -101,15 +108,22 @@ link_directories(${Boost_LIBRARY_DIRS})
 
 # Find library source/headers
 file(GLOB_RECURSE cr_libsrc creativity/*.cpp)
-file(GLOB_RECURSE cr_gui_libsrc creativity/gui/*.cpp)
-list(REMOVE_ITEM cr_libsrc ${cr_gui_libsrc})
+file(GLOB_RECURSE cr_data_libsrc creativity/data/*.cpp creativity/cmdargs/Data.cpp)
+file(GLOB_RECURSE cr_gui_libsrc creativity/gui/*.cpp creativity/cmdargs/GUI.cpp)
+list(REMOVE_ITEM cr_libsrc ${cr_gui_libsrc} ${cr_data_libsrc})
 # doc/CMakeLists.txt needs the list of headers:
 file(GLOB_RECURSE cr_headers RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} creativity/*.hpp creativity/*.hpp.in)
 
 if (NOT GUI)
     # When not building the GUI, also omit the GUI headers
-    file(GLOB_RECURSE cr_gui_headers RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} creativity/gui/*.hpp)
+    file(GLOB_RECURSE cr_gui_headers RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} creativity/gui/*.hpp creativity/cmdargs/GUI.hpp)
     list(REMOVE_ITEM cr_headers ${cr_gui_headers})
+endif()
+
+if (NOT DATA)
+    # When not building the data library/binaries, also omit the data headers
+    file(GLOB_RECURSE cr_data_headers RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} creativity/data/*.hpp creativity/cmdargs/Data.hpp)
+    list(REMOVE_ITEM cr_headers ${cr_data_headers})
 endif()
 
 foreach(h ${cr_headers})
@@ -134,15 +148,16 @@ endif()
 # Add -g for a Debug build
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
 
-add_library(creativity SHARED ${cr_libsrc})
+add_library(libcreativity SHARED ${cr_libsrc})
+set_target_properties(libcreativity PROPERTIES OUTPUT_NAME creativity)
 foreach(pkg ${creativity_pkgconfig})
-    target_link_libraries(creativity ${${pkg}_LIBRARIES})
+    target_link_libraries(libcreativity ${${pkg}_LIBRARIES})
 endforeach()
-target_link_libraries(creativity ${Boost_LIBRARIES})
-list(APPEND creativity_install_targets creativity)
+target_link_libraries(libcreativity ${Boost_LIBRARIES})
+list(APPEND creativity_install_targets libcreativity)
 
 add_executable(creativity-cli cli.cpp)
-target_link_libraries(creativity-cli creativity)
+target_link_libraries(creativity-cli libcreativity)
 list(APPEND creativity_install_targets creativity-cli)
 
 add_executable(creativity-random random.cpp)
@@ -150,25 +165,33 @@ target_link_libraries(creativity-random ${ERIS_LIBRARIES})
 list(APPEND creativity_install_targets creativity-random)
 
 add_executable(creativity-info info.cpp)
-target_link_libraries(creativity-info creativity)
+target_link_libraries(creativity-info libcreativity)
 list(APPEND creativity_install_targets creativity-info)
 
-add_executable(creativity-data data.cpp)
-target_link_libraries(creativity-data creativity)
-list(APPEND creativity_install_targets creativity-data)
+if (DATA)
+    add_library(libcreativity-data SHARED ${cr_data_libsrc})
+    set_target_properties(libcreativity-data PROPERTIES OUTPUT_NAME creativity-data)
+    target_link_libraries(libcreativity-data libcreativity)
+
+
+    add_executable(creativity-data data.cpp)
+    target_link_libraries(creativity-data libcreativity-data)
+    list(APPEND creativity_install_targets creativity-data)
+endif()
 
 
 if (GUI)
-    add_library(creativitygui SHARED ${cr_gui_libsrc})
+    add_library(libcreativity-gui SHARED ${cr_gui_libsrc})
+    set_target_properties(libcreativity-gui PROPERTIES OUTPUT_NAME creativity-gui)
     foreach(pkg ${creativity_gui_pkgconfig})
-        target_link_libraries(creativitygui ${${pkg}_LIBRARIES})
+        target_link_libraries(libcreativity-gui ${${pkg}_LIBRARIES})
     endforeach()
-    list(APPEND creativity_install_targets creativitygui)
+    list(APPEND creativity_install_targets libcreativity-gui)
 
-    target_link_libraries(creativitygui creativity)
+    target_link_libraries(libcreativity-gui libcreativity)
 
     add_executable(creativity-gui gui.cpp)
-    target_link_libraries(creativity-gui creativitygui)
+    target_link_libraries(creativity-gui libcreativity-gui)
     list(APPEND creativity_install_targets creativity-gui)
 
     # Copy the glade and icon to the install datadir
