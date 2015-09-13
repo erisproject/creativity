@@ -108,7 +108,7 @@ link_directories(${Boost_LIBRARY_DIRS})
 
 # Find library source/headers
 file(GLOB_RECURSE cr_libsrc creativity/*.cpp)
-file(GLOB_RECURSE cr_data_libsrc creativity/data/*.cpp creativity/cmdargs/Data.cpp)
+file(GLOB_RECURSE cr_data_libsrc creativity/data/*.cpp creativity/cmdargs/Data.cpp creativity/cmdargs/Results.cpp)
 file(GLOB_RECURSE cr_gui_libsrc creativity/gui/*.cpp creativity/cmdargs/GUI.cpp)
 list(REMOVE_ITEM cr_libsrc ${cr_gui_libsrc} ${cr_data_libsrc})
 # doc/CMakeLists.txt needs the list of headers:
@@ -122,7 +122,7 @@ endif()
 
 if (NOT DATA)
     # When not building the data library/binaries, also omit the data headers
-    file(GLOB_RECURSE cr_data_headers RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} creativity/data/*.hpp creativity/cmdargs/Data.hpp)
+    file(GLOB_RECURSE cr_data_headers RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} creativity/data/*.hpp creativity/cmdargs/Data.hpp creativity/cmdargs/Results.hpp)
     list(REMOVE_ITEM cr_headers ${cr_data_headers})
 endif()
 
@@ -177,6 +177,10 @@ if (DATA)
     add_executable(creativity-data data.cpp)
     target_link_libraries(creativity-data libcreativity-data)
     list(APPEND creativity_install_targets creativity-data)
+
+    add_executable(creativity-results results.cpp)
+    target_link_libraries(creativity-results libcreativity-data)
+    list(APPEND creativity_install_targets creativity-results)
 endif()
 
 

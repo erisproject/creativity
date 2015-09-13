@@ -384,17 +384,11 @@ std::vector<datum> data_fields() {
     return data;
 }
 
-std::string csv_escape(std::string val) {
-    // First, double-up any quotation markseliminate newlines.  It seems pretty unlikely that the input could contain them, but
-    // just in case:
+std::string csv_fix(std::string val) {
     boost::erase_all(val, "\n"); // remove newlines
-    boost::replace_all(val, "\"", "\"\""); // double-up quotes
-    // If there's a "", comma, or semicolon then quote the whole thing (the semicolon isn't really
-    // needed, but might help not confusing a CSV parser).
-    if (boost::algorithm::contains(val, "\"\"") or boost::algorithm::contains(val, ",") or boost::algorithm::contains(val, ";"))
-        return "\"" + val + "\"";
-    else
-        return val;
+    boost::erase_all(val, "\""); // remove "s
+    boost::erase_all(val, ","); // remove ,s
+    return val;
 }
 
 }}

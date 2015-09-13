@@ -103,7 +103,7 @@ int main(int argc, char *argv[]) {
 #undef SKIP_IF
 
         if (args.human_readable) output << "\n\n" << source << "\n==========\n";
-        else output << data::csv_escape(source);
+        else output << data::csv_fix(source);
         for (auto &d : initial_data) {
             if (args.human_readable) output << std::setw(longest_name+1) << d.name + ":" << " ";
             else output << ",";

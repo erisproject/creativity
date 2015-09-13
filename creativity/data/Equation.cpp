@@ -2,7 +2,7 @@
 
 namespace creativity { namespace data {
 
-Equation::Proxy::Proxy(Equation &eq) : eq_{eq} {}
+Equation::Proxy::Proxy(Equation &eq) : eq_(eq) {}
 
 Equation::Equation(const Variable &y) : dep_var_(y) {}
 

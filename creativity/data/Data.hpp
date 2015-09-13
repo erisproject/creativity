@@ -164,9 +164,9 @@ std::vector<initial_datum> initial_data_fields();
 /** Returns a vector of all supported calculated datum values. */
 std::vector<datum> data_fields();
 
-/** Takes a string, manipulates it into a CSV-suitable value by adding " " if necessary, escaping "
- * as "", and removing newlines.
+/** Takes a string, manipulates it into our simplified CSV-suitable value by removing any newlines,
+ * commas, and quotation marks.
  */
-std::string csv_escape(std::string val);
+std::string csv_fix(std::string val);
 
 }}
