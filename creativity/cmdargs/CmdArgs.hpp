@@ -161,6 +161,12 @@ class CmdArgs {
         /// Returns a version string.
         virtual std::string version() const;
 
+        /** Returns a per-executable suffix to add to the generic version string.  Typically
+         * something like " -- command-line interface".  Called by the default version().  The
+         * default implementation returns an empty string.
+         */
+        virtual std::string versionSuffix() const;
+
         /** Returns a usage string such as "Usage: program [ARGS]".  Called by help().  Subclasses should
          * override to change the string as needed.
          */

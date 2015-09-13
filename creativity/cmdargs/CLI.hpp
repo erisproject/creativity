@@ -19,6 +19,9 @@ class CLI : public Simulator {
         /// Whether `output' can be overwritten
         bool overwrite = false;
 
+        /// Overridden to add " -- command-line simulator"
+        virtual std::string versionSuffix() const override;
+
     protected:
         /// Adds CLI command-line options into the option descriptions
         virtual void addOptions() override;

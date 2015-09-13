@@ -38,4 +38,8 @@ void CLI::postParse(boost::program_options::variables_map &vars) {
     overwrite = vars.count("overwrite") > 0;
 }
 
+std::string CLI::versionSuffix() const {
+    return " -- command-line simulator";
+}
+
 }}

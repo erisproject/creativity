@@ -56,8 +56,12 @@ void CmdArgs::parse(int argc, char const* const* argv) {
 
 std::string CmdArgs::version() const {
     std::ostringstream version;
-    version << "Creativity simulator v" << VERSION[0] << "." << VERSION[1] << "." << VERSION[2];
+    version << "Creativity v" << VERSION[0] << "." << VERSION[1] << "." << VERSION[2] << versionSuffix();
     return version.str();
+}
+
+std::string CmdArgs::versionSuffix() const {
+    return "";
 }
 
 std::string CmdArgs::usage() const {

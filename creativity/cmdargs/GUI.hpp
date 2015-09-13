@@ -30,6 +30,9 @@ class GUI : public Simulator {
         /// Overridden to add information about FILE-TO-LOAD
         virtual std::string help() const override;
 
+        /// Overridden to add " -- graphical simulator and simulation viewer"
+        virtual std::string versionSuffix() const override;
+
     protected:
         /// Adds GUI command-line options into the option descriptions
         virtual void addOptions() override;

@@ -57,4 +57,8 @@ std::string GUI::help() const {
         "                                        instead of configuring a new simulation.\n\n";
 }
 
+std::string GUI::versionSuffix() const {
+    return " -- graphical simulator and simulation viewer";
+}
+
 }}

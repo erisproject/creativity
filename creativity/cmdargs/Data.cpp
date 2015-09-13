@@ -52,4 +52,8 @@ std::string Data::help() const {
         "                                        be given.\n\n";
 }
 
+std::string Data::versionSuffix() const {
+    return " -- simulation data collector";
+}
+
 }}

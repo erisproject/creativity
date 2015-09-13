@@ -9,10 +9,10 @@ namespace boost { namespace program_options { class variables_map; } }
 
 namespace creativity { namespace cmdargs {
 
-/** CmdArgs/Simulator subclass for graphical simulator command-line arguments. */
+/** CmdArgs subclass for creativity-data arguments (for generating data from crstate files). */
 class Data : public CmdArgs {
     public:
-        /// Constructor for gui simulation arguments; takes the settings object
+        /// Constructor for data arguments; takes no arguments
         Data();
 
         /// Struct for storing --verify-* options
@@ -51,11 +51,16 @@ class Data : public CmdArgs {
         /// Overridden to add info about input files
         virtual std::string help() const override;
 
+        /// Overridden to add " -- simulation data collector"
+        virtual std::string versionSuffix() const override;
+
     protected:
         /// Adds data collector command-line options into the option descriptions
         virtual void addOptions() override;
 
-        /// Overridden to handle --initialize and --start options
+        /** Overridden to change default precision to 8 if `--human-readable` is specified (and
+         * `--precision` isn't).
+         */
         virtual void postParse(boost::program_options::variables_map &vars) override;
 
 };
