@@ -42,11 +42,14 @@ ReaderState::ReaderState(const Reader &r) :
 void ReaderState::updateLibraryCounts(eris_time_t t) {
     library_purchased = 0;
     library_purchased_new = 0;
+    library_public = 0;
+    library_public_new = 0;
     library_pirated = 0;
     library_pirated_new = 0;
     for (auto &l : library) {
-        if    (l.second.purchased()) { library_purchased++; if (l.second.acquired == t) library_purchased_new++; }
-        else if (l.second.pirated()) { library_pirated++;   if (l.second.acquired == t) library_pirated_new++; }
+        if      (l.second.purchased_market()) { library_purchased++; if (l.second.acquired == t) library_purchased_new++; }
+        else if (l.second.purchased_public()) { library_public++;    if (l.second.acquired == t) library_public_new++; }
+        else if (l.second.pirated())          { library_pirated++;   if (l.second.acquired == t) library_pirated_new++; }
     }
 }
 

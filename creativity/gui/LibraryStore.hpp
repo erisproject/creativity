@@ -34,7 +34,8 @@ class LibraryStore : public BookStore, public virtual Glib::Object {
 
                 Gtk::TreeModelColumn<bool>
                     reader_pirated, ///< True if the book was obtained by piracy
-                    reader_purchased; ///< True if the book was purchased
+                    reader_purchased_market, ///< True if the book was purchased at market
+                    reader_purchased_public; ///< True if the book was purchased from the public provider
 
                 Gtk::TreeModelColumn<unsigned int>
                     reader_acquired; ///< Simulation period when this copy of the book was acquired
@@ -43,7 +44,8 @@ class LibraryStore : public BookStore, public virtual Glib::Object {
                 ColRec() : BookStore::ColRec() {
                     add(reader_quality);
                     add(reader_pirated);
-                    add(reader_purchased);
+                    add(reader_purchased_market);
+                    add(reader_purchased_public);
                     add(reader_acquired);
                 }
                 friend class LibraryStore;
@@ -89,7 +91,8 @@ class LibraryStore : public BookStore, public virtual Glib::Object {
         bool less_##col(const state::BookState &a, const state::BookState &b); \
         bool greater_##col(const state::BookState &a, const state::BookState &b);
         LESS_GREATER_METHODS(reader_quality)
-        LESS_GREATER_METHODS(reader_purchased)
+        LESS_GREATER_METHODS(reader_purchased_market)
+        LESS_GREATER_METHODS(reader_purchased_public)
         LESS_GREATER_METHODS(reader_pirated)
         LESS_GREATER_METHODS(reader_acquired)
 #undef LESS_GREATER_METHODS

@@ -924,7 +924,7 @@ void Reader::intraOptimize() {
                 }
                 // Otherwise the purchase is a good one, so make a reservation.
                 reservations_.push_front(bm->reserve(sharedSelf(), 1, pinfo.total));
-                reserved_books_.emplace(book, false);
+                reserved_books_.emplace(book, bm->isPublic() ? BookCopy::Status::purchased_public : BookCopy::Status::purchased_market);
                 u_curr = u_with_book;
                 money -= pinfo.total;
             }
@@ -945,7 +945,7 @@ void Reader::intraOptimize() {
                     new_books.erase(book);
                     break;
                 }
-                reserved_books_.emplace(book, true);
+                reserved_books_.emplace(book, BookCopy::Status::pirated);
                 reserved_piracy_cost_ += piracy_cost;
                 u_curr = u_with_book;
                 money -= piracy_cost;
@@ -975,11 +975,11 @@ void Reader::intraApply() {
 
     for (auto &new_book : reserved_books_) {
         auto &book = new_book.first;
-        auto &pirated = new_book.second;
+        auto &status = new_book.second;
 
         auto inserted = library_.emplace(
                 SharedMember<Book>(book),
-                BookCopy(book->qualityDraw(), pirated ? BookCopy::Status::pirated : BookCopy::Status::purchased, simulation()->t()));
+                BookCopy(book->qualityDraw(), status, simulation()->t()));
 
         // If the book is still on the private market (which it must be if we just bought it from a
         // private source, and might be if we just pirated it), stash a copy in library_on_market_
@@ -991,7 +991,7 @@ void Reader::intraApply() {
         library_new_.emplace(book, std::ref(inserted.first->second));
 
         // If we obtained a pirated book, record that in the base book metadata:
-        if (pirated) book->recordPiracy(1);
+        if (status == BookCopy::Status::pirated) book->recordPiracy(1);
         //else {} -- // book->recordSale() not needed here: it's called during the BookMarket transaction
     }
     reserved_books_.clear();

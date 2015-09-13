@@ -688,9 +688,9 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
              * cleared of off-market books in updateBeliefs().
              */
             book_cache_market_;
-        /** The set of books associated with reservations_ and reserved_piracy_cost_; the bool is
-         * true if this is a pirated book, false for a purchased book. */
-        std::unordered_map<eris::SharedMember<Book>, bool> reserved_books_;
+        /** The set of books associated with reservations_ and reserved_piracy_cost_; the status
+         * indicates whether this is a market, pirated, or public book. */
+        std::unordered_map<eris::SharedMember<Book>, BookCopy::Status> reserved_books_;
 
         /** Books in `library_` that were authored by this reader.  The set is sorted by book ID;
          * since IDs are monotonic, this also means books are sorted in creation order.

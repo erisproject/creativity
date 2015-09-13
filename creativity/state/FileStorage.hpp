@@ -433,9 +433,11 @@ class FileStorage final : public StorageBackend {
          * The block consists of num_reader (reader id, library block pointer) tuples.
          *
          * The pointed at library block consists of (bookid,t,quality,status) tuples for all books
-         * in the reader's library over all stored simulation periods.  If the block overflows,
-         * additional continued blocks are created and pointed at by a pointer at the end of the
-         * library block.
+         * in the reader's library over all stored simulation periods.  t is the period the book was
+         * acquired; quality is the reader's subjective quality; status is 0 for written books, 1
+         * for private market purchased books, 2 for pirated, and 3 for public-provider-puchased.
+         * If the block overflows, additional continued blocks are created and pointed at by a
+         * pointer at the end of the library block.
          *
          * Reader blocks are stored in memory when the file is opened and updated (both in memory
          * and on disk) as states are added.

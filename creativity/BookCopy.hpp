@@ -9,7 +9,8 @@ class BookCopy final {
         /// The status a book copy can have
         enum class Status {
             wrote, ///< This is the author's own copy of his book
-            purchased, ///< The reader bought this book on the market
+            purchased_market, ///< The reader bought this book on the private market
+            purchased_public, ///< The reader bought this book from the public provider
             pirated ///< The reader pirated this book
         };
 
@@ -27,8 +28,11 @@ class BookCopy final {
         /// Alias for `status == BookCopy::Status::pirated`
         bool pirated() const { return status == Status::pirated; }
 
-        /// Alias for `status == BookCopy::Status::wrote`
-        bool purchased() const { return status == Status::purchased; }
+        /// Alias for `status == BookCopy::Status::purchased_market`
+        bool purchased_market() const { return status == Status::purchased_market; }
+
+        /// Alias for `status == BookCopy::Status::purchased_public`
+        bool purchased_public() const { return status == Status::purchased_public; }
 
 };
 

@@ -49,7 +49,8 @@ void LibraryStore::get_value_vfunc(const iterator &iter, int column, Glib::Value
             ).A)
     IFCOL(reader_quality, quality);
     else IFCOL(reader_pirated, pirated());
-    else IFCOL(reader_purchased, purchased());
+    else IFCOL(reader_purchased_market, purchased_market());
+    else IFCOL(reader_purchased_public, purchased_public());
     else IFCOL(reader_acquired, acquired);
 #undef IFCOL
     else {
@@ -67,7 +68,8 @@ void LibraryStore::set_sort_column_id_vfunc(int sort_column_id, Gtk::SortType or
         compare = std::bind(ascending ? &LibraryStore::less_##COL : &LibraryStore::greater_##COL, this, _1, _2)
     IF_COL(reader_quality);
     else IF_COL(reader_pirated);
-    else IF_COL(reader_purchased);
+    else IF_COL(reader_purchased_market);
+    else IF_COL(reader_purchased_public);
     else IF_COL(reader_acquired);
 #undef IF_COL
     else return BookStore::set_sort_column_id_vfunc(sort_column_id, order);
@@ -85,7 +87,8 @@ bool LibraryStore::greater_##COL(const state::BookState &a, const state::BookSta
     return lib.at(a.id).MEMBER > lib.at(b.id).MEMBER; \
 }
 LESS_GREATER_METHODS(reader_quality, quality)
-LESS_GREATER_METHODS(reader_purchased, purchased())
+LESS_GREATER_METHODS(reader_purchased_market, purchased_market())
+LESS_GREATER_METHODS(reader_purchased_public, purchased_public())
 LESS_GREATER_METHODS(reader_pirated, pirated())
 LESS_GREATER_METHODS(reader_acquired, acquired)
 #undef LESS_GREATER_METHODS
@@ -97,8 +100,9 @@ void LibraryStore::appendColumnsTo(Gtk::TreeView &v) const {
     appendCol(v, "Author", col.author, 80);
     appendCol(v, "Created", col.created, 85);
     appendCol(v, "Acquired", col.reader_acquired, 85);
-    appendCol(v, "Bought", col.reader_purchased, 65);
+    appendCol(v, "Bought", col.reader_purchased_market, 65);
     appendCol(v, "Pirated", col.reader_pirated, 65);
+    appendCol(v, "Public", col.reader_purchased_public, 65);
     appendCol(v, "Quality", col.reader_quality, 85);
     appendCol(v, "Base Q.", col.quality, 85);
 }

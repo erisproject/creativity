@@ -327,9 +327,13 @@ void FileStorage::parseLibraryPointerBlock() {
                     uint32_t acquired = read_u32();
                     double quality = read_dbl();
                     uint8_t status = read_u8();
+                    if (status > 3) throw std::runtime_error("Found invalid library status value `" + std::to_string(status) + "'");
                     BookCopy copy(
                             quality,
-                            status == 0 ? BookCopy::Status::wrote :  status == 1 ? BookCopy::Status::purchased :  BookCopy::Status::pirated,
+                            (   status == 0 ? BookCopy::Status::wrote :
+                                status == 1 ? BookCopy::Status::purchased_market :
+                                status == 2 ? BookCopy::Status::pirated :
+                                BookCopy::Status::purchased_public),
                             acquired);
                     auto ins = data.library.emplace(std::move(bid), std::move(copy));
                     data.library_acq_sorted.emplace(std::ref(*ins.first));
@@ -432,7 +436,7 @@ void FileStorage::updateLibrary(const ReaderState &r) {
             write_u32(l.first);
             write_u32(l.second.acquired);
             write_dbl(l.second.quality);
-            write_u8(l.second.wrote() ? 0 : l.second.purchased() ? 1 : 2);
+            write_u8(l.second.wrote() ? 0 : l.second.purchased_market() ? 1 : l.second.pirated() ? 2 : /* l.second.purchased_public() */ 3);
             lib.records_remaining--;
             lib.pos_next += LIBRARY::record_size;
 

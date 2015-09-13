@@ -38,15 +38,27 @@ class ReaderState final {
          */
         std::map<eris::eris_id_t, BookCopy> library;
 
-        /** The number of purchased books in the reader's library.  When loading/modifying a
+        /** The number of market-purchased books in the reader's library.  When loading/modifying a
          * ReaderState object you should call updateLibraryCounts() to recalculate this, or else set
          * it yourself. */
         unsigned int library_purchased;
 
-        /** The number of purchased books in the reader's library that were acquired in the current
-         * period.  When loading/modifying a ReaderState object you should call
+        /** The number of market-purchased books in the reader's library that were acquired in the
+         * current period.  When loading/modifying a ReaderState object you should call
          * updateLibraryCounts() to recalculate this, or else set it yourself. */
         unsigned int library_purchased_new;
+
+        /** The number of public provider-purchased books in the reader's library.  When
+         * loading/modifying a ReaderState object you should call updateLibraryCounts() to
+         * recalculate this, or else set it yourself.
+         */
+        unsigned int library_public;
+
+        /** The number of public provider-purchased books in the reader's library that were acquired
+         * in the current period.  When loading/modifying a ReaderState object you should call
+         * updateLibraryCounts() to recalculate this, or else set it yourself.
+         */
+        unsigned int library_public_new;
 
         /** The number of pirated books in the reader's library.  When loading/modifying a
          * ReaderState object you should call updateLibraryCounts() to recalculate this, or else set
