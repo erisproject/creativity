@@ -35,10 +35,10 @@ int main(int argc, char *argv[]) {
     unsigned int longest_name = 0;
     if (not args.human_readable) {
         output << "source";
-        for (const auto &d : initial_data) output << ",param_" << d.name;
-        for (const auto &d : data) if (d.applies_to.pre) output << ",pre_" << d.name;
-        for (const auto &d : data) if (d.applies_to.piracy) output << ",piracy_" << d.name;
-        for (const auto &d : data) if (d.applies_to.public_sharing) output << "," << "public_" << d.name;
+        for (const auto &d : initial_data) output << ",param." << d.name;
+        for (const auto &d : data) if (d.applies_to.pre) output << ",pre." << d.name;
+        for (const auto &d : data) if (d.applies_to.piracy) output << ",piracy." << d.name;
+        for (const auto &d : data) if (d.applies_to.public_sharing) output << "," << "public." << d.name;
         output << "\n";
         std::cout << output.str();
         output.str("");
