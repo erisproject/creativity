@@ -17,7 +17,19 @@ if(NOT "@CMAKE_BUILD_TYPE@" STREQUAL "Release")
         message(FATAL_ERROR "Unable to determine commit date for non-Release build")
     endif()
     string(REGEX REPLACE "^([0-9][0-9][0-9][0-9])-([0-9][0-9])-([0-9][0-9]).*" "\\1\\2\\3" cr_build_datestr "${cr_build_date}")
-    set(cr_package_version "${cr_package_version}~git${cr_build_datestr}~${cr_git_rev}")
+    execute_process(COMMAND git tag -l "v@CREATIVITY_VERSION@"
+        RESULT_VARIABLE cr_git_tagged_result
+        OUTPUT_VARIABLE cr_git_tagged
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+    if(NOT cr_git_rev_result EQUAL 0)
+        message(FATAL_ERROR "Unable to run git tag to determine pre/post-release build status")
+    endif()
+    set(gitversep "~")
+    if (cr_git_tagged)
+        set(gitversep "+")
+    endif()
+    set(cr_package_version "${cr_package_version}${gitversep}git${cr_build_datestr}.${cr_git_rev}")
 endif()
 set(arch ${CMAKE_HOST_SYSTEM_PROCESSOR})
 if (arch STREQUAL x86_64)
