@@ -43,12 +43,8 @@ std::string ConstantVariable::name() const {
 
 const double& ConstantVariable::value() const { return c_; }
 
-SimpleVariable::SimpleVariable(const std::string &name, VectorXd &values) :
-    name_{name}, col_(values, 0)
-{}
-
-SimpleVariable::SimpleVariable(const std::string &name, MatrixXd &matrix, unsigned int col) :
-    name_{name}, col_(matrix, col)
+SimpleVariable::SimpleVariable(const std::string &name, const Ref<const VectorXd> values) :
+    name_{name}, col_(values)
 {}
 
 void SimpleVariable::populate(Ref<VectorXd> column, unsigned int offset, unsigned int trim) const {

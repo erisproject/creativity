@@ -112,16 +112,10 @@ class SimpleVariable : public Variable {
     public:
         /// Not default constructible
         SimpleVariable() = delete;
-        /** Constructs a SimpleVariable that copies values from the given Vector.  The caller must
-         * ensure that the given vector remains available for the lifespan of the constructed
-         * SimpleVariable.
+
+        /** Constructs a SimpleVariable that copies values from the given Vector.
          */
-        SimpleVariable(const std::string &name, Eigen::VectorXd &values);
-        /** Constructs a SimpleVariable that copies values from the given Matrix column.  The caller
-         * must ensure that the matrix remains available for the lifespan of the constructed
-         * SimpleVariable.
-         */
-        SimpleVariable(const std::string &name, Eigen::MatrixXd &matrix, unsigned int col);
+        SimpleVariable(const std::string &name, const Eigen::Ref<const Eigen::VectorXd> values);
 
         /// Copies the source column values into `column`
         virtual void populate(Eigen::Ref<Eigen::VectorXd> column, unsigned int offset = 0, unsigned int trim = 0) const override;
@@ -135,8 +129,8 @@ class SimpleVariable : public Variable {
     protected:
         /// The name of this variable
         const std::string name_;
-        /// A reference to a stored column of values
-        const Eigen::Block<const Eigen::MatrixXd, Eigen::Dynamic, 1> col_;
+        /// The column of values
+        Eigen::VectorXd col_;
 };
 
 /** Returns true if V is a simple variable type, that is, a value that only requires copying but not

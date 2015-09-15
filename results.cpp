@@ -154,8 +154,8 @@ void readCSV(const std::string &filename) {
             continue;
         std::string name(dc.first);
         if (dc.first[0] == '.') name = dc.first.substr(1);
-//        SimpleVariable var(name, rawdata, dc.second);
-        data.insert({name, SimpleVariable(name, rawdata, dc.second)});
+//        SimpleVariable var(name, rawdata.col(dc.second));
+        data.insert({name, SimpleVariable(name, rawdata.col(dc.second))});
     }
 
     for (auto &dc : data) {
