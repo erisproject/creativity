@@ -35,11 +35,17 @@ class Equation {
         /// Not default constructible
         Equation() = delete;
 
+        /// Move constructor
+        Equation(Equation &&move) = default;
+
+        /// Copy constructor
+        Equation(const Equation &copy) = default;
+
         /// Creates an equation with the given dependent variable
         Equation(const Variable &y);
+
         /// Creates an equation with the given dependent variable, accepting a rvalue reference
-        template <class V, typename = typename std::enable_if<
-            std::is_base_of<Variable, V>::value and std::is_move_constructible<V>::value>::type>
+        template <class V, typename = typename std::enable_if<std::is_base_of<Variable, V>::value>::type>
         Equation(V &&y);
 
         // Forward declaration
@@ -77,19 +83,21 @@ class Equation {
         /// Adding a double constant (typically 0 or 1) converts the constant to a ConstantVariable
         Equation operator + (double c) &&;
 
-        /** Adds a temporary Variable subclass to an Equation, returning the new equation. */
-        template <class V, typename = typename std::enable_if<
-            std::is_base_of<Variable, V>::value and std::is_move_constructible<V>::value>::type>
-        Equation operator + (V &&var) const &;
+        /// Adds a temporary Variable subclass to an Equation, returning the new equation.
+        template <class V>
+        typename std::enable_if<
+            std::is_base_of<Variable, V>::value and std::is_move_constructible<V>::value,
+            Equation
+            >::type
+        operator + (V &&var) const & { Equation copy(*this); copy.addVar(std::move(var)); return copy; }
 
-        /** Adds a temporary Variable subclass to an Equation, returning the new equation. */
-        template <class V, typename = typename std::enable_if<
-            std::is_base_of<Variable, V>::value and std::is_move_constructible<V>::value>::type>
-        Equation operator + (V &&var) &&;
-
-        /** The addition operator, when called on a temporary, simply adds a new term to temporary
-         * object and returns itself.
-         */
+        /// Adds a temporary Variable subclass to a temporary Equation, returning the new equation.
+        template <class V>
+        typename std::enable_if<
+            std::is_base_of<Variable, V>::value and std::is_move_constructible<V>::value,
+            Equation
+            >::type
+        operator + (V &&var) &&  { addVar(std::move(var)); return std::move(*this); }
 
         /// Accesses the dependent variable
         const Variable& depVar() const;
@@ -171,31 +179,18 @@ class Equation::Proxy final {
 template <class V>
 std::list<std::shared_ptr<Variable>> Equation::private_vars_initializer(V &&v) {
     std::list<std::shared_ptr<Variable>> lst;
-    lst.emplace_back(new V(std::move(v)));
+    lst.emplace_back(std::make_shared<V>(std::move(v)));
     return lst;
 }
 
 template <class V, typename>
-Equation::Equation(V &&y) : private_vars_(private_vars_initializer(std::move(y))), dep_var_(*private_vars_.front())
+Equation::Equation(V &&y) : private_vars_{private_vars_initializer(std::move(y))}, dep_var_{*private_vars_.front()}
 {}
 
 template <class V, typename>
 Equation::Proxy Equation::operator % (V &&var) {
     addVar(std::move(var));
     return Proxy(*this);
-}
-
-template <class V, typename>
-Equation Equation::operator + (V &&var) const & {
-    Equation copy(*this);
-    copy.addVar(std::move(var));
-    return copy;
-}
-
-template <class V, typename>
-Equation Equation::operator + (V &&var) && {
-    addVar(std::move(var));
-    return std::move(*this);
 }
 
 /// Specialization for a ConstantVariable

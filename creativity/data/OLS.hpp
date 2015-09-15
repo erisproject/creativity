@@ -5,7 +5,15 @@
 
 namespace creativity { namespace data {
 
-/** Class for running a basic OLS regression. */
+/** Class for running a basic OLS regression.
+ *
+ * Example:
+ *
+ *     OLS mymodel(Equation(y) + 1 + x1 + x2);
+ *     mymodel.solve();
+ *     // Do something with mymodel.beta(), etc.
+ *     std::cout << mymodel << "\n";
+ */
 class OLS {
     public:
         /// No default constructor
@@ -21,50 +29,114 @@ class OLS {
 
         /** Accesses the model used for this OLS object.
          */
-        const Equation& model() const;
+        const Equation& model() const { return model_; }
+
+        /** Returns the number of observations for this OLS object.  This is an alias for calling
+         * `ols.model().depVar().size()`.
+         */
+        unsigned int n() const { return solved_ ? X_.rows() : model_.depVar().size(); }
+
+        /** Returns the number of variables for this OLS object.  This is an alias for calling
+         * `ols.model().numVars()`.
+         */
+        unsigned int k() const { return solved_ ? X_.cols() : model_.numVars(); }
+
+        /** Returns the degrees of freedom of the model; this is simply `n() - k()`.  Note that this
+         * can be negative, but that such a model is certainly unsolvable.
+         */
+        int df() const { return n() - k(); }
 
         /** Calculates and stores the final numerical values from the model.  This is called when
-         * needed, and does not typically need to be called explicitly.
+         * needed by `solve()`, and does not typically need to be called explicitly.
          *
          * \throws Variable::SizeError if the sizes of the variables in the model do not match.
          */
         void gather();
 
-        /** Attempts to solve the model, if not already done.  This method is called automatically
-         * by the various other methods when the solution is needed, and rarely needs to be called
-         * explicitly.
+        /** Attempts to solve the model, if not already done.
          *
          * \throws RankError if X has too few rows, or has non-full-rank columns.
          */
         void solve();
 
-        /// Returns the vector of coefficients (i.e. the beta vector) that solve the model.
-        const Eigen::VectorXd& beta();
+        /** Returns the vector of coefficients (i.e. the beta vector) that solve the model.
+         *
+         * \throws std::logic_error if the model has not been solved yet by calling `solve()`.
+         */
+        const Eigen::VectorXd& beta() const;
 
-        /// Returns the covariance estimate of the beta estimators
-        const Eigen::MatrixXd& covariance();
+        /** Returns the covariance estimate of the beta estimators.
+         *
+         * \throws std::logic_error if the model has not been solved yet by calling `solve()`.
+         */
+        const Eigen::MatrixXd& covariance() const;
 
-        /// Returns the regression standard error, \f$^2\f$
-        const double& s2();
+        /** Returns the standard errors (the square roots of the diagonal of covariance()) of the
+         * beta() values.
+         *
+         * \throws std::logic_error if the model has not been solved yet by calling `solve()`.
+         */
+        const Eigen::VectorXd& se() const;
 
-        /// Returns the residuals
-        const Eigen::VectorXd& residuals();
+        /** Returns the t-ratios for =0 tests, i.e. `beta().array() / se().array()`
+         *
+         * \throws std::logic_error if the model has not been solved yet by calling `solve()`.
+         */
+        const Eigen::VectorXd& tRatios() const;
 
-        /// Returns the sum-of-squared residuals
-        const double& ssr();
+        /** Returns the p-values of the t-ratios returned by tRatios()
+         *
+         * \throws std::logic_error if the model has not been solved yet by calling `solve()`.
+         */
+        const Eigen::VectorXd& pValues() const;
+
+        /** Returns the regression standard error, \f$^2\f$
+         *
+         * \throws std::logic_error if the model has not been solved yet by calling `solve()`.
+         */
+        const double& s2() const;
+
+        /** Returns the residuals
+         *
+         * \throws std::logic_error if the model has not been solved yet by calling `solve()`.
+         */
+        const Eigen::VectorXd& residuals() const;
+
+        /** Returns the sum-of-squared residuals
+         *
+         * \throws std::logic_error if the model has not been solved yet by calling `solve()`.
+         */
+        const double& ssr() const;
 
         /** Returns the \f$R^2\f$ value for the regression.  This is centered if the model contains
          * a constant, uncentered if it does not.  Note that this constant detection depends on the
          * model's hasConstant() method; a model constructed without a constant but with a
          * SimpleVariable that only takes on a single value will not be considered a constant for
          * the purposes of using centering here.
+         *
+         * \throws std::logic_error if the model has not been solved yet by calling `solve()`.
          */
-        const double& Rsq();
+        const double& Rsq() const;
 
-        /// Returns the y data (without solving the model); calls `gather()` if needed.
+        /** The return value of fStat() */
+        struct ftest {
+            double f; ///< The F value
+            unsigned df_numerator; ///< Numerator d.f.
+            unsigned df_denominator; ///< Denominator d.f.
+            double p; ///< The p-value of the test
+        };
+
+        /** Calculates and returns the F-test of all non-constant coefficients in the model being
+         * equal to 0.
+         *
+         * \throws std::logic_error if the model has not been solved yet by calling `solve()`.
+         */
+        ftest fTest() const;
+
+        /// Returns the y data (without solving the model, if not already solved); calls `gather()` if needed.
         const Eigen::VectorXd& y();
 
-        /// Returns the X data (without solving the model); calls `gather()` if needed.
+        /// Returns the X data (without solving the model, if not already solved); calls `gather()` if needed.
         const Eigen::MatrixXd& X();
 
         /** Overloaded so that an OLS object can be sent to an output stream; the output consists of
@@ -94,12 +166,24 @@ class OLS {
         /// The estimated covariance of the beta estimators
         Eigen::MatrixXd var_beta_;
 
+        /// Cached standard errors
+        Eigen::VectorXd se_;
+
+        /// Cached t ratios
+        Eigen::VectorXd t_ratios_;
+
+        /// Cached p-values
+        Eigen::VectorXd p_values_;
+
         /// Residuals
         Eigen::VectorXd residuals_;
 
         double ssr_ = 0, ///< SSR
                s2_ = 0, ///< sigma^2 estimate
                R2_ = 0; ///< R^2 value
+
+        /// Throws a std::logic_error if the model hasn't been solved.
+        void requireSolved() const { if (!solved_) throw std::logic_error("Cannot obtain model estimates before calling solve()"); }
 
 };
 

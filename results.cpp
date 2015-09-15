@@ -1,5 +1,6 @@
 #include "creativity/data/CSVParser.hpp"
 #include "creativity/data/SUR.hpp"
+#include "creativity/data/tabulate.hpp"
 #include "creativity/cmdargs/Results.hpp"
 #include <Eigen/Core>
 #include <cerrno>
@@ -20,7 +21,26 @@ using namespace creativity::data;
 using namespace eris;
 
 Eigen::MatrixXd rawdata;
-std::unordered_map<std::string, SimpleVariable> data;
+std::unordered_map<std::string, SimpleVariable> data_;
+bool piracy_data = false, public_data = false;
+// Stupid wrapper class so that data["foo"] works (so data.at("foo") isn't needed)
+class {
+    public:
+        SimpleVariable& operator[](const std::string &field) {
+            try { return data_.at(field); }
+            catch (const std::out_of_range &re) {
+                std::cerr << "Data exception: data field '" << field << "' does not exist\n";
+                throw;
+            }
+        }
+        const SimpleVariable& operator[](const std::string &field) const {
+            try { return data_.at(field); }
+            catch (const std::out_of_range &re) {
+                std::cerr << "Data exception: data field '" << field << "' does not exist\n";
+                throw;
+            }
+        }
+} data;
 
 void readCSV(const std::string &filename) {
     CSVParser csv(filename);
@@ -40,15 +60,14 @@ void readCSV(const std::string &filename) {
     // so that it's easier to look up.  Note: elements with leading single underscores should be
     // considered special!
     std::unordered_map<std::string, int> data_column;
-    bool piracy_rows = false, public_rows = false;
 
     int next_col = 0;
     for (auto &f : csv.fields()) {
         if (f[0] == '.') throw std::runtime_error("CSV file has invalid field `" + f + "': fields may not start with .");
         std::string data_field;
         if (f.substr(0, 4) == "pre.") data_field = f.substr(3);
-        else if (f.substr(0, 7) == "piracy.") { data_field = f.substr(6); piracy_rows = true; }
-        else if (f.substr(0, 7) == "public.") { data_field = f.substr(6); public_rows = true; }
+        else if (f.substr(0, 7) == "piracy.") { data_field = f.substr(6); piracy_data = true; }
+        else if (f.substr(0, 7) == "public.") { data_field = f.substr(6); public_data = true; }
 
         if (not data_field.empty()) {
             if (data_column.count(data_field)) {
@@ -69,8 +88,8 @@ void readCSV(const std::string &filename) {
         }
     }
 
-    if (piracy_rows) data_column.insert({"piracy", next_col++}); // piracy dummy
-    if (public_rows) data_column.insert({"public", next_col++}); // public sharing dummy
+    if (piracy_data) data_column.insert({"piracy", next_col++}); // piracy dummy
+    if (public_data) data_column.insert({"public", next_col++}); // public sharing dummy
 
     // Increase the matrix by 2520 row increments: 2520 is the lowest integer divisible by all
     // numbers from 1 to 10, so this will work properly for adding anywhere from 1 to 10 rows of
@@ -86,9 +105,9 @@ void readCSV(const std::string &filename) {
         if (pair.first[0] == '.') {
             if (data_column.count("pre" + pair.first) == 0)
                 pre_nans.push_back(pair.second);
-            if (piracy_rows and data_column.count("piracy" + pair.first) == 0)
+            if (piracy_data and data_column.count("piracy" + pair.first) == 0)
                 piracy_nans.push_back(pair.second);
-            if (public_rows and data_column.count("public" + pair.first) == 0)
+            if (public_data and data_column.count("public" + pair.first) == 0)
                 public_nans.push_back(pair.second);
         }
     }
@@ -106,14 +125,13 @@ void readCSV(const std::string &filename) {
                 rawdata(rows, data_column[d]) = row[fc];
             }
         }
-        if (piracy_rows) rawdata(rows, data_column["piracy"]) = 0;
-        if (public_rows) rawdata(rows, data_column["public"]) = 0;
+        if (piracy_data) rawdata(rows, data_column["piracy"]) = 0;
+        if (public_data) rawdata(rows, data_column["public"]) = 0;
         for (auto nan_i : pre_nans) rawdata(rows, nan_i) = std::numeric_limits<double>::quiet_NaN();
-        std::cerr << "after row, rawdata row: " << rawdata.row(rows) << "\n";
         rows++;
 
         // Second row: piracy values
-        if (piracy_rows) {
+        if (piracy_data) {
             for (unsigned fc = 0; fc < csv.fields().size(); fc++) {
                 auto &d = csv.fields()[fc];
                 if (d.substr(0, 4) != "pre." and d.substr(0, 7) != "public.") {
@@ -121,19 +139,19 @@ void readCSV(const std::string &filename) {
                 }
             }
             rawdata(rows, data_column["piracy"]) = 1;
-            if (public_rows) rawdata(rows, data_column["public"]) = 0;
+            if (public_data) rawdata(rows, data_column["public"]) = 0;
             for (auto nan_i : piracy_nans) rawdata(rows, nan_i) = std::numeric_limits<double>::quiet_NaN();
             rows++;
         }
         // Third row: public values
-        if (public_rows) {
+        if (public_data) {
             for (unsigned fc = 0; fc < csv.fields().size(); fc++) {
                 auto &d = csv.fields()[fc];
                 if (d.substr(0, 4) != "pre." and d.substr(0, 7) != "piracy.") {
                     rawdata(rows, data_column[d]) = row[fc];
                 }
             }
-            if (piracy_rows) rawdata(rows, data_column["piracy"]) = 0;
+            if (piracy_data) rawdata(rows, data_column["piracy"]) = 0;
             rawdata(rows, data_column["public"]) = 1;
             for (auto nan_i : public_nans) rawdata(rows, nan_i) = std::numeric_limits<double>::quiet_NaN();
             rows++;
@@ -145,21 +163,12 @@ void readCSV(const std::string &filename) {
         rawdata.conservativeResize(rows, Eigen::NoChange);
     }
 
-    std::cout << "rawdata:\n" << rawdata << "\n";
-
-
-
     for (auto &dc : data_column) {
         if (dc.first.substr(0, 4) == "pre." or dc.first.substr(0, 7) == "public." or dc.first.substr(0, 7) == "piracy.")
             continue;
         std::string name(dc.first);
         if (dc.first[0] == '.') name = dc.first.substr(1);
-//        SimpleVariable var(name, rawdata.col(dc.second));
-        data.insert({name, SimpleVariable(name, rawdata.col(dc.second))});
-    }
-
-    for (auto &dc : data) {
-        std::cout << dc.first << ":\n" << dc.second.values() << "\n\n";
+        data_.insert({name, SimpleVariable(name, rawdata.col(dc.second))});
     }
 }
 
@@ -174,9 +183,21 @@ int main(int argc, char *argv[]) {
         std::cerr << "Error: failed to read input file `" << args.input << "': " << e.what() << "\n\n";
     }
 
-    // TODO: it would be nice to be able to specify these models via cli args instead of hard-coding
-    // the model here
-//    SUR avg_piracy(
-//            Equation(data["utility"]) + 1 + 
+    SUR avg_effects;
+    for (auto &y : {"net_u", "books_written", "book_quality", "book_p0", "book_revenue", "book_profit"}) {
+        Equation eq(data[y]);
+        eq % 1;
+        if (piracy_data) eq % data["piracy"];
+        if (public_data) eq % data["public"];
+        avg_effects.add(std::move(eq));
+    }
+
+    //std::cout << tabulate(avg_effects);
+    
+    avg_effects.solve();
+    unsigned i = 1;
+    for (auto &beta : avg_effects.beta()) {
+        std::cout << "Equation " << i++ << ": beta = " << beta.transpose() << "\n";
+    }
 }
 

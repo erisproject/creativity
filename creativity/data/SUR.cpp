@@ -91,21 +91,24 @@ void SUR::solve() {
     // We're aiming at getting:
     // beta = (X^T Z X)^{-1} X^T Z y
     // where Z is sigmahatinv kronecker-product identity; calculate it first:
-    MatrixXd bigsigmahat = MatrixXd::Zero(per_eq_rows * num_eqs, per_eq_rows * num_eqs);
+    MatrixXd sigmahatinv_kron_I = MatrixXd::Zero(per_eq_rows * num_eqs, per_eq_rows * num_eqs);
     for (unsigned int i = 0; i < num_eqs; i++) {
         for (unsigned int j = 0; j < num_eqs; j++) {
-            bigsigmahat.block(i*per_eq_rows, j*per_eq_rows, per_eq_rows, per_eq_rows).diagonal().setConstant(smallsigmahatinv(i,j));
+            sigmahatinv_kron_I.block(i*per_eq_rows, j*per_eq_rows, per_eq_rows, per_eq_rows).diagonal().setConstant(smallsigmahatinv(i,j));
         }
     }
 
     // Precalculate the X^T Z part, since we need it twice:
-    MatrixXd xtsig = X_.transpose() * bigsigmahat;
+    MatrixXd xtsig = X_.transpose() * sigmahatinv_kron_I;
 
-    beta_full_ = (xtsig * X_).fullPivHouseholderQr().solve(xtsig * y_);
+    auto xtsigx_qr = (xtsig * X_).fullPivHouseholderQr();
+    beta_full_ = xtsigx_qr.solve(xtsig * y_);
 
     for (unsigned int i = 0, k = 0; i < num_eqs; k += eqs_[i++].numVars()) {
         beta_.emplace_back(beta_full_, k, eqs_[i].numVars());
     }
+
+    var_beta_ = xtsigx_qr.inverse();
 
 /*   FIXME:
     ssr_ = residuals_.squaredNorm();

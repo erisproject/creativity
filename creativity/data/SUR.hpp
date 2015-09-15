@@ -11,16 +11,13 @@ namespace creativity { namespace data {
 /** Class for running a seemingly-unrelated regressions model. */
 class SUR {
     public:
-        /// No default constructor
-        SUR() = delete;
-
         /** Constructs an SUR solver with one or more models.  Given arguments must be accepted by
          * add(...) and are moved (if temporary) or copied.
          *
          * \sa add()
          */
         template <class... Eqns>
-        SUR(Eqns... eqns);
+        explicit SUR(Eqns... eqns);
 
         /** Adds one or more equations to the SUR system.  The first equation is copied; subsequent
          * equations are moved (if temporary) or copied via recursive calls to add().
@@ -107,7 +104,7 @@ class SUR {
 
     protected:
         /// Terminating recursive version of add(), not publically callable.
-        void add();
+        void add() {}
 
         /// The model, given during construction
         std::vector<Equation> eqs_;
@@ -147,9 +144,6 @@ template <class... Eqns>
 SUR::SUR(Eqns... eqns) {
     add(std::forward<Eqns>(eqns)...);
 }
-
-// Terminates the template pack recursive calls:
-void SUR::add() {}
 
 template <class... MoreEqns>
 void SUR::add(const Equation &eq1, MoreEqns... eqns) {

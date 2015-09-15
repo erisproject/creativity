@@ -59,14 +59,37 @@ int main(int, char **) {
 
     std::cout << "Model1: " << model1 << "\nModel2: " << model2 << "\nModel3: " << model3 << "\nModel4: " << model4 << "\n";
 
-    std::cout << "Running model4:\n";
     OLS ols4(model4);
+    std::cout << "ols4, pre-solve:\n" << ols4 << "\n";
     ols4.solve();
-    std::cout << ols4 << "\n";
+    std::cout << "ols4, solved:\n" << ols4 << "\n";
+
+    VectorXd testbeta(4), testu(10), testy(10);
+    MatrixXd testX(10, 4);
+    testbeta << -3, 1, -10, 0.5;
+    testu << 1.48683859, -1.17687648, -0.68941946, -0.30323162, -0.03485257,  3.57557769, -0.07831670, -1.22086850, -1.65255339,  2.11408666;
+    testX <<
+        1, -0.6820301, -0.713643322, -0.9163320,
+        1,  0.2300387,  0.870683685, -1.4051567,
+        1,  0.3266254, -0.191723819,  0.3227581,
+        1,  0.3741961, -0.304324581, -0.6928428,
+        1, -2.4596900,  0.376452159,  2.8230870,
+        1, -0.3383137, -0.007462838,  0.1665202,
+        1, -1.3131063, -0.192922778, -0.3996082,
+        1,  0.4725750,  0.681960046,  0.4801447,
+        1,  0.3315413, -0.411196959, -0.9939557,
+        1, -0.4342752,  0.778097556,  0.6067932;
+    testy = testX * testbeta + testu;
+    OLS testols(Equation(SimpleVariable("y", testy))
+            + SimpleVariable("X1", testX.col(1)) + SimpleVariable("X2", testX.col(2)) + SimpleVariable("X3", testX.col(3)));
+    testols.solve();
+    std::cout << "X=\n" << testols.X() << "\ny' = " << testols.y().transpose() << "\nreal y' = " << testy.transpose() << "\n";
+    std::cout << "Another OLS test:\n" << testols << "\n";
 
     SUR sur4(model4);
+    std::cout << "sur4, pre-solve:\n" << sur4 << "\n";
     sur4.solve();
-    std::cout << sur4 << "\n";
+    std::cout << "sur4, solved:\n" << sur4 << "\n";
 
     SUR sur9(model4, Equation(c1) + 0 + c2);
     sur9.solve();
