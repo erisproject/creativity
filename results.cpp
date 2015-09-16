@@ -22,6 +22,8 @@ using namespace eris;
 
 Eigen::MatrixXd rawdata;
 std::unordered_map<std::string, SimpleVariable> data_;
+// Track fields that don't exist in some of the stages:
+std::unordered_map<std::string, int> pre_nan_, piracy_nan_, public_nan_;
 bool piracy_data = false, public_data = false;
 // Stupid wrapper class so that data["foo"] works (so data.at("foo") isn't needed)
 class {
@@ -40,6 +42,7 @@ class {
                 throw;
             }
         }
+        bool has(const std::string &field) const { return data_.count(field) > 0; }
 } data;
 
 void readCSV(const std::string &filename) {
@@ -100,15 +103,14 @@ void readCSV(const std::string &filename) {
     // Some fields don't have all three (for example, books_pirated has piracy_ and public_ values
     // but not a pre_ value; books_public_copies is only under public_), so we need to fill in some
     // NaNs for the ones where they don't exist: track the columns needing NaNs here:
-    std::list<int> pre_nans, piracy_nans, public_nans;
     for (auto &pair : data_column) {
         if (pair.first[0] == '.') {
-            if (data_column.count("pre" + pair.first) == 0)
-                pre_nans.push_back(pair.second);
-            if (piracy_data and data_column.count("piracy" + pair.first) == 0)
-                piracy_nans.push_back(pair.second);
-            if (public_data and data_column.count("public" + pair.first) == 0)
-                public_nans.push_back(pair.second);
+            if (not data_column.count("pre" + pair.first))
+                pre_nan_.emplace(pair.first.substr(1), pair.second);
+            if (piracy_data and not data_column.count("piracy" + pair.first))
+                piracy_nan_.emplace(pair.first.substr(1), pair.second);
+            if (public_data and not data_column.count("public" + pair.first))
+                public_nan_.emplace(pair.first.substr(1), pair.second);
         }
     }
 
@@ -127,7 +129,7 @@ void readCSV(const std::string &filename) {
         }
         if (piracy_data) rawdata(rows, data_column["piracy"]) = 0;
         if (public_data) rawdata(rows, data_column["public"]) = 0;
-        for (auto nan_i : pre_nans) rawdata(rows, nan_i) = std::numeric_limits<double>::quiet_NaN();
+        for (auto &nan : pre_nan_) rawdata(rows, nan.second) = std::numeric_limits<double>::quiet_NaN();
         rows++;
 
         // Second row: piracy values
@@ -140,7 +142,7 @@ void readCSV(const std::string &filename) {
             }
             rawdata(rows, data_column["piracy"]) = 1;
             if (public_data) rawdata(rows, data_column["public"]) = 0;
-            for (auto nan_i : piracy_nans) rawdata(rows, nan_i) = std::numeric_limits<double>::quiet_NaN();
+            for (auto &nan : piracy_nan_) rawdata(rows, nan.second) = std::numeric_limits<double>::quiet_NaN();
             rows++;
         }
         // Third row: public values
@@ -153,7 +155,7 @@ void readCSV(const std::string &filename) {
             }
             if (piracy_data) rawdata(rows, data_column["piracy"]) = 0;
             rawdata(rows, data_column["public"]) = 1;
-            for (auto nan_i : public_nans) rawdata(rows, nan_i) = std::numeric_limits<double>::quiet_NaN();
+            for (auto &nan : public_nan_) rawdata(rows, nan.second) = std::numeric_limits<double>::quiet_NaN();
             rows++;
         }
     }
@@ -195,9 +197,35 @@ int main(int argc, char *argv[]) {
     //std::cout << tabulate(avg_effects);
     
     avg_effects.solve();
-    unsigned i = 1;
-    for (auto &beta : avg_effects.beta()) {
-        std::cout << "Equation " << i++ << ": beta = " << beta.transpose() << "\n";
+    std::cout << "Average effects:\n================\n" << avg_effects;
+
+    SUR marg_effects;
+    for (auto &y : {"net_u", "books_written", "book_quality", "book_p0", "book_revenue", "book_profit"}) {
+        Equation eq(data[y]);
+        eq % 1;
+        if (piracy_data) eq % data["piracy"];
+        if (public_data) eq % data["public"];
+        for (auto &x : {"density", "cost_fixed", "cost_unit", "creation_time"}) {
+            if (not data.has(x)) continue;
+            if (not pre_nan_.count(x)) eq % data[x];
+            if (piracy_data and not piracy_nan_.count(x)) eq % (data["piracy"] * data[x]);
+            if (public_data and not public_nan_.count(x)) eq % (data["public"] * data[x]);
+        }
+        // These don't get included in "pre":
+        for (auto &x : {"cost_piracy", "piracy_link_proportion"}) {
+            if (not data.has(x)) continue;
+            if (piracy_data and not piracy_nan_.count(x)) eq % (data["piracy"] * data[x]);
+            if (public_data and not public_nan_.count(x)) eq % (data["public"] * data[x]);
+        }
+        // These don't get included in "pre" or "piracy":
+        for (auto &x : {"public_sharing_tax"}) {
+            if (not data.has(x)) continue;
+            if (public_data and not public_nan_.count(x)) eq % (data["public"] * data[x]);
+        }
+        marg_effects.add(eq);
     }
+
+    marg_effects.solve();
+    std::cout << "\n\n\nMarginal effects:\n=================\n" << marg_effects;
 }
 

@@ -31,8 +31,8 @@ void OLS::gather() {
     gathered_ = true;
 }
 
-const MatrixXd& OLS::X() { gather(); return X_; }
-const VectorXd& OLS::y() { gather(); return y_; }
+const MatrixXd& OLS::X() const { requireGathered(); return X_; }
+const VectorXd& OLS::y() const { requireGathered(); return y_; }
 
 void OLS::solve() {
     if (solved_) return;
@@ -124,11 +124,11 @@ std::ostream& operator<<(std::ostream &os, const OLS &ols) {
         for (int i = 0; i < ols.pValues().size(); i++) {
             const double &p = ols.pValues()[i];
             stars.push_back(
-                    p < .001 ? "***" :
-                    p < .01 ? "**" :
-                    p < .05 ? "*" :
-                    p < .1 ? "." :
-                    "");
+                    p < .001 ? " ***" :
+                    p < .01 ? " **" :
+                    p < .05 ? " *" :
+                    p < .1 ? " ." :
+                    " ");
         }
 
         os << "; n=" << ols.n() << " observations\n" << tabulate(results, TableFormat::Text, rownames, {"Coefficient", "std.err.", "t-stat", "p-value"}, stars);

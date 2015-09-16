@@ -31,13 +31,11 @@ class OLS {
          */
         const Equation& model() const { return model_; }
 
-        /** Returns the number of observations for this OLS object.  This is an alias for calling
-         * `ols.model().depVar().size()`.
+        /** Returns the number of observations for this OLS object.
          */
         unsigned int n() const { return solved_ ? X_.rows() : model_.depVar().size(); }
 
-        /** Returns the number of variables for this OLS object.  This is an alias for calling
-         * `ols.model().numVars()`.
+        /** Returns the number of variables for this OLS object.
          */
         unsigned int k() const { return solved_ ? X_.cols() : model_.numVars(); }
 
@@ -90,7 +88,7 @@ class OLS {
          */
         const Eigen::VectorXd& pValues() const;
 
-        /** Returns the regression standard error, \f$^2\f$
+        /** Returns \f$s^2\f$, the square of the regression standard error.
          *
          * \throws std::logic_error if the model has not been solved yet by calling `solve()`.
          */
@@ -133,11 +131,19 @@ class OLS {
          */
         ftest fTest() const;
 
-        /// Returns the y data (without solving the model, if not already solved); calls `gather()` if needed.
-        const Eigen::VectorXd& y();
+        /** Returns the y data used to solve the model. `gather()` must have been called either
+         * explicitly or by a previous call to `solve()`.
+         *
+         * \throws std::logic_error if neither `gather()` nor `solve()` has been called.
+         */
+        const Eigen::VectorXd& y() const;
 
-        /// Returns the X data (without solving the model, if not already solved); calls `gather()` if needed.
-        const Eigen::MatrixXd& X();
+        /** Returns the X data used to solve the model.  `gather()` must have been called either explicitly or by a previous
+         * call to `solve()`.
+         *
+         * \throws std::logic_error if neither `gather()` nor `solve()` has been called.
+         */
+        const Eigen::MatrixXd& X() const;
 
         /** Overloaded so that an OLS object can be sent to an output stream; the output consists of
          * the model followed by the model results if the model has been solved; just the model
@@ -181,6 +187,9 @@ class OLS {
         double ssr_ = 0, ///< SSR
                s2_ = 0, ///< sigma^2 estimate
                R2_ = 0; ///< R^2 value
+
+        /// Throws a std::logic_error if the model hasn't been gathered.
+        void requireGathered() const { if (!gathered_) throw std::logic_error("Cannot access model data before calling gather()"); }
 
         /// Throws a std::logic_error if the model hasn't been solved.
         void requireSolved() const { if (!solved_) throw std::logic_error("Cannot obtain model estimates before calling solve()"); }

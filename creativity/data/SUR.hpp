@@ -41,6 +41,16 @@ class SUR {
          */
         const std::vector<Equation>& equations() const;
 
+        /** Returns the number of observations for this SUR object.  Note that this is *not* the
+         * number of rows of the X matrix as returned by X(): that will generally be `n() *
+         * equations().size()`.
+         *
+         * Note that if an invalid SUR is constructed with multiple models of different sizes, it is
+         * undefined which equation's size will be returned (but such a model will throw an
+         * exception when attempting to gather the data to solve the model).
+         */
+        unsigned int n() const { return eqs_.empty() ? 0 : eqs_.front().depVar().size(); }
+
         /** Calculates and stores the final numerical values from the model.  This is called when
          * needed, and does not typically need to be called explicitly.
          *
@@ -62,39 +72,89 @@ class SUR {
          */
         void clear();
 
-        /// Returns the vector of beta vectors, where element [i] contains the beta values corresponding to equation i.
-        const std::vector<Eigen::VectorBlock<Eigen::VectorXd>>& beta();
+        /// Returns the vector of beta values for equation `i`
+        Eigen::VectorBlock<const Eigen::VectorXd> beta(unsigned i) const;
 
-        /// Returns the covariance estimate of the beta estimators
-        const Eigen::MatrixXd& covariance();
-
-        /// Returns the regression standard error, \f$^2\f$
-        const double& s2();
-
-        /// Returns the residuals
-        const Eigen::VectorXd& residuals();
-
-        /// Returns the sum-of-squared residuals
-        const double& ssr();
-
-        /** Returns the \f$R^2\f$ value for the regression.  This is centered if the model contains
-         * a constant, uncentered if it does not.  Note that this constant detection depends on the
-         * model's hasConstant() method; a model constructed without a constant but with a
-         * SimpleVariable that only takes on a single value will not be considered a constant for
-         * the purposes of using centering here.
+        /** Returns the number of variables for equation `i` in this SUR object.  `sur.k(i)` is the
+         * number of variables in equation `sur.equations()[i]`.
          */
-        const double& Rsq();
+        const unsigned& k(unsigned i) const;
 
-        /** Returns the y data (without solving the model); calls `gather()` if needed.  This is the
-         * y data for the entire model, that is, the y data for each equation stacked together.
+        /** Returns the degrees of freedom for equation `i`.  `sur.df(i)` is the degrees of
+         * freedom value for equation `sur.equations()[i]`.
          */
-        const Eigen::VectorXd& y();
+        int df(unsigned i) const;
 
-        /** Returns the X data (without solving the model); calls `gather()` if needed.  This is the
-         * X data for the entire model, that is, the X data for each equation in block diagonal
-         * form.
+        /// Returns the covariance estimate of the beta estimators for equation `i`
+        Eigen::Block<const Eigen::MatrixXd> covariance(unsigned i) const;
+
+        /** Returns the standard errors (the square roots of the diagonal of covariance()) of the
+         * beta estimates for equation `i`.
+         *
+         * \throws std::logic_error if the model has not been solved yet by calling `solve()`.
          */
-        const Eigen::MatrixXd& X();
+        Eigen::VectorBlock<const Eigen::VectorXd> se(unsigned i) const;
+
+        /** Returns the t-ratios for =0 tests for equation `i`, i.e. `beta(i).array() /
+         * se(i).array()`
+         *
+         * \throws std::logic_error if the model has not been solved yet by calling `solve()`.
+         */
+        Eigen::VectorBlock<const Eigen::VectorXd> tRatios(unsigned i) const;
+
+        /** Returns the p-values of the t-ratios returned by tRatios(`i`)
+         *
+         * \throws std::logic_error if the model has not been solved yet by calling `solve()`.
+         */
+        Eigen::VectorBlock<const Eigen::VectorXd> pValues(unsigned i) const;
+
+        /** Returns \f$s^2\f$, the square of the regression standard error, for equation `i`.
+         *
+         * \throws std::logic_error if the model has not been solved yet by calling `solve()`.
+         */
+        const double& s2(unsigned i) const;
+
+        /// Returns the residuals for equation `i`
+        Eigen::VectorBlock<const Eigen::VectorXd> residuals(unsigned i) const;
+
+        /// Returns the sum-of-squared residuals for equation `i`
+        const double& ssr(unsigned i) const;
+
+        /** Returns the \f$R^2\f$ value for the regression for equation `i`.  This is centered if
+         * the model contains a constant, uncentered if it does not.  Note that this constant
+         * detection depends on the model's hasConstant() method; a model constructed without a
+         * constant but with a SimpleVariable that only takes on a single value will not be
+         * considered a constant for the purposes of using centering here.
+         */
+        const double& Rsq(unsigned i) const;
+
+        /** Returns the y data (without solving the model); `gather()` must have been called either
+         * explicitly or by calling `solve()`.  This is the y data for the entire model, that is,
+         * the y data for each equation stacked together.
+         *
+         * \throws std::logic_error if neither `gather()` nor `solve()` has been called.
+         */
+        const Eigen::VectorXd& y() const;
+
+        /** Returns the sub-vector of y associated with equation `i`.
+         *
+         * \throws std::logic_error if neither `gather()` nor `solve()` has been called.
+         */
+        Eigen::VectorBlock<const Eigen::VectorXd> y(unsigned i) const;
+
+        /** Returns the X data (without solving the model); `gather()` must have been called either
+         * explicitly or by calling `solve()`.  This is the X data for the entire model, that is,
+         * the X data for each equation in block diagonal form.
+         *
+         * \throws std::logic_error if neither `gather()` nor `solve()` has been called.
+         */
+        const Eigen::MatrixXd& X() const;
+
+        /** Returns the `n()` by `k(i)` block of X() associated with observation `i`.
+         *
+         * \throws std::logic_error if neither `gather()` nor `solve()` has been called.
+         */
+        Eigen::Block<const Eigen::MatrixXd> X(unsigned i) const;
 
         /** Overloaded so that an SUR object can be sent to an output stream; the output consists of
          * the model followed by the model results if the model has been solved; just the model
@@ -118,25 +178,43 @@ class SUR {
         /// The X matrix generated from the model
         Eigen::MatrixXd X_;
 
+        /// The model sizes
+        std::vector<unsigned> k_;
+
+        /// Model beginning offsets (in beta_, var_beta_, etc.)
+        std::vector<unsigned> offset_;
+
         /// Whether solve() has been called, to populate the below
         bool solved_ = false;
 
-        /// The whole beta vector
-        Eigen::VectorXd beta_full_;
+        /// The whole beta vector (all equations)
+        Eigen::VectorXd beta_;
 
-        /// The vector of betas for the individual equations
-        std::vector<Eigen::VectorBlock<Eigen::VectorXd>> beta_;
-
-        /// The estimated covariance of the beta estimators
+        /// The estimated covariance of the beta estimators (all equations)
         Eigen::MatrixXd var_beta_;
 
-        /// Residuals
+        /// The standard errors of the betas (all equations)
+        Eigen::VectorXd se_;
+
+        /// t-ratios
+        Eigen::VectorXd t_ratios_;
+
+        /// p-values
+        Eigen::VectorXd p_values_;
+
+        /// Residuals (all equations)
         Eigen::VectorXd residuals_;
 
-        double ssr_ = std::numeric_limits<double>::quiet_NaN(), ///< SSR
-               s2_ = std::numeric_limits<double>::quiet_NaN(), ///< sigma^2 estimate
-               R2_ = std::numeric_limits<double>::quiet_NaN(); ///< R^2 value
+        std::vector<double>
+            ssr_, ///< SSR for each equation
+            s2_, ///< sigma^2 estimates for each equation
+            R2_; ///< R^2 value for each equation
 
+        /// Throws a std::logic_error if the model hasn't been gathered.
+        void requireGathered() const { if (!gathered_) throw std::logic_error("Cannot access model data before calling gather()"); }
+
+        /// Throws a std::logic_error if the model hasn't been solved.
+        void requireSolved() const { if (!solved_) throw std::logic_error("Cannot obtain model estimates before calling solve()"); }
 };
 
 
@@ -147,12 +225,18 @@ SUR::SUR(Eqns... eqns) {
 
 template <class... MoreEqns>
 void SUR::add(const Equation &eq1, MoreEqns... eqns) {
+    if (offset_.empty()) offset_.push_back(0);
+    else offset_.push_back(offset_.back() + k_.back());
+    k_.push_back(eq1.numVars());
     eqs_.push_back(eq1);
     add(std::forward<MoreEqns>(eqns)...);
 }
 
 template <class... MoreEqns>
 void SUR::add(Equation &&eq1, MoreEqns... eqns) {
+    if (offset_.empty()) offset_.push_back(0);
+    else offset_.push_back(offset_.back() + k_.back());
+    k_.push_back(eq1.numVars());
     eqs_.push_back(std::move(eq1));
     add(std::forward<MoreEqns>(eqns)...);
 }

@@ -38,6 +38,9 @@ std::string tabulate_text(
             if (len > width) width = len;
         }
     }
+    size_t extraw = 0;
+    for (auto &s : extracol) extraw = std::max(extraw, s.length());
+
     unsigned rownames_width = 0;
     for (unsigned r = 0; r < matrix.rows(); r++) {
         unsigned len = rowname(rownames, r).length();
@@ -46,16 +49,19 @@ std::string tabulate_text(
 
     std::ostringstream table;
     table.precision(options.precision);
-    table << std::setw(rownames_width) << "";
+    table << options.indent << std::setw(rownames_width) << "";
     for (unsigned c = 0; c < matrix.cols(); c++) {
         table << interrow << std::setw(col_width[c]) << colname(colnames, c);
     }
+    if (extraw > 0) table << std::left << std::setw(extraw) << extracol[0];
     table << "\n";
+
     for (unsigned r = 0; r < matrix.rows(); r++) {
-        table << std::setw(rownames_width) << rowname(rownames, r);
+        table << options.indent << std::setw(rownames_width) << rowname(rownames, r);
         for (unsigned c = 0; c < matrix.cols(); c++) {
-            table << interrow << std::setw(col_width[c]) << matrix(r, c);
+            table << interrow << std::right << std::setw(col_width[c]) << matrix(r, c);
         }
+        if (r+1 < extracol.size()) table << std::left << std::setw(extraw) << extracol[r+1];
         table << "\n";
     }
 
@@ -103,8 +109,7 @@ std::string tabulate(
 std::string tabulate(
         const Equation &equation,
         const tabulation_options &options,
-        const std::vector<std::string> &rownames,
-        const std::vector<std::string> &extracol) {
+        const std::vector<std::string> &rownames) {
     Eigen::MatrixXd mat(equation.depVar().size(), equation.numVars() + 1);
     std::vector<std::string> varnames;
     varnames.emplace_back(equation.depVar().name());

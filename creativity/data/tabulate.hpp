@@ -13,15 +13,23 @@ enum class TableFormat {
     LaTeX ///< LaTeX output
 };
 
+/// Struct holding various options controlling tabulation output
 struct tabulation_options {
+    /// The format (Text, HTML, or LaTeX)
     TableFormat format;
+    /// The precision for numerical values
     unsigned precision;
+    /// The indent (only applies when `format` is Text)
+    std::string indent;
     /** Constructs a tabulation_options struct.
      *
      * \param format the table format, one of the TableFormat enum values; defaults to Text
      * \param precision the precision of double values; defaults to 6
+     * \param indent the per-line indent to use (only for `format == Text`); defaults to an empty
+     * string
      */
-    tabulation_options(TableFormat format = TableFormat::Text, unsigned precision = 6) : format{format}, precision{precision} {}
+    tabulation_options(TableFormat format = TableFormat::Text, unsigned precision = 6, const std::string &indent = "")
+        : format{format}, precision{precision}, indent{indent} {}
 };
 
 
@@ -52,29 +60,20 @@ std::string tabulate(
  * \param options the tabulation_options controlling display output
  * \param rownames the row names to use.  If too short (including empty, the default), unspecified
  * rows will be named `[r,]` where r is the row index beginning at 0.
- * \param extracol is an extra column of string values to display to the right of the last matrix
- * column.  If empty (the default), no extra column is added.  The first value is the column title
- * (if any), the remaining `matrix.rows()` values are values to display.  If the matrix is too
- * short, blank entries will be used for missing values.
  */
 std::string tabulate(
         const Equation &equation,
         const tabulation_options &options = tabulation_options{},
-        const std::vector<std::string> &rownames = {},
-        const std::vector<std::string> &extracol = {});
+        const std::vector<std::string> &rownames = {});
 
-/** Function that takes an SUR object (i.e. of multiple equations) and prints them out, side-by-side
- * in a table; each y variable heading is prefixed with "Eq. n: ", with n starting from 1.
+/** Function that takes an SUR object (i.e. of multiple equations) and returns a string of them,
+ * side-by-side in a table; each y variable heading is prefixed with "Eq. n: ", with n starting from
+ * 1.
  *
  * \param sur the SUR model to display
  * \param options the tabulation_options controlling display output
  * \param rownames the row names to use.  If too short (including empty, the default), unspecified
  * rows will be named `[r,]` where r is the row index beginning at 0.
- * \param extracols is an vector of vectors of extra column of string values to display to the right of each model results in
- * result output; the first `sur.equations().size()` vectors will be displayed as columns, using the first `surthe last matrix
- * column.  If empty (the default), no extra column is added.  The first value is the column title
- * (if any), the remaining `matrix.rows()` values are values to display.  If the matrix is too
- * short, blank entries will be used for missing values.
  */
 std::string tabulate(
         const SUR &sur,

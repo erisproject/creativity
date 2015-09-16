@@ -1,11 +1,14 @@
 #include "creativity/data/SUR.hpp"
 #include "creativity/data/Regression.hpp"
 #include "creativity/data/Variable.hpp"
+#include "creativity/data/tabulate.hpp"
 #include <Eigen/SVD>
 #include <Eigen/QR>
 #include <stdexcept>
 #include <string>
 #include <ostream>
+#include <boost/math/distributions/students_t.hpp>
+#include <boost/math/distributions/complement.hpp>
 
 using namespace Eigen;
 namespace creativity { namespace data {
@@ -17,16 +20,21 @@ void SUR::clear() {
     X_.resize(0, 0);
     y_.resize(0);
     solved_ = false;
-    beta_.clear();
-    beta_full_.resize(0);
+    beta_.resize(0);
     var_beta_.resize(0, 0);
     residuals_.resize(0);
-    ssr_ = s2_ = R2_ = std::numeric_limits<double>::quiet_NaN();
+    ssr_.clear();
+    s2_.clear();
+    R2_.clear();
+    t_ratios_.resize(0);
+    p_values_.resize(0);
     // FIXME: other vars?
 }
 
 void SUR::gather() {
     if (gathered_) return;
+
+    if (eqs_.empty()) throw std::logic_error("SUR::gather(): Invalid SUR: no equations specified");
 
     // Since this is an SUR model, each model should have the same number of observations, so check
     // that.  The number of regressors, on the other hand, is the sum of the number of regressors in
@@ -59,8 +67,19 @@ void SUR::gather() {
     gathered_ = true;
 }
 
-const MatrixXd& SUR::X() { gather(); return X_; }
-const VectorXd& SUR::y() { gather(); return y_; }
+const unsigned& SUR::k(unsigned i) const { return k_[i]; }
+int SUR::df(unsigned i) const { return n() - k(i); }
+
+const MatrixXd& SUR::X() const { requireGathered(); return X_; }
+Block<const MatrixXd> SUR::X(unsigned i) const {
+    requireGathered();
+    return Block<const MatrixXd>(X_, i*n(), offset_[i], n(), k_[i]);
+}
+const VectorXd& SUR::y() const { requireGathered(); return y_; }
+VectorBlock<const VectorXd> SUR::y(unsigned i) const {
+    requireGathered();
+    return VectorBlock<const VectorXd>(y_, i*n(), n());
+}
 
 void SUR::solve() {
     if (solved_) return;
@@ -68,12 +87,11 @@ void SUR::solve() {
     gather();
 
     // Step 1: run OLS
-    const unsigned int per_eq_rows = eqs_.front().depVar().size(),
+    const unsigned int per_eq_rows = n(),
           num_eqs = eqs_.size(),
-          n = X_.rows(),
-          k = X_.cols();
+          K = X_.cols();
 
-    if (n < k) throw RankError("Cannot compute SUR estimates with n < k");
+    if (X_.rows() < K) throw RankError("Cannot compute SUR estimates with N < K");
 
     JacobiSVD<MatrixXd> svd(X_, ComputeThinU | ComputeThinV);
     if (svd.rank() < X_.cols()) throw RankError("Cannot compute SUR estimates: independent data is not full column rank (" + std::to_string(svd.rank()) + " < " + std::to_string(X_.cols()) + ")");
@@ -102,58 +120,136 @@ void SUR::solve() {
     MatrixXd xtsig = X_.transpose() * sigmahatinv_kron_I;
 
     auto xtsigx_qr = (xtsig * X_).fullPivHouseholderQr();
-    beta_full_ = xtsigx_qr.solve(xtsig * y_);
+    beta_= xtsigx_qr.solve(xtsig * y_);
 
-    for (unsigned int i = 0, k = 0; i < num_eqs; k += eqs_[i++].numVars()) {
-        beta_.emplace_back(beta_full_, k, eqs_[i].numVars());
+    var_beta_= xtsigx_qr.inverse();
+    se_= var_beta_.diagonal().cwiseSqrt();
+
+    residuals_ = y_ - X_ * beta_;
+    ssr_.resize(num_eqs, std::numeric_limits<double>::quiet_NaN());
+    s2_.resize(num_eqs, std::numeric_limits<double>::quiet_NaN());
+    R2_.resize(num_eqs, std::numeric_limits<double>::quiet_NaN());
+    t_ratios_ = beta_.array() / se_.array();
+    p_values_.resize(beta_.size());
+    for (unsigned j = 0; j < num_eqs; j++) {
+        unsigned start = j*per_eq_rows;
+        ssr_[j] = residuals_.segment(start, per_eq_rows).squaredNorm();
+        s2_[j] = ssr_[j] / per_eq_rows;
+        auto &eq = eqs_[j];
+        if (eq.hasConstant()) {
+            // Centered R^2:
+            double sum_y = y_.segment(start, per_eq_rows).sum();
+            R2_[j] = 1 - ssr_[j] / (y_.segment(start, per_eq_rows).squaredNorm() - sum_y*sum_y / per_eq_rows);
+        }
+        else {
+            // Uncentered R^2
+            R2_[j] = 1 - ssr_[j] / y_.segment(start, per_eq_rows).squaredNorm();
+        }
+
+        boost::math::students_t tdist(per_eq_rows - k_[j]);
+        p_values_.segment(offset_[j], k_[j]) = t_ratios_.segment(offset_[j], k_[j]).unaryExpr(
+                [&tdist](double t) { return 2.0*cdf(tdist, t < 0 ? t : -t); });
     }
-
-    var_beta_ = xtsigx_qr.inverse();
-
-/*   FIXME:
-    ssr_ = residuals_.squaredNorm();
-    s2_ = X_.cols() == X_.rows() ? std::numeric_limits<double>::quiet_NaN() : ssr_ / (n - k);
-    if (model_.hasConstant()) {
-        // Centered R^2:
-        double sum_y = y_.sum();
-        R2_ = 1 - ssr_ / (y_.squaredNorm() - sum_y*sum_y / n);
-    }
-    else {
-        // Uncentered R^2
-        R2_ = 1 - ssr_ / y_.squaredNorm();
-    }
-
-    DiagonalMatrix<double, Dynamic> S2i(k);
-    // We're after: V S^{-2} V', where S is the (diagonal) matrix of SVD singular values and V is
-    // the SVD "V" matrix.  Computing the ^{-2} on S is trivial, since it's diagonal: just compute
-    // ^{-2} of each element.
-    S2i.diagonal() = svd.singularValues().array().square().inverse();
-    var_beta_ = s2_ * svd.matrixV() * S2i * svd.matrixV().transpose();
-*/
 
     solved_ = true;
 }
 
-const std::vector<VectorBlock<VectorXd>>& SUR::beta() { solve(); return beta_; }
-const MatrixXd& SUR::covariance() { solve(); return var_beta_; }
-const VectorXd& SUR::residuals() { solve(); return residuals_; }
-const double& SUR::s2() { solve(); return s2_; }
-const double& SUR::ssr() { solve(); return ssr_; }
+VectorBlock<const VectorXd> SUR::beta(unsigned i) const {
+    requireSolved();
+    return VectorBlock<const VectorXd>(beta_, offset_[i], k_[i]);
+}
+Block<const MatrixXd> SUR::covariance(unsigned i) const {
+    requireSolved();
+    return Block<const MatrixXd>(var_beta_, offset_[i], offset_[i], k_[i], k_[i]);
+}
+VectorBlock<const VectorXd> SUR::residuals(unsigned i) const {
+    requireSolved();
+    return VectorBlock<const VectorXd>(residuals_, i*n(), n());
+}
+
+const double& SUR::s2(unsigned i) const { requireSolved(); return s2_[i]; }
+const double& SUR::ssr(unsigned i) const { requireSolved(); return ssr_[i]; }
+const double& SUR::Rsq(unsigned i) const { requireSolved(); return R2_[i]; }
+VectorBlock<const VectorXd> SUR::se(unsigned i) const {
+    requireSolved();
+    return VectorBlock<const VectorXd>(se_, offset_[i], k_[i]);
+}
+VectorBlock<const VectorXd> SUR::tRatios(unsigned i) const {
+    requireSolved();
+    return VectorBlock<const VectorXd>(t_ratios_, offset_[i], k_[i]);
+}
+VectorBlock<const VectorXd> SUR::pValues(unsigned i) const {
+    requireSolved();
+    return VectorBlock<const VectorXd>(p_values_, offset_[i], k_[i]);
+}
 
 std::ostream& operator<<(std::ostream &os, const SUR &sur) {
-    os << "SUR system:\n";
-    for (auto &eq : sur.equations()) {
-        os << "\t" << eq << "\n";
-    }
-    if (sur.solved_) {
-        os << "\nBeta:\n";
-        for (auto &beta : sur.beta_) {
-            os << "\t" << beta.transpose() << "\n";
+    os << "SUR system; " << sur.equations().size() << " equations, n = " << sur.n() << " observations per eq.";
+    if (not sur.solved_) {
+        os << " (not solved):\n";
+        for (auto &eq : sur.equations()) {
+            os << eq << "\n";
         }
     }
     else {
-        os << " (not solved)";
+        os << ":\n\n";
+        for (unsigned j = 0; j < sur.eqs_.size(); j++) {
+            auto &eq = sur.equations()[j];
+            os << "Equation " << j+1 << ": " << eq << ":\n";
+            Eigen::MatrixXd results(sur.k(j), 4);
+            results.col(0) = sur.beta(j);
+            results.col(1) = sur.se(j);
+            results.col(2) = sur.tRatios(j);
+            results.col(3) = sur.pValues(j);
+
+            std::vector<std::string> rownames;
+            for (const Variable &var : sur.eqs_[j]) {
+                rownames.emplace_back(var.name());
+            }
+
+            std::vector<std::string> stars;
+            stars.push_back("");
+            auto pvalues = sur.pValues(j);
+            for (int i = 0; i < pvalues.size(); i++) {
+                const double &p = pvalues[i];
+                stars.push_back(
+                        p < .001 ? " ***" :
+                        p < .01 ? " **" :
+                        p < .05 ? " *" :
+                        p < .1 ? " ." :
+                        " ");
+            }
+
+            os << tabulate(results, tabulation_options(TableFormat::Text, os.precision(), "\t"), rownames,
+                    {"Coefficient", "std.err.", "t-stat", "p-value"}, stars);
+
+            double mean_y = sur.y(j).mean();
+            double sd_y = std::sqrt((sur.y(j).squaredNorm() - sur.n() * mean_y * mean_y) / (sur.n()-1));
+            double ssr = sur.ssr(j);
+            double sereg = std::sqrt(sur.s2(j));
+            double R2 = sur.Rsq(j);
+
+            size_t w1 = 0, w2 = 0;
+            for (auto &d : {mean_y, ssr, R2}) {
+                std::ostringstream out;
+                out.precision(os.precision());
+                out << d;
+                w1 = std::max(w1, out.str().length());
+            }
+            for (auto &d : {sd_y, sereg}) {
+                std::ostringstream out;
+                out.precision(os.precision());
+                out << d;
+                w2 = std::max(w2, out.str().length());
+            }
+            os << "\n";
+            os << "\tMean dependent var  " << std::setw(w1) << mean_y << "  " << "S.D. dependent var  " << std::setw(w2) << sd_y  << "\n";
+            os << "\tSum squared resid   " << std::setw(w1) << ssr    << "  " << "S.E. of regression  " << std::setw(w2) << sereg << "\n";
+            os << "\tR-squared           " << std::setw(w1) << R2 << "\n";
+            os << "\n";
+        }
     }
+
     return os;
 }
 
