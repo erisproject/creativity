@@ -21,6 +21,29 @@ using namespace creativity;
 using namespace creativity::state;
 using namespace eris;
 
+// When outputting CSV values, we want exact precision, but don't necessarily need the full
+// max_digits10 digits to get there.  For example, 0.1 with max_digits10 becomes 0.10000000000000001
+// but 0.1 also converts to the numerically identical value.  0.10000000000000002, on the other
+// hand, needs every decimal digit of precision.
+//
+// This function produces tries first at the requested precision, then the requested precision less
+// one, then less two; if the subsequent values are numerically identical to the given double value,
+// the shortest is returned.
+std::string double_str(double d, unsigned precision) {
+    double round_trip;
+    for (unsigned prec : {precision-2, precision-1}) {
+        std::stringstream ss;
+        ss.precision(prec);
+        ss << d;
+        ss >> round_trip;
+        if (round_trip == d) { ss << d; return ss.str(); }
+    }
+    std::stringstream ss;
+    ss.precision(precision);
+    ss << d;
+    return ss.str();
+}
+
 int main(int argc, char *argv[]) {
     cmdargs::Data args;
     args.parse(argc, argv);
@@ -108,7 +131,7 @@ int main(int argc, char *argv[]) {
             if (args.human_readable) output << std::setw(longest_name+1) << d.name + ":" << " ";
             else output << ",";
 
-            if (d.calc_double) output << d.calc_double(creativity->parameters);
+            if (d.calc_double) output << double_str(d.calc_double(creativity->parameters), args.double_precision);
             else output << d.calc_int(creativity->parameters);
 
             if (args.human_readable) output << "\n";
@@ -128,7 +151,7 @@ int main(int argc, char *argv[]) {
                 if (args.human_readable) output << std::setw(longest_name+1) << "pre_" + d.name + ":" << " ";
                 else output << ",";
 
-                output << d.calculate(storage, post_pre - args.data_periods, post_pre - 1);
+                output << double_str(d.calculate(storage, post_pre - args.data_periods, post_pre - 1), args.double_precision);
 
                 if (args.human_readable) output << "\n";
             }
@@ -141,7 +164,7 @@ int main(int argc, char *argv[]) {
                     if (args.human_readable) output << std::setw(longest_name+1) << "piracy_" + d.name + ":" << " ";
                     else output << ",";
 
-                    output << d.calculate(storage, post_piracy - args.data_periods, post_piracy - 1);
+                    output << double_str(d.calculate(storage, post_piracy - args.data_periods, post_piracy - 1), args.double_precision);
 
                     if (args.human_readable) output << "\n";
                 }
@@ -155,7 +178,7 @@ int main(int argc, char *argv[]) {
                     if (args.human_readable) output << std::setw(longest_name+1) << "public_" + d.name + ":" << " ";
                     else output << ",";
 
-                    output << d.calculate(storage, post_public - args.data_periods, post_public - 1);
+                    output << double_str(d.calculate(storage, post_public - args.data_periods, post_public - 1), args.double_precision);
 
                     if (args.human_readable) output << "\n";
                 }
