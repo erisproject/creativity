@@ -23,7 +23,7 @@ class Simulator : public CmdArgs {
          * addGuiOptions(), this is the default value; after calling parse this will be updated
          * to whatever the user specified.
          */
-        unsigned int periods = 250;
+        unsigned int periods = 300;
 
         /** The output file for simulation results; default is "creativity-SEED.crstate" for the
          * CLI, unset for the GUI.

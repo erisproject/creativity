@@ -184,7 +184,7 @@
   <object class="GtkAdjustment" id="adjust_periods">
     <property name="lower">1</property>
     <property name="upper">1000000</property>
-    <property name="value">250</property>
+    <property name="value">300</property>
     <property name="step_increment">1</property>
     <property name="page_increment">25</property>
   </object>

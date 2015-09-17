@@ -108,7 +108,7 @@ struct CreativitySettings {
      * redistributing the collected tax money to authors proportionally to the number of copies
      * obtained of each author's works.
      */
-    eris::eris_time_t public_sharing_begins = 176;
+    eris::eris_time_t public_sharing_begins = 201;
 
     /** The lump size tax extracted by the public tracker from each agent in each period.
      *
