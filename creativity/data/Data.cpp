@@ -321,6 +321,84 @@ double books_public_copies(const Storage &cs, eris_time_t from, eris_time_t to) 
     return count / (double) (to-from+1);
 }
 
+double reader_market_spending(const Storage &cs, eris_time_t from, eris_time_t to) {
+    if (from > to) throw std::logic_error("from > to");
+    double avg_spending = 0;
+    for (eris_time_t t = from; t <= to; t++) {
+        auto cst = cs[t];
+        double period_spending = 0;
+        auto &books = cst->books;
+        for (auto &rdr : cst->readers) {
+            for (auto &bkid : rdr.second.new_books) {
+                if (rdr.second.library.at(bkid).purchased_market()) {
+                    period_spending += books.at(bkid).price;
+                }
+            }
+        }
+        avg_spending += period_spending / cst->readers.size();
+    }
+    return avg_spending / (to-from+1);
+}
+
+double reader_piracy_spending(const Storage &cs, eris_time_t from, eris_time_t to) {
+    if (from > to) throw std::logic_error("from > to");
+    double avg_spending = 0;
+    for (eris_time_t t = from; t <= to; t++) {
+        auto cst = cs[t];
+        double period_spending = 0;
+        for (auto &rdr : cst->readers) {
+            for (auto &bkid : rdr.second.new_books) {
+                if (rdr.second.library.at(bkid).pirated()) {
+                    period_spending += cs.settings.cost_piracy;
+                }
+            }
+        }
+        avg_spending += period_spending / cst->readers.size();
+    }
+    return avg_spending / (to-from+1);
+}
+
+double reader_public_spending(const Storage &cs, eris_time_t from, eris_time_t to) {
+    if (from > to) throw std::logic_error("from > to");
+    double avg_spending = 0;
+    for (eris_time_t t = from; t <= to; t++) {
+        auto cst = cs[t];
+        double period_spending = 0;
+        auto &books = cst->books;
+        for (auto &rdr : cst->readers) {
+            for (auto &bkid : rdr.second.new_books) {
+                if (rdr.second.library.at(bkid).purchased_public()) {
+                    period_spending += books.at(bkid).price;
+                }
+            }
+        }
+        avg_spending += period_spending / cst->readers.size();
+    }
+    return avg_spending / (to-from+1);
+}
+
+double reader_spending(const Storage &cs, eris_time_t from, eris_time_t to) {
+    if (from > to) throw std::logic_error("from > to");
+    double avg_spending = 0;
+    for (eris_time_t t = from; t <= to; t++) {
+        auto cst = cs[t];
+        double period_spending = 0;
+        auto &books = cst->books;
+        for (auto &rdr : cst->readers) {
+            for (auto &bkid : rdr.second.new_books) {
+                auto &bookcopy = rdr.second.library.at(bkid);
+                period_spending +=
+                    (bookcopy.purchased_market() or bookcopy.purchased_public())
+                    ? books.at(bkid).price
+                    : cs.settings.cost_piracy;
+            }
+        }
+        avg_spending += period_spending / cst->readers.size();
+    }
+    return avg_spending / (to-from+1);
+}
+
+
 std::vector<initial_datum> initial_data_fields() {
     std::vector<initial_datum> initial_data;
 #define ADD_SETTING(S) initial_data.emplace_back(#S, [](const CreativitySettings &cs) { return cs.S; })
@@ -379,6 +457,10 @@ std::vector<datum> data_fields() {
     ADD_DATUM(books_bought);
     ADD_DATUM(books_pirated, false, true, true);
     ADD_DATUM(books_public_copies, false, false, true);
+    ADD_DATUM(reader_spending);
+    ADD_DATUM(reader_market_spending);
+    ADD_DATUM(reader_piracy_spending, false, true, true);
+    ADD_DATUM(reader_public_spending, false, false, true);
 #undef ADD_DATUM
 
     return data;

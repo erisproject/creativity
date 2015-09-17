@@ -158,6 +158,35 @@ double books_pirated(const state::Storage &cs, eris::eris_time_t from, eris::eri
  */
 double books_public_copies(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
 
+/** Average per-reader private market spending on books, averaged over the given period.  Only
+ * spending on books bought from the author is included, specifically piracy cost and public sharing
+ * costs are not included.
+ */
+double reader_market_spending(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+
+/** Average per-reader piracy cost expenditure for obtaining pirated copies of books, averaged over
+ * the given period.
+ */
+double reader_piracy_spending(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+
+/** Average per-reader public sharing expenditure for obtaining public provider copies of books,
+ * averaged over the given period.
+ *
+ * This does *not* include the lump-sum tax paid by all readers, only the per-copy price (= marginal
+ * cost) of a book.
+ */
+double reader_public_spending(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+
+/** Average per-reader expenditure for obtaining books from any source.  This is the sum of
+ * book_market_spending plus book_piracy_spending (when piracy is available) plus
+ * book_public_spending (when public sharing is available).
+ *
+ * This does *not* include spending incurred by authors to create books or sell copies of books, nor
+ * does it include lump sum tax amounts.
+ */
+double reader_spending(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+
+
 /** Returns a vector of all supported initial datum values. */
 std::vector<initial_datum> initial_data_fields();
 
