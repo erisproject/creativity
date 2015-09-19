@@ -18,7 +18,10 @@ void Info::addOptions() {
     CmdArgs::addOptions(); // for --help, --version
 
     options_.add_options()
-        ("precision", range<2,std::numeric_limits<double>::max_digits10>(output_precision), "      Specifies the precision level for result values.  The default is 6.")
+        ("precision,p", range<2,std::numeric_limits<double>::max_digits10>(output_precision), "      Specifies the precision level for result values.  The default is 6.")
+        ("thin-periods,t", min<1>(thin_periods), "How many periods to show when --show-periods is specified.  1 means show every period, 2 means show every 2nd period, etc.  The default is 10.")
+        ("all-periods,a", "Equivalent to --thin-periods=1, this shows all periods.")
+        ("hide-periods,q", "If specified, hides the display of period summaries entirely.")
         ;
 
     po::options_description input_desc("Input file");
@@ -29,10 +32,12 @@ void Info::addOptions() {
     positional_.add("input-file", -1);
 }
 
-void Info::postParse(boost::program_options::variables_map&) {
+void Info::postParse(boost::program_options::variables_map &vars) {
     if (input.empty()) {
         throw po::required_option("FILENAME");
     }
+    if (vars.count("all-periods")) thin_periods = 1;
+    else if (vars.count("hide-periods")) thin_periods = 0;
 }
 
 std::string Info::usage() const {

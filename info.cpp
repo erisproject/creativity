@@ -71,25 +71,45 @@ int main(int argc, char *argv[]) {
     auto disp_size = st.size();
     if (disp_size > 0) disp_size--;
     std::cout << "Periods: " << disp_size << "\n";
-    if (st.size() > 0) {
-        std::cout << "Period summary:\n";
+    if (st.size() > 0 and args.thin_periods > 0) {
+        std::cout << "Period summary";
+        if (args.thin_periods > 1) std::cout << " (every " << args.thin_periods <<
+            (args.thin_periods >= 11 and args.thin_periods <= 13 ? "th" : args.thin_periods % 10 == 1 ? "st" :
+             args.thin_periods % 10 == 2 ? "nd" : args.thin_periods % 10 == 3 ? "rd" : "th")
+                << " period)";
+        std::cout << ":\n";
+
         auto h1 =  "             Total                                         Average                                \n";
         auto h2 =  "       -----------------   -----------------------------------------------------------------------\n";
         auto h3 =  "   t   Rdrs  Books  BNew   Net.Util.  NewBuys  NewPiracy  NewPublic  TotBuys  TotPiracy  TotPublic\n";
         auto h4 =  "  ---  ----  -----  ----   ---------  -------  ---------  ---------  -------  ---------  ---------\n";
         auto fmt = "  %3d  %4d  %5d  %4d   %+9.3f  %7.3f  %9.3f  %9.3f  %7.2f  %9.2f  %9.2f\n";
 
-        std::cout << h1 << h2;
+        std::cout << h1 << h2 << h3 << h4;
 
-        for (auto &s : st) {
-            if (s->t == 0) continue;
-            if (s->t % 25 == 1) { if (s->t > 1) std::cout << h4; std::cout << h3 << h4; }
-            if (s->t == creativity->parameters.piracy_begins)
-                std::cout <<
+        unsigned count = 0;
+        // These are 0 for disabled, so pretend we already did them if 0:
+        bool did_piracy = creativity->parameters.piracy_begins == 0,
+             did_public_sharing = creativity->parameters.public_sharing_begins == 0;
+        for (unsigned t = args.thin_periods; t < st.size(); t += args.thin_periods) {
+            auto s = st[t];
+            if (++count % 35 == 1 and count > 1) { std::cout << h4 << h3 << h4; }
+            if (not did_piracy and s->t >= creativity->parameters.piracy_begins) {
+                if (s->t == creativity->parameters.piracy_begins) std::cout <<
                    "  =======================================  PIRACY BEGINS  ========================================\n";
-            if (s->t == creativity->parameters.public_sharing_begins)
-                std::cout <<
+                else std::cout <<
+                   "  ===================================  PIRACY BEGINS " << std::setw(8) << std::left << std::string("(t=" + std::to_string(
+                    creativity->parameters.piracy_begins) + ")") <<            "  ===================================\n";
+                did_piracy = true;
+            }
+            if (not did_public_sharing and s->t >= creativity->parameters.public_sharing_begins) {
+                if (s->t == creativity->parameters.public_sharing_begins) std::cout <<
                    "  ===================================  PUBLIC SHARING BEGINS  ====================================\n";
+                else std::cout <<
+                   "  ===============================  PUBLIC SHARING BEGINS " << std::setw(8) << std::left << std::string("(t=" + std::to_string(
+                    creativity->parameters.public_sharing_begins) + ")") <<         "  ===============================\n";
+                did_public_sharing = true;
+            }
 
             double net_u = 0;
             unsigned long books_new = 0, bought = 0, publicb = 0, pirated = 0, bought_new = 0, pirated_new = 0, public_new = 0;
@@ -122,6 +142,12 @@ int main(int argc, char *argv[]) {
                     bought / R,
                     pirated / R,
                     publicb / R);
+
+            // Mess around with t if we're near but not at the end so that we always include the
+            // very last period.
+            if (t != st.size()-1 and t + args.thin_periods >= st.size()) {
+                t = st.size()-1-args.thin_periods;
+            }
         }
     }
     std::cout << "\n\n\n";
