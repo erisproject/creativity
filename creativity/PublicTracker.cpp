@@ -17,7 +17,7 @@ PublicTracker::PublicTracker(std::shared_ptr<Creativity> creativity, double tax)
     if (tax < 0) throw std::domain_error("PublicTracker creation error: lump sum tax cannot be negative");
 }
 
-void PublicTracker::interAdvance() {
+void PublicTracker::interApply() {
     int count = 0;
     auto lock = writeLock();
     // If the tax is 0, we don't need to do any transfers.
@@ -35,11 +35,9 @@ void PublicTracker::interAdvance() {
     // Create new markets for off-market books
     for (auto &b : simulation()->goods<Book>()) {
         if (not b->hasAnyMarket()) { // The author decided not to put the book on the market for the upcoming period, so we'll take over
-            auto ptm = simulation()->spawn<PublicTrackerMarket>(creativity_, b);
-            b->setMarket(ptm);
+            simulation()->spawn<PublicTrackerMarket>(creativity_, b);
         }
     }
-    // FIXME
 }
 
 void PublicTracker::intraFinish() {

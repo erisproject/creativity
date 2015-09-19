@@ -19,6 +19,10 @@ SharedMember<Book> BookMarket::book() {
     return book_;
 }
 
+void BookMarket::added() {
+    book_->setMarket(sharedSelf());
+}
+
 BookMarket::price_info BookMarket::price(double q) const {
     unsigned long ql = (unsigned long) std::floor(q);
     return price_info(ql*price_, price_, price_);
@@ -26,7 +30,7 @@ BookMarket::price_info BookMarket::price(double q) const {
 
 void BookMarket::setPrice(double p) {
     if (p <= 0) throw std::domain_error("Cannot call BookMarket::setPrice() with a non-positive price");
-    if (simulation()->runStageIntra()) throw std::logic_error("Cannot change book price during intra-optimization");
+    if (hasSimulation() and simulation()->runStageIntra()) throw std::logic_error("Cannot change book price during intra-optimization");
     price_ = p;
 }
 

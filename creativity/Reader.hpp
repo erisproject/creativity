@@ -498,9 +498,9 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         const belief::Quality& qualityBelief() const;
 
         /** Returns the cost (or expected cost) of obtaining a work through sharing.  The current
-         * implementation of this method simply returns the `cost_unit` parameter of the Creativity
-         * object (i.e. the copying cost is the same for individuals as for the creator), but this
-         * may change in the future (e.g. to incorporate beliefs about being caught).
+         * implementation of this method simply returns the `cost_piracy` parameter of the
+         * Creativity object (i.e. the copying cost is the same for everyone), but this may change
+         * in the future (e.g. to incorporate beliefs about the penalties of being caught).
          */
         double piracyCost() const;
 

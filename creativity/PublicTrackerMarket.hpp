@@ -18,7 +18,8 @@ class PublicTrackerMarket : public BookMarket, public virtual eris::interopt::Ad
          * the lower of `unit_cost` or `piracy_cost`.
          */
         PublicTrackerMarket(std::shared_ptr<Creativity> creativity, eris::SharedMember<Book> b);
-        /** Sets the initial price when added to the simulation.
+        /** Sets the initial price and registers this as the book's market when added to the
+         * simulation.
          */
         virtual void added() override;
         /** Updates the market price of the book to the minimum of unit_cost or piracy_cost (in case

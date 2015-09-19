@@ -46,6 +46,9 @@ class BookMarket : public eris::Market, public virtual eris::intraopt::Finish {
          */
         virtual const double& price();
 
+        /** Registers this market as the book's market when added to the simulation. */
+        virtual void added() override;
+
         /** Reserves q units, paying at most p_max for them.  Note that if q is not an integer, this
          * will actually purchase floor(q) units.
          */

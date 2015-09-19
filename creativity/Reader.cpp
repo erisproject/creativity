@@ -200,6 +200,7 @@ void Reader::interOptimize() {
     updateBeliefs();
 
     double income_available = assets()[creativity_->money] + income;
+    if (creativity_->publicSharing()) income_available -= creativity_->parameters.public_sharing_tax;
 
     auto sim = simulation();
     const double market_books = sim->countMarkets<BookMarket>();
@@ -418,9 +419,7 @@ void Reader::interApply() {
             newbook = sim->spawn<Book>(creativity_, create_position_, sharedSelf(), wrote_.size(), create_quality_, qdraw);
             // FIXME: authors can choose to not put this book on the market at all and instead
             // release directly to the public market (if available).
-            newbook->setMarket(
-                    sim->spawn<BookMarket>(creativity_, newbook, create_price_)
-            );
+            sim->spawn<BookMarket>(creativity_, newbook, create_price_);
 
             /// If enabled, add some noise in a random direction to the position
             if (writer_book_sd > 0) {
@@ -429,7 +428,6 @@ void Reader::interApply() {
             }
 
             wrote_.insert(wrote_.end(), newbook);
-            wrote_market_.insert(newbook);
             auto ins = library_.emplace(SharedMember<Book>(newbook), BookCopy(create_quality_, BookCopy::Status::wrote, sim->t()));
             library_on_market_.emplace(newbook, std::ref(ins.first->second));
 
@@ -446,8 +444,8 @@ void Reader::interApply() {
             b->market()->setPrice(new_prices_[b]);
             assets()[creativity_->money] -= cost_fixed;
         }
-        else if (newbook != b) {
-            // No new price (and not the newbie), which means we're removing the book from the market
+        else {
+            // No new price for an old book, which means we're removing the book from the market
             remove.push_back(b);
         }
     }
@@ -456,6 +454,11 @@ void Reader::interApply() {
         wrote_market_.erase(b);
         simulation()->remove(b->market());
     }
+
+    // Don't insert this until down here because the actual insertion of the book is deferred until
+    // after this stage, and thus it's a nuissance to tell whether newbook == b in the above
+    // wrote_market_ loop.
+    if (newbook.ptr()) wrote_market_.insert(newbook);
 
     // Finally, move a random distance in a random direction
     if (creativity_->parameters.reader_step_sd > 0) {
@@ -976,6 +979,9 @@ void Reader::intraApply() {
     for (auto &new_book : reserved_books_) {
         auto &book = new_book.first;
         auto &status = new_book.second;
+
+        // Remove the book from assets() -- we track it via library_ instead.
+        assets().remove(book);
 
         auto inserted = library_.emplace(
                 SharedMember<Book>(book),

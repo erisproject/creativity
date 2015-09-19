@@ -37,7 +37,7 @@ class Creativity;
  * but to write and release directly to the public tracker.
  */
 class PublicTracker : public eris::agent::AssetAgent,
-    public virtual eris::interopt::Advance, public virtual eris::intraopt::Finish {
+    public virtual eris::interopt::Apply, public virtual eris::intraopt::Finish {
     public:
         PublicTracker() = delete; ///< Not default constructible
         /** Constructor for a new PublicTracker agent.  Takes a reference to the creativity object
@@ -49,7 +49,11 @@ class PublicTracker : public eris::agent::AssetAgent,
         /** When the period advances, we take the lump sum tax from all agents, and create a public
          * market for any books that don't have a market (i.e. the author isn't marketing them
          * anymore). */
-        void interAdvance() override;
+        void interApply() override;
+
+        // Override priority to run after the Reader's interApply has deposited income:
+        virtual double interApplyPriority() const override { return 1.0; }
+
         /** When the period finishes, we return the lump sum tax proportionally to all authors. */
         void intraFinish() override;
 

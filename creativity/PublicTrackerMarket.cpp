@@ -1,5 +1,6 @@
 #include "creativity/PublicTrackerMarket.hpp"
 #include "creativity/Creativity.hpp"
+#include "creativity/Book.hpp"
 #include <algorithm>
 
 namespace creativity {
@@ -10,6 +11,7 @@ PublicTrackerMarket::PublicTrackerMarket(std::shared_ptr<Creativity> creativity,
     : BookMarket(creativity, b, 0.0) {}
 
 void PublicTrackerMarket::added() {
+    BookMarket::added();
     updatePrice();
 }
 
