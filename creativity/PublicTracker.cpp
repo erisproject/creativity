@@ -18,19 +18,16 @@ PublicTracker::PublicTracker(std::shared_ptr<Creativity> creativity, double tax)
 }
 
 void PublicTracker::interApply() {
-    int count = 0;
     auto lock = writeLock();
     // If the tax is 0, we don't need to do any transfers.
     if (tax_ > 0) {
         Bundle tax(creativity_->money, tax_);
         for (auto &r : simulation()->agents<Reader>()) {
             lock.add(r);
-            r->assets() -= tax;
+            r->assets().transferApprox(tax, assets(), 1e-8);
             lock.remove(r);
-            count++;
         }
     }
-    assets()[creativity_->money] += count * tax_;
 
     // Create new markets for off-market books
     for (auto &b : simulation()->goods<Book>()) {
