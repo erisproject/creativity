@@ -77,7 +77,7 @@ struct CreativitySettings {
 
     /** The fixed cost of keeping a book on the market.
      */
-    double cost_fixed = 10.0;
+    double cost_fixed = 100.0;
 
     /** The unit cost of selling a copy of a book (note that only copies of books still on the
      * market can be sold), which is also the cost of obtaining a pirated copy (but is then incurred
@@ -168,7 +168,7 @@ struct CreativitySettings {
      */
     struct {
         /** The probability that a reader writes a book. */
-        double prob_write = 0.2;
+        double prob_write = 0.1;
         /** Initial book qualities are distributed Uniform[`q_min`, `q_max`].  Uninformed readers
          * draw from this same distribution when guessing quality. */
         double q_min = 0;
