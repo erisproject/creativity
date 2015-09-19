@@ -18,8 +18,9 @@ extern "C" {
 }
 
 const std::string help_message = u8R"(
-This script is a wrapper around creativity-cli that allows argument values to be drawn from
-distributions.  In particular, it looks for any arguments of the following forms:
+This script is a wrapper intended for use with creativity-cli or creativity-gui (but usable with any
+executable) that allows argument values to be drawn from distributions.  In particular, it looks for
+any arguments of the following forms:
 
     U[a,b] - draws a uniformly distributed double from [a, b)
     iU[a,b] - draws a uniformly distributed integer from [a,b]
@@ -29,14 +30,13 @@ distributions.  In particular, it looks for any arguments of the following forms
                    specify an lower or upper bound, respectively.
     N(m,sd)+ - equivalent to N(m,sd)[0,].
     iN(m,sd) - like N(m,sd), but rounds the drawn value to the nearest integer.
-    iN(m,sd)[a,b] - Like N(m,sd), but rounds the drawn value to the nearest integer, and repeats
-                    until a (rounded) value in [a,b] is found.
+    iN(m,sd)[a,b] - Like iN(m,sd), but repeats until a (rounded) value in [a,b] is found.
 
-Any other argument is passed through as is.
+Any other argument is passed through as is.  At least one argument matching the above must be included.
 
 Example:
 
-    ./creativity-random -D 2 -r 'iN(100,25)[50,150]' -f 'U[0.01,0.25]' -Q 'N(0,1)+'
+    ./creativity-random ./creativity-cli -D 2 -r 'iN(100,25)[50,150]' -f 'U[0.01,0.25]' -Q 'N(0,1)+'
 
 which would take the appropriate draws and could, for example, execute the following:
 
@@ -48,16 +48,16 @@ creativity-random and creativity-cli processes.
 
 
 const std::string
-    re_double("[-+]?[0-9]*\\.?[0-9]+(?:[eE][-+]?[0-9]+)?"),
-    re_double_pos("\\+?[0-9]*\\.?[0-9]+(?:[eE][-+]?[0-9]+)?)"),
-    re_double_inf("[-+]?(?:[0-9]*\\.?[0-9]+(?:[eE][-+]?[0-9]+)?|[iI][nN][fF](?:[iI][nN][iI][tT][yY])?)"),
+    re_double("[-+]?[0-9]*\\.?[0-9]+(?:e[-+]?[0-9]+)?"),
+    re_double_pos("\\+?[0-9]*\\.?[0-9]+(?:e[-+]?[0-9]+)?)"),
+    re_double_inf("[-+]?(?:[0-9]*\\.?[0-9]+(?:e[-+]?[0-9]+)?|inf(?:inity)?)"),
     re_int("[-+]?[0-9]+"),
     re_int_pos("\\+?[0-9]+");
 
 std::vector<std::pair<std::regex, std::function<std::string(const std::smatch&)>>> load_patterns() {
     decltype(load_patterns()) callbacks;
     // U[a,b]
-    callbacks.emplace_back(std::regex("^U[\\[(](" + re_double + ")\\s*,\\s*(" + re_double + ")[\\])]$"),
+    callbacks.emplace_back(std::regex("^U[\\[(](" + re_double + ")\\s*,\\s*(" + re_double + ")[\\])]$", std::regex::icase),
         [](const std::smatch &m) -> std::string {
             double a = std::stod(m[1]);
             double b = std::stod(m[2]);
@@ -68,7 +68,7 @@ std::vector<std::pair<std::regex, std::function<std::string(const std::smatch&)>
             return result.str();
         });
     // iU[a,b]
-    callbacks.emplace_back(std::regex("^iU[\\[(](" + re_int + ")\\s*,\\s*(" + re_int + ")[\\])]$"),
+    callbacks.emplace_back(std::regex("^iU[\\[(](" + re_int + ")\\s*,\\s*(" + re_int + ")[\\])]$", std::regex::icase),
         [](const std::smatch &m) -> std::string {
             long a = std::stol(m[1]);
             long b = std::stol(m[2]);
@@ -77,7 +77,7 @@ std::vector<std::pair<std::regex, std::function<std::string(const std::smatch&)>
         });
     // All the normal variants
     callbacks.emplace_back(std::regex("^(i)?N\\((" + re_double + ")\\s*,\\s*(" + re_double + ")\\)" + 
-                "(?:(\\+)|\\[(" + re_double_inf + ")?\\s*,\\s*(" + re_double_inf + ")?\\])?$"),
+                "(?:(\\+)|\\[(" + re_double_inf + ")?\\s*,\\s*(" + re_double_inf + ")?\\])?$", std::regex::icase),
         [](const std::smatch &m) -> std::string {
             bool round = m[1].matched;
             double mean = std::stod(m[2]);
@@ -113,24 +113,20 @@ std::vector<std::pair<std::regex, std::function<std::string(const std::smatch&)>
     return callbacks;
 }
 
-int main (int argc, char* argv[]) {
-    // Build the path to creativity-cli by replacing "-random" with "-cli" in argv[0].
-    // Note that there might be a suffix (e.g. .exe for Windows users)
-    std::string cli = std::regex_replace(argv[0], std::regex("-random(?!.*-random)"), "-cli");
-
+int main (int argc, const char* argv[]) {
     // This vector stores the patterns and associated lambdas to call, and will be tried in order
     // until a match is found.
-
     auto try_match = load_patterns();
 
-    bool help = false;
+    // The first argument is the program to execute, but make sure it is specified and isn't set to --help
+    bool help = (argc < 3 or std::string(argv[1]) == "--help"); // ... unless the first argument is --help
     bool found = false;
     std::vector<std::string> args;
-    args.reserve(argc-1);
-    for (int i = 1; i < argc; i++) args.push_back(argv[i]);
+    if (argc >= 3) args.reserve(argc-2);
+    for (int i = 2; i < argc; i++) args.push_back(argv[i]);
     for (auto &arg : args) {
         if (arg == "--help") help = true;
-        for (auto &p : try_match) {
+        else for (auto &p : try_match) {
             std::smatch match_res;
             if (std::regex_match(arg, match_res, p.first)) {
                 found = true;
@@ -140,29 +136,32 @@ int main (int argc, char* argv[]) {
         }
     }
 
-    std::vector<char*> cli_argv;
-    cli_argv.reserve(2 + args.size());
-    cli_argv.push_back(const_cast<char*>(cli.c_str()));
-    for (auto &arg : args) cli_argv.push_back(const_cast<char*>(arg.c_str()));
-    cli_argv.push_back(nullptr);
-
     // --help gets passed through, but we *also* handle it by printing help for creativity-random
     if (help or not found) {
-        std::cout << "USAGE: " << argv[0] << " ARG ...\n" << help_message << "\n";
+        std::cout << "USAGE: " << argv[0] << " PROGRAM ARG [ARG ...]\n" << help_message << "\n";
         if (not found) {
-            std::cout << "Aborting because no random signatures found in argument list!\n";
+            std::cerr << "Aborting because no random signatures found in argument list!\n";
             exit(1);
         }
     }
 
-    std::cout << "Executing";
-    for (auto &argv : cli_argv) if (argv) std::cout << " " << argv;
-    std::cout << "\n";
+    const char **exec_argv = new const char*[2 + args.size()]; // +1 for the executable, +1 for the terminating nullptr
+    {
+        int i = 0;
+        std::cout << "Executing " << argv[1];
+        exec_argv[i++] = argv[1];
+        for (auto &arg : args) {
+            exec_argv[i++] = arg.c_str();
+            std::cout << " " << arg;
+        }
+        exec_argv[i] = nullptr;
+        std::cout << "\n";
+    }
 
-    execvp(cli_argv[0], cli_argv.data());
+    execvp(exec_argv[0], const_cast<char**>(exec_argv));
 
     // Getting here means exec failed!
-    std::cerr << "Failed to execute: " << std::strerror(errno) << "\n";
+    std::cerr << "Failed to execute `" << exec_argv[0] << "': " << std::strerror(errno) << "\n";
 
     std::exit(errno);
 }
