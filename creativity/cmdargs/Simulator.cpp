@@ -64,14 +64,14 @@ void Simulator::addOptions() {
     options_.add(beliefs);
 
     piracy.add_options()
-        ("piracy-begins,P", value(s_.piracy_begins), "    The period in which piracy becomes available")
+        ("piracy-begins,P", value(s_.piracy_begins), "    The period in which piracy becomes available.  0 means never")
         ("piracy-link-proportion,f", range<0, 1>(s_.piracy_link_proportion), "Proportion of potential sharing links between readers that are created")
         ("prior-scale-piracy,W", min<1>(s_.prior_scale_piracy), "The same as --prior-weight, but applied in the first piracy period")
         ;
     options_.add(piracy);
 
     publicprov.add_options()
-        ("public-sharing-begins,G", value(s_.public_sharing_begins), "The period in which public sharing becomes available")
+        ("public-sharing-begins,G", value(s_.public_sharing_begins), "The period in which public sharing becomes available. 0 means never")
         ("public-sharing-tax,g", min<0>(s_.public_sharing_tax), "The per-period, lump sum tax collected from each reader for public sharing")
         ("prior-scale-public-sharing,S", min<1>(s_.prior_scale_public_sharing), "The same as --prior-weight, but applied in the first public sharing period")
         ;
