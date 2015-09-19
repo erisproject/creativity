@@ -230,9 +230,14 @@ double Creativity::densityFromBoundary() const {
     return densityFromBoundary(parameters.readers, parameters.dimensions, parameters.boundary);
 }
 
-bool Creativity::sharing() const {
-    if (!setup_sim_) throw std::logic_error("Cannot call sharing() on a non-live or unconfigured simulation");
+bool Creativity::piracy() const {
+    if (!setup_sim_) throw std::logic_error("Cannot call piracy() on a non-live or unconfigured simulation");
     return parameters.piracy_begins > 0 and sim->t() >= parameters.piracy_begins;
+}
+
+bool Creativity::publicSharing() const {
+    if (!setup_sim_) throw std::logic_error("Cannot call publicSharing() on a non-live or unconfigured simulation");
+    return parameters.public_sharing_begins > 0 and sim->t() >= parameters.public_sharing_begins;
 }
 
 double Creativity::priorWeight() const {

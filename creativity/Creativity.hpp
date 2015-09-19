@@ -107,11 +107,17 @@ class Creativity : private eris::noncopyable, public std::enable_shared_from_thi
          */
         double densityFromBoundary() const;
 
-        /** Returns true if file sharing exists.  Attempt to call this on a Creativity object that
-         * is not a live simulation, or is a live simulation but has not been set up yet, will raise
-         * an exception.
+        /** Returns true if piracy exists yet in the simulation.  Attempting to call this on a
+         * Creativity object that is not a live simulation, or is a live simulation but has not been
+         * set up yet, will raise an exception.
          */
-        bool sharing() const;
+        bool piracy() const;
+
+        /** Returns true if public sharing exists yet in the simulation.  Attempting to call this on
+         * a Creativity object that is not a live simulation, or is a live simulation but has not
+         * been set up yet, will raise an exception.
+         */
+        bool publicSharing() const;
 
         /** Returns the prior multiplier currently in effect.  This is
          * CreativitySettings.prior_scale except in the first piracy period, during which it is
