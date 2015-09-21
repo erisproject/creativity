@@ -142,10 +142,6 @@ int main(int argc, char *argv[]) {
         std::list<std::shared_ptr<const State>> state_cache;
 
         for (eris_time_t t = post_pre    - args.data_periods; t < post_pre;    t++) state_cache.push_back(storage[t]);
-        if (not args.skip.piracy)
-            for (eris_time_t t = post_piracy - args.data_periods; t < post_piracy; t++) state_cache.push_back(storage[t]);
-        if (not args.skip.public_sharing)
-            for (eris_time_t t = post_public - args.data_periods; t < post_public; t++) state_cache.push_back(storage[t]);
 
         // pre_*:
         for (auto &d : data) {
@@ -159,8 +155,13 @@ int main(int argc, char *argv[]) {
             }
         }
 
+
         // piracy_*:
         if (not args.skip.piracy) {
+            state_cache.clear();
+            if (not args.skip.piracy)
+                for (eris_time_t t = post_piracy - args.data_periods; t < post_piracy; t++) state_cache.push_back(storage[t]);
+
             for (auto &d : data) {
                 if (d.applies_to.piracy) {
                     if (args.human_readable) output << std::setw(longest_name+1) << "piracy_" + d.name + ":" << " ";
@@ -175,6 +176,10 @@ int main(int argc, char *argv[]) {
 
         // public_*:
         if (not args.skip.public_sharing) {
+            state_cache.clear();
+            if (not args.skip.public_sharing)
+                for (eris_time_t t = post_public - args.data_periods; t < post_public; t++) state_cache.push_back(storage[t]);
+
             for (auto &d : data) {
                 if (d.applies_to.public_sharing) {
                     if (args.human_readable) output << std::setw(longest_name+1) << "public_" + d.name + ":" << " ";
