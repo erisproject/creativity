@@ -44,34 +44,24 @@ std::string double_str(double d, unsigned precision) {
     return ss.str();
 }
 
-int main(int argc, char *argv[]) {
-    cmdargs::Data args;
-    args.parse(argc, argv);
+unsigned int output_count;
+std::mutex output_mutex; // Guards std::out, output_count
+decltype(cmdargs::Data::input.cbegin()) input_it, input_it_end;
+std::mutex input_it_mutex;
 
-    // Simulation parameters:
-    auto initial_data = data::initial_data_fields();
-    auto data = data::data_fields();
+void thr_parse_file(
+        const cmdargs::Data &args,
+        const std::vector<data::initial_datum> &initial_data,
+        const std::vector<data::datum> &data,
+        unsigned readable_name_width) {
+    input_it_mutex.lock();
+    while (input_it != input_it_end) {
+        std::string source(*input_it++);
+        input_it_mutex.unlock();
+        std::cerr << "Processing " << source << "\n";
 
-    std::ostringstream output;
-    int output_count = 0;
-    output << std::setprecision(args.double_precision);
-    unsigned int longest_name = 0;
-    if (not args.human_readable) {
-        output << "source";
-        for (const auto &d : initial_data) output << ",param." << d.name;
-        for (const auto &d : data) if (d.applies_to.pre) output << ",pre." << d.name;
-        for (const auto &d : data) if (d.applies_to.piracy) output << ",piracy." << d.name;
-        for (const auto &d : data) if (d.applies_to.public_sharing) output << "," << "public." << d.name;
-        output << "\n";
-        std::cout << output.str();
-        output.str("");
-    }
-    else {
-        for (const auto &d : initial_data) if (d.name.length() + 6 > longest_name) longest_name = d.name.length() + 6;
-        for (const auto &d : data) if (d.name.length() + 7 > longest_name) longest_name = d.name.length() + 7;
-    }
-
-    for (const auto &source : args.input) {
+        std::ostringstream output;
+        output.precision(args.double_precision);
         auto creativity = Creativity::create();
         // Filename input
         try {
@@ -128,7 +118,7 @@ int main(int argc, char *argv[]) {
         if (args.human_readable) output << "\n\n" << source << "\n==========\n";
         else output << data::csv_fix(source);
         for (auto &d : initial_data) {
-            if (args.human_readable) output << std::setw(longest_name+1) << d.name + ":" << " ";
+            if (args.human_readable) output << std::setw(readable_name_width+1) << d.name + ":" << " ";
             else output << ",";
 
             if (d.calc_double) output << double_str(d.calc_double(creativity->parameters), args.double_precision);
@@ -146,7 +136,7 @@ int main(int argc, char *argv[]) {
         // pre_*:
         for (auto &d : data) {
             if (d.applies_to.pre) {
-                if (args.human_readable) output << std::setw(longest_name+1) << "pre_" + d.name + ":" << " ";
+                if (args.human_readable) output << std::setw(readable_name_width+1) << "pre_" + d.name + ":" << " ";
                 else output << ",";
 
                 output << double_str(d.calculate(storage, post_pre - args.data_periods, post_pre - 1), args.double_precision);
@@ -164,7 +154,7 @@ int main(int argc, char *argv[]) {
 
             for (auto &d : data) {
                 if (d.applies_to.piracy) {
-                    if (args.human_readable) output << std::setw(longest_name+1) << "piracy_" + d.name + ":" << " ";
+                    if (args.human_readable) output << std::setw(readable_name_width+1) << "piracy_" + d.name + ":" << " ";
                     else output << ",";
 
                     output << double_str(d.calculate(storage, post_piracy - args.data_periods, post_piracy - 1), args.double_precision);
@@ -182,7 +172,7 @@ int main(int argc, char *argv[]) {
 
             for (auto &d : data) {
                 if (d.applies_to.public_sharing) {
-                    if (args.human_readable) output << std::setw(longest_name+1) << "public_" + d.name + ":" << " ";
+                    if (args.human_readable) output << std::setw(readable_name_width+1) << "public_" + d.name + ":" << " ";
                     else output << ",";
 
                     output << double_str(d.calculate(storage, post_public - args.data_periods, post_public - 1), args.double_precision);
@@ -192,9 +182,56 @@ int main(int argc, char *argv[]) {
             }
         }
 
+        output_mutex.lock();
         std::cout << output.str() << std::endl;
-        output.str("");
         output_count++;
+        output_mutex.unlock();
+        output.str("");
+
+        input_it_mutex.lock();
+    }
+    input_it_mutex.unlock();
+}
+
+int main(int argc, char *argv[]) {
+    cmdargs::Data args;
+    args.parse(argc, argv);
+
+    // Simulation parameters:
+    auto initial_data = data::initial_data_fields();
+    auto data = data::data_fields();
+
+    unsigned int longest_name = 0;
+    if (args.human_readable) {
+        // Figure out long the longest field is to line things up for the human
+        for (const auto &d : initial_data) if (d.name.length() + 6 > longest_name) longest_name = d.name.length() + 6;
+        for (const auto &d : data) if (d.name.length() + 7 > longest_name) longest_name = d.name.length() + 7;
+    }
+    else {
+        // Write CSV header
+        std::ostringstream output;
+        output << "source";
+        for (const auto &d : initial_data) output << ",param." << d.name;
+        for (const auto &d : data) if (d.applies_to.pre) output << ",pre." << d.name;
+        for (const auto &d : data) if (d.applies_to.piracy) output << ",piracy." << d.name;
+        for (const auto &d : data) if (d.applies_to.public_sharing) output << "," << "public." << d.name;
+        output << "\n";
+        std::cout << output.str();
+    }
+
+    input_it = args.input.cbegin();
+    input_it_end = args.input.cend();
+    if (args.threads == 0) {
+        thr_parse_file(args, initial_data, data, longest_name);
+    }
+    else {
+        std::vector<std::thread> threads;
+        for (unsigned t = 0; t < args.threads; t++) {
+            threads.emplace_back(thr_parse_file, args, initial_data, data, longest_name);
+        }
+        for (auto &th : threads) {
+            if (th.joinable()) th.join();
+        }
     }
 
     if (output_count == 0)
