@@ -14,6 +14,7 @@
 #include <iostream>
 #include <iomanip>
 #include <list>
+#include <future>
 
 namespace creativity { namespace state { class State; } }
 
@@ -142,8 +143,23 @@ int main(int argc, char *argv[]) {
         std::list<std::shared_ptr<const State>> state_cache;
 
         for (eris_time_t t = post_pre    - args.data_periods; t < post_pre;    t++) state_cache.push_back(storage[t]);
-        for (eris_time_t t = post_piracy - args.data_periods; t < post_piracy; t++) state_cache.push_back(storage[t]);
-        for (eris_time_t t = post_public - args.data_periods; t < post_public; t++) state_cache.push_back(storage[t]);
+
+        std::promise<void> piracy_promise, public_promise;
+        std::future<void> piracy_parsed, public_parsed;
+        std::thread pp_parser;
+        if (not args.skip.piracy or not args.skip.public_sharing) {
+            piracy_parsed = piracy_promise.get_future();
+            public_parsed = public_promise.get_future();
+            pp_parser = std::thread([&] {
+                if (not args.skip.piracy)
+                    for (eris_time_t t = post_piracy - args.data_periods; t < post_piracy; t++) state_cache.push_back(storage[t]);
+                piracy_promise.set_value();
+
+                if (not args.skip.public_sharing)
+                    for (eris_time_t t = post_public - args.data_periods; t < post_public; t++) state_cache.push_back(storage[t]);
+                public_promise.set_value();
+            });
+        }
 
         // pre_*:
         for (auto &d : data) {
@@ -159,6 +175,7 @@ int main(int argc, char *argv[]) {
 
         // piracy_*:
         if (not args.skip.piracy) {
+            piracy_parsed.wait();
             for (auto &d : data) {
                 if (d.applies_to.piracy) {
                     if (args.human_readable) output << std::setw(longest_name+1) << "piracy_" + d.name + ":" << " ";
@@ -173,6 +190,7 @@ int main(int argc, char *argv[]) {
 
         // public_*:
         if (not args.skip.public_sharing) {
+            public_parsed.wait();
             for (auto &d : data) {
                 if (d.applies_to.public_sharing) {
                     if (args.human_readable) output << std::setw(longest_name+1) << "public_" + d.name + ":" << " ";
@@ -184,6 +202,8 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
+
+        if (pp_parser.joinable()) pp_parser.join();
 
         std::cout << output.str() << std::endl;
         output.str("");
