@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <eris/Random.hpp>
 
 
 using namespace eris;
@@ -20,14 +21,12 @@ Book::Book(
         const Position &p,
         SharedMember<Reader> author,
         unsigned int order,
-        double quality,
-        std::function<double(const Book&)> qDraw)
+        double quality)
     : WrappedPositional<Good::Discrete>(p, author->wrapLowerBound(), author->wrapUpperBound()),
         creativity_{std::move(creativity)},
         author_{std::move(author)},
         order_{order},
-        quality_{quality},
-        quality_draw_{std::move(qDraw)}
+        quality_draw_(quality, creativity_->parameters.book_quality_sd)
 {}
 
 void Book::added() {
@@ -243,12 +242,23 @@ double Book::price() const {
         : std::numeric_limits<double>::quiet_NaN();
 }
 
-const double& Book::quality() const {
-    return quality_;
+double Book::qualityMean() const {
+    return quality_draw_.mean();
 }
 
 double Book::qualityDraw() {
-    return std::max(0.0, quality_draw_(*this));
+    // We could call Random::truncDist here, but with its defaults for a normal it's just going to
+    // end up doing a rejection sampling loop anyway, so just do that directly.  This loop shouldn't
+    // run too long; since the lowest possible quality is 0, the worst case is that this draw
+    // produces invalid values half the time.
+    if (quality_draw_.stddev() > 0) {
+        auto &rng = Random::rng();
+        double x;
+        do { x = quality_draw_(rng); } while (x < 0);
+        return x;
+    }
+    // No stddev: just return the exact quality value
+    return quality_draw_.mean();
 }
 
 }

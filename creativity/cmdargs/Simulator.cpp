@@ -26,8 +26,8 @@ void Simulator::addOptions() {
         ("dimensions,D", min<1>(s_.dimensions), "    Number of dimensions of the simulation")
         ("readers,r", min<1>(s_.readers), "    Number of reader/author agents in the simulation")
         ("density,d", above<0>(density_), (u8"  Reader density (in readers per unit^D, where D is the configured # of dimensions).  The default is the density required to have simulation boundaries at ±" + output_string(s_.boundary) + " in each dimension.").c_str())
-        ("reader-step-sd,R", min<0>(s_.reader_step_sd), "Standard deviation of the inter-period random-direction reader movement distance ~ |N(0, R)|")
-        ("book-distance-sd,B", min<0>(s_.book_distance_sd), "Standard deviation of book distance from author; distance ~ |N(0, B)|")
+        ("reader-step-mean,R", min<0>(s_.reader_step_mean), "Mean of the inter-period random-direction reader movement distance.  The value is this time a draw from a χ² with 1 d.f.")
+        ("book-distance-mean,B", min<0>(s_.book_distance_mean), "Mean of book distance from author.  The value is this times a draw from a χ² with 1 d.f.")
         ("book-quality-sd,Q", min<0>(s_.book_quality_sd), "    Standard deviation of book perceived quality; perceived quality ~ N(q, Q), where q is the innate quality and Q is this value")
         ;
     options_.add(structure);

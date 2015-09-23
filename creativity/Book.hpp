@@ -39,17 +39,14 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
          * \param order the number of this book in the author's authored books list.  `order == 0`
          * indicates that this is the author's first book; `order == 12` indicates that this is the
          * author's thirteenth book.
-         * \param quality the quality of the book
-         * \param qDraw a callable object that can be called upon to produce a quality draw for a
-         * given book, passed as the argument.  This is often a random draw (and so different
-         * readers can get different quality values).  The returned value should ideally be
-         * non-negative; negative draws will be changed to 0 values.
+         * \param quality the mean quality of the book; perceived quality draws are from a normal
+         * with this mean and standard deviation as configured in the Creativity settings.
          *
          * Note that a reference to the author is stored internally: even if the author is removed
          * from the simulation, it will still be kept from destruction by this class.
          */
-        Book(std::shared_ptr<Creativity> creativity, const eris::Position &p, eris::SharedMember<Reader> author, unsigned int order,
-                double quality, std::function<double(const Book&)> qDraw);
+        Book(std::shared_ptr<Creativity> creativity, const eris::Position &p, eris::SharedMember<Reader> author,
+                unsigned int order, double quality);
 
         /// Returns the age of the book, in simulation periods.
         eris::eris_time_t age() const;
@@ -238,16 +235,15 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
          */
         void recordPiracy(unsigned int new_copies);
 
-        /** Returns the actual, fixed quality value of the book.  This is meant to be used by the
-         * author and the `qDraw` callable object given during construction; readers of the book
-         * should instead obtain a draw using qualityDraw().
+        /** Returns the mean quality level determined by the author at book creation time.  This
+         * value is not intended for use by readers of a book: readers rather receive a subjective
+         * quality from `qualityDraw()`.
          */
-        const double& quality() const;
+        double qualityMean() const;
 
-        /** Draws a quality value for this book.  This is intended to be called once per reader
-         * *after* the reader has obtained a copy of the book; the reader should then maintain the
-         * value.  (Before the reader obtains the copy, they have to use their prior and/or any
-         * network information to predict a quality).
+        /** Draws a quality value for this book.  This is intended to be called once per reader when
+         * the reader obtains a copy of the book; the reader should then maintain the value.
+         * (Before the reader obtains the copy, they have to use their prior to predict a quality).
          *
          * The returned value will always be non-negative.
          */
@@ -264,8 +260,7 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         const unsigned int order_ = 0;
         bool market_private_ = true;
         eris::eris_id_t market_ = 0;
-        const double quality_ = 0;
-        std::function<double(const Book&)> quality_draw_;
+        std::normal_distribution<double> quality_draw_;
 };
 
 }

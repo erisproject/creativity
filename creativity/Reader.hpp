@@ -356,22 +356,6 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          */
         static const std::vector<double> default_penalty_polynomial;
 
-        /** The standard deviation of a written book.  A written book will be located at the
-         * reader's position plus a draw from \f$N(0, s)\f$ in a random direction, where \f$s\f$ is
-         * the value of this parameter.
-         *
-         * Defaults to 0.5.
-         */
-        double writer_book_sd{0.5};
-
-        /** The standard deviation of the quality draw for books written by this author.  A new
-         * reader realizes a quality drawn from a normal distribution with mean of the true quality
-         * and this standard deviation, with negative values truncated to zero.  (Note that changing
-         * negative values to 0 has the effect of increasing the mean and decreasing the variance
-         * with this effect being small only when the value truncation is rare).
-         */
-        double writer_quality_sd{1.0};
-
         /** The reader's creation function shape coefficient.  This reader can exhert effort \f$\ell
          * \geq 0\f$ to create a book of quality \f$q(\ell) = \alpha \frac{(\ell+1)^\beta -
          * 1}{\beta}\f$, where \f$\beta\f$ is this value.

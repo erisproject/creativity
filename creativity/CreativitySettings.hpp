@@ -19,17 +19,17 @@ struct CreativitySettings {
      */
     double boundary = 5.0;
 
-    /** The standard deviation of a book.  An authored book will be located at a distance drawn from
-     * \f$\left|N(0,s)\right|\f$, where \f$s\f$ is this value, in a random direction from the
-     * author's location at the time of writing.
+    /** An authored book will be located at a distance of \f$mx\f$ from the author's location at the
+     * time of writing, where this value is \f$m\f$ and \f$x \sim \chi^2_1\f$.  This distance thus
+     * has the given mean and a standard deviation of \f$\sqrt{2}m\f$.
      *
-     * The direction is drawn from a uniform distribution over the surface of the hypersphere
-     * centred on the author with the randomly drawn radius.
+     * The final location is drawn from a uniform distribution over all points with the given
+     * distance from the author.
      *
      * If this value is 0, the book is located exactly at the author's position at the time of
-     * writing.
+     * writing and no draw is performed.
      */
-    double book_distance_sd = 0.5;
+    double book_distance_mean = 0.2;
 
     /** The standard deviation of a book quality draw.  When a reader obtains a book, his subjective
      * quality is drawn from \f$N(Q, s)\f$, where \f$Q\f$ is the book's base quality as decided by
@@ -40,17 +40,16 @@ struct CreativitySettings {
      */
     double book_quality_sd = 1.0;
 
-    /** Between periods, readers take a random step of length \f$N(0, s^2)\f$.  This value is
-     * \f$s\f$ (the standard deviation, not the variance \f$s^2\f$).  If 0, readers remain at their
-     * initial positions forever.
+    /** Between periods, readers take a random step of length \f$mx\f$, where this value is \f$m\f$
+     * and \f$x \sim \chi^2_1\f$.  This value has mean \f$m\f$ and standard deviation \f$\sqrt{2}
+     * m\f$.  If 0, readers remain at their initial positions forever.
      *
-     * More specifically, a random direction vector of length 1 is multiplied by a draw from this
-     * distribution, so negative draws simply reverse the direction of the random vector; hence the
-     * actual distance moved is the absolute value of the draw, in a random direction.
+     * The final location is selected from a uniform distribution over all points with the given
+     * distance from the reader's initial position.
      *
-     * The default is 0.25.
+     * The default is 0.1.
      */
-    double reader_step_sd = 0.25;
+    double reader_step_mean = 0.1;
 
     /** The "shape" parameter \f$\beta\f$ of the reader effort.
      *

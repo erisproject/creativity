@@ -16,7 +16,7 @@ BookState::BookState(const Book &b) :
     id{b.id()},
     author{b.author()->id()},
     position{b.position()},
-    quality{b.quality()},
+    quality{b.qualityMean()},
     market_private{b.hasPrivateMarket()},
     price{b.price()},
     revenue{b.currRevenue()},

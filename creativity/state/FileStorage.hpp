@@ -124,9 +124,17 @@ class FileStorage final : public StorageBackend {
 
     private:
 
-        /** The file version.  The default is 2, but we can read and write v1 files as well (v1
+        /** The file version.  The default is 2, but we can read and write v1 files as well.  v1
          * files have per-user costs and income, but those never differed from the creativity
-         * setting; v2 files don't include them).
+         * setting in v1-only simulators; v2 files simply don't include them.
+         *
+         * Another difference is the book distance and reader step settings: they were the standard
+         * deviation parameter of a half normal distribution with mean 0 under v1, but are the mean
+         * of a chi squared with 1 d.f. under v2.  When loading a v1 file, we preserve the mean
+         * (which equals the v1 sd values times \f$\sqrt{2/\pi}\f$), but note that, because the
+         * distributions are different, a v1 file loaded into a v2 simulator will have the same mean
+         * but a standard deviation that is \f$2/(\pi-2) \approx 1.871\f$ times the actual sd value
+         * in a v1 simulation (which was the sd value times \f$\sqrt{1-2/\pi}\f$).
          */
         uint32_t version_ = 2;
 
@@ -294,9 +302,9 @@ class FileStorage final : public StorageBackend {
                     dimensions = 20, ///< the number of dimensions of the simulation these states belong to (u32)
                     readers = 24, ///< the number of readers in the simulation
                     boundary = 28, ///< the simulation boundary (positive double)
-                    book_distance_sd = 36, ///< standard deviation of distance of new books from authors (positive double)
+                    book_distance_mean = 36, ///< mean of distance of new books from authors (non-negative double) (in v1 files, this is book_distance_sd)
                     book_quality_sd = 44, ///< standard deviation of perceived book quality draw (draw is normal, with mean = true quality) (dbl)
-                    reader_step_sd = 52, ///< reader random step sd (dbl)
+                    reader_step_mean = 52, ///< mean of reader step distance (non-negative dbl) (in v1 files, this is reader_step_sd)
                     reader_creation_shape = 60, ///< reader q(l) shape parameter (dbl)
                     reader_creation_scale_min = 68, ///< reader q(l) scale parameter ~ U[a,b]; this is 'a' (dbl)
                     reader_creation_scale_max = 76, ///< reader q(l) scale parameter ~ U[a,b]; this is 'b' (dbl)

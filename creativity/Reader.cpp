@@ -220,7 +220,7 @@ void Reader::interOptimize() {
             auto book_mkt = book->market();
 
             try {
-                auto max = demand_belief_.argmaxP(creativity_->parameters.prediction_draws, book->quality(), book->lifeSales(), book->lifePirated(), creativity_->parameters.readers,
+                auto max = demand_belief_.argmaxP(creativity_->parameters.prediction_draws, book->qualityMean(), book->lifeSales(), book->lifePirated(), creativity_->parameters.readers,
                         sim->t() - 1 - book->lastSale(), book->age(), authored_books - 1, market_books, cost_unit,
                         income / 10);
                 const double &p = max.first;
@@ -408,22 +408,14 @@ void Reader::interApply() {
             // cost:
             assets()[creativity_->money] -= cost_fixed;
 
-            auto qdraw = [this] (const Book &book) -> double {
-                double x;
-                // Truncated normal.  Since book.quality() > 0, this should return a valid draw more
-                // than 50% of the time, so this loop shouldn't run that much, usually.
-                do { x = book.quality() + writer_quality_sd * Random::rstdnorm(); }
-                while (x < 0);
-                return x;
-            };
-            newbook = sim->spawn<Book>(creativity_, create_position_, sharedSelf(), wrote_.size(), create_quality_, qdraw);
+            newbook = sim->spawn<Book>(creativity_, create_position_, sharedSelf(), wrote_.size(), create_quality_);
             // FIXME: authors can choose to not put this book on the market at all and instead
             // release directly to the public market (if available).
             sim->spawn<BookMarket>(creativity_, newbook, create_price_);
 
             /// If enabled, add some noise in a random direction to the position
-            if (writer_book_sd > 0) {
-                double step_dist = writer_book_sd * Random::rstdnorm();
+            if (creativity_->parameters.book_distance_mean > 0) {
+                double step_dist = creativity_->parameters.book_distance_mean * std::chi_squared_distribution<double>()(Random::rng());
                 newbook->moveBy(step_dist * Position::random(create_position_.dimensions));
             }
 
@@ -461,8 +453,8 @@ void Reader::interApply() {
     if (newbook.ptr()) wrote_market_.insert(newbook);
 
     // Finally, move a random distance in a random direction
-    if (creativity_->parameters.reader_step_sd > 0) {
-        double step_dist = Random::rstdnorm() * creativity_->parameters.reader_step_sd;
+    if (creativity_->parameters.reader_step_mean > 0) {
+        double step_dist = std::chi_squared_distribution<double>()(Random::rng()) * creativity_->parameters.reader_step_mean;
         if (step_dist != 0)
             moveBy(step_dist * Position::random(position().dimensions));
     }

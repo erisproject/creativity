@@ -48,9 +48,9 @@ void Creativity::checkParameters() {
     PROHIBIT(dimensions, < 1);
     PROHIBIT(readers, < 1);
     PROHIBIT(boundary, <= 0);
-    PROHIBIT(book_distance_sd, < 0);
+    PROHIBIT(book_distance_mean, < 0);
     PROHIBIT(book_quality_sd, < 0);
-    PROHIBIT(reader_step_sd, < 0);
+    PROHIBIT(reader_step_mean, < 0);
     PROHIBIT(reader_creation_shape, >= 1);
     PROHIBIT(reader_creation_scale_min, < 0);
     PROHIBIT(reader_creation_scale_max, < parameters.reader_creation_scale_min);
@@ -98,8 +98,6 @@ void Creativity::setup() {
 
         auto r = sim->spawn<Reader>(shared_from_this(), initpos);
 
-        r->writer_book_sd = parameters.book_distance_sd;
-        r->writer_quality_sd = parameters.book_quality_sd;
         r->creation_shape = parameters.reader_creation_shape;
         r->creation_scale = unif_cr_shape(rng);
     }

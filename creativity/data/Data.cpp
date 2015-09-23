@@ -406,9 +406,9 @@ std::vector<initial_datum> initial_data_fields() {
     ADD_SETTING(dimensions);
     ADD_SETTING(boundary);
     initial_data.emplace_back("density", [](const CreativitySettings &cs) { return Creativity::densityFromBoundary(cs.readers, cs.dimensions, cs.boundary); });
-    ADD_SETTING(book_distance_sd);
+    ADD_SETTING(book_distance_mean);
     ADD_SETTING(book_quality_sd);
-    ADD_SETTING(reader_step_sd);
+    ADD_SETTING(reader_step_mean);
     ADD_SETTING(reader_creation_shape);
     ADD_SETTING(reader_creation_scale_min);
     ADD_SETTING(reader_creation_scale_max);

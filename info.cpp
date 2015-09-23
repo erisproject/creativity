@@ -39,9 +39,9 @@ int main(int argc, char *argv[]) {
     PRINT_SETTING(dimensions);
     PRINT_FIELD("densityFromBoundary()", creativity->densityFromBoundary());
     PRINT_SETTING(boundary);
-    PRINT_SETTING(book_distance_sd);
+    PRINT_SETTING(book_distance_mean);
     PRINT_SETTING(book_quality_sd);
-    PRINT_SETTING(reader_step_sd);
+    PRINT_SETTING(reader_step_mean);
     PRINT_SETTING(reader_creation_shape);
     PRINT_SETTING(reader_creation_scale_min);
     PRINT_SETTING(reader_creation_scale_max);
@@ -86,9 +86,9 @@ int main(int argc, char *argv[]) {
         ADD_SAME(dimensions);
         if (creativity->parameters.boundary != defaults.boundary) std::cout << " --density " <<
             creativity->densityFromBoundary(creativity->parameters.readers, creativity->parameters.dimensions, creativity->parameters.boundary);
-        ADD_SAME(book_distance_sd);
+        ADD_SAME(book_distance_mean);
         ADD_SAME(book_quality_sd);
-        ADD_SAME(reader_step_sd);
+        ADD_SAME(reader_step_mean);
         ADD_SAME(reader_creation_shape);
         ADD_SAME(reader_creation_scale_min);
         ADD_SAME(reader_creation_scale_max);

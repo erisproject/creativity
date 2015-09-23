@@ -10,6 +10,7 @@
 #include "creativity/belief/Profit.hpp"
 #include "creativity/belief/ProfitStream.hpp"
 #include "creativity/belief/Quality.hpp"
+#include <boost/math/constants/constants.hpp>
 
 #ifdef ERIS_DEBUG
 #define FILESTORAGE_DEBUG_WRITE_START \
@@ -59,9 +60,9 @@ constexpr int64_t
         FileStorage::HEADER::pos::dimensions,
         FileStorage::HEADER::pos::readers,
         FileStorage::HEADER::pos::boundary,
-        FileStorage::HEADER::pos::book_distance_sd,
+        FileStorage::HEADER::pos::book_distance_mean,
         FileStorage::HEADER::pos::book_quality_sd,
-        FileStorage::HEADER::pos::reader_step_sd,
+        FileStorage::HEADER::pos::reader_step_mean,
         FileStorage::HEADER::pos::reader_creation_shape,
         FileStorage::HEADER::pos::reader_creation_scale_min,
         FileStorage::HEADER::pos::reader_creation_scale_max,
@@ -258,9 +259,18 @@ void FileStorage::writeSettings(const CreativitySettings &settings) {
     write_value(settings.dimensions);
     write_value(settings.readers);
     write_value(settings.boundary);
-    write_value(settings.book_distance_sd);
-    write_value(settings.book_quality_sd);
-    write_value(settings.reader_step_sd);
+    if (version_ >= 2) {
+        write_value(settings.book_distance_mean);
+        write_value(settings.book_quality_sd);
+        write_value(settings.reader_step_mean);
+    }
+    else {
+        // When writing to a v1 file, write the half-normal sd value that preserves the mean.
+        auto &scale = boost::math::double_constants::root_half_pi;
+        write_value(settings.book_distance_mean * scale);
+        write_value(settings.book_quality_sd);
+        write_value(settings.reader_step_mean * scale);
+    }
     write_value(settings.reader_creation_shape);
     write_value(settings.reader_creation_scale_min);
     write_value(settings.reader_creation_scale_max);
@@ -537,9 +547,16 @@ void FileStorage::parseMetadata() {
     PARSE_VALUE(dimensions);
     PARSE_VALUE(readers);
     PARSE_VALUE(boundary);
-    PARSE_VALUE(book_distance_sd);
+    PARSE_VALUE(book_distance_mean);
     PARSE_VALUE(book_quality_sd);
-    PARSE_VALUE(reader_step_sd);
+    PARSE_VALUE(reader_step_mean);
+    if (version_ == 1) {
+        // In v1 files, the two _means above are actually half-normal sd parameters; we want to
+        // preserve the mean (though that increases the variance)
+        double scale = 2.0 * boost::math::double_constants::one_div_root_two_pi;
+        settings_.book_distance_mean *= scale;
+        settings_.reader_step_mean *= scale;
+    }
     PARSE_VALUE(reader_creation_shape);
     PARSE_VALUE(reader_creation_scale_min);
     PARSE_VALUE(reader_creation_scale_max);
@@ -573,8 +590,9 @@ void FileStorage::parseMetadata() {
     if (settings_.dimensions == 0) throwParseError("found invalid dimensions == 0");
     if (settings_.readers == 0) throwParseError("found invalid readers == 0");
     if (settings_.boundary <= 0) throwParseError("found invalid (non-positive) boundary");
-    if (settings_.book_distance_sd < 0) throwParseError("found invalid (negative) book_distance_sd");
+    if (settings_.book_distance_mean < 0) throwParseError("found invalid (negative) book_distance_mean");
     if (settings_.book_quality_sd < 0) throwParseError("found invalid (negative) book_quality_sd");
+    if (settings_.reader_step_mean < 0) throwParseError("found invalid (negative) reader_step_mean");
 
     if (num_states > 0) {
         // A reader library block is written immediately after the header before writing the first

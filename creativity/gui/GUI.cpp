@@ -808,8 +808,8 @@ void GUI::thr_update_parameters() {
     SET_SB(dimensions);
     SET_SB(readers);
     widget<Gtk::SpinButton>("set_density")->set_value(creativity_->densityFromBoundary());
-    SET_SB(reader_step_sd);
-    SET_SB(book_distance_sd);
+    SET_SB(reader_step_mean);
+    SET_SB(book_distance_mean);
     SET_SB(book_quality_sd);
     SET_SB(reader_creation_shape);
     SET_SB(reader_creation_scale_min);
@@ -1075,9 +1075,9 @@ void GUI::initializeSim() {
     set.boundary = Creativity::boundaryFromDensity(set.readers, set.dimensions, sb("set_density"));
     COPY_SB_I(piracy_begins);
     COPY_SB_D(piracy_link_proportion) * 0.01; // From percentage
-    COPY_SB_D(book_distance_sd);
+    COPY_SB_D(book_distance_mean);
     COPY_SB_D(book_quality_sd);
-    COPY_SB_D(reader_step_sd);
+    COPY_SB_D(reader_step_mean);
     COPY_SB_D(reader_creation_shape);
     COPY_SB_D(reader_creation_scale_min);
     COPY_SB_D(reader_creation_scale_max);
