@@ -110,14 +110,14 @@ std::string tabulate(
         const Equation &equation,
         const tabulation_options &options,
         const std::vector<std::string> &rownames) {
-    Eigen::MatrixXd mat(equation.depVar().size(), equation.numVars() + 1);
+    Eigen::MatrixXd mat(equation.depVar()->size(), equation.numVars() + 1);
     std::vector<std::string> varnames;
-    varnames.emplace_back(equation.depVar().name());
-    equation.depVar().populate(mat.col(0));
+    varnames.emplace_back(equation.depVar()->name());
+    equation.depVar()->populate(mat.col(0));
     unsigned i = 1;
-    for (const Variable &var : equation) {
-        var.populate(mat.col(i++));
-        varnames.emplace_back(var.name());
+    for (const auto &var : equation) {
+        var->populate(mat.col(i++));
+        varnames.emplace_back(var->name());
     }
 
     return tabulate(mat, options, rownames, varnames);
@@ -132,18 +132,18 @@ std::string tabulate(
     unsigned cols = 0;
     for (auto &eq : sur.equations()) {
         cols += eq.numVars() + 1;
-        std::cerr << eq.depVar().name() << ": " << eq.depVar().size() << " rows\n";
+        std::cerr << eq.depVar()->name() << ": " << eq.depVar()->size() << " rows\n";
     }
 
-    Eigen::MatrixXd mat(sur.equations().front().depVar().size(), cols);
+    Eigen::MatrixXd mat(sur.equations().front().depVar()->size(), cols);
     std::vector<std::string> varnames;
     unsigned eqnum = 1, i = 0;
     for (auto &eq : sur.equations()) {
-        varnames.push_back("Eq. " + std::to_string(eqnum++) + ": " + eq.depVar().name());
-        eq.depVar().populate(mat.col(i++));
-        for (const Variable &var : eq) {
-            varnames.emplace_back(var.name());
-            var.populate(mat.col(i++));
+        varnames.push_back("Eq. " + std::to_string(eqnum++) + ": " + eq.depVar()->name());
+        eq.depVar()->populate(mat.col(i++));
+        for (const auto &var : eq) {
+            varnames.emplace_back(var->name());
+            var->populate(mat.col(i++));
         }
     }
 

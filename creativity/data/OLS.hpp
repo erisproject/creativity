@@ -33,7 +33,7 @@ class OLS {
 
         /** Returns the number of observations for this OLS object.
          */
-        unsigned int n() const { return solved_ ? X_.rows() : model_.depVar().size(); }
+        unsigned int n() const { return solved_ ? X_.rows() : model_.depVar()->size(); }
 
         /** Returns the number of variables for this OLS object.
          */

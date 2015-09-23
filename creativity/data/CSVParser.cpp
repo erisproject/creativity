@@ -27,6 +27,10 @@ bool CSVParser::readRow() {
     std::getline(f_, row); // throws on error
 
     lineno_++;
+
+    // Skip commented rows:
+    if (row[0] == '#') return readRow();
+
     auto fields = split(row);
     if (fields.size() != header_.size())
         throw std::invalid_argument("Invalid data on line " + std::to_string(lineno_) + ": number of fields differs from that of the header");

@@ -21,21 +21,21 @@ using namespace creativity::data;
 using namespace eris;
 
 Eigen::MatrixXd rawdata;
-std::unordered_map<std::string, SimpleVariable> data_;
+std::unordered_map<std::string, std::shared_ptr<const SimpleVariable>> data_;
 // Track fields that don't exist in some of the stages:
 std::unordered_map<std::string, int> pre_nan_, piracy_nan_, public_nan_;
 bool piracy_data = false, public_data = false;
 // Stupid wrapper class so that data["foo"] works (so data.at("foo") isn't needed)
 class {
     public:
-        SimpleVariable& operator[](const std::string &field) {
+        std::shared_ptr<const SimpleVariable> operator[](const std::string &field) {
             try { return data_.at(field); }
             catch (const std::out_of_range &re) {
                 std::cerr << "Data exception: data field '" << field << "' does not exist\n";
                 throw;
             }
         }
-        const SimpleVariable& operator[](const std::string &field) const {
+        const std::shared_ptr<const SimpleVariable>& operator[](const std::string &field) const {
             try { return data_.at(field); }
             catch (const std::out_of_range &re) {
                 std::cerr << "Data exception: data field '" << field << "' does not exist\n";
@@ -170,7 +170,7 @@ void readCSV(const std::string &filename) {
             continue;
         std::string name(dc.first);
         if (dc.first[0] == '.') name = dc.first.substr(1);
-        data_.insert({name, SimpleVariable(name, rawdata.col(dc.second))});
+        data_.insert({name, SimpleVariable::create(name, rawdata.col(dc.second))});
     }
 }
 

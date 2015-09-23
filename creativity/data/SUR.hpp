@@ -49,7 +49,7 @@ class SUR {
          * undefined which equation's size will be returned (but such a model will throw an
          * exception when attempting to gather the data to solve the model).
          */
-        unsigned int n() const { return eqs_.empty() ? 0 : eqs_.front().depVar().size(); }
+        unsigned int n() const { return eqs_.empty() ? 0 : eqs_.front().depVar()->size(); }
 
         /** Calculates and stores the final numerical values from the model.  This is called when
          * needed, and does not typically need to be called explicitly.

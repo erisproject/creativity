@@ -25,6 +25,9 @@ namespace creativity { namespace data {
  *     while (csv.readRow()) {
  *         // Do something with csv.row()
  *     }
+ *
+ * One non-standard extension is that this allows comment lines beginning with # in the file: any
+ * such line will be skipped.
  */
 class CSVParser : private eris::noncopyable {
     public:

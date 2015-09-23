@@ -39,10 +39,10 @@ void SUR::gather() {
     // Since this is an SUR model, each model should have the same number of observations, so check
     // that.  The number of regressors, on the other hand, is the sum of the number of regressors in
     // each equation (which can differ between equations).
-    unsigned int per_eq_rows = eqs_.front().depVar().size();
+    unsigned int per_eq_rows = eqs_.front().depVar()->size();
     unsigned int total_cols = 0;
     for (const auto& eq : eqs_) {
-        if (eq.depVar().size() != per_eq_rows) throw Variable::SizeError("Invalid SUR: found equations with differing numbers of rows");
+        if (eq.depVar()->size() != per_eq_rows) throw Variable::SizeError("Invalid SUR: found equations with differing numbers of rows");
         total_cols += eq.numVars();
     }
     unsigned int total_rows = per_eq_rows * eqs_.size();
@@ -52,9 +52,9 @@ void SUR::gather() {
     // Second pass: actually populate
     unsigned int r = 0, c = 0;
     for (const auto& eq : eqs_) {
-        eq.depVar().populate(y_.segment(r, per_eq_rows));
-        for (const Variable &var : eq) {
-            var.populate(X_.col(c++).segment(r, per_eq_rows));
+        eq.depVar()->populate(y_.segment(r, per_eq_rows));
+        for (const auto &var : eq) {
+            var->populate(X_.col(c++).segment(r, per_eq_rows));
         }
         r += per_eq_rows;
     }
@@ -203,8 +203,8 @@ std::ostream& operator<<(std::ostream &os, const SUR &sur) {
             results.col(3) = sur.pValues(j);
 
             std::vector<std::string> rownames;
-            for (const Variable &var : sur.eqs_[j]) {
-                rownames.emplace_back(var.name());
+            for (const auto &var : sur.eqs_[j]) {
+                rownames.emplace_back(var->name());
             }
 
             std::vector<std::string> stars;

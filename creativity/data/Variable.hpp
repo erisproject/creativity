@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <memory>
 #include <Eigen/Core>
 
 namespace creativity { namespace data {
@@ -10,10 +11,12 @@ namespace creativity { namespace data {
 /// Helper wrapper around std::to_string that removes insignificant 0s and a .
 std::string to_string(double d);
 
+#define CREATE_SHARED_WRAPPER(C) template <class... Args> static std::shared_ptr<C> create(Args... args) { return std::shared_ptr<C>(new C(std::forward<Args>(args)...)); }
+
 /** Abstract base class for model variables.  Subclasses of this are used for simple variables,
  * multiplications of variables, etc.
  */
-class Variable {
+class Variable : public std::enable_shared_from_this<Variable> {
     public:
         /// Virtual destructor
         virtual ~Variable() = default;
@@ -78,13 +81,17 @@ class Variable {
  * be copied into every requested position of the given column.
  */
 class ConstantVariable final : public Variable {
-    public:
+    protected:
         /// Default constructor creates a constant with the value 1.0
         ConstantVariable() = default;
         /** Creates a constant with the given value (this constructor also allows implicit
          * conversion of a double to a ConstantVariable).
          */
         ConstantVariable(double c);
+    public:
+        /// Forwards arguments to the protected constructor and returns a shared_ptr to the created object.
+        CREATE_SHARED_WRAPPER(ConstantVariable)
+
         /// Copies the constant into the given column positions.
         virtual void populate(Eigen::Ref<Eigen::VectorXd> column, unsigned int offset = 0, unsigned int trim = 0) const override;
 
@@ -109,13 +116,17 @@ class ConstantVariable final : public Variable {
 
 /** Wrapper class around a simple column, where values are exactly the value in the column. */
 class SimpleVariable : public Variable {
-    public:
+    protected:
         /// Not default constructible
         SimpleVariable() = delete;
 
         /** Constructs a SimpleVariable that copies values from the given Vector.
          */
         SimpleVariable(const std::string &name, const Eigen::Ref<const Eigen::VectorXd> values);
+
+    public:
+        /// Forwards arguments to the protected constructor and returns a shared_ptr to the created object.
+        CREATE_SHARED_WRAPPER(SimpleVariable)
 
         /// Copies the source column values into `column`
         virtual void populate(Eigen::Ref<Eigen::VectorXd> column, unsigned int offset = 0, unsigned int trim = 0) const override;
@@ -133,297 +144,118 @@ class SimpleVariable : public Variable {
         Eigen::VectorXd col_;
 };
 
-/** Returns true if V is a simple variable type, that is, a value that only requires copying but not
- * other operations.  This is primarily used to determine when parentheses need to be added to the
- * names of complex types.  The default implementation returns false; classes that are simple types
- * should provide specializations that return true.
- */
-template <class V> constexpr bool is_simple() { return false; }
-/// Specialization of is_simple for SimpleVariable that returns true
-template <> constexpr bool is_simple<SimpleVariable>() { return true; }
-/// Specialization of is_simple for ConstantVariable that returns true
-template <> constexpr bool is_simple<ConstantVariable>() { return true; }
-
-/// Common base class for all Addition<A,B> classes
-class AdditionBase : public Variable {};
-/// Common base class for all Multiplication<A,B> classes
-class MultiplicationBase : public Variable {};
-/// Common base class for all Division<A,B> classes
-class DivisionBase : public Variable {};
-/// Common base class for all Power<V> classes
-class PowerBase : public Variable {};
-/// Common base class for all Exponential<V> classes
-class ExponentialBase : public Variable {};
-/// Common base class for all Logarithm<V> classes
-class LogarithmBase : public Variable {};
-
-/** Wrapper class around a multiplication of the elements of two Variable subclassess.  This can be
- * constructed explicitly or implicitly by the multiplication operator of two Variable objects.
- */
-template <class Left, class Right, typename = typename std::enable_if<std::is_base_of<Variable, Left>::value and std::is_base_of<Variable, Right>::value>::type>
-class Multiplication : public MultiplicationBase {
+/** Base class for composite variables with two Variable components. */
+class BinaryExpr : public Variable {
     public:
-        // Default-constructible iff Left and Right are default-constructible
-
-        /** Multiplies two Variables together.  (Note that the multiplication is only done when
-         * populate() is called to determine the actual value.)
+        /** Returns the size of the binary expression, if either left or right variables have a
+         * size.  If neither do, throws a SizeError exception.
          */
-        Multiplication(Left left, Right right) : left_{std::move(left)}, right_{std::move(right)} {}
+        virtual unsigned int size() const override;
+
+    protected:
+        /// Not default-constructible
+        BinaryExpr() = delete;
+
+        /// Constructs a binary variable with the left and right variables.
+        BinaryExpr(const std::shared_ptr<const Variable> &left, const std::shared_ptr<const Variable> &right);
+
+        /// The left-hand Variable
+        std::shared_ptr<const Variable> left_;
+        /// The right-hand Variable
+        std::shared_ptr<const Variable> right_;
+};
+
+/** Base class for composite variables with a single variable.  This isn't always strictly a unary
+ * expression--it can also be used by classes that, for example, also handle a double value. */
+class UnaryExpr : public Variable {
+    public:
+        /** Returns the size of the unary expression, if the variable has a size.  If it doesn't
+         * throws a SizeError exception.
+         */
+        virtual unsigned int size() const override;
+
+    protected:
+        /// Not default-constructible
+        UnaryExpr() = delete;
+
+        /// Constructs a unary variable
+        UnaryExpr(const std::shared_ptr<const Variable> &var);
+
+        /// The underlying unary variable
+        std::shared_ptr<const Variable> var_;
+};
+
+
+/** Wrapper class around a multiplication of the elements of two Variables.  This can be constructed
+ * explicitly or implicitly by the multiplication operator of two Variable objects.
+ */
+class Multiplication : public BinaryExpr {
+    protected:
+        /// Inherit constructor(s) from BinaryExpr
+        using BinaryExpr::BinaryExpr;
+
+    public:
+        /// Forwards arguments to the protected constructor and returns a shared_ptr to the created object.
+        CREATE_SHARED_WRAPPER(Multiplication)
 
         /// Calculates the component-wise multiplication of the two variables.
-        virtual void populate(Eigen::Ref<Eigen::VectorXd> column, unsigned int offset = 0, unsigned int trim = 0) const override {
-            left_.populate(column, offset, trim);
-            column.array() *= right_.values(column.size(), offset, trim).array();
-        }
+        virtual void populate(Eigen::Ref<Eigen::VectorXd> column, unsigned int offset = 0, unsigned int trim = 0) const override;
 
         /** Returns the name by joining together left and right names with "*".  If one or the other
          * is something other than a SimpleVariable or ConstantVariable, the name is surrounded with
          * parentheses.
          *
-         * As a special case, if Left is a ConstantVariable equal to -1, and Right is not a
+         * As a special case, if the left variable is a ConstantVariable equal to -1, and Right is not a
          * ConstantVariable, this results in "-name" instead of "-1*name".
          */
-        virtual std::string name() const override {
-            // Attempt some bracket collapses where order-of-operations allows
-            std::string left(
-                    std::is_base_of<MultiplicationBase, Left>::value or
-                    std::is_base_of<DivisionBase, Left>::value or
-                    std::is_base_of<PowerBase, Left>::value or
-                    std::is_base_of<ExponentialBase, Left>::value or
-                    std::is_base_of<LogarithmBase, Left>::value
-                    ? left_.name() : left_.nameBracketed());
-            std::string op("*");
-            std::string right(
-                    std::is_base_of<MultiplicationBase, Right>::value or
-                    std::is_base_of<DivisionBase, Right>::value or
-                    std::is_base_of<PowerBase, Right>::value or
-                    std::is_base_of<ExponentialBase, Right>::value or
-                    std::is_base_of<LogarithmBase, Right>::value
-                    ? right_.name() : right_.nameBracketed());
-
-            if (std::is_same<Left, ConstantVariable>::value and not std::is_same<Right, ConstantVariable>::value
-                    // This dynamic_cast isn't doing anything since the first is_same above is true
-                    and dynamic_cast<const ConstantVariable&>(left_).value() == -1.0) {
-                left.clear(); op = "-";
-            }
-            else if (std::is_same<Right, ConstantVariable>::value and not std::is_same<Left, ConstantVariable>::value
-                    and dynamic_cast<const ConstantVariable&>(right_).value() == -1.0) {
-                right = left;
-                op = "-";
-                left.clear();
-            }
-
-            return left + op + right;
-        }
-
-        /// Examines the data set to attempt to find and return a data size.
-        unsigned int size() const override {
-            try { return left_.size(); }
-            catch (SizeError&) {
-                // If both sides throw, we're a complex operation of just constants (so we want to
-                // throw):
-                return right_.size();
-            }
-        }
-
-
-    protected:
-        /// The left-hand Variable
-        Left left_;
-        /// The right-hand Variable
-        Right right_;
+        virtual std::string name() const override;
 };
 
-/** Multiplies two Variable subclass object together, returning a new Multiplication object. */
-template <class Left, class Right, typename = typename std::enable_if<std::is_base_of<Variable, Left>::value and std::is_base_of<Variable, Right>::value>::type>
-Multiplication<Left, Right> operator* (const Left &left, const Right &right) {
-    return Multiplication<Left, Right>(left, right);
-}
-
-/// Multiplies a Variable by a constant.
-template <class V, typename = typename std::enable_if<std::is_base_of<Variable, V>::value>::type>
-Multiplication<ConstantVariable, V> operator* (const V &v, double c) {
-    return Multiplication<ConstantVariable, V>(c, v);
-}
-/// Multiplies a constant by a Variable.
-template <class V, typename = typename std::enable_if<std::is_base_of<Variable, V>::value>::type>
-Multiplication<ConstantVariable, V> operator* (double c, const V &v) {
-    return Multiplication<ConstantVariable, V>(c, v);
-}
-/// Unary negation of a Variable is converted to a multiplication by -1
-template <class V, typename = typename std::enable_if<std::is_base_of<Variable, V>::value>::type>
-Multiplication<ConstantVariable, V> operator- (const V &v) {
-    return -1.0 * v;
-}
-
-/** Wrapper class around a addition of the elements of two Variable subclassess.  This can be
- * constructed explicitly or implicitly by the addition or subtraction operator of two Variable
- * objects.
+/** Wrapper class around a addition of the elements of two Variables.  This can be constructed
+ * explicitly or implicitly by the addition or subtraction operator of two Variable objects.
  */
-template <class Left, class Right, typename = typename std::enable_if<std::is_base_of<Variable, Left>::value and std::is_base_of<Variable, Right>::value>::type>
-class Addition : public AdditionBase {
-    public:
-        // Default-constructible iff Left and Right are default-constructible
+class Addition : public BinaryExpr {
+    protected:
+        /// Inherit constructor(s) from BinaryExpr
+        using BinaryExpr::BinaryExpr;
 
-        /** Adds two Variables together.  (Note that the addition is only done when populate() is
-         * called to determine the actual value.)
-         */
-        Addition(Left left, Right right) : left_{std::move(left)}, right_{std::move(right)} {}
+    public:
+        /// Forwards arguments to the protected constructor and returns a shared_ptr to the created object.
+        CREATE_SHARED_WRAPPER(Addition)
 
         /// Calculates the component-wise addition of the two variables.
-        virtual void populate(Eigen::Ref<Eigen::VectorXd> column, unsigned int offset = 0, unsigned int trim = 0) const override {
-            left_.populate(column, offset, trim);
-            column.array() += right_.values(column.size(), offset, trim).array();
-        }
+        virtual void populate(Eigen::Ref<Eigen::VectorXd> column, unsigned int offset = 0, unsigned int trim = 0) const override;
 
         /** Returns the name by joining together left and right names with "+".  Since there is
          * nothing lower in the order or operations, this returns unbracketed left- and right-hand
          * side operands.
          */
-        virtual std::string name() const override { return left_.name() + "+" + right_.name(); }
-
-        /// Examines the data set to attempt to find and return a data size.
-        unsigned int size() const override {
-            try { return left_.size(); }
-            catch (SizeError&) {
-                // If both sides throw, we're a complex operation of just constants (so we want to
-                // throw):
-                return right_.size();
-            }
-        }
-
-    protected:
-        /// The left-hand Variable
-        Left left_;
-        /// The right-hand Variable
-        Right right_;
+        virtual std::string name() const override;
 };
-
-/** Adds two Variable subclass object together, returning a new Addition object. */
-template <class Left, class Right, typename = typename std::enable_if<std::is_base_of<Variable, Left>::value and std::is_base_of<Variable, Right>::value>::type>
-Addition<Left, Right> operator+ (const Left &left, const Right &right) {
-    return Addition<Left, Right>(left, right);
-}
-
-/// Adds a constant to a Variable; the constant is converted to a ConstantVariable
-template <class V, typename = typename std::enable_if<std::is_base_of<Variable, V>::value>::type>
-Addition<V, ConstantVariable> operator+ (const V &v, double c) {
-    return Addition<V, ConstantVariable>(v, c);
-}
-/// Adds a Variable to a constant; the constant is converted to a ConstantVariable
-template <class V, typename = typename std::enable_if<std::is_base_of<Variable, V>::value>::type>
-Addition<ConstantVariable, V> operator+ (double c, const V &v) {
-    return Addition<ConstantVariable, V>(c, v);
-}
-/// Subtracts one Variable from another; the subtracted value is multiplied by -1.
-template <class Left, class Right, typename = typename std::enable_if<std::is_base_of<Variable, Left>::value and std::is_base_of<Variable, Right>::value>::type>
-Addition<Left, Multiplication<ConstantVariable, Right>> operator- (const Left &left, const Right &right) {
-    return Addition<Left, Multiplication<ConstantVariable, Right>>(left, -right);
-}
-/// Subtracts a constant from a Variable; the constant is converted to a ConstantVariable
-template <class V, typename = typename std::enable_if<std::is_base_of<Variable, V>::value>::type>
-Addition<V, ConstantVariable> operator- (const V &v, double c) {
-    return Addition<V, ConstantVariable>(v, -c);
-}
-/** Subtracts a Variable from a constant; the constant is converted to a ConstantVariable, and the
- * Variable is multiplied by -1.
- */
-template <class V, typename = typename std::enable_if<std::is_base_of<Variable, V>::value>::type>
-Addition<ConstantVariable, Multiplication<ConstantVariable, V>> operator- (double c, const V &v) {
-    return Addition<ConstantVariable, Multiplication<ConstantVariable, V>>(c, -v);
-}
 
 /** Class that returns the coefficient-wise division of elements in one Variable by corresponding
  * elements in the other Variable.
  *
  * The class can be used directly or via the overload of the '/' operator.
  */
-template <class Top, class Bottom, typename = typename std::enable_if<std::is_base_of<Variable, Top>::value and std::is_base_of<Variable, Bottom>::value>::type>
-class Division : public DivisionBase {
-    public:
-        // Default-constructible iff Top and Bottom are default-constructible
+class Division : public BinaryExpr {
+    protected:
+        /// Inherit constructor(s) from BinaryExpr
+        using BinaryExpr::BinaryExpr;
 
-        /** Divides one Variable by another.  (Note that the division is only done when populate()
-         * is called to determine the actual value.)
-         */
-        Division(Top numerator, Bottom denominator) : top_{std::move(numerator)}, bottom_{std::move(denominator)} {}
+    public:
+        /// Forwards arguments to the protected constructor and returns a shared_ptr to the created object.
+        CREATE_SHARED_WRAPPER(Division)
 
         /// Calculates the component-wise multiplication of the two variables.
-        virtual void populate(Eigen::Ref<Eigen::VectorXd> column, unsigned int offset = 0, unsigned int trim = 0) const override {
-            top_.populate(column, offset, trim);
-            column.array() /= bottom_.values(column.size(), offset, trim).array();
-        }
+        virtual void populate(Eigen::Ref<Eigen::VectorXd> column, unsigned int offset = 0, unsigned int trim = 0) const override;
 
         /** Returns the name by joining together left and right names with "/".  If one or the other
          * is something other than a SimpleVariable or ConstantVariable, the name is surrounded with
          * parentheses as needed.
          */
-        virtual std::string name() const override {
-            // This is similar (but not identical) to the Multiplication version: the main
-            // difference is in the denominator, which has different precedence rules than the top.
-
-            // Attempt some bracket collapses where order-of-operations allows
-            std::string left(
-                    std::is_base_of<MultiplicationBase, Top>::value or
-                    std::is_base_of<DivisionBase, Top>::value or
-                    std::is_base_of<PowerBase, Top>::value or
-                    std::is_base_of<ExponentialBase, Top>::value or
-                    std::is_base_of<LogarithmBase, Top>::value
-                    ? top_.name() : top_.nameBracketed());
-            std::string op("/");
-            std::string right(
-                    std::is_base_of<PowerBase, Bottom>::value or
-                    std::is_base_of<ExponentialBase, Bottom>::value or
-                    std::is_base_of<LogarithmBase, Bottom>::value
-                    ? bottom_.name() : bottom_.nameBracketed());
-
-            if (std::is_same<Top, ConstantVariable>::value and not std::is_same<Bottom, ConstantVariable>::value
-                    // This dynamic_cast isn't doing anything since the first is_same above is true
-                    and dynamic_cast<const ConstantVariable&>(top_).value() == -1.0) {
-                left.clear(); op = "-";
-            }
-            else if (std::is_same<Bottom, ConstantVariable>::value and not std::is_same<Top, ConstantVariable>::value
-                    and dynamic_cast<const ConstantVariable&>(bottom_).value() == -1.0) {
-                right = left;
-                op = "-";
-                left.clear();
-            }
-
-            return left + op + right;
-        }
-
-        /// Examines the data set to attempt to find and return a data size.
-        unsigned int size() const override {
-            try { return top_.size(); }
-            catch (SizeError&) {
-                // If both sides throw, we're a complex operation of just constants (so we want to
-                // throw):
-                return bottom_.size();
-            }
-        }
-
-    protected:
-        /// The left-hand Variable
-        Top top_;
-        /// The right-hand Variable
-        Bottom bottom_;
+        virtual std::string name() const override;
 };
-
-/** Divides one Variable by another, returning a new Division object. */
-template <class Top, class Bottom, typename = typename std::enable_if<std::is_base_of<Variable, Top>::value and std::is_base_of<Variable, Bottom>::value>::type>
-Division<Top, Bottom> operator/ (const Top &numerator, const Bottom &denominator) {
-    return Division<Top, Bottom>(numerator, denominator);
-}
-/// Divides a Variable by a constant.
-template <class V, typename = typename std::enable_if<std::is_base_of<Variable, V>::value>::type>
-Division<V, ConstantVariable> operator/ (const V &v, double c) {
-    return Division<V, ConstantVariable>(v, c);
-}
-/// Divides a constant by a Variable.
-template <class V, typename = typename std::enable_if<std::is_base_of<Variable, V>::value>::type>
-Division<ConstantVariable, V> operator/ (double c, const V &v) {
-    return Division<ConstantVariable, V>(c, v);
-}
 
 /** Raises a Variable's values to a power.  This is done using std::pow unless the power is one of
  * the special values -1, 0.5, 1, 2, or 3.
@@ -431,51 +263,31 @@ Division<ConstantVariable, V> operator/ (double c, const V &v) {
  * The class can be used explicitly, but a specialization of `std::pow(var, power)` and an overload
  * of `var ^ double` are also available.
  */
-template <class V, typename = typename std::enable_if<std::is_base_of<Variable, V>::value>::type>
-class Power : public PowerBase {
-    public:
+class Power : public UnaryExpr {
+    protected:
         /// Not default constructible
         Power() = delete;
 
         /** Wraps around a Variable to provide exponentiation of the variable's values. */
-        Power(V var, double power) : var_{std::move(var)}, power_{power} {}
+        Power(const std::shared_ptr<const Variable> &var, double power);
+
+    public:
+        /// Forwards arguments to the protected constructor and returns a shared_ptr to the created object.
+        CREATE_SHARED_WRAPPER(Power)
 
         /// Calculates and stores the raised values
-        virtual void populate(Eigen::Ref<Eigen::VectorXd> column, unsigned int offset = 0, unsigned int trim = 0) const override {
-            var_.populate(column, offset, trim);
-            if (power_ == 2)
-                column = column.array().square();
-            else if (power_ == 3)
-                column = column.array().cube();
-            else if (power_ == 0.5)
-                column = column.array().sqrt();
-            else if (power_ == -1)
-                column = column.array().inverse();
-            else if (power_ != 1)
-                column = column.array().pow(power_);
-        }
+        virtual void populate(Eigen::Ref<Eigen::VectorXd> column, unsigned int offset = 0, unsigned int trim = 0) const override;
 
         /** Returns the concatenation the underlying Variable name() with "^" and the power.  If V
          * is something other than SimpleVariable or ConstantVariable, the underlying name is also
          * surrounded by parentheses.
          */
-        virtual std::string name() const override { return var_.nameBracketed() + "^" + to_string(power_); }
-
-        /// Examines the data set to attempt to find and return a data size.
-        unsigned int size() const override { return var_.size(); }
+        virtual std::string name() const override;
 
     protected:
-        /// The Variable subclass with values to be inverted
-        V var_;
         /// The power to which to raise the variable
         double power_;
 };
-
-/** `Variable ^ power` returns a Power object. */
-template <class V, typename = typename std::enable_if<std::is_base_of<Variable, V>::value>::type>
-Power<V> operator^ (const V &val, double pow) {
-    return Power<V>(val, pow);
-}
 
 /** Raises a base value to a Variable's value.  This uses std::pow for exponentiation except in the
  * special cases where `base == std::exp(1)` and `base == 2`, where std::exp and std::exp2 are used
@@ -484,125 +296,113 @@ Power<V> operator^ (const V &val, double pow) {
  * The class can be used explicitly, but a specializations of `std::pow(base, var)`,
  * `std::exp(var)`, and `std::exp2(var)` and an overload of `double ^ var` are also available.
  */
-template <class V, typename = typename std::enable_if<std::is_base_of<Variable, V>::value>::type>
-class Exponential : public ExponentialBase {
-    public:
-        /// Not default constructible
-        Exponential() = delete;
-
+class Exponential : public UnaryExpr {
+    protected:
         /** Wraps around a Variable to provide exponentiation of the variable's values. */
-        Exponential(double base, V var) : var_{std::move(var)}, base_{base} {}
+        Exponential(double base, const std::shared_ptr<const Variable> &var);
 
         /** Wraps around a Variable to provide exponentiation of the variable's values using Euler's
          * number (e).
          */
-        Exponential(V var) : var_{std::move(var)}, base_{std::exp(1)} {}
+        Exponential(const std::shared_ptr<const Variable> &var);
+
+    public:
+        /// Forwards arguments to the protected constructor and returns a shared_ptr to the created object.
+        CREATE_SHARED_WRAPPER(Exponential)
 
         /// Calculates and stores the exponential values
-        virtual void populate(Eigen::Ref<Eigen::VectorXd> column, unsigned int offset = 0, unsigned int trim = 0) const override {
-            var_.populate(column, offset, trim);
-            if (base_ == std::exp(1))
-                column = column.array().exp().matrix();
-            else if (base_ == 2)
-                column = column.unaryExpr([](double c) { return std::exp2(c); });
-            else
-                column = column.unaryExpr([this](double c) { return std::pow(base_, c); });
-        }
+        virtual void populate(Eigen::Ref<Eigen::VectorXd> column, unsigned int offset = 0, unsigned int trim = 0) const override;
 
         /** Returns a string representation of the variable.  If the base equals `std::exp(1)`, this
          * is "exp(name)"; otherwise the name is "base^name", with parentheses added to name if it
          * is a complex variable.
          */
-        virtual std::string name() const override {
-            if (base_ == std::exp(1)) return "exp(" + var_.name() + ")"; // NB: don't need bracketed name here
-            else return to_string(base_) + "^" + var_.nameBracketed();
-        }
+        virtual std::string name() const override;
 
         /// Returns the name of the variable such as '{2^name}' or 'exp(name)' or '{2^log(name)}'
-        virtual std::string nameBracketed(const std::string &bracketL = "(", const std::string &bracketR = ")") const override {
-            if (base_ == std::exp(1)) return "exp(" + var_.name() + ")";
-            else return bracketL + to_string(base_) + "^" + var_.nameBracketed() + bracketR;
-        }
-
-        /// Examines the data set to attempt to find and return a data size.
-        unsigned int size() const override { return var_.size(); }
+        virtual std::string nameBracketed(const std::string &bracketL = "(", const std::string &bracketR = ")") const override;
 
     protected:
-        /// The Variable subclass with values to be inverted
-        V var_;
         /// The power to which to raise the variable
         double base_;
 };
 
-/** `base ^ Variable` returns an Exponential object. */
-template <class V, typename = typename std::enable_if<std::is_base_of<Variable, V>::value>::type>
-Exponential<V> operator^ (double base, const V &val) {
-    return Exponential<V>(base, val);
-}
-
 /** Takes a natural logarithm of a Variable's values.
  */
-template <class V, typename = typename std::enable_if<std::is_base_of<Variable, V>::value>::type>
-class Logarithm : public LogarithmBase {
-    public:
-        /// Not default constructible
-        Logarithm() = delete;
+class Logarithm : public UnaryExpr {
+    protected:
+        /// Inherit constructors from UnaryExpr
+        using UnaryExpr::UnaryExpr;
 
-        /** Wraps around a Variable to provide a natural logarithm calculation of the variable's
-         * values.
-         */
-        Logarithm(V var) : var_{std::move(var)} {}
+    public:
+        /// Forwards arguments to the protected constructor and returns a shared_ptr to the created object.
+        CREATE_SHARED_WRAPPER(Logarithm)
 
         /// Calculates and stores the logarithm values
-        virtual void populate(Eigen::Ref<Eigen::VectorXd> column, unsigned int offset = 0, unsigned int trim = 0) const override {
-            var_.populate(column, offset, trim);
-            column = column.array().log().matrix();
-        }
+        virtual void populate(Eigen::Ref<Eigen::VectorXd> column, unsigned int offset = 0, unsigned int trim = 0) const override;
 
         /** Returns a string representation of the variable, which is `log(name)`, where name is the
          * name of the variable being log'ed.
          */
-        virtual std::string name() const override {
-            return "log(" + var_.name() + ")";
-        }
+        virtual std::string name() const override;
 
-        virtual std::string nameBracketed(const std::string& = "(", const std::string& = ")") const override {
-            return name();
-        }
-
-        /// Examines the data set to attempt to find and return a data size.
-        unsigned int size() const override { return var_.size(); }
-
-    protected:
-        /// The Variable subclass with values to be log'ed
-        V var_;
+        virtual std::string nameBracketed(const std::string& = "(", const std::string& = ")") const override;
 };
+
+#undef CREATE_SHARED_WRAPPER
+
+/** Multiplies two Variable objects together, returning a new Multiplication object. */
+std::shared_ptr<Multiplication> operator* (const std::shared_ptr<const Variable> &left, const std::shared_ptr<const Variable> &right);
+/// Multiplies a Variable by a constant.
+std::shared_ptr<Multiplication> operator* (const std::shared_ptr<const Variable> &v, double c);
+/// Multiplies a constant by a Variable.
+std::shared_ptr<Multiplication> operator* (double c, const std::shared_ptr<const Variable> &v);
+/// Unary negation of a Variable is converted to a multiplication by -1
+std::shared_ptr<Multiplication> operator- (const std::shared_ptr<const Variable> &v);
+/** Adds two Variable objects together, returning a new Addition object. */
+std::shared_ptr<Addition> operator+ (const std::shared_ptr<const Variable> &left, const std::shared_ptr<const Variable> &right);
+/// Adds a constant to a Variable; the constant is converted to a ConstantVariable
+std::shared_ptr<Addition> operator+ (const std::shared_ptr<const Variable> &v, double c);
+/// Adds a Variable to a constant; the constant is converted to a ConstantVariable
+std::shared_ptr<Addition> operator+ (double c, const std::shared_ptr<const Variable> &v);
+/// Subtracts one Variable from another; the subtracted value is multiplied by -1.
+std::shared_ptr<Addition> operator- (const std::shared_ptr<const Variable> &left, const std::shared_ptr<const Variable> &right);
+/// Subtracts a constant from a Variable; the constant is converted to a ConstantVariable
+std::shared_ptr<Addition> operator- (const std::shared_ptr<const Variable> &v, double c);
+/** Subtracts a Variable from a constant; the constant is converted to a ConstantVariable, and the
+ * Variable is multiplied by -1.
+ */
+std::shared_ptr<Addition> operator- (double c, const std::shared_ptr<const Variable> &v);
+/** Divides one Variable by another, returning a new Division object. */
+std::shared_ptr<Division> operator/ (const std::shared_ptr<const Variable> &numerator, const std::shared_ptr<const Variable> &denominator);
+/// Divides a Variable by a constant.
+std::shared_ptr<Division> operator/ (const std::shared_ptr<const Variable> &v, double c);
+/// Divides a constant by a Variable.
+std::shared_ptr<Division> operator/ (double c, const std::shared_ptr<const Variable> &v);
+/** `Variable ^ power` returns a Power object. */
+std::shared_ptr<Power> operator^ (const std::shared_ptr<const Variable> &val, double pow);
+/** `base ^ Variable` returns an Exponential object. */
+std::shared_ptr<Exponential> operator^ (double base, const std::shared_ptr<const Variable> &val);
 
 }}
 
 namespace std {
 /// std::exp specialization for a Variable.  Returns an Exponential variable wrapper.
-template <class V>
-typename std::enable_if<std::is_base_of<creativity::data::Variable, V>::value, creativity::data::Exponential<V>>::type
-exp(const V &var) { return var; }
+shared_ptr<creativity::data::Exponential>
+exp(const shared_ptr<const creativity::data::Variable> &var);
 /// std::exp2 specialization for a Variable.  Returns an Exponential variable wrapper with base 2.
-template <class V>
-typename std::enable_if<std::is_base_of<creativity::data::Variable, V>::value, creativity::data::Exponential<V>>::type
-exp2(const V &var) { return creativity::data::Exponential<V>(2, var); }
+shared_ptr<creativity::data::Exponential>
+exp2(const shared_ptr<const creativity::data::Variable> &var);
 /// std::log specialization for a Variable.  Returns a Logarithm variable wrapper.
-template <class V>
-typename std::enable_if<std::is_base_of<creativity::data::Variable, V>::value, creativity::data::Logarithm<V>>::type
-log(const V &var) { return var; }
+shared_ptr<creativity::data::Logarithm>
+log(const shared_ptr<const creativity::data::Variable> &var);
 /// std::sqrt specialization for a Variable.  Returns a Power variable wrapper with power = 0.5.
-template <class V>
-typename std::enable_if<std::is_base_of<creativity::data::Variable, V>::value, creativity::data::Power<V>>::type
-sqrt(const V &var) { return creativity::data::Power<V>(var, 0.5); }
+shared_ptr<creativity::data::Power>
+sqrt(const shared_ptr<const creativity::data::Variable> &var);
 /// std::pow specialization for a Variable raised to a numeric power.  Returns a Power variable wrapper.
-template <class V>
-typename std::enable_if<std::is_base_of<creativity::data::Variable, V>::value, creativity::data::Power<V>>::type
-pow(const V &var, double power) { return creativity::data::Power<V>(var, power); }
+shared_ptr<creativity::data::Power>
+pow(const shared_ptr<const creativity::data::Variable> &var, double power);
 /// std::pow specialization for a double raised to a Variable.  Returns an Exponential variable wrapper.
-template <class V>
-typename std::enable_if<std::is_base_of<creativity::data::Variable, V>::value, creativity::data::Exponential<V>>::type
-pow(double base, const V &var) { return creativity::data::Exponential<V>(base, var); }
+shared_ptr<creativity::data::Exponential>
+pow(double base, const shared_ptr<const creativity::data::Variable> &var);
 }

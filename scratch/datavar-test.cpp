@@ -24,27 +24,27 @@ int main(int, char **) {
 
     std::cout << Xdata << "\n";
 
-    SimpleVariable y("y", ydata);
-    SimpleVariable c1("X_1", Xdata.col(0).transpose());
-    SimpleVariable c2("X_2", Xdata.col(1).transpose());
-    SimpleVariable c3("X_3", Xdata.col(2).transpose());
-    ConstantVariable constant(1);
+    auto y = SimpleVariable::create("y", ydata);
+    auto c1 = SimpleVariable::create("X_1", Xdata.col(0).transpose());
+    auto c2 = SimpleVariable::create("X_2", Xdata.col(1).transpose());
+    auto c3 = SimpleVariable::create("X_3", Xdata.col(2).transpose());
+    auto constant = ConstantVariable::create(1);
 
     auto c1sq = c1 ^ 2;
     auto c2exp = std::exp(c2);
     auto const2 = constant * 2;
 
-    ERIS_DBGVAR(c1sq.values(4, 0, 1).transpose());
-    ERIS_DBGVAR(c2exp.values(4, 1).transpose());
-    ERIS_DBGVAR(const2.values(7).transpose());
+    ERIS_DBGVAR(c1sq->values(4, 0, 1).transpose());
+    ERIS_DBGVAR(c2exp->values(4, 1).transpose());
+    ERIS_DBGVAR(const2->values(7).transpose());
 
-    ERIS_DBGVAR((c1 * c3).values(5).transpose());
-    ERIS_DBGVAR((c1 + c3).values(5).transpose());
-    ERIS_DBGVAR((c1 - c3).values(5).transpose());
-    ERIS_DBGVAR((c1 - 3).values(5).transpose());
-    ERIS_DBGVAR((-c2.values(5)).transpose());
+    ERIS_DBGVAR((c1 * c3)->values(5).transpose());
+    ERIS_DBGVAR((c1 + c3)->values(5).transpose());
+    ERIS_DBGVAR((c1 - c3)->values(5).transpose());
+    ERIS_DBGVAR((c1 - 3)->values(5).transpose());
+    ERIS_DBGVAR(((-c2)->values(5)).transpose());
 
-    Equation model1(SimpleVariable("y", ydata));
+    Equation model1(SimpleVariable::create("y", ydata));
     model1 % 1 + c1 + c2;
 
     Equation model2(y);
@@ -80,8 +80,10 @@ int main(int, char **) {
         1,  0.3315413, -0.411196959, -0.9939557,
         1, -0.4342752,  0.778097556,  0.6067932;
     testy = testX * testbeta + testu;
-    OLS testols(Equation(SimpleVariable("y", testy))
-            + SimpleVariable("X1", testX.col(1)) + SimpleVariable("X2", testX.col(2)) + SimpleVariable("X3", testX.col(3)));
+    OLS testols(Equation(SimpleVariable::create("y", testy))
+            + SimpleVariable::create("X1", testX.col(1))
+            + SimpleVariable::create("X2", testX.col(2))
+            + SimpleVariable::create("X3", testX.col(3)));
     testols.solve();
     std::cout << "Another OLS test:\n" << testols << "\n";
 

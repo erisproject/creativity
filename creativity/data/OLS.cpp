@@ -20,12 +20,12 @@ OLS::OLS(Equation &&model) : model_(std::move(model)) {}
 void OLS::gather() {
     if (gathered_) return;
 
-    y_ = model_.depVar().values();
+    y_ = model_.depVar()->values();
     X_ = MatrixXd(y_.size(), model_.numVars());
 
     unsigned int k = 0;
-    for (const Variable &var : model_) {
-        var.populate(X_.col(k++));
+    for (const auto &var : model_) {
+        var->populate(X_.col(k++));
     }
 
     gathered_ = true;
@@ -71,7 +71,7 @@ void OLS::solve() {
     se_ = var_beta_.diagonal().cwiseSqrt();
     t_ratios_ = beta_.array() / se_.array();
     boost::math::students_t tdist(n - k);
-    p_values_ = t_ratios_.unaryExpr([&tdist](double t) { return 2.0*cdf(tdist, t < 0 ? t : -t); });
+    p_values_ = t_ratios_.unaryExpr([&tdist](double t) { return std::isnan(t) ? t : 2.0*cdf(tdist, t < 0 ? t : -t); });
 
     solved_ = true;
 }
@@ -115,8 +115,8 @@ std::ostream& operator<<(std::ostream &os, const OLS &ols) {
         results.col(3) = ols.pValues();
 
         std::vector<std::string> rownames;
-        for (const Variable &var : ols.model()) {
-            rownames.emplace_back(var.name());
+        for (const auto &var : ols.model()) {
+            rownames.emplace_back(var->name());
         }
 
         std::vector<std::string> stars;

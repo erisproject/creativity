@@ -42,11 +42,7 @@ class Equation {
         Equation(const Equation &copy) = default;
 
         /// Creates an equation with the given dependent variable
-        Equation(const Variable &y);
-
-        /// Creates an equation with the given dependent variable, accepting a rvalue reference
-        template <class V, typename = typename std::enable_if<std::is_base_of<Variable, V>::value>::type>
-        Equation(V &&y);
+        Equation(const std::shared_ptr<const Variable> &y);
 
         // Forward declaration
         class Proxy;
@@ -55,14 +51,7 @@ class Equation {
          * constant is removed from the equation; other ConstantVariable values replace (or re-add,
          * if previously removed) the constant.  Other types of variables are added to the equation.
          */
-        Proxy operator % (const Variable &var);
-
-        /** Adding a temporary variable works like above, but first stores the temporary by moving
-         * it.  Only move constructible types are permitted.
-         */
-        template <class V, typename = typename std::enable_if<
-            std::is_base_of<Variable, V>::value and std::is_move_constructible<V>::value>::type>
-        Proxy operator % (V &&var);
+        Proxy operator % (const std::shared_ptr<const Variable> &var);
 
         /// `% d` for double d is equivalent to `% ConstantVariable(d)`.
         Proxy operator % (double c);
@@ -70,12 +59,12 @@ class Equation {
         /** The addition operator duplicates the called-upon Equation an adds a new term to the
          * duplicate, then returns it.
          */
-        Equation operator + (const Variable &var) const &;
+        Equation operator + (const std::shared_ptr<const Variable> &var) const &;
 
         /** The addition operator called on a temporary adds a new term to the temporary, then
          * returns it.
          */
-        Equation operator + (const Variable &var) &&;
+        Equation operator + (const std::shared_ptr<const Variable> &var) &&;
 
         /// Adding a double constant (typically 0 or 1) converts the constant to a ConstantVariable
         Equation operator + (double c) const &;
@@ -83,24 +72,8 @@ class Equation {
         /// Adding a double constant (typically 0 or 1) converts the constant to a ConstantVariable
         Equation operator + (double c) &&;
 
-        /// Adds a temporary Variable subclass to an Equation, returning the new equation.
-        template <class V>
-        typename std::enable_if<
-            std::is_base_of<Variable, V>::value and std::is_move_constructible<V>::value,
-            Equation
-            >::type
-        operator + (V &&var) const & { Equation copy(*this); copy.addVar(std::move(var)); return copy; }
-
-        /// Adds a temporary Variable subclass to a temporary Equation, returning the new equation.
-        template <class V>
-        typename std::enable_if<
-            std::is_base_of<Variable, V>::value and std::is_move_constructible<V>::value,
-            Equation
-            >::type
-        operator + (V &&var) &&  { addVar(std::move(var)); return std::move(*this); }
-
         /// Accesses the dependent variable
-        const Variable& depVar() const;
+        std::shared_ptr<const Variable> depVar() const;
 
         /// Returns the number of independent variables.
         unsigned int numVars() const;
@@ -119,88 +92,37 @@ class Equation {
          * constant of 0 has been added to the model, this will skip the constant; otherwise the
          * constant will be the first element.
          */
-        const std::list<std::reference_wrapper<const Variable>>::const_iterator begin() const;
+        std::list<std::shared_ptr<const Variable>>::const_iterator begin() const;
 
         /** Const access to the past-the-end iterator of independent variables.
          */
-        const std::list<std::reference_wrapper<const Variable>>::const_iterator end() const;
+        std::list<std::shared_ptr<const Variable>>::const_iterator end() const;
 
         /** Overloaded so that an Equation can be sent to an output stream, resulting in output such
          * as `y ~ const + x1 + x2`.
          */
         friend std::ostream& operator<<(std::ostream &os, const Equation &eq);
 
-    private:
-        // If given rvalue reference, move and store them here
-        std::list<std::shared_ptr<Variable>> private_vars_;
-
-        /// Helper function to initialize the private_vars_ list with a single value
-        template <class V>
-        static std::list<std::shared_ptr<Variable>> private_vars_initializer(V &&v);
-
-        // The constant; if called with a new ConstantVariable, we replace this one.  If the
-        // constant value becomes 0, independent variables list iteration won't include the
-        // constant.  Defaults to 1.
-        ConstantVariable const_;
-
     protected:
         /// The dependent variable
-        const Variable &dep_var_;
+        std::shared_ptr<const Variable> dep_var_;
 
         /// The independent variables; the first is always a ConstantVariable
-        std::list<std::reference_wrapper<const Variable>> indep_vars_{{const_}};
+        std::list<std::shared_ptr<const Variable>> indep_vars_{{ConstantVariable::create()}};
 
         /// Internal method to add a variable to the model
-        void addVar(const Variable &var);
-
-        /** Internal method to add a variable to the model; this moves and stores the given
-         * variable, then calls the lvalue version of the method.
-         */
-        template <class V, typename = typename std::enable_if<
-            std::is_base_of<Variable, V>::value and std::is_move_constructible<V>::value>::type>
-        void addVar(V &&var);
+        void addVar(const std::shared_ptr<const Variable> &var);
 };
 
 /// Proxy object returned by << that allows more variables to be appended with +
 class Equation::Proxy final {
     public:
-        /// Appends another variable to the model; see Equation::operator<<
-        Proxy& operator + (const Variable &var);
-        /// Appends another variable to the model; see Equation::operator<<
-        template <class V, typename = typename std::enable_if<
-            std::is_base_of<Variable, V>::value and std::is_move_constructible<V>::value>::type>
-        Proxy& operator + (V &&var) { eq_.addVar(std::move(var)); return *this; }
+        /// Appends another variable to the model; see Equation::operator%
+        Proxy& operator + (const std::shared_ptr<const Variable> &var);
     private:
         Equation &eq_;
         Proxy(Equation &eq);
         friend class Equation;
 };
-
-template <class V>
-std::list<std::shared_ptr<Variable>> Equation::private_vars_initializer(V &&v) {
-    std::list<std::shared_ptr<Variable>> lst;
-    lst.emplace_back(std::make_shared<V>(std::move(v)));
-    return lst;
-}
-
-template <class V, typename>
-Equation::Equation(V &&y) : private_vars_{private_vars_initializer(std::move(y))}, dep_var_{*private_vars_.front()}
-{}
-
-template <class V, typename>
-Equation::Proxy Equation::operator % (V &&var) {
-    addVar(std::move(var));
-    return Proxy(*this);
-}
-
-/// Specialization for a ConstantVariable
-template <>
-void Equation::addVar<ConstantVariable>(ConstantVariable &&v);
-
-template <class V, typename>
-void Equation::addVar(V &&v) {
-    private_vars_.emplace_back(new V(std::move(v)));
-    addVar(*private_vars_.back());
-}
 
 }}
