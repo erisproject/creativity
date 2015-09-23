@@ -118,16 +118,19 @@ namespace belief { class Profit; }
  *
  * - inter-optimize:
  *   - updates beliefs based on previous period activity
- *   - using updated belief, decides whether to create, and if so, the effort to expend in creation
+ *   - If there is no in-progress book, using updated belief, the reader decides whether to create,
+ *     and if so, the effort to expend in creation.
  *   - for all authored books still on the market, decides whether to remove from the market, or to
  *     keep on the market.  If the latter, also chooses the price for the upcoming period.
  * - inter-apply:
  *   - Receives external (non-book) income
- *   - If creation was decided upon in inter-optimize, gives up the decided-upon effort level in
- *     income and creates a book
+ *   - If book creation initiated in previous periods is now complete, the book is created.
+ *   - If creation was decided upon in inter-optimize, pays the decided-upon effort level and fixed
+ *     creation cost from income, and creates a book
+ *   - If creation_time is 0, the book appears immediately
  *   - The author incurs the fixed cost for all books staying on the market (including a new one, if
  *     just created).
- *   - Takes a step of distance N(0,0.25) in a random direction
+ *   - Takes a step of in a random direction (if reader_step_sd is positive)
  * - intra-initialize:
  *   - (internal optimization; no visible effect).
  * - intra-optimize:

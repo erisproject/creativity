@@ -277,7 +277,7 @@ void Reader::interOptimize() {
     }
 
     if (create_countdown_ == -1) {
-        //// NEW BOOK CREATION:
+        //// NEW BOOK CREATION DECISION:
         if (income_available >= cost_fixed) {
             // Creating a book requires an ability to predict profit (to determine whether creation is
             // worthwhile), and an ability to predict demand (to determine the initial price)
