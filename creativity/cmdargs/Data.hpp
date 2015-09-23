@@ -42,6 +42,9 @@ class Data : public CmdArgs {
         /// The precision of double values.  The default is full double precision.
         unsigned int double_precision = std::numeric_limits<double>::max_digits10;
 
+        /// Number of threads to use
+        unsigned int threads = 0;
+
         /// The input files to load data from
         std::vector<std::string> input;
 

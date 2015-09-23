@@ -25,6 +25,7 @@ void Data::addOptions() {
         ("verify-periods,T", value(verify.periods), "    If non-zero, only use given simulation files with the last time period matching the given argument.")
         ("verify-piracy-begins,P", value(verify.piracy_begins), "If non-zero, only use given simulation files with piracy beginning in the given period.")
         ("verify-public-sharing-begins,G", value(verify.public_sharing_begins), "If non-zero, only use given simulation files with public sharing beginning in the given period.")
+        ("threads,j", value(threads), "    Maximum number of threads to use for data parsing.  0 (the default) disables data parsing threading entirely.")
         ;
 
     po::options_description input_desc("Input files");
