@@ -215,20 +215,20 @@ int main(int argc, char *argv[]) {
         eq % 1;
         if (piracy_data) eq % data["piracy"];
         if (public_data) eq % data["public"];
-        for (auto &x : {"density", "cost_fixed", "cost_unit", "creation_time"}) {
+        for (auto &x : {"param.density", "param.cost_fixed", "param.cost_unit", "param.creation_time"}) {
             if (not data.has(x)) continue;
             if (not pre_nan_.count(x)) eq % data[x];
             if (piracy_data and not piracy_nan_.count(x)) eq % (data["piracy"] * data[x]);
             if (public_data and not public_nan_.count(x)) eq % (data["public"] * data[x]);
         }
         // These don't get included in "pre":
-        for (auto &x : {"cost_piracy", "piracy_link_proportion"}) {
+        for (auto &x : {"param.cost_piracy", "param.piracy_link_proportion"}) {
             if (not data.has(x)) continue;
             if (piracy_data and not piracy_nan_.count(x)) eq % (data["piracy"] * data[x]);
             if (public_data and not public_nan_.count(x)) eq % (data["public"] * data[x]);
         }
         // These don't get included in "pre" or "piracy":
-        for (auto &x : {"public_sharing_tax"}) {
+        for (auto &x : {"param.public_sharing_tax"}) {
             if (not data.has(x)) continue;
             if (public_data and not public_nan_.count(x)) eq % (data["public"] * data[x]);
         }
