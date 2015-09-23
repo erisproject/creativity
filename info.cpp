@@ -11,6 +11,7 @@
 #include <utility>
 #include <iostream>
 #include <iomanip>
+#include <regex>
 
 using namespace creativity;
 using namespace creativity::state;
@@ -51,10 +52,14 @@ int main(int argc, char *argv[]) {
     PRINT_SETTING(income);
     PRINT_SETTING(piracy_begins);
     PRINT_SETTING(piracy_link_proportion);
+    PRINT_SETTING(public_sharing_begins);
+    PRINT_SETTING(public_sharing_tax);
     PRINT_SETTING(prior_scale);
-    PRINT_SETTING(prior_scale_piracy);
     PRINT_SETTING(prior_scale_burnin);
+    PRINT_SETTING(prior_scale_piracy);
+    PRINT_SETTING(prior_scale_public_sharing);
     PRINT_SETTING(burnin_periods);
+    PRINT_SETTING(prediction_draws);
     PRINT_SETTING(initial.prob_write);
     PRINT_SETTING(initial.q_min);
     PRINT_SETTING(initial.q_max);
@@ -64,6 +69,65 @@ int main(int argc, char *argv[]) {
     PRINT_SETTING(initial.keep_price);
     PRINT_SETTING(initial.belief_threshold);
 #undef PRINT_SETTING
+
+    if (args.show_cli_args) {
+        CreativitySettings defaults;
+        auto saveprec = std::cout.precision();
+        std::cout.precision(std::numeric_limits<double>::max_digits10);
+        std::cout << "\n\nArguments to re-run: ./creativity-cli";
+#define ADD(ARG, PARAM) if (creativity->parameters.PARAM != defaults.PARAM) { \
+    std::string arg(ARG); \
+    std::replace(arg.begin(), arg.end(), '_', '-'); \
+    std::replace(arg.begin(), arg.end(), '.', '-'); \
+    std::cout << " " << arg << " " << creativity->parameters.PARAM; \
+}
+#define ADD_SAME(PARAM) ADD("--" #PARAM, PARAM)
+        ADD_SAME(readers);
+        ADD_SAME(dimensions);
+        if (creativity->parameters.boundary != defaults.boundary) std::cout << " --density " <<
+            creativity->densityFromBoundary(creativity->parameters.readers, creativity->parameters.dimensions, creativity->parameters.boundary);
+        ADD_SAME(book_distance_sd);
+        ADD_SAME(book_quality_sd);
+        ADD_SAME(reader_step_sd);
+        ADD_SAME(reader_creation_shape);
+        ADD_SAME(reader_creation_scale_min);
+        ADD_SAME(reader_creation_scale_max);
+        ADD_SAME(creation_time);
+        ADD_SAME(cost_fixed);
+        ADD_SAME(cost_unit);
+        ADD_SAME(cost_piracy);
+        ADD_SAME(income);
+        ADD_SAME(piracy_begins);
+        ADD_SAME(piracy_link_proportion);
+        ADD_SAME(public_sharing_begins);
+        ADD_SAME(public_sharing_tax);
+        ADD_SAME(prior_scale);
+        ADD_SAME(prior_scale_burnin);
+        ADD_SAME(prior_scale_piracy);
+        ADD_SAME(prior_scale_public_sharing);
+        ADD_SAME(burnin_periods);
+        ADD_SAME(prediction_draws);
+        ADD_SAME(initial.prob_write);
+        ADD("--initial-quality-min", initial.q_min);
+        ADD("--initial-quality-max", initial.q_max);
+        ADD("--initial-price-min", initial.p_min);
+        ADD("--initial-price-max", initial.p_max);
+        ADD_SAME(initial.prob_keep);
+        ADD_SAME(initial.keep_price);
+        ADD("--belief-threshold", initial.belief_threshold);
+
+        std::smatch smatch;
+        if (regex_search(args.input, smatch, std::regex("-(\\d+)\\.[a-z]+$"))) {
+            std::cout << " --seed " << smatch[1] << "\n";
+        }
+        else  {
+            std::cout << "\n";
+            std::cerr << "(could not determine --seed value from input filename `" << args.input << "')\n";
+        }
+
+        std::cout.precision(saveprec);
+    }
+
 
     auto stpair = creativity->storage();
     auto &st = *stpair.first; 

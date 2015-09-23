@@ -21,6 +21,9 @@ class Info : public CmdArgs {
         /// Show every `n`th period (where this value is n).  0 means don't show any.
         unsigned int thin_periods = 10;
 
+        /// Show CLI usage to recreate experiment
+        bool show_cli_args = false;
+
         /// Overridden to add " FILENAME"
         virtual std::string usage() const override;
 

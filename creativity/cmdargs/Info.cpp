@@ -22,6 +22,7 @@ void Info::addOptions() {
         ("thin-periods,t", min<1>(thin_periods), "How many periods to show when --show-periods is specified.  1 means show every period, 2 means show every 2nd period, etc.  The default is 10.")
         ("all-periods,a", "Equivalent to --thin-periods=1, this shows all periods.")
         ("hide-periods,q", "If specified, hides the display of period summaries entirely.")
+        ("show-cli-arguments,c", value(show_cli_args), "If specified, output the command line arguments to recreate the experiment.")
         ;
 
     po::options_description input_desc("Input file");
