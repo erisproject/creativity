@@ -125,7 +125,7 @@ class StorageBackend : private eris::noncopyable {
          * flush(). */
         std::condition_variable queue_finished_cv_;
 
-        /** Thread object (for subclasses that return true for threaded()).  The thread loops perpetually
+        /** Thread object (for subclasses that return true for threaded()).  The thread runs perpetually
          * until the StorageBackend destructor is called.
          */
         std::thread thread_;
