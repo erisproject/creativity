@@ -333,11 +333,12 @@ class FileStorage final : public StorageBackend {
                     public_sharing_begins = 220, ///< The period in which the PublicTracker is created (u32)
                     public_sharing_tax = 224, ///< The lump sum tax the PublicTracker collects (dbl)
                     prior_scale_public_sharing = 232, ///< The prior scale for the period the PublicTracker first becomes available (dbl)
+                    creation_fixed = 240, ///< Fixed cost of creation (dbl)
                     // NB: this next one should be an integer multiple of 8 (so that states+cont
                     // location go to the end, and so the `states` division below has no remainder)
                     //
                     // padding, if needed, here.
-                    state_first = 240, ///< the first state record
+                    state_first = 248, ///< the first state record
                     state_last = size - 16, ///< the last state record
                     continuation = size - 8; ///< the header continuation block pointer (used once header state blocks fill up)
             };

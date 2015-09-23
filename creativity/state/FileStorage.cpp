@@ -87,6 +87,7 @@ constexpr int64_t
         FileStorage::HEADER::pos::public_sharing_begins,
         FileStorage::HEADER::pos::public_sharing_tax,
         FileStorage::HEADER::pos::prior_scale_public_sharing,
+        FileStorage::HEADER::pos::creation_fixed,
         FileStorage::HEADER::pos::state_first,
         FileStorage::HEADER::pos::state_first_v1,
         FileStorage::HEADER::pos::state_last,
@@ -297,6 +298,7 @@ void FileStorage::writeSettings(const CreativitySettings &settings) {
         write_value(settings.public_sharing_begins);
         write_value(settings.public_sharing_tax);
         write_value(settings.prior_scale_public_sharing);
+        write_value(settings.creation_fixed);
     }
     else {
         write_u32(0); // Unused padding value in v1 files
@@ -583,6 +585,7 @@ void FileStorage::parseMetadata() {
         PARSE_VALUE(public_sharing_begins);
         PARSE_VALUE(public_sharing_tax);
         PARSE_VALUE(prior_scale_public_sharing);
+        PARSE_VALUE(creation_fixed);
     }
 #undef PARSE_VALUE
 #undef PARSE_VALUE_INIT

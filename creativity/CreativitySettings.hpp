@@ -74,6 +74,11 @@ struct CreativitySettings {
      */
     uint32_t creation_time = 3;
 
+    /** The fixed cost component of initial creation.  This plus the expended effort level is
+     * incurred to create.
+     */
+    double creation_fixed = 100.0;
+
     /** The fixed cost of keeping a book on the market.
      */
     double cost_fixed = 10.0;

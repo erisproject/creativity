@@ -33,6 +33,7 @@ void Simulator::addOptions() {
     options_.add(structure);
 
     authorship.add_options()
+        ("creation-cost,E", value(s_.creation_fixed), u8"The fixed cost component of creation; total initial creation cost is this plus expended effort")
         ("creation-time,e", value(s_.creation_time), u8"The number of periods that elapse between the creation decision and the book being ready")
         ("reader-creation-shape,s", below<1>(s_.reader_creation_shape), u8"Shape parameter, β, of the creator effort function: q(ℓ) = (α/β)[(ℓ+1)^β - 1]")
         ("reader-creation-scale-min,z", min<0>(s_.reader_creation_scale_min), u8"Minimum support of scale parameter α ~ U[a,b] for the creator effort function: q(ℓ) = (α/β)[(ℓ+1)^β - 1]")
