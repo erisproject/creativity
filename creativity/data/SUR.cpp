@@ -148,7 +148,7 @@ void SUR::solve() {
 
         boost::math::students_t tdist(per_eq_rows - k_[j]);
         p_values_.segment(offset_[j], k_[j]) = t_ratios_.segment(offset_[j], k_[j]).unaryExpr(
-                [&tdist](double t) { return 2.0*cdf(tdist, t < 0 ? t : -t); });
+                [&tdist](double t) { return std::isnan(t) ? t : 2.0*cdf(tdist, t < 0 ? t : -t); });
     }
 
     solved_ = true;
