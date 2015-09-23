@@ -12,11 +12,6 @@ namespace po = boost::program_options;
 
 CLI::CLI(CreativitySettings &s) : Simulator(s) {}
 
-// Single-letter options used:
-// b B c C d D e f g G i j k K m M n N o O p P Q r R s S T u U w W x y z Z
-// Available:
-// a A E F H I J l L q t v V X Y
-
 void CLI::addOptions() {
     output = "creativity-SEED.crstate";
     threads = 0;

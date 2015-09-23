@@ -12,11 +12,6 @@ namespace po = boost::program_options;
 
 GUI::GUI(CreativitySettings &s) : Simulator(s) {}
 
-// Single-letter options used (bracketed values are in CLI but not GUI):
-// b B c C d D e f g G i j k K m M n N o [O] p P Q r R s S T u U w W x y z Z
-// Available:
-// a A E F H I J l L q t v V X Y
-
 void GUI::addOptions() {
     threads = std::thread::hardware_concurrency();
     if (threads == 1) threads = 0;

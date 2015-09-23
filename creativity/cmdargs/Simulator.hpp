@@ -8,7 +8,19 @@ namespace boost { namespace program_options { class variables_map; } }
 
 namespace creativity { namespace cmdargs {
 
-/** Common base class for CLI and GUI argument handling for running a simulation. */
+/** Common base class for CLI and GUI argument handling for running a simulation.
+ *
+ * Current used single-argument parameters:
+ *
+ * Single-letter options used in this class:
+ *     b B c C d D e f g G i j k K m M n N p P Q r R s S T u U w W x y z Z
+ * Used in [CLI], {GUI}, or both:
+ *     o [O]
+ * Used in CmdArgs base class:
+ *     h
+ * Available:
+ *     a A E F H I J l L q t v V X Y
+ */
 class Simulator : public CmdArgs {
     protected:
         /// Default constructor deleted
