@@ -193,6 +193,16 @@ int main(int argc, char *argv[]) {
         if (public_data) eq % data["public"];
         avg_effects.add(std::move(eq));
     }
+    avg_effects.gather();
+    for (unsigned i = 0; i < avg_effects.equations().size(); i++) {
+        auto yi = avg_effects.y(i);
+        for (unsigned r = 0; r < yi.size(); r++) {
+            if (std::isnan(yi[r])) {
+                std::cerr << "Error: found NaN for " << avg_effects.equations()[i].depVar()->name() << ", row " <<
+                    (r / (piracy_data and public_data ? 3 : piracy_data or public_data ? 2 : 1)) << "\n";
+            }
+        }
+    }
 
     //std::cout << tabulate(avg_effects);
     
