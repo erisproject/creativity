@@ -51,7 +51,7 @@ void PublicTracker::intraFinish() {
         }
     }
 
-    Bundle per_copy_payout(creativity_->money, 1.0 / total_copies);
+    Bundle per_copy_payout(creativity_->money, assets()[creativity_->money] / total_copies);
 
     if (total_copies > 0) {
         for (auto &ac : author_copies) {
