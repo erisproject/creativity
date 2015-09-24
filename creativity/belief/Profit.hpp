@@ -96,11 +96,13 @@ class Profit : public eris::belief::BayesianLinearRestricted {
          * \param l_max the maximum value of `l` to consider.  This is typically the reader's
          * money (income) on hand.
          *
-         * \returns the double value \f$\ell\f$ that maximizes expected net profit.
+         * \returns a pair of double values: the first is the double value \f$\ell\f$ that maximizes
+         * expected net profit; the second is the maximized profit value *after* subtracting the
+         * maximizing \f$ell\f$, but *before* subtracting fixed creation costs.
          *
          * \sa eris::single_peak_search for the numerical algorithm used.
          */
-        double argmaxL(
+    std::pair<double, double> argmaxL(
                 unsigned int draws,
                 const std::function<double(const double &)> q,
                 unsigned long previousBooks, unsigned long marketBooks,

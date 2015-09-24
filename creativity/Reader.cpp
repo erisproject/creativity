@@ -7,6 +7,7 @@
 #include <Eigen/Core>
 #include <algorithm>
 #include <cstddef>
+#include <functional>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -28,9 +29,7 @@ const std::vector<unsigned int> Reader::profit_stream_ages{{1,2,4,8}};
 
 Reader::Reader(std::shared_ptr<Creativity> creativity, const Position &pos)
     : WrappedPositional<agent::AssetAgent>(pos, creativity->parameters.boundary, -creativity->parameters.boundary),
-    creativity_{std::move(creativity)},
-    cost_unit{creativity_->parameters.cost_unit}, cost_fixed{creativity_->parameters.cost_fixed}, income{creativity_->parameters.income},
-    profit_belief_{new Profit()}, profit_belief_extrap_{profit_belief_}
+    creativity_{std::move(creativity)}, profit_belief_{new Profit()}, profit_belief_extrap_{profit_belief_}
 {
     profit_stream_beliefs_.emplace(1, ProfitStream(1));
 }
@@ -199,7 +198,7 @@ void Reader::interOptimize() {
     // Update the various profit, demand, and quality beliefs
     updateBeliefs();
 
-    double income_available = assets()[creativity_->money] + income;
+    double income_available = assets()[creativity_->money] + creativity_->parameters.income;
     if (creativity_->publicSharing()) income_available -= creativity_->parameters.public_sharing_tax;
 
     auto sim = simulation();
@@ -211,6 +210,8 @@ void Reader::interOptimize() {
     new_prices_.clear();
 
     auto &rng = Random::rng();
+    const double &cost_fixed = creativity_->parameters.cost_fixed,
+          &cost_unit = creativity_->parameters.cost_unit;
 
     std::list<eris::SharedMember<Book>> bypass_beliefs;
     if (usableBelief(demand_belief_)) {
@@ -222,7 +223,7 @@ void Reader::interOptimize() {
             try {
                 auto max = demand_belief_.argmaxP(creativity_->parameters.prediction_draws, book->qualityMean(), book->lifeSales(), book->lifePirated(), creativity_->parameters.readers,
                         sim->t() - 1 - book->lastSale(), book->age(), authored_books - 1, market_books, cost_unit,
-                        income / 10);
+                        creativity_->parameters.income / 10);
                 const double &p = max.first;
                 const double &q = max.second;
 
@@ -263,7 +264,7 @@ void Reader::interOptimize() {
     // Bypass market predictions if our market demand belief is noninformative, not sufficiently
     // informed, or can't produce usable draws.  In these cases, use initial model action
     // parameters instead.
-    if (creativity_->parameters.initial.prob_keep > 0) {
+    if (not bypass_beliefs.empty() and creativity_->parameters.initial.prob_keep > 0) {
         std::bernoulli_distribution keep(creativity_->parameters.initial.prob_keep);
         for (auto on_market = bypass_beliefs.cbegin();
                 income_available >= cost_fixed and on_market != bypass_beliefs.cend(); on_market++) {
@@ -276,27 +277,35 @@ void Reader::interOptimize() {
         }
     }
 
+    // If we have no book in the pipeline, we can consider whether or not to write (or write
+    // randomly, if profit and demand beliefs aren't yet usable).
     if (create_countdown_ == -1) {
-        //// NEW BOOK CREATION DECISION:
-        if (income_available >= cost_fixed) {
-            // Creating a book requires an ability to predict profit (to determine whether creation is
-            // worthwhile), and an ability to predict demand (to determine the initial price)
-            if (usableBelief(*profit_belief_) and usableBelief(demand_belief_)) { // NB: profit_belief_extrap_ is a copy or update of profit_belief_, so will also be usable
-                // Create a book if E(profit) > effort required
 
-                // Find the l that maximizes creation profit given current wealth (which would have come from
-                // past sales, if non-zero) plus the fixed income we're about to receive, minus whatever we
-                // decided to spend above to keep books on the market.
+        // Make sure we have enough income to create a book, which requires (at 0 effort)
+        // creation_fixed; if creation is instantaneous, we also need to have cost_fixed available
+        // so that we can actually bring the book to market.
+        double creation_base_cost = creativity_->parameters.creation_fixed;
+        if (creativity_->parameters.creation_time == 0) creation_base_cost += cost_fixed;
+
+        if (income_available >= creation_base_cost) {
+            // Create a book if maximized (wrt effort) `E(profit(effort)) - effort > 0`
+
+            if (usableBelief(*profit_belief_) and usableBelief(demand_belief_)) {
+                // NB: profit_belief_extrap_ is a copy or update of profit_belief_, so will also be usable
+
+                // Find the l that maximizes creation profit given current wealth (which would have come
+                // from past sales, if non-zero) plus the fixed income we're about to receive, minus
+                // whatever we decided to spend above to keep books on the market.
 
                 try {
-                    double effort;
+                    std::pair<double, double> effort_profit;
 #               ifdef ERIS_DEBUG
                     try {
 #               endif
-                    effort = profit_belief_extrap_->argmaxL(
+                    effort_profit = profit_belief_extrap_->argmaxL(
                             creativity_->parameters.prediction_draws,
-                            [this] (double l) -> double { return creationQuality(l); },
-                            authored_books, market_books, income_available - cost_fixed
+                            [this] (double l) { return creationQuality(l); },
+                            authored_books, market_books, income_available - creation_base_cost
                             );
 #               ifdef ERIS_DEBUG
                     } catch (BayesianLinear::draw_failure &e) {
@@ -304,33 +313,26 @@ void Reader::interOptimize() {
                         throw;
                     }
 #               endif
-                    double quality = creationQuality(effort);
 
-                    double exp_profit;
-#               ifdef ERIS_DEBUG
-                    try {
-#               endif
-                    exp_profit = profit_belief_extrap_->predict(creativity_->parameters.prediction_draws, quality, authored_books, market_books);
-#               ifdef ERIS_DEBUG
-                    }
-                    catch (BayesianLinear::draw_failure &e) {
-                        ERIS_DBG("draw failure in profit_extrap belief prediction; reader="<<id() << ", t=" << simulation()->t());
-                        throw;
-                    }
-#               endif
+                    // If the optimal effort level gives a book that earns back at least the fixed
+                    // creation cost, we'll consider it (as long as first period demand is actually
+                    // positive as well).
+                    if (effort_profit.second > creation_base_cost) {
+                        double quality = creationQuality(effort_profit.first);
 
-                    // If the optimal effort level gives a book with positive expected profits, do it:
-                    if (exp_profit > effort) {
-                        // We're going to create, so calculate the optimal first-period price.  It's possible that
-                        // we get back cost_unit (and so predicted profit is non-positive); write the book anyway:
-                        // perhaps profits are expected to come in later periods?
+                        // We're going to create, so calculate the optimal first-period price.  If the
+                        // optimal price ends up being 0 (which is a prediction that quantity demanded
+                        // is 0 or negative even at marginal cost), we'll abort the creation.
+                        //
+                        // As a safety against absurd prices, we also enforce a price ceiling of 10% of
+                        // per-period income.
                         std::pair<double, double> max;
 #                   ifdef ERIS_DEBUG
                         try {
 #                   endif
                         max = demand_belief_.argmaxP(creativity_->parameters.prediction_draws, quality, 0, 0,
                                 creativity_->parameters.readers, 0, 0, authored_books, market_books, cost_unit,
-                                income / 10);
+                                creativity_->parameters.income / 10);
 #                   ifdef ERIS_DEBUG
                         }
                         catch (BayesianLinear::draw_failure &e) {
@@ -342,8 +344,8 @@ void Reader::interOptimize() {
                         if (max.first > 0) {
                             create_price_ = max.first;
                             create_quality_ = quality;
-                            create_effort_ = effort;
-                            create_started_ = true;
+                            create_effort_ = effort_profit.first;
+                            create_starting_ = true;
                             create_countdown_ = creativity_->parameters.creation_time;
                             create_position_ = position();
                         }
@@ -352,7 +354,7 @@ void Reader::interOptimize() {
                     }
                 }
                 catch (BayesianLinear::draw_failure &e) {
-                    // Ignore draw failures
+                    // If we get draw failures, ignore them (and don't create)
                 }
             }
             else {
@@ -362,7 +364,7 @@ void Reader::interOptimize() {
                     double effort = creationEffort(q);
                     // Make sure the required effort doesn't exceed the available funds
                     if (income_available >= effort) {
-                        create_started_ = true;
+                        create_starting_ = true;
                         create_countdown_ = creativity_->parameters.creation_time;
                         create_price_ = cost_unit + std::uniform_real_distribution<double>(creativity_->parameters.initial.p_min, creativity_->parameters.initial.p_max)(rng);
                         create_quality_ = q;
@@ -373,6 +375,10 @@ void Reader::interOptimize() {
             }
         }
     }
+
+    // FIXME: (issue #7): if create_countdown_ == 0 we just finished a book and should choose its
+    // price *now* rather than the choice above, which chooses the price at creation decision time.
+
 #   ifdef ERIS_DEBUG
     } catch (std::exception &e) {
         std::cerr << "\nCaught exception in reader interOptimize: " << e.what() << "\n";
@@ -385,14 +391,16 @@ void Reader::interApply() {
     // Give potential income (this has to be before authorship decision, since authorship requires
     // giving up some potential income: actual income will be this amount minus whatever is given up
     // to author)
-    assets()[creativity_->money] += income;
+    assets()[creativity_->money] += creativity_->parameters.income;
+
+    const double &cost_fixed = creativity_->parameters.cost_fixed;
 
     auto sim = simulation();
     SharedMember<Book> newbook;
-    if (create_started_) {
-        // Incur the creation effort cost right away
-        assets()[creativity_->money] -= create_effort_;
-        create_started_ = false;
+    if (create_starting_) {
+        // Incur the creation effort cost as soon as we start creating
+        assets().transferApprox({creativity_->money, create_effort_ + creativity_->parameters.creation_fixed });
+        create_starting_ = false;
     }
     if (create_countdown_ > 0) {
         create_countdown_--;
@@ -401,16 +409,13 @@ void Reader::interApply() {
         // Book is finished, release it.
 
         if (assets()[creativity_->money] >= cost_fixed) {
-            // We can't afford to release it right now, so just hang onto it and release it next
-            // period.
-
-            // The cost (think of this as an opportunity cost) of creating, and the first period fixed
-            // cost:
-            assets()[creativity_->money] -= cost_fixed;
+            // Remove the first period fixed cost of bringing the book to market:
+            assets().transferApprox({ creativity_->money, cost_fixed });
 
             newbook = sim->spawn<Book>(creativity_, create_position_, sharedSelf(), wrote_.size(), create_quality_);
-            // FIXME: authors can choose to not put this book on the market at all and instead
-            // release directly to the public market (if available).
+            // FIXME: (issue #6): authors can choose to not put this book on the market at all and
+            // instead release directly to the public market (if available).
+
             sim->spawn<BookMarket>(creativity_, newbook, create_price_);
 
             /// If enabled, add some noise in a random direction to the position

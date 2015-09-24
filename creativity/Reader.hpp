@@ -566,9 +566,6 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
     protected:
         /// The Creativity object that owns the simulation this reader belongs to
         std::shared_ptr<Creativity> creativity_;
-        const double &cost_unit, ///< Alias for creativity_->parameters.cost_unit
-            &cost_fixed, ///< Alias for creativity_->parameters.cost_fixed
-            &income; ///< Alias for creativity_->parameters.income
 
         std::shared_ptr<belief::Profit> profit_belief_, ///< Belief about lifetime book profits
             profit_belief_extrap_; ///< Beliefs about lifetime book profits using profit stream expectations
@@ -696,7 +693,8 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         // or has a negative price, it'll be removed from the market
         std::unordered_map<eris::SharedMember<Book>, double> new_prices_;
 
-        bool create_started_ = false;
+        // True in the period in which creation started, false otherwise.
+        bool create_starting_ = false;
         int create_countdown_ = -1; // the number of periods remaining until the book is finished; new books are only created when this is -1.
         double create_effort_ = 0, create_quality_ = 0, create_price_ = 0;
         // The author's position at the time of creation; the final position will be this plus noise

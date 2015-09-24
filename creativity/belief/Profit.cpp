@@ -13,10 +13,11 @@ double Profit::predict(unsigned int draws, double q, unsigned long previousBooks
     return predict(profitRow(q, previousBooks, marketBooks), draws);
 }
 
-double Profit::argmaxL(
+std::pair<double, double> Profit::argmaxL(
         unsigned int draws,
         const std::function<double(const double &)> q,
-        unsigned long previousBooks, unsigned long marketBooks,
+        unsigned long previousBooks,
+        unsigned long marketBooks,
         double l_max
 ) {
 
@@ -30,7 +31,9 @@ double Profit::argmaxL(
         return predict(X, draws) - l;
     };
 
-    return eris::single_peak_search(profit, 0, l_max);
+    double ell = eris::single_peak_search(profit, 0, l_max);
+    double net_profit = predict(draws, q(ell), previousBooks, marketBooks) - ell;
+    return std::pair<double, double>(ell, net_profit);
 }
 
 RowVectorXd Profit::profitRow(double quality, int, int lag_market_books) {
