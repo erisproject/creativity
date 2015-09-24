@@ -153,7 +153,7 @@
     <property name="step_increment">1</property>
     <property name="page_increment">10</property>
   </object>
-  <object class="GtkAdjustment" id="adjust_cost_fixed">
+  <object class="GtkAdjustment" id="adjust_cost_market">
     <property name="upper">1000</property>
     <property name="value">10</property>
     <property name="step_increment">1</property>
@@ -1382,7 +1382,7 @@ This value overrides the "Prior discounting" setting in just the "PIracy begins"
                                               <object class="GtkLabel" id="label5">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="label" translatable="yes">Cost (fixed)</property>
+                                                <property name="label" translatable="yes">Cost (market)</property>
                                                 <property name="xalign">0</property>
                                               </object>
                                               <packing>
@@ -1432,14 +1432,14 @@ This value overrides the "Prior discounting" setting in just the "PIracy begins"
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkSpinButton" id="set_cost_fixed">
+                                              <object class="GtkSpinButton" id="set_cost_market">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
                                                 <property name="tooltip_text" translatable="yes">The per-period fixed cost of keeping a book on the market.</property>
                                                 <property name="margin_bottom">1</property>
                                                 <property name="invisible_char">●</property>
                                                 <property name="input_purpose">number</property>
-                                                <property name="adjustment">adjust_cost_fixed</property>
+                                                <property name="adjustment">adjust_cost_market</property>
                                                 <property name="digits">2</property>
                                                 <property name="numeric">True</property>
                                                 <property name="update_policy">if-valid</property>

@@ -215,7 +215,7 @@ double book_profit(const Storage &cs, eris_time_t from, eris_time_t to) {
             auto &b = bp.second;
             if (b.market_private) {
                 seen.insert(b.id);
-                profit_total += b.revenue - cs.settings.cost_unit * b.sales - cs.settings.cost_fixed;
+                profit_total += b.revenue - cs.settings.cost_unit * b.sales - cs.settings.cost_market;
                 if (b.created == t) {
                     // In the creation period, subtract the effort that had to be expended to write
                     // the book
@@ -412,7 +412,7 @@ std::vector<initial_datum> initial_data_fields() {
     ADD_SETTING(reader_creation_shape);
     ADD_SETTING(reader_creation_scale_min);
     ADD_SETTING(reader_creation_scale_max);
-    ADD_SETTING(cost_fixed);
+    ADD_SETTING(cost_market);
     ADD_SETTING(cost_unit);
     ADD_SETTING(cost_piracy);
     ADD_SETTING(creation_time);

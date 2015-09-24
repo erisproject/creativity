@@ -97,8 +97,8 @@ class Profit : public eris::belief::BayesianLinearRestricted {
          * money (income) on hand.
          *
          * \returns a pair of double values: the first is the double value \f$\ell\f$ that maximizes
-         * expected net profit; the second is the maximized profit value *after* subtracting the
-         * maximizing \f$ell\f$, but *before* subtracting fixed creation costs.
+         * expected net profit; the second is the maximized profit value *after* subtracting
+         * the maximizing \f$ell\f$, but *before* subtracting fixed creation costs.
          *
          * \sa eris::single_peak_search for the numerical algorithm used.
          */
@@ -118,7 +118,10 @@ class Profit : public eris::belief::BayesianLinearRestricted {
          * \f$t=3\f$).
          *
          * \param previous_books the number of previous books written by the same author
-         * \param quality the quality of the book as perceived by the reader this belief is for
+         * \param quality the quality of the book as perceived by the reader this belief is for.  If
+         * negative, the value will be truncated to 0 (since readers know that an author can never
+         * choose a negative quality book, and thus negative values must simply be an unfavourable
+         * quality draw).
          * \param lag_market_books the number of books that was in the market in the period just
          * before the just-ended period.
          *

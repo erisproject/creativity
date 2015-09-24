@@ -81,7 +81,7 @@ struct CreativitySettings {
 
     /** The fixed cost of keeping a book on the market.
      */
-    double cost_fixed = 10.0;
+    double cost_market = 10.0;
 
     /** The unit cost of selling a copy of a book (note that only copies of books still on the
      * market can be sold), which is also the cost of obtaining a pirated copy (but is then incurred

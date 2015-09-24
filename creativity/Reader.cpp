@@ -210,7 +210,7 @@ void Reader::interOptimize() {
     new_prices_.clear();
 
     auto &rng = Random::rng();
-    const double &cost_fixed = creativity_->parameters.cost_fixed,
+    const double &cost_market = creativity_->parameters.cost_market,
           &cost_unit = creativity_->parameters.cost_unit;
 
     std::list<eris::SharedMember<Book>> bypass_beliefs;
@@ -227,7 +227,7 @@ void Reader::interOptimize() {
                 const double &p = max.first;
                 const double &q = max.second;
 
-                const double profit = (p - cost_unit) * q - cost_fixed;
+                const double profit = (p - cost_unit) * q - cost_market;
 
                 if (profit > 0) {
                     // Profitable to keep this book on the market, so do so
@@ -243,16 +243,16 @@ void Reader::interOptimize() {
         // profitability UNLESS we can't afford the fixed cost of keeping the book on the market.
         // Anything with a negative expected profit or costs that can't be covered will be removed from
         // the market.  Note that the costs calculated here aren't actually incurred until interApply().
-        while (income_available >= cost_fixed and not profitability.empty()) {
+        while (income_available >= cost_market and not profitability.empty()) {
             auto &books = profitability.begin()->second;
-            if (income_available < cost_fixed * books.size())
+            if (income_available < cost_market * books.size())
                 // We don't have enough to do all the books at this profitability level, so shuffle them
                 // so that we choose randomly
                 std::shuffle(books.begin(), books.end(), rng);
 
             for (auto &b : books) {
-                if (income_available < cost_fixed) break;
-                income_available -= cost_fixed;
+                if (income_available < cost_market) break;
+                income_available -= cost_market;
                 new_prices_.emplace(b.first, b.second);
             }
         }
@@ -267,10 +267,10 @@ void Reader::interOptimize() {
     if (not bypass_beliefs.empty() and creativity_->parameters.initial.prob_keep > 0) {
         std::bernoulli_distribution keep(creativity_->parameters.initial.prob_keep);
         for (auto on_market = bypass_beliefs.cbegin();
-                income_available >= cost_fixed and on_market != bypass_beliefs.cend(); on_market++) {
+                income_available >= cost_market and on_market != bypass_beliefs.cend(); on_market++) {
             auto &book = *on_market;
             if (keep(rng)) {
-                income_available -= cost_fixed;
+                income_available -= cost_market;
                 double new_price = (book->price() - cost_unit) * creativity_->parameters.initial.keep_price + cost_unit;
                 new_prices_.emplace(book, new_price);
             }
@@ -282,10 +282,10 @@ void Reader::interOptimize() {
     if (create_countdown_ == -1) {
 
         // Make sure we have enough income to create a book, which requires (at 0 effort)
-        // creation_fixed; if creation is instantaneous, we also need to have cost_fixed available
+        // creation_fixed; if creation is instantaneous, we also need to have cost_market available
         // so that we can actually bring the book to market.
         double creation_base_cost = creativity_->parameters.creation_fixed;
-        if (creativity_->parameters.creation_time == 0) creation_base_cost += cost_fixed;
+        if (creativity_->parameters.creation_time == 0) creation_base_cost += cost_market;
 
         if (income_available >= creation_base_cost) {
             // Create a book if maximized (wrt effort) `E(profit(effort)) - effort > 0`
@@ -393,7 +393,7 @@ void Reader::interApply() {
     // to author)
     assets()[creativity_->money] += creativity_->parameters.income;
 
-    const double &cost_fixed = creativity_->parameters.cost_fixed;
+    const double &cost_market = creativity_->parameters.cost_market;
 
     auto sim = simulation();
     SharedMember<Book> newbook;
@@ -408,9 +408,9 @@ void Reader::interApply() {
     else if (create_countdown_ == 0) {
         // Book is finished, release it.
 
-        if (assets()[creativity_->money] >= cost_fixed) {
+        if (assets()[creativity_->money] >= cost_market) {
             // Remove the first period fixed cost of bringing the book to market:
-            assets().transferApprox({ creativity_->money, cost_fixed });
+            assets().transferApprox({ creativity_->money, cost_market });
 
             newbook = sim->spawn<Book>(creativity_, create_position_, sharedSelf(), wrote_.size(), create_quality_);
             // FIXME: (issue #6): authors can choose to not put this book on the market at all and
@@ -439,7 +439,7 @@ void Reader::interApply() {
         // If it's staying on the market, update the price and incur the fixed cost
         if (new_prices_.count(b) > 0) {
             b->market()->setPrice(new_prices_[b]);
-            assets()[creativity_->money] -= cost_fixed;
+            assets()[creativity_->money] -= cost_market;
         }
         else {
             // No new price for an old book, which means we're removing the book from the market
@@ -658,12 +658,12 @@ void Reader::updateProfitStreamBelief() {
             // fixed and unit costs, even if the actual author has different costs.  This is because
             // this belief is for predicting what the profit stream would have been for *this* reader.
             const unsigned long &created = book->created();
-            double last_profit = book->revenue(created+periods-1) - cost_fixed - cost_unit*book->sales(created+periods-1);
-            double second_last_profit = book->revenue(created+periods-2) - cost_fixed - cost_unit*book->sales(created+periods-2);
+            double last_profit = book->revenue(created+periods-1) - cost_market - cost_unit*book->sales(created+periods-1);
+            double second_last_profit = book->revenue(created+periods-2) - cost_market - cost_unit*book->sales(created+periods-2);
             while (periods > 1 and last_profit <= 0 and second_last_profit <= 0) {
                 periods--;
                 last_profit = second_last_profit;
-                second_last_profit = book->revenue(created+periods-2) - cost_fixed - cost_unit*book->sales(created+periods-2);
+                second_last_profit = book->revenue(created+periods-2) - cost_market - cost_unit*book->sales(created+periods-2);
             }
 
             // If there weren't at least 2 meaningful sales periods, we can't use this book to infer
@@ -703,7 +703,7 @@ void Reader::updateProfitStreamBelief() {
             // In other words, figure out profits under the optimal removal decision.
             eris_time_t last_profit_t = 0; // Will be > 0 once we've figured it out
             for (auto t = book->outOfPrint()-1; t >= book->created(); t--) {
-                double prof_t = book->revenue(t) - cost_fixed - cost_unit * book->sales(t);
+                double prof_t = book->revenue(t) - cost_market - cost_unit * book->sales(t);
                 if (last_profit_t == 0) {
                     if (prof_t <= 0) continue;
                     // Else this book had positive profits in t, so stop skipping
@@ -716,7 +716,7 @@ void Reader::updateProfitStreamBelief() {
             const unsigned long &created = book->created();
             for (unsigned int i = 0; i < age; i++) {
                 eris_time_t t = created + i;
-                double prof_t = book->revenue(t) - cost_fixed - cost_unit * book->sales(t);
+                double prof_t = book->revenue(t) - cost_market - cost_unit * book->sales(t);
                 X(row, i) = prof_t;
                 cumul_profit += prof_t;
             }
@@ -725,7 +725,7 @@ void Reader::updateProfitStreamBelief() {
             // to use the final negative profit value instead of 0.  Otherwise, we want the
             // difference between total_profit and cumul_profit (== profit remaining).
             if (last_profit_t == created + age - 1)
-                y[row] = book->revenue(created+age-1) - cost_fixed - cost_unit*book->sales(created+age-1);
+                y[row] = book->revenue(created+age-1) - cost_market - cost_unit*book->sales(created+age-1);
             else
                 y[row] = total_profit - cumul_profit;
             row++;

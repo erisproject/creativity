@@ -54,7 +54,7 @@ void Creativity::checkParameters() {
     PROHIBIT(reader_creation_shape, >= 1);
     PROHIBIT(reader_creation_scale_min, < 0);
     PROHIBIT(reader_creation_scale_max, < parameters.reader_creation_scale_min);
-    PROHIBIT(cost_fixed, < 0);
+    PROHIBIT(cost_market, < 0);
     PROHIBIT(cost_unit, < 0);
     PROHIBIT(cost_piracy, < 0);
     PROHIBIT(income, < 0);

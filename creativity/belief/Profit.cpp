@@ -36,8 +36,9 @@ std::pair<double, double> Profit::argmaxL(
     return std::pair<double, double>(ell, net_profit);
 }
 
-RowVectorXd Profit::profitRow(double quality, int, int lag_market_books) {
+RowVectorXd Profit::profitRow(double quality, int /*previous_books*/, int lag_market_books) {
     RowVectorXd Xi(parameters());
+    if (quality < 0) quality = 0;
     Xi << 1.0, quality, quality*quality, lag_market_books;
     return Xi;
 }

@@ -46,7 +46,8 @@ int main(int argc, char *argv[]) {
     PRINT_SETTING(reader_creation_scale_min);
     PRINT_SETTING(reader_creation_scale_max);
     PRINT_SETTING(creation_time);
-    PRINT_SETTING(cost_fixed);
+    PRINT_SETTING(creation_fixed);
+    PRINT_SETTING(cost_market);
     PRINT_SETTING(cost_unit);
     PRINT_SETTING(cost_piracy);
     PRINT_SETTING(income);
@@ -93,7 +94,8 @@ int main(int argc, char *argv[]) {
         ADD_SAME(reader_creation_scale_min);
         ADD_SAME(reader_creation_scale_max);
         ADD_SAME(creation_time);
-        ADD_SAME(cost_fixed);
+        ADD_SAME(creation_fixed);
+        ADD_SAME(cost_market);
         ADD_SAME(cost_unit);
         ADD_SAME(cost_piracy);
         ADD_SAME(income);

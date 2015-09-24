@@ -179,7 +179,7 @@ double Book::lifeRevenue() const {
 
 double Book::lifeProfitPrivate() const {
     return lifeRevenuePrivate()
-        - privateMarketPeriods() * creativity_->parameters.cost_fixed
+        - privateMarketPeriods() * creativity_->parameters.cost_market
         - lifeSalesPrivate() * creativity_->parameters.cost_unit;
 }
 

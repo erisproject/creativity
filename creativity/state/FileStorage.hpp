@@ -309,7 +309,7 @@ class FileStorage final : public StorageBackend {
                     reader_creation_scale_min = 68, ///< reader q(l) scale parameter ~ U[a,b]; this is 'a' (dbl)
                     reader_creation_scale_max = 76, ///< reader q(l) scale parameter ~ U[a,b]; this is 'b' (dbl)
                     creation_time = 84, ///< Time to create a book
-                    cost_fixed = 88, ///< Fixed cost of keeping a book on the market (dbl)
+                    cost_market = 88, ///< Fixed cost of keeping a book on the market (dbl)
                     cost_unit = 96, ///< Unit cost of an author creating a copy of a book (dbl)
                     cost_piracy = 104, ///< Unit cost of getting a copy of a book via piracy (dbl)
                     income = 112, ///< Per-period reader external income (before incurring authorship costs or receiving book profits) (dbl)
@@ -547,7 +547,7 @@ class FileStorage final : public StorageBackend {
          * Version 1 state files additionally include the following fields after u_lifetime but
          * before creation_shape:
          *
-         *     dbl              cost_fixed
+         *     dbl              cost_market
          *     dbl              cost_unit
          *     dbl              cost_piracy
          *     dbl              income

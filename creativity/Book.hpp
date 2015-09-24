@@ -187,7 +187,7 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         /** Calculates the lifetime profit of this book from the private market, not including
          * initial creation cost, but include per-period fixed costs and unit costs.
          *
-         * Note that if cost_unit or cost_fixed are changed, this will return what the profit would
+         * Note that if cost_unit or cost_market are changed, this will return what the profit would
          * have been at the current levels.
          *
          * Note that it is possible for this value to be negative (typically because the market had

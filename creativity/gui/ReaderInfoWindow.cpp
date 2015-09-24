@@ -59,6 +59,7 @@ ReaderInfoWindow::ReaderInfoWindow(
     data_append(grid_status, "position", "Position");
     data_append(grid_status, "utility", "Utility");
     data_append(grid_status, "uLife", "Lifetime utility");
+    data_append(grid_status, "creationScale", "Creation scale");
     data_append(grid_status, "books", "Books owned");
     data_append(grid_status, "booksPurchased", "Books purchased");
     data_append(grid_status, "booksPirated", "Books pirated");
@@ -186,6 +187,7 @@ void ReaderInfoWindow::refresh(std::shared_ptr<const State> state) {
     updateValue("position", GUI::pos_to_string(r.position));
     updateValue("utility", r.u);
     updateValue("uLife", r.u_lifetime);
+    updateValue("creationScale", r.creation_scale);
     updateValue("books", r.library.size());
     updateValue("booksPurchased", r.library_purchased);
     updateValue("booksPirated", r.library_pirated);

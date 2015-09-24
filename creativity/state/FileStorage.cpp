@@ -67,7 +67,7 @@ constexpr int64_t
         FileStorage::HEADER::pos::reader_creation_scale_min,
         FileStorage::HEADER::pos::reader_creation_scale_max,
         FileStorage::HEADER::pos::creation_time,
-        FileStorage::HEADER::pos::cost_fixed,
+        FileStorage::HEADER::pos::cost_market,
         FileStorage::HEADER::pos::cost_unit,
         FileStorage::HEADER::pos::cost_piracy,
         FileStorage::HEADER::pos::income,
@@ -276,7 +276,7 @@ void FileStorage::writeSettings(const CreativitySettings &settings) {
     write_value(settings.reader_creation_scale_min);
     write_value(settings.reader_creation_scale_max);
     write_value(settings.creation_time);
-    write_value(settings.cost_fixed);
+    write_value(settings.cost_market);
     write_value(settings.cost_unit);
     write_value(settings.cost_piracy);
     write_value(settings.income);
@@ -563,7 +563,7 @@ void FileStorage::parseMetadata() {
     PARSE_VALUE(reader_creation_scale_min);
     PARSE_VALUE(reader_creation_scale_max);
     PARSE_VALUE(creation_time);
-    PARSE_VALUE(cost_fixed);
+    PARSE_VALUE(cost_market);
     PARSE_VALUE(cost_unit);
     PARSE_VALUE(cost_piracy);
     PARSE_VALUE(income);
@@ -737,7 +737,7 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
     r.u_lifetime = read_dbl();
     if (version_ == 1) {
         // Skip old fields (no longer used or supported)
-        read_dbl(); // cost_fixed
+        read_dbl(); // cost_market
         read_dbl(); // cost_unit
         read_dbl(); // cost_piracy
         read_dbl(); // income
@@ -927,7 +927,7 @@ void FileStorage::writeReader(const ReaderState &r) {
     if (version_ == 1) {
         // If we're writing a v1 file (which can only happen if we're appending to a v1 file rather
         // than creating a new file), we need 4 fields for costs/income
-        write_value(settings_.cost_fixed);
+        write_value(settings_.cost_market);
         write_value(settings_.cost_unit);
         write_value(settings_.cost_piracy);
         write_value(settings_.income);

@@ -815,6 +815,7 @@ void GUI::thr_update_parameters() {
     SET_SB(reader_creation_scale_min);
     SET_SB(reader_creation_scale_max);
     SET_SB(creation_time);
+    SET_SB(creation_fixed);
 
 #define SET_INIT_SB(PARAMETER) widget<Gtk::SpinButton>("set_init_" #PARAMETER)->set_value(creativity_->parameters.initial.PARAMETER)
     SET_INIT_SB(prob_write);
@@ -827,7 +828,7 @@ void GUI::thr_update_parameters() {
 #undef SET_INIT_SB
 
     SET_SB(income);
-    SET_SB(cost_fixed);
+    SET_SB(cost_market);
     SET_SB(cost_unit);
     SET_SB(cost_piracy);
 
@@ -1082,7 +1083,7 @@ void GUI::initializeSim() {
     COPY_SB_D(reader_creation_scale_min);
     COPY_SB_D(reader_creation_scale_max);
     COPY_SB_D(income);
-    COPY_SB_D(cost_fixed);
+    COPY_SB_D(cost_market);
     COPY_SB_D(cost_unit);
     COPY_SB_D(cost_piracy);
     COPY_SB_D(prior_scale);
@@ -1091,6 +1092,7 @@ void GUI::initializeSim() {
     COPY_SB_I(burnin_periods);
     COPY_SB_I(prediction_draws);
     COPY_SB_I(creation_time);
+    COPY_SB_I(creation_fixed);
 #define COPY_SB_INIT_D(PARAMETER) set.initial.PARAMETER = sb("set_init_"#PARAMETER)
     COPY_SB_INIT_D(prob_write);
     COPY_SB_INIT_D(q_min);

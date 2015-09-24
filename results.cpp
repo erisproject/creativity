@@ -215,7 +215,7 @@ int main(int argc, char *argv[]) {
         eq % 1;
         if (piracy_data) eq % data["piracy"];
         if (public_data) eq % data["public"];
-        for (auto &x : {"param.density", "param.cost_fixed", "param.cost_unit", "param.creation_time"}) {
+        for (auto &x : {"param.density", "param.cost_market", "param.cost_unit", "param.creation_time", "param.creation_fixed"}) {
             if (not data.has(x)) continue;
             if (not pre_nan_.count(x)) eq % data[x];
             if (piracy_data and not piracy_nan_.count(x)) eq % (data["piracy"] * data[x]);

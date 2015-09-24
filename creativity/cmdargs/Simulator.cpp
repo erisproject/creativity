@@ -43,7 +43,7 @@ void Simulator::addOptions() {
 
     costs.add_options()
         ("income,i", above<0>(s_.income), "  Per-period external reader income")
-        ("cost-fixed,C", min<0>(s_.cost_fixed), "    Fixed cost of keeping a book on the market for a period")
+        ("cost-market,C", min<0>(s_.cost_market), "    Fixed cost of keeping a book on the market for a period")
         ("cost-unit,c", min<0>(s_.cost_unit), "    Unit cost of making a copy of a book")
         ("cost-piracy,y", min<0>(s_.cost_piracy), "    Cost of receiving a pirated copy of a book")
         ;
