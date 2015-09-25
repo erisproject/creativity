@@ -119,7 +119,7 @@ int main(int argc, char *argv[]) {
         ADD("--belief-threshold", initial.belief_threshold);
 
         std::smatch smatch;
-        if (regex_search(args.input, smatch, std::regex("-(\\d+)\\.[a-z]+$"))) {
+        if (regex_search(args.input, smatch, std::regex("-(\\d+)\\.(?:crstate\\b|\\w+$)"))) {
             std::cout << " --seed " << smatch[1] << "\n";
         }
         else  {
