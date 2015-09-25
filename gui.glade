@@ -759,7 +759,7 @@
                                             <property name="margin_bottom">2</property>
                                             <property name="column_spacing">10</property>
                                             <child>
-                                              <object class="GtkLabel" id="label48">
+                                              <object class="GtkLabel" id="label_Structure">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="margin_end">15</property>
@@ -774,7 +774,7 @@
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label52">
+                                              <object class="GtkLabel" id="label_Initial_behaviour">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="tooltip_text" translatable="yes">These settings control the behaviours of agents in the initial periods of the simulation, before agents have enough observations to form beliefs about the world.</property>
@@ -789,7 +789,7 @@
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label41">
+                                              <object class="GtkLabel" id="lbl_init_prob_write">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Pr(&lt;i&gt;write&lt;/i&gt;)</property>
@@ -817,7 +817,7 @@
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label43">
+                                              <object class="GtkLabel" id="lbl_init_l_min">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">ℓ ~ U[&lt;b&gt;&lt;i&gt;A&lt;/i&gt;&lt;/b&gt;,B]</property>
@@ -845,7 +845,7 @@
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label42">
+                                              <object class="GtkLabel" id="lbl_init_l_max">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">ℓ ~ U[A,&lt;b&gt;&lt;i&gt;B&lt;/i&gt;&lt;/b&gt;]</property>
@@ -873,7 +873,7 @@
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label15">
+                                              <object class="GtkLabel" id="label_Beliefs">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="margin_bottom">5</property>
@@ -887,7 +887,7 @@
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label34">
+                                              <object class="GtkLabel" id="lbl_prior_scale">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Per-period discount</property>
@@ -899,7 +899,7 @@
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label44">
+                                              <object class="GtkLabel" id="lbl_init_p_min">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">P ~ U[&lt;b&gt;&lt;i&gt;A&lt;/i&gt;&lt;/b&gt;,B]</property>
@@ -912,7 +912,7 @@
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label45">
+                                              <object class="GtkLabel" id="lbl_init_p_max">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">P ~ U[A,&lt;b&gt;&lt;i&gt;B&lt;/i&gt;&lt;/b&gt;]</property>
@@ -975,7 +975,7 @@ More specifically, this scales the prior's &lt;tt&gt;V&lt;/tt&gt; matrix such th
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label46">
+                                              <object class="GtkLabel" id="lbl_init_prob_keep">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Pr(&lt;i&gt;keep&lt;/i&gt;)</property>
@@ -1020,7 +1020,7 @@ For example, if this is set to 0.6 and, the previous market price was 6, and mar
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label47">
+                                              <object class="GtkLabel" id="lbl_init_keep_price">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Keep price</property>
@@ -1032,7 +1032,7 @@ For example, if this is set to 0.6 and, the previous market price was 6, and mar
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label36">
+                                              <object class="GtkLabel" id="lbl_prior_scale_burnin">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Burn-in discount</property>
@@ -1096,7 +1096,7 @@ This value overrides the "Prior discounting" setting in the initial periods.</pr
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label61">
+                                              <object class="GtkLabel" id="lbl_prior_scale_public_sharing">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Public prior discount</property>
@@ -1128,7 +1128,7 @@ This value overrides the "Prior discounting" setting in just the "Sharing begins
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label93">
+                                              <object class="GtkLabel" id="lbl_public_sharing_tax">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Lump-sum tax</property>
@@ -1140,7 +1140,7 @@ This value overrides the "Prior discounting" setting in just the "Sharing begins
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label63">
+                                              <object class="GtkLabel" id="lbl_public_sharing_begins">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Public begins</property>
@@ -1190,7 +1190,7 @@ If 0, piracy never becomes available.</property>
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label55">
+                                              <object class="GtkLabel" id="label_Public_Provision">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="margin_bottom">5</property>
@@ -1204,7 +1204,7 @@ If 0, piracy never becomes available.</property>
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label51">
+                                              <object class="GtkLabel" id="label_Piracy">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="margin_bottom">5</property>
@@ -1218,7 +1218,7 @@ If 0, piracy never becomes available.</property>
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label23">
+                                              <object class="GtkLabel" id="lbl_piracy_begins">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Piracy begins</property>
@@ -1230,7 +1230,7 @@ If 0, piracy never becomes available.</property>
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label31">
+                                              <object class="GtkLabel" id="lbl_piracy_link_proportion">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Friendship %</property>
@@ -1242,7 +1242,7 @@ If 0, piracy never becomes available.</property>
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label66">
+                                              <object class="GtkLabel" id="lbl_prior_scale_piracy">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Piracy prior discount</property>
@@ -1314,7 +1314,7 @@ This value overrides the "Prior discounting" setting in just the "PIracy begins"
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label50">
+                                              <object class="GtkLabel" id="label_Costs">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="margin_end">15</property>
@@ -1329,7 +1329,7 @@ This value overrides the "Prior discounting" setting in just the "PIracy begins"
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label30">
+                                              <object class="GtkLabel" id="lbl_income">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Income</property>
@@ -1341,7 +1341,7 @@ This value overrides the "Prior discounting" setting in just the "PIracy begins"
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label5">
+                                              <object class="GtkLabel" id="lbl_cost_market">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Cost (market)</property>
@@ -1353,7 +1353,7 @@ This value overrides the "Prior discounting" setting in just the "PIracy begins"
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label10">
+                                              <object class="GtkLabel" id="lbl_cost_unit">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Cost (unit)</property>
@@ -1365,7 +1365,7 @@ This value overrides the "Prior discounting" setting in just the "PIracy begins"
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label32">
+                                              <object class="GtkLabel" id="lbl_cost_piracy">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Cost (piracy)</property>
@@ -1448,7 +1448,7 @@ This value overrides the "Prior discounting" setting in just the "PIracy begins"
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label1">
+                                              <object class="GtkLabel" id="lbl_book_quality_sd">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Book quality s.d.</property>
@@ -1460,7 +1460,7 @@ This value overrides the "Prior discounting" setting in just the "PIracy begins"
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label7">
+                                              <object class="GtkLabel" id="lbl_book_distance_mean">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Book distance mean</property>
@@ -1472,7 +1472,7 @@ This value overrides the "Prior discounting" setting in just the "PIracy begins"
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label17">
+                                              <object class="GtkLabel" id="lbl_reader_step_mean">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Random step mean</property>
@@ -1484,7 +1484,7 @@ This value overrides the "Prior discounting" setting in just the "PIracy begins"
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label8">
+                                              <object class="GtkLabel" id="lbl_density">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Density</property>
@@ -1496,7 +1496,7 @@ This value overrides the "Prior discounting" setting in just the "PIracy begins"
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label3">
+                                              <object class="GtkLabel" id="lbl_readers">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Readers</property>
@@ -1599,7 +1599,7 @@ When the Creation time setting is greater than 0, the random location is relativ
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label95">
+                                              <object class="GtkLabel" id="lbl_dimensions">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Dimensions</property>
@@ -1629,7 +1629,7 @@ When the Creation time setting is greater than 0, the random location is relativ
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label37">
+                                              <object class="GtkLabel" id="lbl_burnin_periods">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Burn-in periods</property>
@@ -1641,7 +1641,7 @@ When the Creation time setting is greater than 0, the random location is relativ
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label38">
+                                              <object class="GtkLabel" id="lbl_prediction_draws">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Prediction draws</property>
@@ -1681,7 +1681,7 @@ When the Creation time setting is greater than 0, the random location is relativ
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label18">
+                                              <object class="GtkLabel" id="lbl_reader_creation_shape">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Quality fn. shape</property>
@@ -1715,7 +1715,7 @@ The value given here is &lt;b&gt;&lt;i&gt;β&lt;/i&gt;&lt;/b&gt;.  Note that &lt
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label33">
+                                              <object class="GtkLabel" id="lbl_reader_creation_scale_min">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Quality fn. scale min</property>
@@ -1749,7 +1749,7 @@ q(ℓ) = &lt;b&gt;&lt;i&gt;α&lt;/i&gt;&lt;/b&gt; [(ℓ+1)&lt;sup&gt;&lt;b&gt;&l
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label35">
+                                              <object class="GtkLabel" id="lbl_reader_creation_scale_max">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Quality fn. scale max</property>
@@ -1783,7 +1783,7 @@ q(ℓ) = &lt;b&gt;&lt;i&gt;α&lt;/i&gt;&lt;/b&gt; [(ℓ+1)&lt;sup&gt;&lt;b&gt;&l
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label40">
+                                              <object class="GtkLabel" id="lbl_creation_time">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Creation time</property>
@@ -1813,7 +1813,7 @@ q(ℓ) = &lt;b&gt;&lt;i&gt;α&lt;/i&gt;&lt;/b&gt; [(ℓ+1)&lt;sup&gt;&lt;b&gt;&l
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label13">
+                                              <object class="GtkLabel" id="lbl_creation_fixed">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="label" translatable="yes">Creation fixed cost</property>
@@ -1843,7 +1843,7 @@ q(ℓ) = &lt;b&gt;&lt;i&gt;α&lt;/i&gt;&lt;/b&gt; [(ℓ+1)&lt;sup&gt;&lt;b&gt;&l
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="label14">
+                                              <object class="GtkLabel" id="label_Authorship">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
                                                 <property name="tooltip_text" translatable="yes">These settings control the behaviours of agents in the initial periods of the simulation, before agents have enough observations to form beliefs about the world.</property>

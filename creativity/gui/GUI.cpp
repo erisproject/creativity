@@ -455,25 +455,18 @@ void GUI::thr_run(const cmdargs::GUI &args) {
     thr_update_parameters();
 
     // Update the attributes tooltips: only the SpinButtons in the glade file have tooltips, so copy
-    // those tooltips into the associated Label as well (which is just left of the spinbutton in the
-    // grid)
+    // those tooltips into the associated Label as well.
     auto attribs_grid = widget<Gtk::Grid>("grid_sim_params");
-    bool done_copying_tooltips = false;
-    for (int c = 1; not done_copying_tooltips; c += 2) {
-        for (int r = 1; ; r++) {
-            auto *widget = attribs_grid->get_child_at(c, r), *left = attribs_grid->get_child_at(c-1, r);
-            if (not widget or not left) {
-                if (r == 1) done_copying_tooltips = 1;
-                break;
+    for (auto &child : attribs_grid->get_children()) {
+        auto name = child->Gtk::Buildable::get_name();
+        auto tooltip = child->get_tooltip_markup();
+        std::cerr << "child(" << name << "), TT=" << tooltip << std::endl;
+        if (not tooltip.empty() and name.length() > 4 and name.substr(0, 4) == "set_") {
+            if (auto label = widget<Gtk::Label>("lbl_" + name.substr(4))) {
+                label->set_tooltip_markup(tooltip);
             }
-            // Don't copy the tooltip left if there is no tooltip, or the left element already has a
-            // tooltip
-            auto tooltip = widget->get_tooltip_markup();
-            if (not tooltip.empty() and left->get_tooltip_markup().empty())
-                left->set_tooltip_markup(tooltip);
         }
     }
-
 
     rdr_win_ = widget<Gtk::ScrolledWindow>("win_rdr");
     bk_win_ = widget<Gtk::ScrolledWindow>("win_bk");
