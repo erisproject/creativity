@@ -124,17 +124,21 @@ class FileStorage final : public StorageBackend {
 
     private:
 
-        /** The file version.  The default is 2, but we can read and write v1 files as well.  v1
-         * files have per-user costs and income, but those never differed from the creativity
-         * setting in v1-only simulators; v2 files simply don't include them.
+        /** The file version.  The default is 2; earlier versions are from versions of the program
+         * with fundamentally incompatible features (they can be read with earlier versions of the
+         * program, if necessary).
          *
-         * Another difference is the book distance and reader step settings: they were the standard
-         * deviation parameter of a half normal distribution with mean 0 under v1, but are the mean
-         * of a chi squared with 1 d.f. under v2.  When loading a v1 file, we preserve the mean
-         * (which equals the v1 sd values times \f$\sqrt{2/\pi}\f$), but note that, because the
-         * distributions are different, a v1 file loaded into a v2 simulator will have the same mean
-         * but a standard deviation that is \f$2/(\pi-2) \approx 1.871\f$ times the actual sd value
-         * in a v1 simulation (which was the sd value times \f$\sqrt{1-2/\pi}\f$).
+         * In particular:
+         *
+         * - v1 files have per-user costs and income, but those never differed from the creativity
+         *   setting in v1-only simulators; v2 files simply don't include them.
+         *
+         * - book distance and reader step parameters are different: they were the standard
+         *   deviation parameter of a half normal distribution with mean 0 under v1, but are the
+         *   mean of a scaled χ²(1) in v2 files.
+         *
+         * - the initial behaviour distributions are different: in v1, authors choose quality from a
+         *   uniform distribution; in v2 they choose effort from a uniform distribution.
          */
         uint32_t version_ = 2;
 
@@ -302,9 +306,9 @@ class FileStorage final : public StorageBackend {
                     dimensions = 20, ///< the number of dimensions of the simulation these states belong to (u32)
                     readers = 24, ///< the number of readers in the simulation
                     boundary = 28, ///< the simulation boundary (positive double)
-                    book_distance_mean = 36, ///< mean of distance of new books from authors (non-negative double) (in v1 files, this is book_distance_sd)
+                    book_distance_mean = 36, ///< mean of distance of new books from authors (non-negative double)
                     book_quality_sd = 44, ///< standard deviation of perceived book quality draw (draw is normal, with mean = true quality) (dbl)
-                    reader_step_mean = 52, ///< mean of reader step distance (non-negative dbl) (in v1 files, this is reader_step_sd)
+                    reader_step_mean = 52, ///< mean of reader step distance (non-negative dbl)
                     reader_creation_shape = 60, ///< reader q(l) shape parameter (dbl)
                     reader_creation_scale_min = 68, ///< reader q(l) scale parameter ~ U[a,b]; this is 'a' (dbl)
                     reader_creation_scale_max = 76, ///< reader q(l) scale parameter ~ U[a,b]; this is 'b' (dbl)
@@ -320,16 +324,13 @@ class FileStorage final : public StorageBackend {
                     prior_scale_burnin = 148, ///< The prior 'n' multiplier (usually 0-1)
                     burnin_periods = 156, ///< The burnin-periods during which beliefs are more heavily discounted (u32)
                     init_prob_write = 160, ///< The probability of writing (while beliefs noninformative)
-                    init_q_min = 168, ///< `a` in U[a,b], the noninformative belief authorship quality level
-                    init_q_max = 176, ///< `b` in U[a,b], the noninformative belief authorship quality level
+                    init_l_min = 168, ///< `a` in U[a,b], the noninformative belief authorship effort level
+                    init_l_max = 176, ///< `b` in U[a,b], the noninformative belief authorship effort level
                     init_p_min = 184, ///< `a` in U[a,b], the noninformative belief book price
                     init_p_max = 192, ///< `b` in U[a,b], the noninformative belief book price
                     init_prob_keep = 200, ///< The probability of keeping a book on the market (uninformed beliefs)
                     init_keep_price = 208, ///< If keeping a book on the market, the new price is (p-c)*s+c, where this is s
                     init_belief_threshold = 216, ///< The required n-k value for readers to use beliefs instead of initial behaviour (i32)
-                    state_first_v1 = 224, ///< the first state record in version 1 files (preceeded by 4 bytes padding)
-
-                    // Added in version 2:
                     public_sharing_begins = 220, ///< The period in which the PublicTracker is created (u32)
                     public_sharing_tax = 224, ///< The lump sum tax the PublicTracker collects (dbl)
                     prior_scale_public_sharing = 232, ///< The prior scale for the period the PublicTracker first becomes available (dbl)
@@ -346,7 +347,6 @@ class FileStorage final : public StorageBackend {
              * requires using continuation blocks.
              */
             static constexpr unsigned int states = (pos::state_last - pos::state_first) / 8 + 1;
-            static constexpr unsigned int states_v1 = (pos::state_last - pos::state_first_v1) / 8 + 1;
         };
 
         /// Constants for continuation blocks
@@ -488,26 +488,8 @@ class FileStorage final : public StorageBackend {
          */
         std::shared_ptr<const State> readState() const;
 
-        /** Called by readState() when reading from a v1 file.  In version 1 files the state data
-         * structure is:
-         *
-         *     u32      t (simulation time period)
-         *     READER[] readers array
-         *     BOOK[]   books array
-         *
-         * where X[] indicates an array structured as:
-         *     u32          length
-         *     type*length  sequential X records
-         */
-        std::shared_ptr<const State> readState_v1() const;
-
         /// Writes the given state at the current file position.
         void writeState(const State &state);
-
-        /** Writes the given state to a v1 file.  Will throw an exception if the state contains data
-         * not representable in a v1 file, such as a PublicTracker.
-         */
-        void writeState_v1(const State &state);
 
         /** Reads a ReaderState record from the current file position and returns it in an
          * {eris_id_t, ReaderState} pair, where `.first` is the id.  Such a record consists of:
@@ -543,18 +525,6 @@ class FileStorage final : public StorageBackend {
          * profit stream beliefs may not be placeholder beliefs (i.e. default constructed objects);
          * such objects should simply be omitted when writing the data.  Each profit stream belief K
          * value must also be unique.
-         *
-         * Version 1 state files additionally include the following fields after u_lifetime but
-         * before creation_shape:
-         *
-         *     dbl              cost_market
-         *     dbl              cost_unit
-         *     dbl              cost_piracy
-         *     dbl              income
-         *
-         * Version 2 files omit these because per-user costs/income were never entirely supported,
-         * tested, or used: all users simple use the values in the creativity parameters block.
-         * When loading a v1 file, these fields are ignored.
          */
         std::pair<eris::eris_id_t, ReaderState> readReader(eris::eris_time_t t) const;
 
@@ -634,13 +604,13 @@ class FileStorage final : public StorageBackend {
          *     u32          author id
          *     dbl*DIM      position (DIM = dimensions)
          *     dbl          quality
-         *     u8           status fields (current just 1 for private market) -- added in v2
+         *     u8           status fields (current just 1 for private market)
          *     dbl          price (market is derived from this: market=true unless price is NaN)
          *     dbl          revenue
          *     dbl          revenue_lifetime
          *     u32          sales
          *     u32          sales_lifetime_private
-         *     u32          sales_lifetime_public -- added in v2
+         *     u32          sales_lifetime_public
          *     u32          pirated
          *     u32          piratedLifetime
          *     u32          created

@@ -213,66 +213,74 @@ void Reader::interOptimize() {
     const double &cost_market = creativity_->parameters.cost_market,
           &cost_unit = creativity_->parameters.cost_unit;
 
-    std::list<eris::SharedMember<Book>> bypass_beliefs;
-    if (usableBelief(demand_belief_)) {
-        // Figure out the expected profitability of each book; positive ones will be kept on the market
-        std::map<double, std::vector<std::pair<SharedMember<Book>, double>>, std::greater<double>> profitability;
-        for (auto &book : wrote_market_) {
-            auto book_mkt = book->market();
+    if (not wrote_market_.empty()) {
+        if (usableBelief(demand_belief_)) {
+            // Figure out the expected profitability of each book; positive ones will be kept on the market
+            std::map<double, std::vector<std::pair<SharedMember<Book>, double>>, std::greater<double>> profitability;
+            for (auto &book : wrote_market_) {
+                auto book_mkt = book->market();
 
-            try {
-                auto max = demand_belief_.argmaxP(creativity_->parameters.prediction_draws, book->qualityMean(), book->lifeSales(), book->lifePirated(), creativity_->parameters.readers,
-                        sim->t() - 1 - book->lastSale(), book->age(), authored_books - 1, market_books, cost_unit,
-                        creativity_->parameters.income / 10);
-                const double &p = max.first;
-                const double &q = max.second;
+                try {
+                    auto max = demand_belief_.argmaxP(creativity_->parameters.prediction_draws, book->qualityMean(), book->lifeSales(), book->lifePirated(), creativity_->parameters.readers,
+                            sim->t() - 1 - book->lastSale(), book->age(), authored_books - 1, market_books, cost_unit,
+                            creativity_->parameters.income / 10);
+                    const double &p = max.first;
+                    const double &q = max.second;
 
-                const double profit = (p - cost_unit) * q - cost_market;
+                    const double profit = (p - cost_unit) * q - cost_market;
 
-                if (profit > 0) {
-                    // Profitable to keep this book on the market, so do so
-                    profitability[profit].push_back(std::make_pair(book, p));
+                    if (profit > 0) {
+                        // Profitable to keep this book on the market, so do so
+                        profitability[profit].push_back(std::make_pair(book, p));
+                    }
+                }
+                catch (BayesianLinear::draw_failure &fail) {
+                    // If we fail to get an admissable draw, pull the book from the market.
                 }
             }
-            catch (BayesianLinear::draw_failure &fail) {
-                // If we fail to get an admissable draw, pull the book from the market.
+
+            // Store the decided prices for each book staying on the market in decreasing order of
+            // profitability UNLESS we can't afford the fixed cost of keeping the book on the market.
+            // Anything with a negative expected profit or costs that can't be covered will be removed from
+            // the market.  Note that the costs calculated here aren't actually incurred until interApply().
+            for (auto prof_iter = profitability.begin(), prof_iter_end = profitability.end();
+                    income_available >= cost_market and prof_iter != prof_iter_end;
+                    prof_iter++) {
+                auto &books = prof_iter->second;
+                // If we don't have enough to put all the books at this profitability level on the
+                // market, shuffle them so that we choose randomly.
+                if (income_available < cost_market * books.size())
+                    std::shuffle(books.begin(), books.end(), rng);
+
+                for (auto &b : books) {
+                    income_available -= cost_market;
+                    new_prices_.emplace(b.first, b.second);
+                    // Stop if we run out of income:
+                    if (income_available < cost_market) break;
+                }
             }
         }
-
-        // Store the decided prices for each book staying on the market in decreasing order of
-        // profitability UNLESS we can't afford the fixed cost of keeping the book on the market.
-        // Anything with a negative expected profit or costs that can't be covered will be removed from
-        // the market.  Note that the costs calculated here aren't actually incurred until interApply().
-        while (income_available >= cost_market and not profitability.empty()) {
-            auto &books = profitability.begin()->second;
-            if (income_available < cost_market * books.size())
-                // We don't have enough to do all the books at this profitability level, so shuffle them
-                // so that we choose randomly
+        // Otherwise bypass market predictions if our market demand belief isn't usable: use initial
+        // model action parameters instead (unless we don't have enough income to support even a
+        // single book, in which case we can't keep anything on the market).
+        else if (creativity_->parameters.initial.prob_keep > 0 and income_available >= cost_market) {
+            std::bernoulli_distribution keep(creativity_->parameters.initial.prob_keep);
+            std::vector<SharedMember<Book>> books(wrote_market_.begin(), wrote_market_.end());
+            if (income_available < books.size() * cost_market) {
+                // If we don't have enough income to keep every book on the market (which is the
+                // worst case scenario for income), shuffle the list so that we choose which ones to
+                // keep randomly.
                 std::shuffle(books.begin(), books.end(), rng);
-
-            for (auto &b : books) {
-                if (income_available < cost_market) break;
-                income_available -= cost_market;
-                new_prices_.emplace(b.first, b.second);
             }
-        }
-    }
-    else {
-        bypass_beliefs.insert(bypass_beliefs.end(), wrote_market_.begin(), wrote_market_.end());
-    }
-
-    // Bypass market predictions if our market demand belief is noninformative, not sufficiently
-    // informed, or can't produce usable draws.  In these cases, use initial model action
-    // parameters instead.
-    if (not bypass_beliefs.empty() and creativity_->parameters.initial.prob_keep > 0) {
-        std::bernoulli_distribution keep(creativity_->parameters.initial.prob_keep);
-        for (auto on_market = bypass_beliefs.cbegin();
-                income_available >= cost_market and on_market != bypass_beliefs.cend(); on_market++) {
-            auto &book = *on_market;
-            if (keep(rng)) {
-                income_available -= cost_market;
-                double new_price = (book->price() - cost_unit) * creativity_->parameters.initial.keep_price + cost_unit;
-                new_prices_.emplace(book, new_price);
+            for (auto &book : books) {
+                if (keep(rng)) {
+                    income_available -= cost_market;
+                    double new_price = (book->price() - cost_unit) * creativity_->parameters.initial.keep_price + cost_unit;
+                    new_prices_.emplace(book, new_price);
+                    // If we don't have enough income for any more books, leave the rest off the
+                    // market:
+                    if (income_available < cost_market) break;
+                }
             }
         }
     }
@@ -360,17 +368,18 @@ void Reader::interOptimize() {
             else {
                 // If we have no useful profit belief yet, just use the initial values:
                 if (creativity_->parameters.initial.prob_write > 0 and std::bernoulli_distribution(creativity_->parameters.initial.prob_write)(rng)) {
-                    double q = std::uniform_real_distribution<double>(creativity_->parameters.initial.q_min, creativity_->parameters.initial.q_max)(rng);
-                    double effort = creationEffort(q);
-                    // Make sure the required effort doesn't exceed the available funds
-                    if (income_available >= effort) {
-                        create_starting_ = true;
-                        create_countdown_ = creativity_->parameters.creation_time;
-                        create_price_ = cost_unit + std::uniform_real_distribution<double>(creativity_->parameters.initial.p_min, creativity_->parameters.initial.p_max)(rng);
-                        create_quality_ = q;
-                        create_effort_ = effort;
-                        create_position_ = position();
-                    }
+                    double effort = std::uniform_real_distribution<double>(creativity_->parameters.initial.l_min, creativity_->parameters.initial.l_max)(rng);
+                    // Make sure the required effort doesn't exceed the available funds; if it does,
+                    // reduce the effort:
+                    if (creation_base_cost + effort > income_available)
+                        effort = income_available - creation_base_cost;
+
+                    create_starting_ = true;
+                    create_countdown_ = creativity_->parameters.creation_time;
+                    create_price_ = cost_unit + std::uniform_real_distribution<double>(creativity_->parameters.initial.p_min, creativity_->parameters.initial.p_max)(rng);
+                    create_effort_ = effort;
+                    create_quality_ = creationQuality(effort);
+                    create_position_ = position();
                 }
             }
         }
@@ -393,13 +402,13 @@ void Reader::interApply() {
     // to author)
     assets()[creativity_->money] += creativity_->parameters.income;
 
-    const double &cost_market = creativity_->parameters.cost_market;
+    const Bundle cost_market(creativity_->money, creativity_->parameters.cost_market);
 
     auto sim = simulation();
     SharedMember<Book> newbook;
     if (create_starting_) {
         // Incur the creation effort cost as soon as we start creating
-        assets().transferApprox({creativity_->money, create_effort_ + creativity_->parameters.creation_fixed });
+        assets().transferApprox({ creativity_->money, create_effort_ + creativity_->parameters.creation_fixed });
         create_starting_ = false;
     }
     if (create_countdown_ > 0) {
@@ -408,9 +417,9 @@ void Reader::interApply() {
     else if (create_countdown_ == 0) {
         // Book is finished, release it.
 
-        if (assets()[creativity_->money] >= cost_market) {
+        if (assets().hasApprox(cost_market)) {
             // Remove the first period fixed cost of bringing the book to market:
-            assets().transferApprox({ creativity_->money, cost_market });
+            assets().transferApprox(cost_market);
 
             newbook = sim->spawn<Book>(creativity_, create_position_, sharedSelf(), wrote_.size(), create_quality_);
             // FIXME: (issue #6): authors can choose to not put this book on the market at all and
@@ -439,7 +448,7 @@ void Reader::interApply() {
         // If it's staying on the market, update the price and incur the fixed cost
         if (new_prices_.count(b) > 0) {
             b->market()->setPrice(new_prices_[b]);
-            assets()[creativity_->money] -= cost_market;
+            assets().transferApprox(cost_market);
         }
         else {
             // No new price for an old book, which means we're removing the book from the market
@@ -491,8 +500,8 @@ double Reader::quality(const SharedMember<Book> &b) const {
         q_hat = q_b.predict(b, creativity_->parameters.prediction_draws);
     }
     else {
-        // No informative beliefs above quality, so just use initial parameter mean (= midpoint)
-        q_hat = (creativity_->parameters.initial.q_max + creativity_->parameters.initial.q_min) / 2.0;
+        // No informative beliefs above quality, so just use initial parameter mean
+        q_hat = creativity_->meanInitialQuality();
     }
     if (q_hat < 0) q_hat = 0;
     quality_predictions_.emplace(b, q_hat);
@@ -966,7 +975,7 @@ void Reader::intraApply() {
         res.buy();
     }
     // Also remove any cost associated with obtaining pirated copies of books:
-    assets()[creativity_->money] -= reserved_piracy_cost_;
+    assets().transferApprox({ creativity_->money, reserved_piracy_cost_ });
     reserved_piracy_cost_ = 0.0;
     reservations_.clear();
 

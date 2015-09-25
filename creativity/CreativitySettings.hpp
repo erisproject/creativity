@@ -173,12 +173,14 @@ struct CreativitySettings {
     struct {
         /** The probability that a reader writes a book. */
         double prob_write = 0.1;
-        /** Initial book qualities are distributed Uniform[`q_min`, `q_max`].  Uninformed readers
-         * draw from this same distribution when guessing quality. */
-        double q_min = 0;
-        /** Initial book qualities are distributed Uniform[`q_min`, `q_max`].  Uninformed readers
-         * draw from this same distribution when guessing quality. */
-        double q_max = 10.0;
+        /** Initial book creation effort levels are distributed Uniform[`l_min`, `l_max`].  Readers
+         * without sufficiently informed quality beliefs use the mean of the resulting quality
+         * distribution for initial purchasing decisions. */
+        double l_min = 0;
+        /** Initial book creation effort levels are distributed Uniform[`l_min`, `l_max`].  Readers
+         * without sufficiently informed quality beliefs use the mean of the resulting quality
+         * distribution for initial purchasing decisions. */
+        double l_max = 100.0;
         /** Initial book prices are distributed `cost_unit +` Uniform[`p_min`, `p_max`] */
         double p_min = 0.5;
         /** Initial book prices are distributed `cost_unit +` Uniform[`p_min`, `p_max`] */

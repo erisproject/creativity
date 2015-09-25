@@ -64,8 +64,8 @@ void Creativity::checkParameters() {
     PROHIBIT(initial.prob_write, > 1);
     PROHIBIT(initial.p_min, < 0);
     PROHIBIT(initial.p_max, < parameters.initial.p_min);
-    PROHIBIT(initial.q_max, < parameters.initial.q_min);
-    PROHIBIT(initial.q_min, < 0);
+    PROHIBIT(initial.l_max, < parameters.initial.l_min);
+    PROHIBIT(initial.l_min, < 0);
     PROHIBIT(initial.prob_keep, < 0);
     PROHIBIT(initial.prob_keep, > 1);
     PROHIBIT(initial.keep_price, < 0);
@@ -245,6 +245,22 @@ double Creativity::priorWeight() const {
         t == parameters.public_sharing_begins ? parameters.prior_scale_public_sharing :
         t <= parameters.burnin_periods ? parameters.prior_scale_burnin :
         parameters.prior_scale;
+}
+
+double Creativity::meanInitialQuality() const {
+    const double &L = parameters.initial.l_max, &l = parameters.initial.l_min,
+          &beta = parameters.reader_creation_shape;
+    double val;
+    if (beta == 0) {
+        const double logLp1 = std::log(L+1), loglp1 = std::log(l+1);
+        val = (L*logLp1 - L + logLp1)
+            - (l*loglp1 - l + loglp1);
+    }
+    else {
+        val = (std::pow(L+1, beta+1) / (beta+1) - L)
+            - (std::pow(l+1, beta+1) / (beta+1) - l);
+    }
+    return val * (parameters.reader_creation_scale_max - parameters.reader_creation_scale_min) / (2 * (L - l));
 }
 
 std::pair<std::vector<SharedMember<Book>>&, std::unique_lock<std::mutex>> Creativity::newBooks() {

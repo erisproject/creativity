@@ -386,9 +386,9 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * simulation allows readers to differ in ability while maintaining the same functional
          * form.
          *
-         * The specified value must be non-negative, for obvious reasons.  Specifying 0 results in a
-         * reader always producing 0 quality works, regardless of effort (and so will put no effort
-         * at all into creation).
+         * The specified value must be non-negative, for obvious reasons.  Specifying 0 is
+         * technically permitted, but results in a reader always producing 0 quality works,
+         * regardless of effort (and so will put no effort at all into creation).
          */
         double creation_scale = 10.0;
 

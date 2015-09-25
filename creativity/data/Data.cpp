@@ -427,8 +427,8 @@ std::vector<initial_datum> initial_data_fields() {
     ADD_SETTING(burnin_periods);
     ADD_SETTING(prediction_draws);
     ADD_SETTING(initial.prob_write);
-    ADD_SETTING(initial.q_min);
-    ADD_SETTING(initial.q_max);
+    ADD_SETTING(initial.l_min);
+    ADD_SETTING(initial.l_max);
     ADD_SETTING(initial.p_min);
     ADD_SETTING(initial.p_max);
     ADD_SETTING(initial.prob_keep);

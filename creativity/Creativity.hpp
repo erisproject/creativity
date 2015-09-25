@@ -126,6 +126,32 @@ class Creativity : private eris::noncopyable, public std::enable_shared_from_thi
          */
         double priorWeight() const;
 
+        /** Returns the mean quality of books created with initial parameter distributions.
+         *
+         * With effort levels distributed \f$\ell \sim U[l,L]\f$, and creation_scale distributed
+         * \f$\alpha \sim U[a,A]\f$, the expected value of the mean quality will be, since the two
+         * distributions are independent, \f$E[\alpha]E[Q(\ell)] = \frac{A-a}{2} E[Q(\ell)]\f$,
+         * where \f$Q(\ell)\f$ is the quality function not including the creation_scale multiplier.
+         *
+         * Integrating the quality function \f$q(\ell) = \alpha \frac{(\ell+1)^\beta - 1}{\beta}\f$
+         * over the uniform range \f$[l,L]\f$ yields:
+         * \f[
+         *     E[Q(\ell)] = \frac{1}{L-l} \frac{1}{\beta} \left[\frac{(x+1)^{\beta+1}}{\beta+1} -
+         *     x\right]_{x=l}^{L}
+         * \f]
+         * for \f$\beta \neq 0\f$ and
+         * \f[
+         *     E[Q(\ell)] = \frac{1}{L-l} \left[x \log(x+1) - x + \log(x+1)\right]_{x=l}^{L}
+         * \f]
+         * for the log version when \f$\beta = 0\f$.  Multiplying these expressions by
+         * \f$\frac{1}{2}(A-a)\f$ gives the expected quality value of a book.
+         *
+         * Note that this function implicitly assumes that all readers' creation_scale and
+         * creation_shape parameters remain set to the values as dictated by the current
+         * `parameters` values.
+         */
+        double meanInitialQuality() const;
+
         /** Establishes a lock on the new books storage and returns a pair consisting of the new
          * books reference and a unique lock on the books.  For optimal performance, store the
          * returned value in the smallest scope practical.

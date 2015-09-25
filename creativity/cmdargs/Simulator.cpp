@@ -60,8 +60,8 @@ void Simulator::addOptions() {
 
     initial.add_options()
         ("initial-prob-write,x", range<0, 1>(s_.initial.prob_write), "The probability of writing in initial periods")
-        ("initial-quality-min,m", min<0>(s_.initial.q_min), "The minimum support of quality q ~ U[a,b] for authored books in initial periods")
-        ("initial-quality-max,M", min<0>(s_.initial.q_max), "The maximum support of quality q ~ U[a,b] for authored books in initial periods")
+        ("initial-effort-min,m", min<0>(s_.initial.l_min), "The minimum support of effort l ~ U[a,b] for authored books in initial periods")
+        ("initial-effort-max,M", min<0>(s_.initial.l_max), "The maximum support of effort l ~ U[a,b] for authored books in initial periods")
         ("initial-price-min,n", min<0>(s_.initial.p_min), "The minimum support of price c + U[a,b] for new books in initial periods")
         ("initial-price-max,N", min<0>(s_.initial.p_max), "The maximum support of price c + U[a,b] for new books in initial periods")
         ("initial-prob-keep,k", range<0, 1>(s_.initial.prob_keep), "The probability of keeping a previously-written book on the market for another period")

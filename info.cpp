@@ -62,8 +62,8 @@ int main(int argc, char *argv[]) {
     PRINT_SETTING(burnin_periods);
     PRINT_SETTING(prediction_draws);
     PRINT_SETTING(initial.prob_write);
-    PRINT_SETTING(initial.q_min);
-    PRINT_SETTING(initial.q_max);
+    PRINT_SETTING(initial.l_min);
+    PRINT_SETTING(initial.l_max);
     PRINT_SETTING(initial.p_min);
     PRINT_SETTING(initial.p_max);
     PRINT_SETTING(initial.prob_keep);
@@ -110,8 +110,8 @@ int main(int argc, char *argv[]) {
         ADD_SAME(burnin_periods);
         ADD_SAME(prediction_draws);
         ADD_SAME(initial.prob_write);
-        ADD("--initial-quality-min", initial.q_min);
-        ADD("--initial-quality-max", initial.q_max);
+        ADD("--initial-effort-min", initial.l_min);
+        ADD("--initial-effort-max", initial.l_max);
         ADD("--initial-price-min", initial.p_min);
         ADD("--initial-price-max", initial.p_max);
         ADD_SAME(initial.prob_keep);

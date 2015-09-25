@@ -819,8 +819,8 @@ void GUI::thr_update_parameters() {
 
 #define SET_INIT_SB(PARAMETER) widget<Gtk::SpinButton>("set_init_" #PARAMETER)->set_value(creativity_->parameters.initial.PARAMETER)
     SET_INIT_SB(prob_write);
-    SET_INIT_SB(q_min);
-    SET_INIT_SB(q_max);
+    SET_INIT_SB(l_min);
+    SET_INIT_SB(l_max);
     SET_INIT_SB(p_min);
     SET_INIT_SB(p_max);
     SET_INIT_SB(prob_keep);
@@ -1095,8 +1095,8 @@ void GUI::initializeSim() {
     COPY_SB_I(creation_fixed);
 #define COPY_SB_INIT_D(PARAMETER) set.initial.PARAMETER = sb("set_init_"#PARAMETER)
     COPY_SB_INIT_D(prob_write);
-    COPY_SB_INIT_D(q_min);
-    COPY_SB_INIT_D(q_max);
+    COPY_SB_INIT_D(l_min);
+    COPY_SB_INIT_D(l_max);
     COPY_SB_INIT_D(p_min);
     COPY_SB_INIT_D(p_max);
     COPY_SB_INIT_D(prob_keep);
