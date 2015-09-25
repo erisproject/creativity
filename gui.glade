@@ -1299,7 +1299,7 @@ The maximum number of links in a simulation of &lt;b&gt;&lt;i&gt;R&lt;/i&gt;&lt;
                                                 <property name="can_focus">True</property>
                                                 <property name="tooltip_markup" translatable="yes">The discount level applied to belief priors during the &lt;b&gt;first&lt;/b&gt; period when piracy becomes available.
 
-This value overrides the "Prior discounting" setting in just the "PIracy begins" period.</property>
+This value overrides the "Prior discounting" setting in just the "Piracy begins" period.</property>
                                                 <property name="margin_bottom">1</property>
                                                 <property name="invisible_char">●</property>
                                                 <property name="input_purpose">number</property>
@@ -1380,7 +1380,7 @@ This value overrides the "Prior discounting" setting in just the "PIracy begins"
                                               <object class="GtkSpinButton" id="set_income">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
-                                                <property name="tooltip_text" translatable="yes">The per-period fixed cost of keeping a book on the market.</property>
+                                                <property name="tooltip_text" translatable="yes">The per-period exogeneous income received by readers at the beginning of each period.</property>
                                                 <property name="margin_bottom">1</property>
                                                 <property name="invisible_char">●</property>
                                                 <property name="input_purpose">number</property>
@@ -1433,7 +1433,7 @@ This value overrides the "Prior discounting" setting in just the "PIracy begins"
                                               <object class="GtkSpinButton" id="set_cost_piracy">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
-                                                <property name="tooltip_text" translatable="yes">The per-unit cost to the author of creating a copy of a book.</property>
+                                                <property name="tooltip_text" translatable="yes">The per-unit cost to the receiver of obtaining a pirated copy of a book from an adjacent reader on the piracy network.</property>
                                                 <property name="margin_bottom">1</property>
                                                 <property name="invisible_char">●</property>
                                                 <property name="input_purpose">number</property>
@@ -1614,7 +1614,7 @@ When the Creation time setting is greater than 0, the random location is relativ
                                               <object class="GtkSpinButton" id="set_dimensions">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
-                                                <property name="tooltip_text" translatable="yes">The number of dimensions of the simulation.  Note that the simulation world wraps in each dimension, so 1 dimension is really a circle, 2 dimensions is a torus, etc.</property>
+                                                <property name="tooltip_text" translatable="yes">The number of dimensions of the simulation.  Note that the simulation world wraps in each dimension, so 1 dimension is really a circle, 2 dimensions is a torus.  This graphical creativity interface supports only 1 or 2 dimensions.</property>
                                                 <property name="margin_bottom">1</property>
                                                 <property name="invisible_char">●</property>
                                                 <property name="input_purpose">number</property>
