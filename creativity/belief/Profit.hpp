@@ -76,16 +76,8 @@ class Profit : public eris::belief::BayesianLinearRestricted {
 
         /** Given `previousBooks` and `marketBooks` parameters, a function \f$q(\ell)\f$ that returns
          * expected quality for a given value \f$\ell\f$, and \f$\ell_{max}\f$, this numerically
-         * determines the value of `l` in \f$[0, max_l]\f$ that maximizes the expected net profit
-         * function:
-         *
-         * \f[
-         *      \Pi = \beta_1 + \beta_2 (q(\ell))^D + \beta_3 firstBook + \beta_4 previousBooks +
-         *      \beta_4 marketBooks - \ell
-         * \f]
-         *
-         * using the current values of `beta`.  Note that this maximum is likely to simply be
-         * \f$0\f$ or \f$\ell_{max}\f$ if \f$(q(\ell))^D\f$ is not concave.
+         * determines the value of `l` in \f$[0, max_l]\f$ that maximizes the profit less effort.
+         * Initial fixed creation cost is not included.
          *
          * \param draws the number of beta draws to use for prediction
          * \param q A function, lambda or similar object that takes a double and returns the quality
