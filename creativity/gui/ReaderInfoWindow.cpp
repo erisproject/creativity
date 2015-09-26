@@ -83,7 +83,7 @@ ReaderInfoWindow::ReaderInfoWindow(
     std::vector<std::string> q_vars(rdr.quality.names());
     for (size_t i = 0; i < q_vars.size(); i++)
         data_append(grid_quality, "q_" + std::to_string(i), beta + "[" + q_vars[i] + "]", 1, 1);
-    matrix_at(grid_quality, "q_V", "s<sup>2</sup><b>V</b>", 2, 2, q_vars.size(), q_vars.size());
+    matrix_at(grid_quality, "q_s2V", "s<sup>2</sup><b>V</b>", 2, 2, q_vars.size(), q_vars.size());
 
     auto &grid_profit = new_tab_grid(beliefs, "Profit");
     labels_append(grid_profit, "Dependent variable", "<i>lifetimeProfit</i>");
@@ -95,7 +95,7 @@ ReaderInfoWindow::ReaderInfoWindow(
     data_append(grid_profit, "_p_draws", "# successful draws");
     data_append(grid_profit, "_p_discards", "# discarded draws");
     data_append(grid_profit, "_p_drawtype", "Draw method");
-    matrix_at(grid_profit, "p_V", "s<sup>2</sup><b>V</b>", 2, 2, p_vars.size(), p_vars.size());
+    matrix_at(grid_profit, "p_s2V", "s<sup>2</sup><b>V</b>", 2, 2, p_vars.size(), p_vars.size());
 
     auto &grid_demand = new_tab_grid(beliefs, "Demand");
     labels_append(grid_demand, "Dependent variable", "<i>quantityDemanded</i>");
@@ -107,7 +107,7 @@ ReaderInfoWindow::ReaderInfoWindow(
     data_append(grid_demand, "_d_draws", "# successful draws");
     data_append(grid_demand, "_d_discards", "# discarded draws");
     data_append(grid_demand, "_d_drawtype", "Draw method");
-    matrix_at(grid_demand, "d_V", "s<sup>2</sup><b>V</b>", 2, 2, d_vars.size(), d_vars.size());
+    matrix_at(grid_demand, "d_s2V", "s<sup>2</sup><b>V</b>", 2, 2, d_vars.size(), d_vars.size());
     comment_append(grid_demand, "<i>NB: This regression is for single-period demand.</i>", p_vars.size() + 3);
 
     nbs_.emplace_back();
@@ -137,7 +137,7 @@ ReaderInfoWindow::ReaderInfoWindow(
     data_append(grid_pextrap, "_pe_draws", "# successful draws");
     data_append(grid_pextrap, "_pe_discards", "# discarded draws");
     data_append(grid_pextrap, "_pe_drawtype", "Draw method");
-    matrix_at(grid_pextrap, "pe_V", "s<sup>2</sup><b>V</b>", 2, 2, p_vars.size(), p_vars.size());
+    matrix_at(grid_pextrap, "pe_s2V", "s<sup>2</sup><b>V</b>", 2, 2, p_vars.size(), p_vars.size());
     comment_append(grid_pextrap, "<i>NB: This is the same model as the Profit belief, but its data also includes extrapolated values for "
             "still-on-market books using ProfitStream beliefs, while Profit beliefs only include books once they leave the market.</i>",
             p_vars.size() + 3);
