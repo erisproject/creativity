@@ -82,18 +82,18 @@ namespace creativity { namespace gui {
 GUI::GUI(std::shared_ptr<Creativity> creativity,
         std::function<void(Parameter)> configure,
         std::function<void()> initialize,
-        std::function<void(unsigned int count)> run,
+        std::function<void(eris_time_t end)> change_periods,
+        std::function<void()> run,
         std::function<void()> stop,
-        std::function<void()> resume,
         std::function<void()> step,
         std::function<void()> quit)
     :
         creativity_{std::move(creativity)},
         on_configure_{std::move(configure)},
         on_initialize_{std::move(initialize)},
+        on_change_periods_{std::move(change_periods)},
         on_run_{std::move(run)},
         on_stop_{std::move(stop)},
-        on_resume_{std::move(resume)},
         on_step_{std::move(step)},
         on_quit_{std::move(quit)}
 {}
@@ -249,7 +249,7 @@ void GUI::thr_run(const cmdargs::GUI &args) {
     });
 
     widget<Gtk::Button>("btn_resume")->signal_clicked().connect([this] {
-        queueEvent(Event::Type::resume);
+        runSim();
     });
 
     widget<Gtk::Button>("btn_step")->signal_clicked().connect([this] {
@@ -306,6 +306,14 @@ void GUI::thr_run(const cmdargs::GUI &args) {
         th.param = ParamType::threads; th.ul = std::stoul(widget<Gtk::ComboBoxText>("combo_threads")->get_active_id());
         queueEvent(th);
     });
+
+    widget<Gtk::SpinButton>("set_periods")->signal_value_changed().connect([this] {
+        queueEvent(Event::Type::periods, sb_int("set_periods"));
+
+        widget<Gtk::Button>("btn_run")->set_sensitive(true);
+        widget<Gtk::Button>("btn_resume")->set_sensitive(true);
+    });
+
 
     widget<Gtk::Entry>("set_seed")->signal_icon_press().connect([this](Gtk::EntryIconPosition icon_position, const GdkEventButton*) -> void {
         if (icon_position == Gtk::EntryIconPosition::ENTRY_ICON_SECONDARY)
@@ -909,23 +917,34 @@ void GUI::thr_signal() {
         widget<Gtk::Button>("btn_run")->set_visible(true);
         widget<Gtk::Button>("btn_run")->set_sensitive(true);
         widget<Gtk::Button>("btn_resume")->set_visible(false);
+        widget<Gtk::Button>("btn_resume")->set_sensitive(true);
         widget<Gtk::Button>("btn_pause")->set_visible(false);
         widget<Gtk::Button>("btn_step")->set_sensitive(true);
     }
     else if (last_state.type == Signal::Type::running) {
-        widget<Gtk::Button>("btn_run")->set_visible(false);
-        widget<Gtk::Button>("btn_run")->set_sensitive(true);
-        widget<Gtk::Button>("btn_resume")->set_visible(false);
+        auto btn_run = widget<Gtk::Button>("btn_run"),
+             btn_resume = widget<Gtk::Button>("btn_resume");
+        btn_run->set_visible(false);
+        btn_run->set_sensitive(false);
+        btn_resume->set_visible(false);
+        btn_resume->set_sensitive(false);
         widget<Gtk::Button>("btn_pause")->set_visible(true);
         widget<Gtk::Button>("btn_step")->set_sensitive(false);
 
         widget<Gtk::ComboBox>("combo_threads")->set_sensitive(false);
     }
     else if (last_state.type == Signal::Type::stopped) {
-        // Turn off pause and turn on either play or resume buttons
-        widget<Gtk::Button>("btn_run")->set_visible(!last_state.boolean);
-        widget<Gtk::Button>("btn_resume")->set_visible(last_state.boolean);
-        widget<Gtk::Button>("btn_pause")->set_visible(false);
+        // If either the pause button or the resume button was visible, turn on resume, otherwise turn on run.  Then hide pause.
+        bool more = last_state.boolean;
+        auto btn_pause = widget<Gtk::Button>("btn_pause"),
+             btn_resume = widget<Gtk::Button>("btn_resume"),
+             btn_run = widget<Gtk::Button>("btn_run");
+        bool show_resume = btn_pause->get_visible() or btn_resume->get_visible();
+        btn_resume->set_visible(show_resume);
+        btn_resume->set_sensitive(more);
+        btn_run->set_visible(!show_resume);
+        btn_run->set_sensitive(more);
+        btn_pause->set_visible(false);
         widget<Gtk::Button>("btn_step")->set_sensitive(true);
 
         widget<Gtk::ComboBox>("combo_threads")->set_sensitive(true);
@@ -1103,10 +1122,11 @@ void GUI::initializeSim() {
     queueEvent(p);
 
     queueEvent(Event::Type::initialize);
+    queueEvent(Event::Type::periods, sb_int("set_periods"));
 }
 
 void GUI::runSim() {
-    queueEvent(Event::Type::run, sb_int("set_periods"));
+    queueEvent(Event::Type::run);
 }
 
 void GUI::newStates(unsigned long switch_to) {
@@ -1131,7 +1151,7 @@ void GUI::progress(unsigned long t, unsigned long end, double speed) {
     queueSignal(std::move(s));
 }
 
-void GUI::stopped(bool manual) { queueSignal({Signal::Type::stopped, manual}); }
+void GUI::stopped(bool more) { queueSignal({Signal::Type::stopped, more}); }
 
 void GUI::error(std::string message) { queueSignal({ Signal::Type::error, message }); }
 
@@ -1191,14 +1211,14 @@ void GUI::handleEvent(const Event &event) {
             case Event::Type::initialize:
                 if (on_initialize_) on_initialize_();
                 break;
+            case Event::Type::periods:
+                if (on_change_periods_) on_change_periods_(event.ul);
+                break;
             case Event::Type::run:
-                if (on_run_) on_run_(event.ul);
+                if (on_run_) on_run_();
                 break;
             case Event::Type::stop:
                 if (on_stop_) on_stop_();
-                break;
-            case Event::Type::resume:
-                if (on_resume_) on_resume_();
                 break;
             case Event::Type::step:
                 if (on_step_) on_step_();

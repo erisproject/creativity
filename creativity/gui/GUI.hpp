@@ -70,25 +70,27 @@ class GUI : eris::noncopyable {
                  */
                 std::function<void(Parameter param)> configure,
 
-                /** A function to call to initialize the simulation.  If something goes wrong, this
-                 * should throw an exception derived from std::exception: the `.what()` value of the
-                 * exception will be displayed to the user as an error message.
+                /** A function to call to initialize the simulation without starting it.  If
+                 * something goes wrong, this should throw an exception derived from std::exception:
+                 * the `.what()` value of the exception will be displayed to the user as an error
+                 * message.
                  */
                 std::function<void()> initialize,
 
-                /** Called to run the simulation for `rounds` periods. `initialize` will be called
-                 * before the first call to this.
+                /** A function called to specify the number of simulation periods, and called again
+                 * whenever the user changes the number of simulation periods. */
+                std::function<void(eris::eris_time_t end)> change_periods,
+
+                /** Called to run or continue running the simulation until the number of periods
+                 * sent by the last `change_periods` call have been completed.  `initialize` will be
+                 * called before the first call to this, and `change_periods` will have been called
+                 * one or more times.
                  */
-                std::function<void(eris::eris_time_t rounds)> run,
+                std::function<void()> run,
 
                 /** Called when the user hits the stop button in the GUI. This should pause the
-                 * current simulation run loop until either resume or run are called. */
+                 * current simulation run loop until run or step are called. */
                 std::function<void()> stop,
-
-                /** Called when the user resumes the simulation in the GUI after having stopped it.
-                 * This should resume running of the current simulation run loop (if there are
-                 * iterations remaining). */
-                std::function<void()> resume,
 
                 /** Called when the user wishes to step forward one period then stop. */
                 std::function<void()> step,
@@ -144,10 +146,10 @@ class GUI : eris::noncopyable {
 
         /** Sends a signal to the GUI thread that the simulation has stopped running.
          *
-         * \param manual is true if this stopped because the user hit "Stop" during an active run, false
-         * otherwise (e.g. initialization without running, or the configured number of steps completed).
+         * \param more is true if there are still more simulation periods to run (as specified in
+         * the Periods setting).
          */
-        void stopped(bool manual);
+        void stopped(bool more);
 
         /** Sends a signal to the GUI thread that an error has occurred.  Takes a string to display
          * in a dialog to the user. */
@@ -189,9 +191,9 @@ class GUI : eris::noncopyable {
                 enum class Type {
                     configure, ///< An event that configures a Parameter
                     initialize, ///< An event triggered when the user hits "begin" with configuration data
+                    periods, ///< An event indicating that the number of periods is now known or has changed
                     run, ///< An event triggered when starting a new or resuming a stopped simulation
                     stop, ///< The user hit the "stop" button to pause the simulation.
-                    resume, ///< The user hit the "resume" button to unpause the simulation.
                     step, ///< The user hit the "step" button to unpause the simulation for one step.
                     quit, ///< Sent when the user quits the application
                     none ///< Fake Event indicating that no events are pending
@@ -453,9 +455,9 @@ class GUI : eris::noncopyable {
         // The callbacks for GUI thread events
         std::function<void(GUI::Parameter)> on_configure_;
         std::function<void()> on_initialize_;
-        std::function<void(unsigned int count)> on_run_;
+        std::function<void(unsigned int count)> on_change_periods_;
+        std::function<void()> on_run_;
         std::function<void()> on_stop_;
-        std::function<void()> on_resume_;
         std::function<void()> on_step_;
         std::function<void()> on_quit_;
 

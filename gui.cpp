@@ -38,7 +38,7 @@ int main(int argc, char *argv[1]) {
     std::cout << std::setprecision(16);
 
     bool setup = false, stopped = true, step = false, quit = false;
-    eris_time_t run_start = 0, run_end = 0;
+    eris_time_t run_end = 0;
     std::chrono::milliseconds sync_speed{50};
     bool save_to_file = false, load_from_file = false;
     unsigned int max_threads = cmd.threads;
@@ -76,6 +76,8 @@ int main(int argc, char *argv[1]) {
         }
     };
 
+    auto on_change_periods = [&](eris_time_t end) { run_end = end; };
+
     auto on_initialize = [&]() {
         if (load_from_file)
             throw std::logic_error("Cannot initialize a new simulation after loading one from a file");
@@ -88,21 +90,18 @@ int main(int argc, char *argv[1]) {
         setup = true;
     };
 
-    auto on_run = [&](eris_time_t periods) { // Run
+    auto on_run = [&]() {
         if (not setup)
             throw std::logic_error("Event error: RUN before successful SETUP");
         if (load_from_file)
             throw std::logic_error("Error: simulation state is readonly");
-        run_start = creativity->sim->t();
-        run_end = run_start + periods;
         stopped = false;
     };
     auto on_stop = [&]() { stopped = true; };
     auto on_step = [&]() { step = true; };
-    auto on_resume = [&]() { stopped = false; };
     auto on_quit = [&]() { quit = true; };
 
-    GUI gui(creativity, on_configure, on_initialize, on_run, on_stop, on_resume, on_step, on_quit);
+    GUI gui(creativity, on_configure, on_initialize, on_change_periods, on_run, on_stop, on_step, on_quit);
 
     try {
         gui.start(cmd);
@@ -188,7 +187,7 @@ int main(int argc, char *argv[1]) {
         // If the GUI told us to quit, just quit.
         if (quit) break;
 
-        // Tell the GUI we finished
+        // Tell the GUI we stopped but, if the argument is true, that there are more periods to go
         gui.stopped(sim->t() < run_end);
 
         // Wait for the GUI to tell us to do something else
