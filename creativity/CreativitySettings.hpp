@@ -181,10 +181,12 @@ struct CreativitySettings {
          * without sufficiently informed quality beliefs use the mean of the resulting quality
          * distribution for initial purchasing decisions. */
         double l_max = 100.0;
+        /** Initial book prices are distributed `cost_unit +` Uniform[`p_min`, `p_max`].  Note that
+         * initial book quality, at default creation shape/scale and l_min/l_max settings, can take
+         * a value anywhere from 0 to 46.15, and has a mean of 20.14. */
+        double p_min = 4.0;
         /** Initial book prices are distributed `cost_unit +` Uniform[`p_min`, `p_max`] */
-        double p_min = 0.5;
-        /** Initial book prices are distributed `cost_unit +` Uniform[`p_min`, `p_max`] */
-        double p_max = 5.0;
+        double p_max = 34.0;
         /** The probability of a book being kept on the market for another period. */
         double prob_keep = 0.5;
         /** The relative price-above-marginal-cost of a book being kept on the market for another
