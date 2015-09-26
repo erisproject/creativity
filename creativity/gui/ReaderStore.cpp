@@ -60,6 +60,8 @@ void ReaderStore::get_value_vfunc(const iterator &iter, int column, Glib::ValueB
     else IFCOL_V(pos_y, r.position[1]);
     else IFCOL(u);
     else IFCOL(u_lifetime);
+    else IFCOL(creation_shape);
+    else IFCOL(creation_scale);
     else IFCOL_V(pos_str, GUI::pos_to_string(r.position));
     else IFCOL_V(books_owned, r.library.size());
     else IFCOL_V(books_purchased, r.library_purchased);
@@ -89,6 +91,8 @@ void ReaderStore::set_sort_column_id_vfunc(int sort_column_id, Gtk::SortType ord
     ELSE_IF_COL(pos_str);
     ELSE_IF_COL(u);
     ELSE_IF_COL(u_lifetime);
+    ELSE_IF_COL(creation_shape);
+    ELSE_IF_COL(creation_scale);
     ELSE_IF_COL(num_friends);
     ELSE_IF_COL(books_owned);
     ELSE_IF_COL(books_purchased);
@@ -115,6 +119,8 @@ LESS_GREATER_A(pos_x, position[0])
 LESS_GREATER_A(pos_y, position[1])
 LESS_GREATER(u)
 LESS_GREATER(u_lifetime)
+LESS_GREATER(creation_shape)
+LESS_GREATER(creation_scale)
 LESS_GREATER_A(num_friends, friends.size())
 LESS_GREATER_A(books_owned, library.size())
 LESS_GREATER_A(books_purchased, library_purchased)
@@ -149,12 +155,13 @@ void ReaderStore::appendColumnsTo(Gtk::TreeView &v) const {
     appendCol(v, "Position", columns.pos_str, 110);
     appendCol(v, "Utility", columns.u, 90);
     appendCol(v, "Life Util.", columns.u_lifetime, 90);
-    appendCol(v, "# Friends", columns.num_friends, 80);
+    appendCol(v, "Friends", columns.num_friends, 80);
     appendCol(v, "Books", columns.books_owned, 80);
-    appendCol(v, "# New", columns.books_new, 80);
-    appendCol(v, "# Bought", columns.books_purchased, 100);
-    appendCol(v, "# Pirated", columns.books_pirated, 100);
-    appendCol(v, "# Written", columns.books_written, 100);
+    appendCol(v, "New", columns.books_new, 60);
+    appendCol(v, "Bought", columns.books_purchased, 80);
+    appendCol(v, "Pirated", columns.books_pirated, 80);
+    appendCol(v, "Wrote", columns.books_written, 75);
+    appendCol(v, "C.Scale", columns.creation_scale, 85);
     appendCol(v, "Last wrote", columns.last_book_age, 100);
 }
 

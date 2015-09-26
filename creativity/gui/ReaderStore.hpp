@@ -23,21 +23,7 @@ class ReaderStore : public MemberStore<state::ReaderState>, private virtual Glib
     public:
         /** Interface class between a simulation state's Reader information and a Gtk::TreeView.
          *
-         * This exposes 9 columns:
-         * - ID
-         * - x position
-         * - y position
-         * - position string (made from x position and y position)
-         * - current utility
-         * - lifetime utility
-         * - books owned
-         * - books purchased
-         * - books pirated
-         * - new books
-         * - new books (purchased)
-         * - new books (pirated)
-         * - books written
-         * - age of most recently written book (simulation age if no books written)
+         * This exposes various reader-specific columns; see ColRec for details.
          */
         static Glib::RefPtr<ReaderStore> create(std::shared_ptr<const state::State> state);
 
