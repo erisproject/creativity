@@ -176,7 +176,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         template <typename Container>
         typename std::enable_if<std::is_base_of<Book, typename Container::value_type::member_type>::value, double>::type
         u(double money, const Container &books) const {
-            double u = money - penalty(books.size());
+            double u = money - numBooksPenalty(books.size());
             for (auto &book : books) {
                 u += uBook(book);
             }
@@ -189,7 +189,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         template <typename Container>
         typename std::enable_if<std::is_same<eris::eris_id_t, typename Container::value_type>::value, double>::type
         u(double money, const Container &books) const {
-            double u = money - penalty(books.size());
+            double u = money - numBooksPenalty(books.size());
             for (auto &book_id : books) {
                 u += uBook(simGood<Book>(book_id));
             }
@@ -234,10 +234,10 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         const std::set<eris::SharedMember<Book>>& wrote() const;
 
         /** Returns the unpenalized utility of reading the given book.  The utility is found by
-         * adding together the distance polynomial value and the quality value of the book.  The
-         * distance polynomial is as returned by distPolynomial(), evaluated at the distance from
-         * the Reader to the given Book.  The quality comes from calling the quality() method.  If
-         * the calculated overall value is less than 0, 0 is returned.
+         * subtracting the distance polynomial value from the quality value of the book.  The
+         * distance polynomial is as returned by distancePenaltyPolynomial(), evaluated at the
+         * distance from the Reader to the given Book.  The quality comes from calling the quality()
+         * method.  If the calculated overall value is less than 0, 0 is returned.
          *
          * If the book is already in the reader's library, this returns the realized utility.
          * Otherwise, this method returns an estimate by calling quality().
@@ -264,71 +264,64 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          */
         virtual double quality(const eris::SharedMember<Book> &b) const;
 
-        /** Utility penalty from reading `books` books in the same period.  The basic idea behind
-         * this penalty is that reading more books has a larger opportunity cost (or equivalently,
-         * books read in the same period have decreasing marginal utility).
+        /** Evaluates the given polynomial at the value `x`.
          *
-         * Must be (non-strictly) increasing and strictly positive, and must return 0 for 0 books.
-         *
-         * By default the current penalty polynomial is evaluated at `books`.
+         * \param x the value at which to evaluate the polynomial.
+         * \param polynomial the coefficients at which to evaluate the polynomial.  `polynomial[0]`
+         * is the constant term, `polynomial[i]` applies to the \f$x^i\f$ term.
          */
-        virtual double penalty(unsigned long books) const;
+        static double evalPolynomial(double x, const std::vector<double> &polynomial);
 
-        /** Sets the coefficients for the polynomial used in uBook(double).  Coefficient \f$c_i\f$
-         * is the coefficient multiplying \f$d^i\f$ in the resulting polynomial.  For example,
-         * coefficients(std::vector<double>{{3, 1, -1}}) sets the coefficients for distance utility
-         * of \f$-d^2 + d + 3\f$.  The polynomial is permitted to produce negative values: these will
-         * be treated as 0 in uBook().
+        /** Sets the coefficients for the polynomial used in uBook(double) to calculate the penalty
+         * for book distance.  Coefficient \f$c_i\f$ is the coefficient multiplying \f$d^i\f$ in the
+         * resulting polynomial.  For example, `coefficients(std::vector<double>{{0, 1, 0.5}})` sets
+         * the coefficients for distance penalty to of \f$d + \frac{d^2}{2}\f$.  The polynomial
+         * should be increasing in \f$d\f$ for \f$d \geq 0\f$; this is checked for a few sample `d`
+         * values to catch common problems, but the checking is not exhaustive.
+         *
+         * The first coefficient (i.e.\ the constant) is typically 0: readers receive no penalty for
+         * reading a book at their most preferred location.
          *
          * Some rudimentary safety checks are performed to check common ways the given polynomial
          * might be invalid (note that these checks are skipped if the indicated element of `coef`
          * doesn't exist):
          * - all coef[i] values must be finite.
-         * - `coef[0] > 0` must be true.  If it isn't, the decreasing requirement of uBook means
-         *   that the reader gets no utility ever from books (since \f$f(x > 0) < f(0) \leq 0\f$).
-         * - The first non-zero coefficient (not counting `coef[0]`) must be negative (typically
-         *   this means `coef[1] <= 0`).  If it isn't, the polynomial is increasing for values of
-         *   `d` close to 0 (more technically, the derivative of the polynomial is strictly positive
-         *   at 0).
-         * - the last non-zero coefficient (not counting `coef[0]`) must be negative.  If it isn't,
-         *   the limit of the polynomial is positive infinity and thus must (eventually) be upward
-         *   sloping.
-         * - the polynomial must be decreasing when evaluated at 0, 0.000001, 0.001, 0.01, 0.1, 1,
-         *   10, 100, 1000, 1000000.  These values are arbitrary, and of course this is no guarantee
-         *   that the polynomial is decreasing between and outside these values: it only provides a
-         *   safety check.
+         * - the first non-zero coefficient after the constant must be non-negative (if not, the
+         *   polynomial will be decreasing in the neighbourhood of \f$d=0\f$ since the first lowest
+         *   order, non-negative, non-constant term dominates in values very close to 0).
+         * - the last, non-zero coefficient must be positive (if not, the polynomial will
+         *   (eventually) become negative.
+         * - f(0) <= f(1e-100) <= f(1e-10) <= f(.1) <= f(1) <= f(10) <= f(100) <= f(1e10) must all hold (this
+         *   is a rudimentary test that the function is actually increasing).
          *
          * \param coef the vector of polynomial coefficients.
          *
          * Note that the coefficients set here might not be used by a subclass that overrides
          * uBook().
          */
-        void uPolynomial(std::vector<double> coef);
+        void distancePenaltyPolynomial(std::vector<double> coef);
 
         /** Accesses the vector of coefficients for the uBook() polynomial.
          *
          * \sa uPolynomial(std::vector<double>)
          */
-        const std::vector<double>& uPolynomial() const;
+        const std::vector<double>& distancePenaltyPolynomial() const;
 
-        /** Evaluates the given polynomial at the value `x`.
-         *
-         * \param x the value at which to evaluate the polynomial.
-         * \param polynomial the coefficients at which to evaluate the polynomial.
-         * `coefficients[0]` is the constant term, `coefficients[i]` applies to the \f$x^i\f$ term.
+        /** The default distance penalty polynomial coefficients.  The default is {0, 1}, that
+         * is, book utility decreases by the distance to the book).
          */
-        static double evalPolynomial(double x, const std::vector<double> &polynomial);
+        static constexpr std::initializer_list<double> default_distance_penalty_polynomial{0, 1, 0.25};
 
-        /** The default polynomial coefficients.  The default is the straight line \f$4-d\f$ (that
-         * is, the vector {4.0, -1.0}).
+        /** Returns the distance penalty by evaluating the distancePenaltyPolynomial() at the given
+         * distance value.
          */
-        static const std::vector<double> default_polynomial;
+        double distancePenalty(double distance) const;
 
-        /** Sets the coefficients for the penalty polynomial used in `penalty(n)`.
-         * Coefficient \f$c_i\f$ is the coefficient multiplying \f$n^i\f$ in the resulting
-         * polynomial.  For example, coefficients(std::vector<double>{{0, 1, 0.25}}) sets the
-         * coefficients for a book count penalty of \f$\frac{1}{4}n^2 + n\f$.  The polynomial is
-         * required to evaluate to be increasing in the non-negative integers \f$n\f$.
+        /** Sets the coefficients for the penalty polynomial for the number of books read used in
+         * `numBooksPenalty(n)`.  Coefficient \f$c_i\f$ is the coefficient multiplying \f$n^i\f$ in
+         * the resulting polynomial.  For example, coefficients(std::vector<double>{{0, 1, 0.25}})
+         * sets the coefficients for a book count penalty of \f$\frac{1}{4}n^2 + n\f$.  The
+         * polynomial is required to evaluate to be increasing in the non-negative integers \f$n\f$.
          *
          * Some rudimentary safety checks are performed to check common ways the given polynomial
          * might be invalid; in particular, it must satisfy each of the following inequalities:
@@ -342,19 +335,29 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * \throw std::domain_error if the polynomial appears inadmissable by failure of one of the
          * above safety checks.
          */
-        void penaltyPolynomial(std::vector<double> coef);
+        void numBooksPenaltyPolynomial(std::vector<double> coef);
 
-        /** Returns the coefficients for the penalty() polynomial.
+        /** Returns the coefficients for the numBooksPenalty() polynomial.
          *
          * \sa penaltyPolynomial(std::vector<double>)
          */
-        const std::vector<double>& penaltyPolynomial() const;
+        const std::vector<double>& numBooksPenaltyPolynomial() const;
 
         /** The default penality polynomial coefficients.  The default is the function
          * \f$\frac{b^2}{4}\f$, which has first few values (beginning at 0 books): (0, 0.25, 1,
          * 2.25, 4)
          */
-        static const std::vector<double> default_penalty_polynomial;
+        static constexpr std::initializer_list<double> default_num_books_penalty_polynomial{0, 0, 1};
+
+        /** Utility penalty from reading `books` books in the same period.  The basic idea behind
+         * this penalty is that reading more books has a larger opportunity cost (or equivalently,
+         * books read in the same period have decreasing marginal utility).
+         *
+         * Must be (non-strictly) increasing and strictly positive, and must return 0 for 0 books.
+         *
+         * By default the current penalty polynomial is evaluated at `books`.
+         */
+        virtual double numBooksPenalty(unsigned long books) const;
 
         /** The reader's creation function shape coefficient.  This reader can exhert effort \f$\ell
          * \geq 0\f$ to create a book of quality \f$q(\ell) = \alpha \frac{(\ell+1)^\beta -
@@ -647,8 +650,8 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         void updateProfitStreamBelief();
 
     private:
-        std::vector<double> u_poly_ = Reader::default_polynomial;
-        std::vector<double> pen_poly_ = Reader::default_penalty_polynomial;
+        std::vector<double> dist_penalty_poly_;
+        std::vector<double> nbooks_penalty_poly_;
         /// Map of books owned to properties of those books (in BookCopy container objects):
         std::unordered_map<eris::SharedMember<Book>, BookCopy> library_;
         /** Cache of quality predictions used so that quality(book) returns the same value if called

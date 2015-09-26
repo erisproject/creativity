@@ -23,49 +23,63 @@ using namespace creativity::belief;
 
 namespace creativity {
 
-const std::vector<double> Reader::default_polynomial{{4., -1.}};
-const std::vector<double> Reader::default_penalty_polynomial{{0, 0, 0.25}};
+constexpr std::initializer_list<double> Reader::default_distance_penalty_polynomial;
+constexpr std::initializer_list<double> Reader::default_num_books_penalty_polynomial;
 const std::vector<unsigned int> Reader::profit_stream_ages{{1,2,4,8}};
 
-Reader::Reader(std::shared_ptr<Creativity> creativity, const Position &pos)
-    : WrappedPositional<agent::AssetAgent>(pos, creativity->parameters.boundary, -creativity->parameters.boundary),
-    creativity_{std::move(creativity)}, profit_belief_{new Profit()}, profit_belief_extrap_{profit_belief_}
+Reader::Reader(std::shared_ptr<Creativity> creativity, const Position &pos) :
+    WrappedPositional<agent::AssetAgent>(pos, creativity->parameters.boundary, -creativity->parameters.boundary),
+    creativity_{std::move(creativity)},
+    profit_belief_{new Profit()},
+    profit_belief_extrap_{profit_belief_}
 {
     profit_stream_beliefs_.emplace(1, ProfitStream(1));
+    distancePenaltyPolynomial(default_distance_penalty_polynomial);
+    numBooksPenaltyPolynomial(default_num_books_penalty_polynomial);
 }
 
-void Reader::uPolynomial(std::vector<double> coef) {
-    // 0th coefficient must be positive
-    if (coef.size() >= 1 and coef[0] <= 0) throw std::domain_error("Invalid uPolynomial: coef[0] <= 0");
+void Reader::distancePenaltyPolynomial(std::vector<double> coef) {
+    // Trim off any trailing 0's to simplify the polynomial expression:
+    while (not coef.empty() and coef.back() == 0) coef.pop_back();
 
-    // all coefficients must be finite; first and last non-zero coefficients must be negative
-    double first = 0.0, last = 0.0;
+    if (coef.size() > 1 and coef.back() < 0) throw std::domain_error("Invalid distancePenaltyPolynomial: last non-zero, non-constant coefficient must be positive.");
+
+    // Make sure all coefficients are finite
     for (size_t i = 0; i < coef.size(); i++) {
         if (not std::isfinite(coef[i]))
-            throw std::domain_error("Invalid uPolynomial: coef[" + std::to_string(i) + "] is not finite");
-
-        if (i > 0 and coef[i] != 0) {
-            last = coef[i];
-            if (first == 0) first = coef[i];
-        }
+            throw std::domain_error("Invalid uPolynomial: coef[" + std::to_string(i) + "] is not finite (" + std::to_string(coef[i]) + ")");
     }
 
-    if (first > 0) throw std::domain_error("Invalid uPolynomial: first non-zero, non-constant coefficient must be negative.");
-    if (last > 0) throw std::domain_error("Invalid uPolynomial: last non-zero, non-constant coefficient must be negative.");
+    // First non-zero, non-constant coefficient must be positive
+    for (size_t i = 1; i < coef.size(); i++) {
+        if (coef[i] < 0) throw std::domain_error("Invalid distancePenaltyPolynomial: first non-zero, non-constant coefficient must be positive.");
+        else if (coef[i] > 0) break;
+    }
 
     double xlast = 0;
-    double p = evalPolynomial(0, coef);
-    for (const double &x : {1e-6, .001, .01, .1, 1., 10., 100., 1000., 1e6}) {
-        double pnext = evalPolynomial(x, coef);
-        if (pnext > p)
-            throw std::domain_error("Invalid uPolynomial: polynomial is increasing: f(" + std::to_string(x) + ") > f(" + std::to_string(xlast) + ")");
+    double plast = evalPolynomial(0, coef);
+    for (const double &x : {1e-100, 1e-10, .1, 1., 10., 100., 1e10}) {
+        double p = evalPolynomial(x, coef);
+        if (p < plast)
+            throw std::domain_error("Invalid uPolynomial: polynomial is not increasing: f(" + std::to_string(x) + ") = " + std::to_string(p) +
+                    " is less than f(" + std::to_string(xlast) + ") = " + std::to_string(plast));
+        xlast = x;
+        plast = p;
     }
 
-    u_poly_ = std::move(coef);
+    dist_penalty_poly_ = std::move(coef);
+}
+
+const std::vector<double>& Reader::distancePenaltyPolynomial() const {
+    return dist_penalty_poly_;
+}
+
+double Reader::distancePenalty(double distance) const {
+    return evalPolynomial(distance, distancePenaltyPolynomial());
 }
 
 double Reader::u(double money, const std::unordered_map<eris::SharedMember<Book>, std::reference_wrapper<BookCopy>> &books) const {
-    double u = money - penalty(books.size());
+    double u = money - numBooksPenalty(books.size());
     for (auto &bc : books) {
         u += uBook(bc.first, bc.second.get().quality);
     }
@@ -84,10 +98,6 @@ const std::set<SharedMember<Book>>& Reader::wrote() const {
     return wrote_;
 }
 
-const std::vector<double>& Reader::uPolynomial() const {
-    return u_poly_;
-}
-
 double Reader::evalPolynomial(double x, const std::vector<double> &polynomial) {
     double p = 0.0;
     double xi = 1.0;
@@ -98,22 +108,25 @@ double Reader::evalPolynomial(double x, const std::vector<double> &polynomial) {
     return p;
 }
 
-void Reader::penaltyPolynomial(std::vector<double> coef) {
-    double last = evalPolynomial(0, coef);
-    unsigned long last_x = 0;
-    for (auto &x : {1,2,3,4,5,6,7,8,9,10,20,30,40,50,60,70,80,90,100,1000,1000000}) {
-        double pen = evalPolynomial(x, coef);
-        if (pen < last)
-            throw std::domain_error("Invalid penalty polynomial: f(" + std::to_string(x) + ") < f("
-                    + std::to_string(last_x) + ")");
-        last = pen;
-        last_x = x;
+void Reader::numBooksPenaltyPolynomial(std::vector<double> coef) {
+    unsigned xlast = 0;
+    double plast = evalPolynomial(xlast, coef);
+    for (const unsigned &x : {1,2,3,4,5,6,7,8,9,10,20,30,40,50,60,70,80,90,100,1000,1000000}) {
+        double p = evalPolynomial(x, coef);
+        if (p < plast)
+            throw std::domain_error("Invalid numBooksPenaltyPolynomial: f(" + std::to_string(x) + ") = " + std::to_string(p) +
+                    " is less than f(" + std::to_string(xlast) + ") = " + std::to_string(plast));
+        plast = p;
+        xlast = x;
     }
 
-    pen_poly_ = std::move(coef);
+    nbooks_penalty_poly_ = std::move(coef);
 }
-const std::vector<double>& Reader::penaltyPolynomial() const {
-    return pen_poly_;
+const std::vector<double>& Reader::numBooksPenaltyPolynomial() const {
+    return nbooks_penalty_poly_;
+}
+double Reader::numBooksPenalty(unsigned long n) const {
+    return evalPolynomial(n, numBooksPenaltyPolynomial());
 }
 
 double Reader::creationQuality(double effort) const {
@@ -344,7 +357,7 @@ void Reader::interOptimize() {
 #                   ifdef ERIS_DEBUG
                         }
                         catch (BayesianLinear::draw_failure &e) {
-                            ERIS_DBG("draw failure in demand argmaxP calculation; reader="<<id() << ", t=" << simulation()->t());
+                            ERIS_DBG("draw failure in demand argmaxP calculation; reader="<< id() << ", t=" << simulation()->t());
                             ERIS_DBGVAR(demand_belief_.draw_rejection_success);
                             throw;
                         }
@@ -479,7 +492,7 @@ double Reader::uBook(const SharedMember<Book> &b) const {
 }
 
 double Reader::uBook(const SharedMember<Book> &b, double quality) const {
-    quality += evalPolynomial(distance(b), u_poly_);
+    quality -= distancePenalty(distance(b));
     if (quality < 0) quality = 0.0;
     return quality;
 }
@@ -507,10 +520,6 @@ double Reader::quality(const SharedMember<Book> &b) const {
     quality_predictions_.emplace(b, q_hat);
 
     return q_hat;
-}
-
-double Reader::penalty(unsigned long n) const {
-    return evalPolynomial(n, pen_poly_);
 }
 
 const std::unordered_map<SharedMember<Book>, BookCopy>& Reader::library() const { return library_; }
