@@ -89,6 +89,22 @@ class Demand : public eris::belief::BayesianLinearRestricted {
 
         using BayesianLinearRestricted::predict;
 
+        /** Given various information about a book, returns an X matrix row of data representing
+         * that information.
+         *
+         * \param draws the number of draws to use for prediction
+         * \param P the price of a copy of the book
+         * \param q the quality of the book
+         * \param S prior book sales
+         * \param nosales the number of time periods since the book last had a sale; if greater than
+         * age, age is used (so that `sim->t() - book->lastSale()` can be passed)
+         * \param age of the book
+         * \param otherBooks the number of other books created by this book's author.  This parameter
+         * also determines the `onlyBook` dummy (`= 1` iff `otherBooks == 0`).
+         * \param lag_marketBooks the number of books on the market in the previous period
+         */
+        static Eigen::RowVectorXd row(double P, double q, unsigned S, unsigned nosales, unsigned age, unsigned otherBooks, unsigned lag_marketBooks);
+
         /** Given a set of model parameters (other than \f$P_b\f$) and a per-unit cost this returns
          * the \f$P_b\f$ value that maximizes expected total profits:
          *

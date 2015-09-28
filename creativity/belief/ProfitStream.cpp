@@ -16,7 +16,7 @@ double ProfitStream::predict(SharedMember<Book> book, unsigned int draws) {
         X[i] = book->revenue(book->created() + i);
     }
 
-    return predict(X, draws);
+    return predict(X, draws)[0];
 }
 
 } }

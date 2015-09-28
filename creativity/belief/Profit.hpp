@@ -110,10 +110,8 @@ class Profit : public eris::belief::BayesianLinearRestricted {
          * \f$t=3\f$).
          *
          * \param previous_books the number of previous books written by the same author
-         * \param quality the quality of the book as perceived by the reader this belief is for.  If
-         * negative, the value will be truncated to 0 (since readers know that an author can never
-         * choose a negative quality book, and thus negative values must simply be an unfavourable
-         * quality draw).
+         * \param quality the mean quality of the book as determined at creation time by the book's
+         * author.  Must be non-negative.
          * \param lag_market_books the number of books that was in the market in the period just
          * before the just-ended period.
          *
