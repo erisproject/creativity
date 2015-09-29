@@ -22,7 +22,6 @@ ReaderState::ReaderState(const Reader &r) :
     creation_scale{r.creation_scale},
     profit{r.profitBelief()},
     demand{r.demandBelief()},
-    quality{r.qualityBelief()},
     profit_stream{r.profitStreamBeliefs()}
 {
     if (r.profitExtrapBeliefDiffers()) profit_extrap = r.profitExtrapBelief();

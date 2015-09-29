@@ -6,7 +6,6 @@
 #include "creativity/belief/Demand.hpp"
 #include "creativity/belief/Profit.hpp"
 #include "creativity/belief/ProfitStream.hpp"
-#include "creativity/belief/Quality.hpp"
 #include "creativity/state/State.hpp"
 #include <Eigen/Core>
 #include <Eigen/QR>
@@ -75,15 +74,6 @@ ReaderInfoWindow::ReaderInfoWindow(
     tabs.append_page(beliefs, "Beliefs");
 
     const std::string beta(u8"<i>β</i>");
-
-    auto &grid_quality = new_tab_grid(beliefs, "Quality");
-    labels_append(grid_quality, "Dependent variable", "<i>quality</i>");
-    data_append(grid_quality, "q_n", "n");
-    data_append(grid_quality, "q_s2", "s<sup>2</sup>");
-    std::vector<std::string> q_vars(rdr.quality.names());
-    for (size_t i = 0; i < q_vars.size(); i++)
-        data_append(grid_quality, "q_" + std::to_string(i), beta + "[" + q_vars[i] + "]", 1, 1);
-    matrix_at(grid_quality, "q_s2V", "s<sup>2</sup><b>V</b>", 2, 2, q_vars.size(), q_vars.size());
 
     auto &grid_profit = new_tab_grid(beliefs, "Profit");
     labels_append(grid_profit, "Dependent variable", "<i>lifetimeProfit</i>");
@@ -211,7 +201,6 @@ void ReaderInfoWindow::refresh(std::shared_ptr<const State> state) {
         updateValue(PREFIX + std::to_string(i), VAR.beta()[i]);
 #define UPDATE_LIN_RB(PREFIX, BELIEF) UPDATE_LIN(PREFIX, r.BELIEF)
 
-    UPDATE_LIN_RB("q_", quality);
     UPDATE_LIN_RB("p_", profit);
     UPDATE_LIN_RB("d_", demand);
     UPDATE_LIN_RB("pe_", profitExtrap());

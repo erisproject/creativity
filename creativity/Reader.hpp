@@ -6,7 +6,6 @@
 #include "creativity/BookCopy.hpp" // IWYU pragma: keep
 #include "creativity/belief/ProfitStream.hpp"
 #include "creativity/belief/Demand.hpp"
-#include "creativity/belief/Quality.hpp"
 #include <vector>
 #include <unordered_set>
 #include <forward_list>
@@ -32,8 +31,8 @@ namespace belief { class Profit; }
  *     - \f$r\f$ is the Reader's position
  *     - \f$b_1, \ldots, b_n\f$ are the \f$n\f$ books the agent buys this period
  *     - \f$f(b)\f$ is a function that maps a book into a utility value using the book's quality
- *     plus a decreasing function of the distance between the reader's position and the book's
- *     position.  It returns 0 for any books that the reader already owns.
+ *       minus an increasing function of the distance between the reader's position and the book's
+ *       position.  It returns 0 for any books that the reader already owns.
  *     - \f$p(n)\f$ is a penalty function that increases in the number of books read
  *     - \f$m\f$ is the quantity of non-book spending the reader engages in which delivers a
  *     constant marginal utility of 1.
@@ -43,15 +42,14 @@ namespace belief { class Profit; }
  *
  * Reading books
  * -------------
- * A reader optimizes in each period by looking at all Books currently available for sale, assessing
- * their quality, considering their price, then deciding which books to buy.  Books are only
+ * A reader optimizes in each period by looking at all Books currently available for sale,
+ * considering their quality, price, and distance then deciding which books to buy.  Books are only
  * purchased once, and at most one copy is purchased by any reader.  The utility gain of a book is
  * incurred immediately.
  *
- * Book quality is not observable but book authorship is.  Readers have beliefs about book quality
- * of previously known and previously unknown authors with which they can estimate quality.  Once
- * purchased, readers obtain a random, permanent quality draw (which is based on the actual quality)
- * as their own private assessment of the book's quality.
+ * Mean book quality is observable, but readers receive a subjective actual quality drawn from a
+ * normal distribution with the observed mean and fixed standard deviation.  This subjective quality
+ * is realized only when readers obtain a copy of the book.
  *
  * Writing books
  * -------------
@@ -69,16 +67,6 @@ namespace belief { class Profit; }
  * Beliefs
  * =======
  * Reader behaviour is governed by the following beliefs which are updated over time.
- *
- * Book quality
- * ----------------------
- * When considering a book that has not been read (previously read books are not considered at all),
- * a Reader predicts quality using the model:
- *
- *     FIXME
- *     (include "known" dummy and "known" x "mean quality" terms, and perhaps "known" x "numBooks")
- *
- * to predict a book's quality.  This belief is updated whenever the reader reads any books.
  *
  * Lifetime profit
  * ---------------
@@ -237,10 +225,10 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * subtracting the distance polynomial value from the quality value of the book.  The
          * distance polynomial is as returned by distancePenaltyPolynomial(), evaluated at the
          * distance from the Reader to the given Book.  The quality comes from calling the quality()
-         * method.  If the calculated overall value is less than 0, 0 is returned.
+         * method.
          *
          * If the book is already in the reader's library, this returns the realized utility.
-         * Otherwise, this method returns an estimate by calling quality().
+         * Otherwise, this method uses the mean of the quality distribution of the book.
          *
          * Note that this method isn't enough to evaluate the utility of adding an additional book:
          * calling code must also ensure that the book being added is not already contained in the
@@ -258,9 +246,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
 
         /** Returns the quality of a given book.  If the given book is already in the user's
          * library, this returns the realized quality value determined when the book was added;
-         * otherwise it returns a predicted quality value based on the reader's quality prior.  This
-         * quantity may be stochastic for the initial call, but subsequent calls will return the same
-         * predicted value until the quality belief is updated.
+         * otherwise it returns the mean of the quality distribution for the book.
          */
         virtual double quality(const eris::SharedMember<Book> &b) const;
 
@@ -484,8 +470,6 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
 
         /// Read-only access to this reader's demand belief
         const belief::Demand& demandBelief() const;
-        /// Read-only access to this reader's quality belief
-        const belief::Quality& qualityBelief() const;
 
         /** Returns the cost (or expected cost) of obtaining a work through sharing.  The current
          * implementation of this method simply returns the `cost_piracy` parameter of the
@@ -573,7 +557,6 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         std::shared_ptr<belief::Profit> profit_belief_, ///< Belief about lifetime book profits
             profit_belief_extrap_; ///< Beliefs about lifetime book profits using profit stream expectations
         belief::Demand demand_belief_; ///< Belief about per-period demand
-        belief::Quality quality_belief_; ///< Belief about book quality
         /** Profit stream beliefs for books on market for various lengths of time.  E.g.
          * `profit_stream_beliefs_[3]` is the model of future profits for books that stayed on the
          * market for at least 3 periods.  Used to build profit_belief_extrap_.
@@ -584,7 +567,6 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         std::unordered_set<eris::SharedMember<Reader>> friends_;
 
         /** Updates all of the reader's beliefs, in the following order:
-         * - book quality beliefs
          * - per-period demand
          * - profit stream models
          * - lifetime profitability
@@ -596,7 +578,6 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * After updating beliefs, `library_on_market_` is updated to remove books that are no
          * longer on the market (since those will have now been incorporated into the beliefs).
          *
-         * \sa updateQualityBelief
          * \sa updateDemandBelief
          * \sa updateProfitStreamBelief
          * \sa updateProfitBelief
@@ -604,13 +585,6 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * \sa CreativitySettings.prior_weight_piracy
          */
         void updateBeliefs();
-
-        /** Updates the quality model based on observations from the just-finished period.
-         *
-         * The current belief is used as a prior, suitably weakened if
-         * CreativitySettings.prior_weight is not equal to 1.
-         */
-        void updateQualityBelief();
 
         /** Updates the demand equation belief based on book sales observed in the previous period.
          *
@@ -654,16 +628,8 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         std::vector<double> nbooks_penalty_poly_;
         /// Map of books owned to properties of those books (in BookCopy container objects):
         std::unordered_map<eris::SharedMember<Book>, BookCopy> library_;
-        /** Cache of quality predictions used so that quality(book) returns the same value if called
-         * multiple times.  The cache is reset whenever the library or quality belief changes.
-         */
-        mutable std::unordered_map<eris::SharedMember<Book>, double> quality_predictions_;
-        std::unordered_map<eris::SharedMember<Book>, std::reference_wrapper<BookCopy>>
-            /// Books obtained in the just-finished period
-            library_new_,
-            /** Set of books that haven't been used for learning yet (because they are still
-             * on the market, or have just left the market). */
-            library_on_market_;
+        /// Books obtained in the just-finished period
+        std::unordered_map<eris::SharedMember<Book>, std::reference_wrapper<BookCopy>> library_new_;
 
         std::unordered_set<eris::SharedMember<Book>>
             /// Books written by this reader that are still on the market

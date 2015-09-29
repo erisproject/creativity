@@ -208,7 +208,7 @@ void Reader::interOptimize() {
 #   ifdef ERIS_DEBUG
     try {
 #   endif
-    // Update the various profit, demand, and quality beliefs
+    // Update the various beliefs
     updateBeliefs();
 
     double income_available = assets()[creativity_->money] + creativity_->parameters.income;
@@ -447,8 +447,7 @@ void Reader::interApply() {
             }
 
             wrote_.insert(wrote_.end(), newbook);
-            auto ins = library_.emplace(SharedMember<Book>(newbook), BookCopy(create_quality_, BookCopy::Status::wrote, sim->t()));
-            library_on_market_.emplace(newbook, std::ref(ins.first->second));
+            library_.emplace(SharedMember<Book>(newbook), BookCopy(create_quality_, BookCopy::Status::wrote, sim->t()));
 
             create_countdown_--;
         }
@@ -492,34 +491,17 @@ double Reader::uBook(const SharedMember<Book> &b) const {
 }
 
 double Reader::uBook(const SharedMember<Book> &b, double quality) const {
-    quality -= distancePenalty(distance(b));
-    if (quality < 0) quality = 0.0;
-    return quality;
+    return quality - distancePenalty(distance(b));
 }
 
 double Reader::quality(const SharedMember<Book> &b) const {
+    // If we already have a copy of this book, return the realized quality value
     auto found = library_.find(b);
     if (found != library_.end())
         return found->second.quality;
 
-    auto found_pred = quality_predictions_.find(b);
-    if (found_pred != quality_predictions_.end())
-        return found_pred->second;
-
-    double q_hat;
-    if (usableBelief(quality_belief_)) {
-        // Use the quality belief to predict the quality
-        auto &q_b = const_cast<belief::Quality&>(quality_belief_);
-        q_hat = q_b.predict(b, creativity_->parameters.prediction_draws);
-    }
-    else {
-        // No informative beliefs above quality, so just use initial parameter mean
-        q_hat = creativity_->meanInitialQuality();
-    }
-    if (q_hat < 0) q_hat = 0;
-    quality_predictions_.emplace(b, q_hat);
-
-    return q_hat;
+    // Otherwise return the mean quality
+    return b->qualityMean();
 }
 
 const std::unordered_map<SharedMember<Book>, BookCopy>& Reader::library() const { return library_; }
@@ -528,7 +510,6 @@ const belief::Profit& Reader::profitBelief() const { return *profit_belief_; }
 const belief::Profit& Reader::profitExtrapBelief() const { return *profit_belief_extrap_; }
 bool Reader::profitExtrapBeliefDiffers() const { return profit_belief_ != profit_belief_extrap_; }
 const belief::Demand& Reader::demandBelief() const { return demand_belief_; }
-const belief::Quality& Reader::qualityBelief() const { return quality_belief_; }
 const belief::ProfitStream& Reader::profitStreamBelief(const unsigned int age, const bool usable) const {
     // Get the first belief > age
     auto it = profit_stream_beliefs_.upper_bound(age);
@@ -552,22 +533,13 @@ bool Reader::usableBelief(const BayesianLinear &model) const {
 }
 
 void Reader::updateBeliefs() {
-    updateQualityBelief();
     updateDemandBelief();
     //updateProfitStreamBelief();
     updateProfitBelief();
 
     // Clear any "on-market" book references that aren't on the market anymore, since they just got
     // incorporated into the beliefs above.
-    std::vector<SharedMember<Book>> remove;
-    for (auto &book : library_on_market_) {
-        if (not book.first->hasPrivateMarket())
-            remove.push_back(book.first);
-    }
-    for (auto &book : remove)
-        library_on_market_.erase(book);
-
-    remove.clear();
+    std::list<SharedMember<Book>> remove;
     for (auto &book : book_cache_market_) {
         if (not book->hasPrivateMarket())
             remove.push_back(book);
@@ -576,33 +548,6 @@ void Reader::updateBeliefs() {
         book_cache_market_.erase(book);
 }
 
-void Reader::updateQualityBelief() {
-    double weaken = creativity_->priorWeight();
-    bool belief_changed = true;
-
-    // If we obtained any new books, update the quality belief with them
-    if (not newBooks().empty()) {
-        std::vector<SharedMember<Book>> books;
-        VectorXd y(newBooks().size());
-        size_t i = 0;
-        for (auto &a : newBooks()) {
-            books.push_back(a.first);
-            y[i++] = a.second.get().quality;
-        }
-
-        quality_belief_ = std::move(quality_belief_).weaken(weaken).update(y, Quality::bookData(books));
-    }
-    else if (weaken != 1.0) {
-        quality_belief_ = std::move(quality_belief_).weaken(weaken);
-    }
-    else {
-        belief_changed = false;
-    }
-
-    if (belief_changed) {
-        quality_predictions_.clear();
-    }
-}
 void Reader::updateDemandBelief() {
     // If we aren't starting simulation period t=3 or later, don't do anything: we can't
     // incorporated books into the belief because we need the lagged market book count
@@ -612,9 +557,6 @@ void Reader::updateDemandBelief() {
 
     // Figure out which books might yield usable data: i.e. those on the market
     std::list<SharedMember<Book>> mktbooks;
-    for (auto &bu : library_on_market_) {
-        if (bu.first->hasPrivateMarket()) mktbooks.push_back(bu.first);
-    }
     for (auto &b : book_cache_market_) {
         if (b->hasPrivateMarket()) mktbooks.push_back(b);
     }
@@ -627,7 +569,7 @@ void Reader::updateDemandBelief() {
         size_t i = 0;
         for (const auto &b : mktbooks) {
             y[i] = b->sales(last_t);
-            X.row(i) = Demand::bookRow(b, quality(b), creativity_->market_books_lagged);
+            X.row(i) = Demand::bookRow(b, b->qualityMean(), creativity_->market_books_lagged);
             i++;
         }
 
@@ -644,9 +586,6 @@ void Reader::updateProfitStreamBelief() {
     /*
     // Figure out which books might yield usable data
     std::list<SharedMember<Book>> potential;
-    for (auto &bu : library_on_market_) {
-        if (not bu.first->hasMarket()) potential.push_back(bu.first);
-    }
     for (auto &b : book_cache_market_) {
         if (not b->hasMarket()) potential.push_back(b);
     }
@@ -767,26 +706,17 @@ void Reader::updateProfitBelief() {
     // incorporated books into the belief because we need the lagged market book count
     if (simulation()->t() < 3) return;
 
-    std::vector<std::pair<SharedMember<Book>, double>> new_prof_books, extrap_books;
-
-    for (auto &bc : library_on_market_) {
-        if (bc.first->hasPrivateMarket()) {
-            // The book is still on the market, so we'll have to extrapolate using profit stream
-            // beliefs
-            extrap_books.push_back(std::make_pair(bc.first, bc.second.get().quality));
-        }
-        else {
-            // The book just left the market
-            new_prof_books.push_back(std::make_pair(bc.first, bc.second.get().quality));
-        }
-    }
+    std::list<SharedMember<Book>> new_prof_books, extrap_books;
 
     // Also need to go through books that we don't own, using predicted quality
     for (auto &b : book_cache_market_) {
         if (b->hasPrivateMarket())
-            extrap_books.push_back(std::make_pair(b, quality(b)));
+            // The book is still on the market, so we'll have to extrapolate using profit stream
+            // beliefs
+            extrap_books.push_back(b);
         else
-            new_prof_books.push_back(std::make_pair(b, quality(b)));
+            // The book just left the market
+            new_prof_books.push_back(b);
     }
 
     double weaken = creativity_->priorWeight();
@@ -796,11 +726,10 @@ void Reader::updateProfitBelief() {
         VectorXd y(new_prof_books.size());
 
         size_t i = 0;
-        for (auto &bq : new_prof_books) {
-            auto &book = bq.first;
+        for (auto &book : new_prof_books) {
             // Calculate the book's total (private) profit
             y[i] = book->lifeProfitPrivate();
-            X.row(i) = Profit::profitRow(bq.second, bq.first->order(), creativity_->market_books_lagged);
+            X.row(i) = Profit::profitRow(book->qualityMean(), book->order(), creativity_->market_books_lagged);
             i++;
         }
 
@@ -821,11 +750,10 @@ void Reader::updateProfitBelief() {
         VectorXd y(extrap_books.size());
 
         size_t i = 0;
-        for (auto &bq : extrap_books) {
-            auto &book = bq.first;
+        for (auto &book : extrap_books) {
             // Calculate the book's total profit (ignoring initial creation cost)
             y[i] = book->lifeProfitPrivate();
-            X.row(i) = Profit::profitRow(bq.second, bq.first->order(), creativity_->market_books_lagged);
+            X.row(i) = Profit::profitRow(book->qualityMean(), book->order(), creativity_->market_books_lagged);
             i++;
         }
 
@@ -838,7 +766,7 @@ void Reader::intraInitialize() {
     auto nb = creativity_->newBooks();
     for (auto &bm : nb.first) {
         book_cache_.insert(bm);
-        book_cache_market_.insert(bm);
+        if (bm->hasPrivateMarket()) book_cache_market_.insert(bm);
     }
 }
 
@@ -1001,12 +929,6 @@ void Reader::intraApply() {
         auto inserted = library_.emplace(
                 SharedMember<Book>(book),
                 BookCopy(book->qualityDraw(), status, simulation()->t()));
-
-        // If the book is still on the private market (which it must be if we just bought it from a
-        // private source, and might be if we just pirated it), stash a copy in library_on_market_
-        // so that it will (eventually) get incorporated into profit stream beliefs.
-        if (book->hasPrivateMarket())
-            library_on_market_.emplace(book, std::ref(inserted.first->second));
 
         // And it's always considered a "new" (to us) book, so stash it there:
         library_new_.emplace(book, std::ref(inserted.first->second));

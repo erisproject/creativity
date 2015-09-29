@@ -7,7 +7,6 @@
 #include "creativity/belief/Demand.hpp"
 #include "creativity/belief/Profit.hpp"
 #include "creativity/belief/ProfitStream.hpp"
-#include "creativity/belief/Quality.hpp"
 
 namespace creativity { class Reader; }
 
@@ -94,7 +93,6 @@ class ReaderState final {
         belief::Profit profit; ///< Profit beliefs
         belief::Profit profit_extrap; ///< Profit beliefs using extrapolation for on-market books (will be default-constructed if there is no extrapolation)
         belief::Demand demand; ///< Single-period demand belief
-        belief::Quality quality; ///< Quality belief
         std::map<unsigned int, belief::ProfitStream> profit_stream; ///< Profit stream beliefs
 
         /** Returns profit_extrap if it exists (i.e. if there is extrapolated data), otherwise

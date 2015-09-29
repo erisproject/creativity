@@ -9,7 +9,6 @@
 #include "creativity/belief/Demand.hpp"
 #include "creativity/belief/Profit.hpp"
 #include "creativity/belief/ProfitStream.hpp"
-#include "creativity/belief/Quality.hpp"
 #include <boost/math/constants/constants.hpp>
 
 #ifdef ERIS_DEBUG
@@ -723,12 +722,6 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
         r.demand.draw_rejection_discards = belief.draw_discards_cumulative;
     }
 
-    belief = readBelief();
-    if (belief.K > 0)
-        r.quality = belief.noninformative
-            ? Quality(belief.K)
-            : Quality(belief.beta, belief.s2, belief.Vinv, belief.n);
-
     auto pstream_locs = read_u32();
     for (uint32_t i = 0; i < pstream_locs; i++) {
         belief = readBelief();
@@ -863,7 +856,6 @@ void FileStorage::writeReader(const ReaderState &r) {
     writeBelief(r.profit);
     writeBelief(r.profit_extrap);
     writeBelief(r.demand);
-    writeBelief(r.quality);
 
     // Have to prefix the profit stream beliefs with the count, but since we need to exclude any
     // default-constructed values, we need to loop twice:

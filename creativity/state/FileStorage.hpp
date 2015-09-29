@@ -504,7 +504,6 @@ class FileStorage final : public StorageBackend {
          *     BELIEF           profit belief
          *     BELIEF           profit extrapolated belief
          *     BELIEF           demand belief
-         *     BELIEF           quality belief
          *     BELIEF[]         profit stream beliefs (for different K() values)
          *
          * where type[] indicates an array structured as:
