@@ -14,7 +14,7 @@ set(creativity_description "Agent-based model of creativity and piracy")
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/Modules)
 
-set(ERIS_VERSION_REQUIRED "0.3.4")
+set(ERIS_VERSION_REQUIRED "0.3.5")
 
 # No in-source building
 include(MacroEnsureOutOfSourceBuild)
