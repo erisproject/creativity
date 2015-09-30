@@ -205,7 +205,7 @@ int main(int argc, char *argv[]) {
         for (const auto &d : initial_data) if (d.name.length() + 6 > longest_name) longest_name = d.name.length() + 6;
         for (const auto &d : data) if (d.name.length() + 7 > longest_name) longest_name = d.name.length() + 7;
     }
-    else {
+    else if (not args.no_csv_header) {
         // Write CSV header
         std::ostringstream output;
         output << "source";
@@ -232,7 +232,9 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (output_count == 0)
+    if (output_count == 0 and not args.only_csv_header) {
         std::cerr << "Error: no usable data sources!\n";
+        return 1;
+    }
 }
 

@@ -36,6 +36,12 @@ class Data : public CmdArgs {
         /// If true, produce output in human-readable format; otherwise CSV output.
         bool human_readable = false;
 
+        /// If true, suppress the CSV header (doesn't apply when `human_readable` is true).
+        bool no_csv_header = false;
+
+        /// If true, *only* output the CSV header (no files may be specified).
+        bool only_csv_header = false;
+
         /// The number of periods to use to calculate average values
         unsigned int data_periods = 25;
 

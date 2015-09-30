@@ -18,6 +18,8 @@ void Data::addOptions() {
 
     options_.add_options()
         ("human-readable,H", value(human_readable), "Produce output in human-readable format.  The default (when this is not specified) outputs comma-separated values.  This also changes the default value for --precision to 8.")
+        ("no-csv-header", value(no_csv_header), "Don't include the CSV header.  Useful when combining output from multiple creativity-data invocations.")
+        ("only-csv-header", value(only_csv_header), "Outputs just the CSV header associated with the program arguments instead of processing files.  This is primarily intended to be combined with other invocations using the --no-csv-header argument.")
         ("precision", range<3,std::numeric_limits<double>::max_digits10>(double_precision), "      Specifies the precision level for floating point values.  The default is the minimum required to exactly represent all possible double values without any loss of precision.")
         ("periods,t", min<1>(data_periods), "    Specifies the number of periods to use for calculating pre, new, and post-piracy data")
         ("skip-piracy", value(skip.piracy), "If specified, do not produce data for piracy periods.  Required for simulation data that does not contain pre-public sharing piracy periods.")
@@ -40,6 +42,12 @@ void Data::postParse(boost::program_options::variables_map &vars) {
     if (human_readable and vars["precision"].defaulted()) {
         double_precision = 8;
     }
+    if (only_csv_header and no_csv_header)
+        throw std::logic_error("Conflicting arguments: --only-csv-header cannot be used with --no-csv-header");
+    if (human_readable and (only_csv_header or no_csv_header))
+        throw std::logic_error("Conflicting arguments: --human-readable cannot be used with --{no,only}-csv-header");
+    if (only_csv_header and not input.empty())
+        throw std::logic_error("Conflicting arguments: --only-csv-header cannot be used when input files are specified");
 }
 
 std::string Data::usage() const {
