@@ -149,8 +149,7 @@ void thr_parse_file(
         // piracy_*:
         if (not args.skip.piracy) {
             state_cache.clear();
-            if (not args.skip.piracy)
-                for (eris_time_t t = post_piracy - args.data_periods; t < post_piracy; t++) state_cache.push_back(storage[t]);
+            for (eris_time_t t = post_piracy - args.data_periods; t < post_piracy; t++) state_cache.push_back(storage[t]);
 
             for (auto &d : data) {
                 if (d.applies_to.piracy) {
@@ -167,8 +166,7 @@ void thr_parse_file(
         // public_*:
         if (not args.skip.public_sharing) {
             state_cache.clear();
-            if (not args.skip.public_sharing)
-                for (eris_time_t t = post_public - args.data_periods; t < post_public; t++) state_cache.push_back(storage[t]);
+            for (eris_time_t t = post_public - args.data_periods; t < post_public; t++) state_cache.push_back(storage[t]);
 
             for (auto &d : data) {
                 if (d.applies_to.public_sharing) {
@@ -213,8 +211,8 @@ int main(int argc, char *argv[]) {
         output << "source";
         for (const auto &d : initial_data) output << ",param." << d.name;
         for (const auto &d : data) if (d.applies_to.pre) output << ",pre." << d.name;
-        for (const auto &d : data) if (d.applies_to.piracy) output << ",piracy." << d.name;
-        for (const auto &d : data) if (d.applies_to.public_sharing) output << "," << "public." << d.name;
+        if (not args.skip.piracy) for (const auto &d : data) if (d.applies_to.piracy) output << ",piracy." << d.name;
+        if (not args.skip.public_sharing) for (const auto &d : data) if (d.applies_to.public_sharing) output << "," << "public." << d.name;
         output << "\n";
         std::cout << output.str();
     }
