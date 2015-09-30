@@ -29,7 +29,7 @@ struct CreativitySettings {
      * If this value is 0, the book is located exactly at the author's position at the time of
      * writing and no draw is performed.
      */
-    double book_distance_mean = 0.2;
+    double book_distance_mean = 0.0;
 
     /** The standard deviation of a book quality draw.  When a reader obtains a book, his subjective
      * quality is drawn from \f$N(Q, s)\f$, where \f$Q\f$ is the book's base quality as decided by
@@ -49,7 +49,7 @@ struct CreativitySettings {
      *
      * The default is 0.1.
      */
-    double reader_step_mean = 0.1;
+    double reader_step_mean = 1.0;
 
     /** The "shape" parameter \f$\beta\f$ of the reader effort.
      *
