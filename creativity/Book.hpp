@@ -107,7 +107,7 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
 
         /** When the market is removed from the simulation, record it by clearing the stored market.
          */
-        void weakDepRemoved(eris::SharedMember<Member>, eris::eris_id_t old) override;
+        void weakDepRemoved(eris::SharedMember<eris::Member>, eris::eris_id_t old) override;
 
         /** Returns true if this Book's author is still in the simulation, false otherwise. */
         bool livingAuthor() const;
@@ -201,6 +201,15 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         /// Returns the revenue earned by this book in simulation period `t`
         double revenue(eris::eris_time_t t) const;
 
+        /// Returns the prize money earned by the author for this book in the current period
+        double currPrize() const;
+
+        /// Returns the prize money earned by the author for this book in simulation period `t`
+        double prize(eris::eris_time_t t) const;
+
+        /// Returns the lifetime prize money earned by the author for this book
+        double lifePrize() const;
+
         /** Returns `lifeSales() + lifePirated()` (but atomically), reflecting the number of copies
          * of the book that have been made.  This should always be one less than the total in the
          * simulation, as the author also has a copy of the book in his library which is neither a
@@ -235,6 +244,10 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
          */
         void recordPiracy(unsigned int new_copies);
 
+        /** Record public money received by the author for this book.
+         */
+        void recordPrize(double prize);
+
         /** Returns the mean quality level determined by the author at book creation time.  This
          * value is not intended for use by readers of a book: readers rather receive a subjective
          * quality from `qualityDraw()`.
@@ -253,13 +266,13 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         std::shared_ptr<Creativity> creativity_;
         eris::eris_time_t created_ = 0, left_private_market_ = 0, public_market_created_ = 0;
         unsigned int copies_private_total_ = 0, copies_pirated_total_ = 0, copies_public_total_ = 0;
-        double revenue_private_total_ = 0, revenue_public_total_ = 0;
+        double revenue_private_total_ = 0, revenue_public_total_ = 0, prize_total_ = 0;
         std::map<eris::eris_time_t, unsigned int> copies_sold_, copies_pirated_;
-        std::map<eris::eris_time_t, double> revenue_;
+        std::map<eris::eris_time_t, double> revenue_, prize_;
         eris::SharedMember<Reader> author_;
         const unsigned int order_ = 0;
         bool market_private_ = true;
-        eris::eris_id_t market_ = 0;
+        eris::eris_id_t market_id_ = 0;
         std::normal_distribution<double> quality_draw_;
 };
 

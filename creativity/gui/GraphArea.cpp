@@ -115,7 +115,7 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
 
         // In 1D mode, draw the circle first (in 2+D, we draw the axes at the end so that they're on
         // top of everything).
-        if (gui_.creativity_->parameters.dimensions == 1) {
+        if (gui_.creativity_->parameters.dimensions == 1 and design.enabled.axes) {
             drawCircularAxis(cr, trans);
         }
 
@@ -281,7 +281,7 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
         }
 
         // Add axes (last, so that they are on top)
-        if (gui_.creativity_->parameters.dimensions != 1) {
+        if (gui_.creativity_->parameters.dimensions != 1 and design.enabled.axes) {
             drawAxes(cr, trans);
         }
     }

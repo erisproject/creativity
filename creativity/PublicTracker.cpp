@@ -40,6 +40,7 @@ void PublicTracker::interApply() {
 void PublicTracker::intraFinish() {
     unsigned int total_copies = 0;
     std::unordered_map<SharedMember<Reader>, unsigned int> author_copies;
+    std::unordered_map<SharedMember<Book>, unsigned int> book_copies;
     if (assets()[creativity_->money] > 0) {
         // Get the number of PublicTrackerMarket sales for each author
         for (auto &ptm : simulation()->markets<PublicTrackerMarket>()) {
@@ -47,6 +48,7 @@ void PublicTracker::intraFinish() {
             if (copies > 0) {
                 total_copies += copies;
                 author_copies[ptm->book()->author()] += copies;
+                book_copies[ptm->book()] += copies;
             }
         }
     }
@@ -56,6 +58,9 @@ void PublicTracker::intraFinish() {
     if (total_copies > 0) {
         for (auto &ac : author_copies) {
             assets().transferApprox(per_copy_payout * ac.second, ac.first->assets(), 1e-8);
+        }
+        for (auto &bc : book_copies) {
+            bc.first->recordPrize(per_copy_payout[creativity_->money] * bc.second);
         }
     }
     // Otherwise no copies downloaded: just leave the assets for the next period's pool

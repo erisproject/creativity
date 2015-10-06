@@ -52,11 +52,17 @@ class BookState final {
         /// The market price of this book; will be NaN if this book was not on the market.
         double price;
 
-        /// The revenue of this book this period.
+        /// The private market revenue of this book this period.
         double revenue;
 
-        /// The cumulative lifetime revenue of this book, up to and including the current period.
+        /// The cumulative lifetime private market revenue of this book, up to and including the current period.
         double revenue_lifetime;
+
+        /// The public/prize money received by the book's author this period for this book.
+        double prize;
+
+        /// The lifetime public/prize money received by the book's author for this book.
+        double prize_lifetime;
 
         /** The number of sales of copies of this book in the current period.  The sales are private
          * sales if `.market_private` is true and public sales if `.market_public()` is true.

@@ -3,6 +3,7 @@
 #include <eris/WrappedPositional.hpp>
 #include <eris/agent/AssetAgent.hpp>
 #include <eris/Market.hpp>
+#include "creativity/Book.hpp"
 #include "creativity/BookCopy.hpp" // IWYU pragma: keep
 #include "creativity/belief/ProfitStream.hpp"
 #include "creativity/belief/Demand.hpp"
@@ -17,7 +18,6 @@
 
 namespace creativity {
 
-class Book;
 class Creativity;
 namespace belief { class Profit; }
 
@@ -134,6 +134,7 @@ namespace belief { class Profit; }
  *   - The author receives all of the periods proceeds from the period.
  */
 class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
+    public virtual eris::interopt::Begin,
     public virtual eris::interopt::OptApply,
     public virtual eris::intraopt::Initialize,
     public virtual eris::intraopt::OptApplyReset
@@ -293,10 +294,9 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          */
         const std::vector<double>& distancePenaltyPolynomial() const;
 
-        /** The default distance penalty polynomial coefficients.  The default is {0, 1}, that
-         * is, book utility decreases by the distance to the book).
+        /** The default distance penalty polynomial coefficients.  The default is {0, 0, 0.5}.
          */
-        static constexpr std::initializer_list<double> default_distance_penalty_polynomial{0, 1, 0.25};
+        static constexpr std::initializer_list<double> default_distance_penalty_polynomial{0, 0, 3};
 
         /** Returns the distance penalty by evaluating the distancePenaltyPolynomial() at the given
          * distance value.
@@ -450,7 +450,9 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
 
         /** Returns true if the given belief is usable.  Specifically, to be usable it must not be a
          * noninformative() belief, and must have at least `K` plus `belief_min_n_less_k`
-         * observations.
+         * observations.  Note that this doesn't guarantee that the belief can be successfully drawn
+         * from, i.e. because it has linear constraints that are too far in the tail to meaningfully
+         * satisfy.
          */
         bool usableBelief(const eris::belief::BayesianLinear &model) const;
 
@@ -504,6 +506,9 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * \returns true if the friendship was removed, false if the friendship did not exist.
          */
         bool removeFriend(const eris::SharedMember<Reader> &old_pal, bool recurse = true);
+
+        /** At the beginning of the period transition, the reader takes a random step. */
+        void interBegin() override;
 
         /** In-between periods, the reader optimizes by:
          * - updates his beliefs based on characteristics of newly obtained books
@@ -623,6 +628,20 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          */
         void updateProfitStreamBelief();
 
+        /** Called from Book when the Book gets added to the simulation to let the author record the
+         * new book appropriately.  This can't be done at the instance the book is created because
+         * it doesn't have an id yet (it won't be actually added until the end of the in-progress
+         * optimization round), but needs to have an id to be put into containers.
+         */
+        void registerAuthoredBook(eris::SharedMember<Book> book);
+        friend void Book::added();
+        /** Called from Book::setMarket when one of this author's Books has changed market status
+         * (either gaining a new private or public market, or losing its current market).
+         */
+        void registerMarketUpdate(eris::SharedMember<Book> book);
+        friend void Book::setMarket(eris::SharedMember<BookMarket>);
+        friend void Book::weakDepRemoved(eris::SharedMember<eris::Member>, eris::eris_id_t);
+
     private:
         std::vector<double> dist_penalty_poly_;
         std::vector<double> nbooks_penalty_poly_;
@@ -664,7 +683,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
 
         // True in the period in which creation started, false otherwise.
         bool create_starting_ = false;
-        int create_countdown_ = -1; // the number of periods remaining until the book is finished; new books are only created when this is -1.
+        int create_countdown_ = -1; // the number of periods remaining until the book is finished; new books can only be initiated when this is -1.
         double create_effort_ = 0, create_quality_ = 0, create_price_ = 0;
         // The author's position at the time of creation; the final position will be this plus noise
         eris::Position create_position_;

@@ -106,6 +106,7 @@ void BookStore::get_value_vfunc(const iterator &iter, int column, Glib::ValueBas
     else IFCOL(pirated);
     else IFCOL(pirated_lifetime);
     else IFCOL_M(copies);
+    else IFCOL_M(copies_lifetime);
     else IFCOL(lifetime_private);
     else throw std::out_of_range("Invalid column index accessed");
 #undef IFCOL_M
@@ -140,6 +141,7 @@ void BookStore::set_sort_column_id_vfunc(int sort_column_id, Gtk::SortType order
     ELSE_IF_COL(pirated);
     ELSE_IF_COL(pirated_lifetime);
     ELSE_IF_COL(copies);
+    ELSE_IF_COL(copies_lifetime);
     ELSE_IF_COL(lifetime_private);
 #undef ELSE_IF_COL
 
@@ -172,7 +174,8 @@ LESS_GREATER(sales_lifetime_public)
 LESS_GREATER_M(sales_lifetime)
 LESS_GREATER(pirated)
 LESS_GREATER(pirated_lifetime)
-LESS_GREATER_A(copies, copies_lifetime())
+LESS_GREATER_M(copies)
+LESS_GREATER_M(copies_lifetime)
 LESS_GREATER(lifetime_private)
 #undef LESS_GREATER
 #undef LESS_GREATER_A
@@ -225,7 +228,7 @@ void BookStore::appendColumnsTo(Gtk::TreeView &v) const {
     appendCol(v, "Rev.", columns->revenue_lifetime, 75);
     appendCol(v, "Sales", columns->sales_lifetime, 75);
     appendCol(v, "Pirated", columns->pirated_lifetime, 85);
-    appendCol(v, "Copies", columns->copies, 80);
+    appendCol(v, "Copies", columns->copies_lifetime, 80);
 }
 
 }}

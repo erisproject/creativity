@@ -21,6 +21,8 @@ BookState::BookState(const Book &b) :
     price{b.price()},
     revenue{b.currRevenue()},
     revenue_lifetime{b.lifeRevenue()},
+    prize{b.currPrize()},
+    prize_lifetime{b.lifePrize()},
     sales{b.currSales()},
     sales_lifetime_private{b.lifeSalesPrivate()},
     sales_lifetime_public{b.lifeSalesPublic()},

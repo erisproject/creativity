@@ -51,7 +51,9 @@ class PublicTracker : public eris::agent::AssetAgent,
          * anymore). */
         void interApply() override;
 
-        // Override priority to run after the Reader's interApply has deposited income:
+        /** Override priority to run after the Reader's interApply has deposited income, and after
+         * readers have created new books and withdrawn old books from the market.
+         */
         virtual double interApplyPriority() const override { return 1.0; }
 
         /** When the period finishes, we return the lump sum tax proportionally to all authors. */

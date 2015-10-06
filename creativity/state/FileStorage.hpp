@@ -607,6 +607,8 @@ class FileStorage final : public StorageBackend {
          *     dbl          price (market is derived from this: market=true unless price is NaN)
          *     dbl          revenue
          *     dbl          revenue_lifetime
+         *     dbl          prize
+         *     dbl          prize_lifetime
          *     u32          sales
          *     u32          sales_lifetime_private
          *     u32          sales_lifetime_public

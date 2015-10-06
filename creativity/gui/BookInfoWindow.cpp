@@ -36,6 +36,8 @@ BookInfoWindow::BookInfoWindow(
     data_append(grid_status, "pirated", "Copies pirated (lifetime)");
     data_append(grid_status, "piratedLast", "Copies pirated (current)");
     data_append(grid_status, "copies", "Copies in world");
+    data_append(grid_status, "prizeLast", "Public/prize money (current)");
+    data_append(grid_status, "prize", "Public/prize money (lifetime)");
     data_append(grid_status, "author", "Author ID");
     override_background_color(Gdk::RGBA{"white"});
 
@@ -68,13 +70,16 @@ void BookInfoWindow::refresh(std::shared_ptr<const State> state) {
         updateValue("pirated", b.pirated_lifetime);
         updateValue("piratedLast", b.pirated);
         updateValue("copies", b.copies_lifetime());
+        updateValue("prizeLast", b.prize);
+        updateValue("prize", b.prize_lifetime);
     }
     else {
         // If the user navigates back in time to a period where the book doesn't exist, set
         // everything to N/A and change the title.
         set_title("Book details (" + std::to_string(id) + "): not yet created!");
         for (auto &key : {"id", "author", "position", "market", "price", "quality", "age", "created",
-                "revenue", "revenueLast", "salesPrivate", "salesPublic", "salesLast", "pirated", "piratedLast", "copies"}) {
+                "revenue", "revenueLast", "salesPrivate", "salesPublic", "salesLast", "pirated", "piratedLast", "copies",
+                "prize", "prizeLast"}) {
             updateValue(key, "N/A");
         }
     }

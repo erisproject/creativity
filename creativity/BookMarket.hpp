@@ -18,16 +18,21 @@ class BookMarket : public eris::Market, public virtual eris::intraopt::Finish {
          */
         BookMarket(std::shared_ptr<Creativity> creativity, eris::SharedMember<Book> b, double price);
 
-        /** Returns price info.  Since price is constant, and there is no quantity limits,
-         * this price into is simple: it's always feasible, and total is just quantity times price,
-         * truncated to an integer (since books are discrete).
+        /** Returns price info.  Since price is constant, and `quantity` should always 1, this price info
+         * is simple: it's always feasible, and total is just the price.
+         *
+         * \param q the quantity, which must be 1.
+         * \throws std::logic_error if the given quantity does not equal 1.0.
          */
         virtual price_info price(double q) const override;
 
-        /** Returns quantity info for a given payment.  Since price is constant, this is simple:
-         * .quantity is the floor of p divided by current price, .constrained is always false,
-         * .spent equals p*.quantity, and .unspent equals whatever amount is leftover which can't
-         * buy another whole book.
+        /** Returns quantity info for a given payment.  As long as the given price is at least as
+         * large as the market price, this returns a quantity_info with `quantity` set to 1,
+         * `constrained` set to false, `spent` set to the price, and `unspent` set to `p` minus the
+         * price.
+         *
+         * Otherwise (if p is too low) this returns a `quantity` of 0, `spent` set to 0,
+         * `constrained` set to false, and `unspent` set to p.
          */
         virtual quantity_info quantity(double p) const override;
 
@@ -49,8 +54,8 @@ class BookMarket : public eris::Market, public virtual eris::intraopt::Finish {
         /** Registers this market as the book's market when added to the simulation. */
         virtual void added() override;
 
-        /** Reserves q units, paying at most p_max for them.  Note that if q is not an integer, this
-         * will actually purchase floor(q) units.
+        /** Reserves a copy of a book, paying at most p_max for it.  The `q` argument must be 1: you
+         * can't buy anything other than 1 copy.
          */
         virtual Reservation reserve(
                 eris::SharedMember<eris::agent::AssetAgent> agent,

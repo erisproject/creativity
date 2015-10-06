@@ -94,7 +94,8 @@ class BookStore : public MemberStore<state::BookState>, public virtual Glib::Obj
                     sales_lifetime, ///< Lifetime copies sold (both private/public)
                     pirated, ///< Copies sold in the current period
                     pirated_lifetime, ///< Lifetime copies sold
-                    copies, ///< Lifetime copies (sold + pirated)
+                    copies, ///< Copies created (sold or pirated) in the current period
+                    copies_lifetime, ///< Lifetime copies created (sold or pirated)
                     lifetime_private; ///< Number of periods the book has been or was on the private market
 
             protected:
@@ -104,7 +105,8 @@ class BookStore : public MemberStore<state::BookState>, public virtual Glib::Obj
                     add(pos_str);
                     add(market_private); add(market_public); add(market_any); add(market_str);
                     add(age); add(created); add(sales); add(sales_lifetime_private); add(sales_lifetime_public);
-                    add(sales_lifetime); add(pirated); add(pirated_lifetime); add(copies); add(lifetime_private);
+                    add(sales_lifetime); add(pirated); add(pirated_lifetime);
+                    add(copies); add(copies_lifetime); add(lifetime_private);
                 }
                 friend class BookStore;
         };
@@ -203,6 +205,7 @@ class BookStore : public MemberStore<state::BookState>, public virtual Glib::Obj
         LESS_GREATER_METHODS(pirated)
         LESS_GREATER_METHODS(pirated_lifetime)
         LESS_GREATER_METHODS(copies)
+        LESS_GREATER_METHODS(copies_lifetime)
         LESS_GREATER_METHODS(lifetime_private)
 #undef LESS_GREATER_METHODS
 };

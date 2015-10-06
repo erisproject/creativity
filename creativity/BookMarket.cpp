@@ -11,8 +11,10 @@ using namespace eris;
 
 namespace creativity {
 
+// NB: b might not actually be in the simulation yet (in which case it won't have an eris_id)
 BookMarket::BookMarket(std::shared_ptr<Creativity> creativity, SharedMember<Book> b, double price)
-    : Market{{{ b, 1 }}, {{ creativity->money, 1 }}}, creativity_{std::move(creativity)}, book_{b}, price_{price}
+    // Our output bundle is empty: book copies aren't Goods, and are handled elsewhere
+    : Market{Bundle{}, {{ creativity->money, 1 }}}, creativity_{std::move(creativity)}, book_{b}, price_{price}
 {}
 
 SharedMember<Book> BookMarket::book() {
@@ -24,8 +26,8 @@ void BookMarket::added() {
 }
 
 BookMarket::price_info BookMarket::price(double q) const {
-    unsigned long ql = (unsigned long) std::floor(q);
-    return price_info(ql*price_, price_, price_);
+    if (q != 1) throw std::logic_error("BookMarket price() can only b called with q=1");
+    return price_info(price_, price_, price_);
 }
 
 void BookMarket::setPrice(double p) {
@@ -39,28 +41,23 @@ const double& BookMarket::price() {
 }
 
 BookMarket::quantity_info BookMarket::quantity(double p) const {
-    unsigned long ql = std::floor(p / price_);
-    p -= ql*price_;
     return {
-        .quantity = (double) ql,
-            .constrained = false,
-            .spent = ql*price_,
-            .unspent = p
+        .quantity = (p >= price_ ? 1. : 0.),
+        .constrained = false,
+        .spent = (p >= price_ ? price_ : 0.),
+        .unspent = (p >= price_ ? price_ - p : p)
     };
 }
 
 Market::Reservation BookMarket::reserve(
         SharedMember<AssetAgent> agent, double q, double p_max) {
+    if (q != 1) throw std::logic_error("BookMarket price() can only b called with q=1");
 
-    auto ql = (unsigned long) std::floor(q);
-    if (ql * price_ > p_max) {
-        ql = std::floor(p_max / price_);
-    }
-    double total_p = ql*price_;
+    if (price_ > p_max) throw std::logic_error("BookMarket::reserve() called with p_max < price");
 
     auto lock = writeLock(agent); // Lock the market and agent
 
-    return createReservation(agent, ql, total_p);
+    return createReservation(agent, 1.0, price_);
 }
 
 void BookMarket::buy(Reservation &res) {
@@ -76,8 +73,7 @@ void BookMarket::buy(Reservation &res) {
     // Transfer the money into the "proceeds" jar (which will eventually go to the author)
     b.transferApprox(b, proceeds_);
 
-    // Leave a copy of the book
-    b.set(book_, res.quantity);
+    // We don't transfer anything back: the new BookCopy is actually created in Reader
 
     // Complete the reservation
     Market::buy(res);

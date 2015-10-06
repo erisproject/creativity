@@ -663,7 +663,7 @@ std::pair<eris_id_t, ReaderState> FileStorage::readReader(eris_time_t t) const {
     r.id = pair.first;
 
     // Position
-    for (uint32_t d = 0; d < settings_.dimensions; d++)
+    for (unsigned d = 0; d < settings_.dimensions; d++)
         r.position[d] = read_dbl();
 
     // Friends
@@ -958,6 +958,8 @@ std::pair<eris_id_t, BookState> FileStorage::readBook() const {
     b.price = read_dbl();
     b.revenue = read_dbl();
     b.revenue_lifetime = read_dbl();
+    b.prize = read_dbl();
+    b.prize_lifetime = read_dbl();
     b.sales = read_u32();
     b.sales_lifetime_private = read_u32();
     b.sales_lifetime_public = read_u32();
@@ -985,6 +987,8 @@ void FileStorage::writeBook(const BookState &b) {
     write_dbl(b.price);
     write_dbl(b.revenue);
     write_dbl(b.revenue_lifetime);
+    write_dbl(b.prize);
+    write_dbl(b.prize_lifetime);
     write_u32(b.sales);
     write_u32(b.sales_lifetime_private);
     write_u32(b.sales_lifetime_public);
