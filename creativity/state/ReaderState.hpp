@@ -71,11 +71,8 @@ class ReaderState final {
 
         std::set<eris::eris_id_t>
             friends, ///< Friends of the reader
-            new_books; ///< The set of book IDs that were newly obtained in the period, not including self-authored books.
-
-        /** Set of IDs of books written by this reader, sorted by ID (and thus also by creation
-         * order). */
-        std::set<eris::eris_id_t> wrote;
+            new_books, ///< The set of book IDs that were newly obtained in the period, not including self-authored books.
+            wrote; ///< IDs of books written by this reader
 
         /// Utility in the current period.
         double u;
