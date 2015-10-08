@@ -411,7 +411,7 @@ std::vector<initial_datum> initial_data_fields() {
     ADD_SETTING(reader_step_mean);
     ADD_SETTING(reader_creation_shape);
     ADD_SETTING(reader_creation_scale_min);
-    ADD_SETTING(reader_creation_scale_max);
+    ADD_SETTING(reader_creation_scale_range);
     ADD_SETTING(cost_market);
     ADD_SETTING(cost_unit);
     ADD_SETTING(cost_piracy);
@@ -428,9 +428,9 @@ std::vector<initial_datum> initial_data_fields() {
     ADD_SETTING(prediction_draws);
     ADD_SETTING(initial.prob_write);
     ADD_SETTING(initial.l_min);
-    ADD_SETTING(initial.l_max);
+    ADD_SETTING(initial.l_range);
     ADD_SETTING(initial.p_min);
-    ADD_SETTING(initial.p_max);
+    ADD_SETTING(initial.p_range);
     ADD_SETTING(initial.prob_keep);
     ADD_SETTING(initial.keep_price);
     ADD_SETTING(initial.belief_threshold);

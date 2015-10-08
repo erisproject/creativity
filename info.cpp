@@ -44,7 +44,7 @@ int main(int argc, char *argv[]) {
     PRINT_SETTING(reader_step_mean);
     PRINT_SETTING(reader_creation_shape);
     PRINT_SETTING(reader_creation_scale_min);
-    PRINT_SETTING(reader_creation_scale_max);
+    PRINT_SETTING(reader_creation_scale_range);
     PRINT_SETTING(creation_time);
     PRINT_SETTING(creation_fixed);
     PRINT_SETTING(cost_market);
@@ -63,9 +63,9 @@ int main(int argc, char *argv[]) {
     PRINT_SETTING(prediction_draws);
     PRINT_SETTING(initial.prob_write);
     PRINT_SETTING(initial.l_min);
-    PRINT_SETTING(initial.l_max);
+    PRINT_SETTING(initial.l_range);
     PRINT_SETTING(initial.p_min);
-    PRINT_SETTING(initial.p_max);
+    PRINT_SETTING(initial.p_range);
     PRINT_SETTING(initial.prob_keep);
     PRINT_SETTING(initial.keep_price);
     PRINT_SETTING(initial.belief_threshold);
@@ -92,7 +92,7 @@ int main(int argc, char *argv[]) {
         ADD_SAME(reader_step_mean);
         ADD_SAME(reader_creation_shape);
         ADD_SAME(reader_creation_scale_min);
-        ADD_SAME(reader_creation_scale_max);
+        ADD_SAME(reader_creation_scale_range);
         ADD_SAME(creation_time);
         ADD_SAME(creation_fixed);
         ADD_SAME(cost_market);
@@ -111,9 +111,9 @@ int main(int argc, char *argv[]) {
         ADD_SAME(prediction_draws);
         ADD_SAME(initial.prob_write);
         ADD("--initial-effort-min", initial.l_min);
-        ADD("--initial-effort-max", initial.l_max);
+        ADD("--initial-effort-range", initial.l_range);
         ADD("--initial-price-min", initial.p_min);
-        ADD("--initial-price-max", initial.p_max);
+        ADD("--initial-price-range", initial.p_range);
         ADD_SAME(initial.prob_keep);
         ADD_SAME(initial.keep_price);
         ADD("--belief-threshold", initial.belief_threshold);

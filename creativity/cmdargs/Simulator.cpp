@@ -37,7 +37,7 @@ void Simulator::addOptions() {
         ("creation-time,e", value(s_.creation_time), u8"The number of periods that elapse between the creation decision and the book being ready")
         ("reader-creation-shape,s", below<1>(s_.reader_creation_shape), u8"Shape parameter, β, of the creator effort function: q(ℓ) = (α/β)[(ℓ+1)^β - 1]")
         ("reader-creation-scale-min,z", min<0>(s_.reader_creation_scale_min), u8"Minimum support of scale parameter α ~ U[a,b] for the creator effort function: q(ℓ) = (α/β)[(ℓ+1)^β - 1]")
-        ("reader-creation-scale-max,Z", min<0>(s_.reader_creation_scale_max), u8"Maximum support of scale parameter α ~ U[a,b] for the creator effort function: q(ℓ) = (α/β)[(ℓ+1)^β - 1]")
+        ("reader-creation-scale-range,Z", min<0>(s_.reader_creation_scale_range), u8"Support range (that is, b-a) of scale parameter α ~ U[a,b] for the creator effort function: q(ℓ) = (α/β)[(ℓ+1)^β - 1]")
         ;
     options_.add(authorship);
 
@@ -61,9 +61,9 @@ void Simulator::addOptions() {
     initial.add_options()
         ("initial-prob-write,x", range<0, 1>(s_.initial.prob_write), "The probability of writing in initial periods")
         ("initial-effort-min,m", min<0>(s_.initial.l_min), "The minimum support of effort l ~ U[a,b] for authored books in initial periods")
-        ("initial-effort-max,M", min<0>(s_.initial.l_max), "The maximum support of effort l ~ U[a,b] for authored books in initial periods")
-        ("initial-price-min,n", min<0>(s_.initial.p_min), "The minimum support of price c + U[a,b] for new books in initial periods")
-        ("initial-price-max,N", min<0>(s_.initial.p_max), "The maximum support of price c + U[a,b] for new books in initial periods")
+        ("initial-effort-range,M", min<0>(s_.initial.l_range), "The range of effort l ~ U[a,b] (in other words, b-a) for authored books in initial periods")
+        ("initial-price-min,n", min<0>(s_.initial.p_min), "The minimum support, `a', of the random component of price c + U[a,b] for new books in initial periods")
+        ("initial-price-range,N", min<0>(s_.initial.p_range), "The range, `b-a', of the random component of price c + U[a,b] for new books in initial periods")
         ("initial-prob-keep,k", range<0, 1>(s_.initial.prob_keep), "The probability of keeping a previously-written book on the market for another period")
         ("initial-keep-price,K", range<0, 1>(s_.initial.keep_price), "The  price-above-marginal-cost level (relative to current P-MC) for a book left on the market for another period")
         ;

@@ -311,7 +311,7 @@ class FileStorage final : public StorageBackend {
                     reader_step_mean = 52, ///< mean of reader step distance (non-negative dbl)
                     reader_creation_shape = 60, ///< reader q(l) shape parameter (dbl)
                     reader_creation_scale_min = 68, ///< reader q(l) scale parameter ~ U[a,b]; this is 'a' (dbl)
-                    reader_creation_scale_max = 76, ///< reader q(l) scale parameter ~ U[a,b]; this is 'b' (dbl)
+                    reader_creation_scale_range = 76, ///< reader q(l) scale parameter ~ U[a,b]; this is 'b-a' (dbl)
                     creation_time = 84, ///< Time to create a book
                     cost_market = 88, ///< Fixed cost of keeping a book on the market (dbl)
                     cost_unit = 96, ///< Unit cost of an author creating a copy of a book (dbl)
@@ -325,9 +325,9 @@ class FileStorage final : public StorageBackend {
                     burnin_periods = 156, ///< The burnin-periods during which beliefs are more heavily discounted (u32)
                     init_prob_write = 160, ///< The probability of writing (while beliefs noninformative)
                     init_l_min = 168, ///< `a` in U[a,b], the noninformative belief authorship effort level
-                    init_l_max = 176, ///< `b` in U[a,b], the noninformative belief authorship effort level
-                    init_p_min = 184, ///< `a` in U[a,b], the noninformative belief book price
-                    init_p_max = 192, ///< `b` in U[a,b], the noninformative belief book price
+                    init_l_range = 176, ///< `b-a` in U[a,b], the noninformative belief authorship effort level
+                    init_p_min = 184, ///< `a` in U[a,b], the noninformative belief book price (net of cost)
+                    init_p_range = 192, ///< `b-a` in U[a,b], the noninformative belief book price (net of cost)
                     init_prob_keep = 200, ///< The probability of keeping a book on the market (uninformed beliefs)
                     init_keep_price = 208, ///< If keeping a book on the market, the new price is (p-c)*s+c, where this is s
                     init_belief_threshold = 216, ///< The required n-k value for readers to use beliefs instead of initial behaviour (i32)

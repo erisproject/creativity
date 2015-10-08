@@ -376,7 +376,8 @@ void Reader::interOptimize() {
             else {
                 // If we have no useful profit belief yet, just use the initial values:
                 if (creativity_->parameters.initial.prob_write > 0 and std::bernoulli_distribution(creativity_->parameters.initial.prob_write)(rng)) {
-                    double effort = std::uniform_real_distribution<double>(creativity_->parameters.initial.l_min, creativity_->parameters.initial.l_max)(rng);
+                    double effort = std::uniform_real_distribution<double>(creativity_->parameters.initial.l_min,
+                            creativity_->parameters.initial.l_min + creativity_->parameters.initial.l_range)(rng);
                     // Make sure the required effort doesn't exceed the available funds; if it does,
                     // reduce the effort:
                     if (creation_base_cost + effort > income_available)
@@ -390,7 +391,7 @@ void Reader::interOptimize() {
                     create_price_ = creativity_->parameters.cost_unit +
                         std::uniform_real_distribution<double>(
                                 creativity_->parameters.initial.p_min,
-                                creativity_->parameters.initial.p_max)(Random::rng());
+                                creativity_->parameters.initial.p_min + creativity_->parameters.initial.p_range)(Random::rng());
                 }
             }
         }
@@ -424,7 +425,7 @@ void Reader::interOptimize() {
                 create_price_ = creativity_->parameters.cost_unit +
                     std::uniform_real_distribution<double>(
                             creativity_->parameters.initial.p_min,
-                            creativity_->parameters.initial.p_max)(Random::rng());
+                            creativity_->parameters.initial.p_min + creativity_->parameters.initial.p_range)(Random::rng());
             }
         }
     }

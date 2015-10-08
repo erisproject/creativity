@@ -58,16 +58,16 @@ struct CreativitySettings {
     double reader_creation_shape = 0;
 
     /** Reader.creation_scale values are drawn from \f$U[a,b]\f$, where this value is the lower
-     * bound.  Defaults to 5.
+     * bound.  Defaults to 0.
      *
      * \sa Reader.creation_scale
      */
-    double reader_creation_scale_min = 1.0;
+    double reader_creation_scale_min = 0.0;
 
-    /** Reader.creation_scale values are drawn from \f$U[a,b]\f$, where this value is the upper
-     * bound.  Defaults to 15.
+    /** Reader.creation_scale values are drawn from \f$U[a,b]\f$, where this value is the size of
+     * the range `b-a`.  Defaults to 10 (so the values are drawn from U[0,10]).
      */
-    double reader_creation_scale_max = 10.0;
+    double reader_creation_scale_range = 10.0;
 
     /** The length of time (in simulation periods) it takes to create a book.  If 0, books are
      * created instantly; if larger, the given number of periods go by before the book is finished.
@@ -173,20 +173,20 @@ struct CreativitySettings {
     struct {
         /** The probability that a reader writes a book. */
         double prob_write = 0.1;
-        /** Initial book creation effort levels are distributed Uniform[`l_min`, `l_max`].  Readers
-         * without sufficiently informed quality beliefs use the mean of the resulting quality
-         * distribution for initial purchasing decisions. */
+        /** Initial book creation effort levels are distributed Uniform[`l_min`, `l_min+l_range`].
+         * Readers without sufficiently informed quality beliefs use the mean of the resulting
+         * quality distribution for initial purchasing decisions. */
         double l_min = 0;
-        /** Initial book creation effort levels are distributed Uniform[`l_min`, `l_max`].  Readers
-         * without sufficiently informed quality beliefs use the mean of the resulting quality
-         * distribution for initial purchasing decisions. */
-        double l_max = 100.0;
-        /** Initial book prices are distributed `cost_unit +` Uniform[`p_min`, `p_max`].  Note that
-         * initial book quality, at default creation shape/scale and l_min/l_max settings, can take
-         * a value anywhere from 0 to 46.15, and has a mean of 20.14. */
+        /** Initial book creation effort levels are distributed Uniform[`l_min`, `l_min+l_range`].
+         * Readers without sufficiently informed quality beliefs use the mean of the resulting
+         * quality distribution for initial purchasing decisions. */
+        double l_range = 100.0;
+        /** Initial book prices are distributed `cost_unit +` Uniform[`p_min`, `p_min+p_range`].
+         * Note that initial book quality, at default creation shape/scale and l_min/l_range
+         * settings, can take a value anywhere from 0 to 46.15, and has a mean of 20.14. */
         double p_min = 4.0;
-        /** Initial book prices are distributed `cost_unit +` Uniform[`p_min`, `p_max`] */
-        double p_max = 34.0;
+        /** Initial book prices are distributed `cost_unit +` Uniform[`p_min`, `p_min+p_range`] */
+        double p_range = 30.0;
         /** The probability of a book being kept on the market for another period. */
         double prob_keep = 0.5;
         /** The relative price-above-marginal-cost of a book being kept on the market for another

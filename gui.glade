@@ -32,7 +32,7 @@
     <property name="step_increment">0.01</property>
     <property name="page_increment">0.10000000000000001</property>
   </object>
-  <object class="GtkAdjustment" id="adj_p_max">
+  <object class="GtkAdjustment" id="adj_p_range">
     <property name="upper">100</property>
     <property name="step_increment">0.10000000000000001</property>
     <property name="page_increment">1</property>
@@ -86,7 +86,7 @@
     <property name="step_increment">1</property>
     <property name="page_increment">10</property>
   </object>
-  <object class="GtkAdjustment" id="adj_l_max">
+  <object class="GtkAdjustment" id="adj_l_range">
     <property name="upper">1000</property>
     <property name="step_increment">1</property>
     <property name="page_increment">10</property>
@@ -96,7 +96,7 @@
     <property name="step_increment">1</property>
     <property name="page_increment">10</property>
   </object>
-  <object class="GtkAdjustment" id="adj_reader_creation_scale_max">
+  <object class="GtkAdjustment" id="adj_reader_creation_scale_range">
     <property name="upper">10000</property>
     <property name="step_increment">0.10000000000000001</property>
     <property name="page_increment">1</property>
@@ -820,7 +820,7 @@
                                               <object class="GtkLabel" id="lbl_init_l_min">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="label" translatable="yes">ℓ ~ U[&lt;b&gt;&lt;i&gt;A&lt;/i&gt;&lt;/b&gt;,B]</property>
+                                                <property name="label" translatable="yes">ℓ ~ U[&lt;b&gt;&lt;i&gt;A&lt;/i&gt;&lt;/b&gt;,A+B]</property>
                                                 <property name="use_markup">True</property>
                                                 <property name="xalign">0</property>
                                               </object>
@@ -833,7 +833,7 @@
                                               <object class="GtkSpinButton" id="set_init_l_min">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
-                                                <property name="tooltip_text" translatable="yes">The lower support of the uniform distribution of the effort put into an authored book (before demand and profit beliefs are informed).  Readers with uninformed Quality beliefs use the mean of the quality distribution implied by this setting and the creation shape and scale parameters.</property>
+                                                <property name="tooltip_text" translatable="yes">The lower support of the uniform distribution of the effort put into an authored book (before demand and profit beliefs are informed).</property>
                                                 <property name="margin_bottom">1</property>
                                                 <property name="adjustment">adj_l_min</property>
                                                 <property name="digits">2</property>
@@ -845,10 +845,10 @@
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="lbl_init_l_max">
+                                              <object class="GtkLabel" id="lbl_init_l_range">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="label" translatable="yes">ℓ ~ U[A,&lt;b&gt;&lt;i&gt;B&lt;/i&gt;&lt;/b&gt;]</property>
+                                                <property name="label" translatable="yes">ℓ ~ U[A,A+&lt;b&gt;&lt;i&gt;B&lt;/i&gt;&lt;/b&gt;]</property>
                                                 <property name="use_markup">True</property>
                                                 <property name="xalign">0</property>
                                               </object>
@@ -858,12 +858,12 @@
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkSpinButton" id="set_init_l_max">
+                                              <object class="GtkSpinButton" id="set_init_l_range">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
-                                                <property name="tooltip_text" translatable="yes">The upper support of the uniform distribution of the effort put into an authored book (before demand and profit beliefs are informed).  Readers with uninformed Quality beliefs use the mean of the quality distribution implied by this setting and the creation shape and scale parameters.</property>
+                                                <property name="tooltip_text" translatable="yes">The range of the uniform distribution of the effort put into an authored book (before demand and profit beliefs are informed).</property>
                                                 <property name="margin_bottom">1</property>
-                                                <property name="adjustment">adj_l_max</property>
+                                                <property name="adjustment">adj_l_range</property>
                                                 <property name="digits">2</property>
                                                 <property name="numeric">True</property>
                                               </object>
@@ -902,7 +902,7 @@
                                               <object class="GtkLabel" id="lbl_init_p_min">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="label" translatable="yes">P ~ U[&lt;b&gt;&lt;i&gt;A&lt;/i&gt;&lt;/b&gt;,B]</property>
+                                                <property name="label" translatable="yes">P ~ U[c+&lt;b&gt;&lt;i&gt;A&lt;/i&gt;&lt;/b&gt;,c+A+B]</property>
                                                 <property name="use_markup">True</property>
                                                 <property name="xalign">0</property>
                                               </object>
@@ -912,10 +912,10 @@
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="lbl_init_p_max">
+                                              <object class="GtkLabel" id="lbl_init_p_range">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="label" translatable="yes">P ~ U[A,&lt;b&gt;&lt;i&gt;B&lt;/i&gt;&lt;/b&gt;]</property>
+                                                <property name="label" translatable="yes">P ~ U[c+A,c+A+&lt;b&gt;&lt;i&gt;B&lt;/i&gt;&lt;/b&gt;]</property>
                                                 <property name="use_markup">True</property>
                                                 <property name="xalign">0</property>
                                               </object>
@@ -940,12 +940,12 @@
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkSpinButton" id="set_init_p_max">
+                                              <object class="GtkSpinButton" id="set_init_p_range">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
                                                 <property name="tooltip_text" translatable="yes">The distribution of the initial price above marginal cost of an authored book (before Demand belief is informed).</property>
                                                 <property name="margin_bottom">1</property>
-                                                <property name="adjustment">adj_p_max</property>
+                                                <property name="adjustment">adj_p_range</property>
                                                 <property name="digits">2</property>
                                                 <property name="numeric">True</property>
                                               </object>
@@ -1734,7 +1734,7 @@ The value given here is &lt;b&gt;&lt;i&gt;β&lt;/i&gt;&lt;/b&gt;.  Note that &lt
 
 q(ℓ) = &lt;b&gt;&lt;i&gt;α&lt;/i&gt;&lt;/b&gt; [(ℓ+1)&lt;sup&gt;&lt;b&gt;&lt;i&gt;β&lt;/i&gt;&lt;/b&gt;&lt;/sup&gt; - 1] / &lt;b&gt;&lt;i&gt;β&lt;/i&gt;&lt;/b&gt;
 
-&lt;b&gt;&lt;i&gt;α&lt;/i&gt;&lt;/b&gt; ~ U[&lt;b&gt;A&lt;/b&gt;,B], where the value given here is &lt;b&gt;A&lt;/b&gt;.</property>
+&lt;b&gt;&lt;i&gt;α&lt;/i&gt;&lt;/b&gt; ~ U[&lt;b&gt;A&lt;/b&gt;,A+B], where the value given here is &lt;b&gt;A&lt;/b&gt;.</property>
                                                 <property name="margin_bottom">1</property>
                                                 <property name="invisible_char">●</property>
                                                 <property name="input_purpose">number</property>
@@ -1749,10 +1749,10 @@ q(ℓ) = &lt;b&gt;&lt;i&gt;α&lt;/i&gt;&lt;/b&gt; [(ℓ+1)&lt;sup&gt;&lt;b&gt;&l
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="lbl_reader_creation_scale_max">
+                                              <object class="GtkLabel" id="lbl_reader_creation_scale_range">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="label" translatable="yes">Quality fn. scale max</property>
+                                                <property name="label" translatable="yes">Quality fn. scale range</property>
                                                 <property name="xalign">0</property>
                                               </object>
                                               <packing>
@@ -1761,18 +1761,18 @@ q(ℓ) = &lt;b&gt;&lt;i&gt;α&lt;/i&gt;&lt;/b&gt; [(ℓ+1)&lt;sup&gt;&lt;b&gt;&l
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkSpinButton" id="set_reader_creation_scale_max">
+                                              <object class="GtkSpinButton" id="set_reader_creation_scale_range">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
                                                 <property name="tooltip_markup" translatable="yes">Readers expend effort to create a book.  The quality of a book created with effort level ℓ is given by:
 
 q(ℓ) = &lt;b&gt;&lt;i&gt;α&lt;/i&gt;&lt;/b&gt; [(ℓ+1)&lt;sup&gt;&lt;b&gt;&lt;i&gt;β&lt;/i&gt;&lt;/b&gt;&lt;/sup&gt; - 1] / &lt;b&gt;&lt;i&gt;β&lt;/i&gt;&lt;/b&gt;
 
-&lt;b&gt;&lt;i&gt;α&lt;/i&gt;&lt;/b&gt; ~ U[A,&lt;b&gt;B&lt;/b&gt;], where the value given here is &lt;b&gt;B&lt;/b&gt;.</property>
+&lt;b&gt;&lt;i&gt;α&lt;/i&gt;&lt;/b&gt; ~ U[A,A+&lt;b&gt;B&lt;/b&gt;], where the value given here is &lt;b&gt;B&lt;/b&gt;.</property>
                                                 <property name="margin_bottom">1</property>
                                                 <property name="invisible_char">●</property>
                                                 <property name="input_purpose">number</property>
-                                                <property name="adjustment">adj_reader_creation_scale_max</property>
+                                                <property name="adjustment">adj_reader_creation_scale_range</property>
                                                 <property name="digits">2</property>
                                                 <property name="numeric">True</property>
                                                 <property name="update_policy">if-valid</property>

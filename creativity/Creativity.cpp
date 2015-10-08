@@ -53,7 +53,7 @@ void Creativity::checkParameters() {
     PROHIBIT(reader_step_mean, < 0);
     PROHIBIT(reader_creation_shape, >= 1);
     PROHIBIT(reader_creation_scale_min, < 0);
-    PROHIBIT(reader_creation_scale_max, < parameters.reader_creation_scale_min);
+    PROHIBIT(reader_creation_scale_range, < 0);
     PROHIBIT(cost_market, < 0);
     PROHIBIT(cost_unit, < 0);
     PROHIBIT(cost_piracy, < 0);
@@ -63,9 +63,9 @@ void Creativity::checkParameters() {
     PROHIBIT(initial.prob_write, < 0);
     PROHIBIT(initial.prob_write, > 1);
     PROHIBIT(initial.p_min, < 0);
-    PROHIBIT(initial.p_max, < parameters.initial.p_min);
-    PROHIBIT(initial.l_max, < parameters.initial.l_min);
+    PROHIBIT(initial.p_range, < 0);
     PROHIBIT(initial.l_min, < 0);
+    PROHIBIT(initial.l_range, < 0);
     PROHIBIT(initial.prob_keep, < 0);
     PROHIBIT(initial.prob_keep, > 1);
     PROHIBIT(initial.keep_price, < 0);
@@ -89,7 +89,8 @@ void Creativity::setup() {
 
     auto &rng = eris::Random::rng();
     std::uniform_real_distribution<double> unif_pmb(-parameters.boundary, parameters.boundary);
-    std::uniform_real_distribution<double> unif_cr_shape(parameters.reader_creation_scale_min, parameters.reader_creation_scale_max);
+    std::uniform_real_distribution<double> unif_cr_shape(parameters.reader_creation_scale_min,
+            parameters.reader_creation_scale_min + parameters.reader_creation_scale_range);
 
     Position initpos = Position::zero(parameters.dimensions);
     for (unsigned int i = 0; i < parameters.readers; i++) {
@@ -248,8 +249,9 @@ double Creativity::priorWeight() const {
 }
 
 double Creativity::meanInitialQuality() const {
-    const double &L = parameters.initial.l_max, &l = parameters.initial.l_min,
+    const double &r = parameters.initial.l_range, &l = parameters.initial.l_min,
           &beta = parameters.reader_creation_shape;
+    const double L = l+r;
     double val;
     if (beta == 0) {
         const double logLp1 = std::log(L+1), loglp1 = std::log(l+1);
@@ -260,7 +262,7 @@ double Creativity::meanInitialQuality() const {
         val = (std::pow(L+1, beta+1) / (beta+1) - L)
             - (std::pow(l+1, beta+1) / (beta+1) - l);
     }
-    return val * (parameters.reader_creation_scale_max + parameters.reader_creation_scale_min) / (2 * (L - l));
+    return val / r * (parameters.reader_creation_scale_min + parameters.reader_creation_scale_range / 2);
 }
 
 std::pair<std::vector<SharedMember<Book>>&, std::unique_lock<std::mutex>> Creativity::newBooks() {

@@ -63,7 +63,7 @@ constexpr int64_t
         FileStorage::HEADER::pos::reader_step_mean,
         FileStorage::HEADER::pos::reader_creation_shape,
         FileStorage::HEADER::pos::reader_creation_scale_min,
-        FileStorage::HEADER::pos::reader_creation_scale_max,
+        FileStorage::HEADER::pos::reader_creation_scale_range,
         FileStorage::HEADER::pos::creation_time,
         FileStorage::HEADER::pos::cost_market,
         FileStorage::HEADER::pos::cost_unit,
@@ -77,9 +77,9 @@ constexpr int64_t
         FileStorage::HEADER::pos::burnin_periods,
         FileStorage::HEADER::pos::init_prob_write,
         FileStorage::HEADER::pos::init_l_min,
-        FileStorage::HEADER::pos::init_l_max,
+        FileStorage::HEADER::pos::init_l_range,
         FileStorage::HEADER::pos::init_p_min,
-        FileStorage::HEADER::pos::init_p_max,
+        FileStorage::HEADER::pos::init_p_range,
         FileStorage::HEADER::pos::init_prob_keep,
         FileStorage::HEADER::pos::init_keep_price,
         FileStorage::HEADER::pos::public_sharing_begins,
@@ -262,7 +262,7 @@ void FileStorage::writeSettings(const CreativitySettings &settings) {
     write_value(settings.reader_step_mean);
     write_value(settings.reader_creation_shape);
     write_value(settings.reader_creation_scale_min);
-    write_value(settings.reader_creation_scale_max);
+    write_value(settings.reader_creation_scale_range);
     write_value(settings.creation_time);
     write_value(settings.cost_market);
     write_value(settings.cost_unit);
@@ -276,9 +276,9 @@ void FileStorage::writeSettings(const CreativitySettings &settings) {
     write_value(settings.burnin_periods);
     write_value(settings.initial.prob_write);
     write_value(settings.initial.l_min);
-    write_value(settings.initial.l_max);
+    write_value(settings.initial.l_range);
     write_value(settings.initial.p_min);
-    write_value(settings.initial.p_max);
+    write_value(settings.initial.p_range);
     write_value(settings.initial.prob_keep);
     write_value(settings.initial.keep_price);
     write_value(settings.initial.belief_threshold);
@@ -537,7 +537,7 @@ void FileStorage::parseMetadata() {
     PARSE_VALUE(reader_step_mean);
     PARSE_VALUE(reader_creation_shape);
     PARSE_VALUE(reader_creation_scale_min);
-    PARSE_VALUE(reader_creation_scale_max);
+    PARSE_VALUE(reader_creation_scale_range);
     PARSE_VALUE(creation_time);
     PARSE_VALUE(cost_market);
     PARSE_VALUE(cost_unit);
@@ -551,9 +551,9 @@ void FileStorage::parseMetadata() {
     PARSE_VALUE(burnin_periods);
     PARSE_VALUE_INIT(prob_write);
     PARSE_VALUE_INIT(l_min);
-    PARSE_VALUE_INIT(l_max);
+    PARSE_VALUE_INIT(l_range);
     PARSE_VALUE_INIT(p_min);
-    PARSE_VALUE_INIT(p_max);
+    PARSE_VALUE_INIT(p_range);
     PARSE_VALUE_INIT(prob_keep);
     PARSE_VALUE_INIT(keep_price);
     PARSE_VALUE_INIT(belief_threshold);
