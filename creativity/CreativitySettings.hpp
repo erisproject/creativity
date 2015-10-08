@@ -47,9 +47,9 @@ struct CreativitySettings {
      * The final location is selected from a uniform distribution over all points with the given
      * distance from the reader's initial position.
      *
-     * The default is 0.1.
+     * The default is 0.5.
      */
-    double reader_step_mean = 1.0;
+    double reader_step_mean = 0.5;
 
     /** The "shape" parameter \f$\beta\f$ of the reader effort.
      *
