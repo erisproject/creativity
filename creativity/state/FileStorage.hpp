@@ -517,9 +517,9 @@ class FileStorage final : public StorageBackend {
          * stored in the locations referenced in the dedicated reader library section at the
          * beginning of the file.
          *
-         * BELIEF is a set of belief data, as handled by readBelief(int64_t).  profit extrapolated
-         * belief is set to a belief only if it differs from profit_belief; otherwise it is simply
-         * set to a no-data, noninformative belief record (and shouldn't be used).
+         * BELIEF is a set of belief data, as handled by readBelief().  profit extrapolated belief
+         * is set to a belief only if it differs from profit_belief; otherwise it is simply set to a
+         * no-data, noninformative belief record (and shouldn't be used).
          *
          * profit stream beliefs may not be placeholder beliefs (i.e. default constructed objects);
          * such objects should simply be omitted when writing the data.  Each profit stream belief K
