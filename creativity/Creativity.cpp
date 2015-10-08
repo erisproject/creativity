@@ -260,7 +260,7 @@ double Creativity::meanInitialQuality() const {
         val = (std::pow(L+1, beta+1) / (beta+1) - L)
             - (std::pow(l+1, beta+1) / (beta+1) - l);
     }
-    return val * (parameters.reader_creation_scale_max - parameters.reader_creation_scale_min) / (2 * (L - l));
+    return val * (parameters.reader_creation_scale_max + parameters.reader_creation_scale_min) / (2 * (L - l));
 }
 
 std::pair<std::vector<SharedMember<Book>>&, std::unique_lock<std::mutex>> Creativity::newBooks() {
