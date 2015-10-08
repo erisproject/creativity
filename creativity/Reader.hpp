@@ -634,13 +634,16 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * optimization round), but needs to have an id to be put into containers.
          */
         void registerAuthoredBook(eris::SharedMember<Book> book);
-        friend void Book::added();
         /** Called from Book::setMarket when one of this author's Books has changed market status
          * (either gaining a new private or public market, or losing its current market).
          */
         void registerMarketUpdate(eris::SharedMember<Book> book);
+#ifndef DOXYGEN_SHOULD_SEE_THIS
+        // The protected register* methods are called from Book:
+        friend void Book::added();
         friend void Book::setMarket(eris::SharedMember<BookMarket>);
         friend void Book::weakDepRemoved(eris::SharedMember<eris::Member>, eris::eris_id_t);
+#endif
 
     private:
         std::vector<double> dist_penalty_poly_;
