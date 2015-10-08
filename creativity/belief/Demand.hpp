@@ -92,7 +92,6 @@ class Demand : public eris::belief::BayesianLinearRestricted {
         /** Given various information about a book, returns an X matrix row of data representing
          * that information.
          *
-         * \param draws the number of draws to use for prediction
          * \param P the price of a copy of the book
          * \param q the quality of the book
          * \param S prior book sales
