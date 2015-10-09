@@ -24,6 +24,7 @@ void Data::addOptions() {
         ("periods,t", min<1>(data_periods), "    Specifies the number of periods to use for calculating pre, new, and post-piracy data")
         ("skip-piracy", value(skip.piracy), "If specified, do not produce data for piracy periods.  Required for simulation data that does not contain pre-public sharing piracy periods.")
         ("skip-public-sharing", value(skip.public_sharing), "If specified, do not produce data for public sharing periods.  Required for simulation data that does not contain public sharing periods.")
+        ("skip-short-run", value(skip.short_run), "If specified, don't include \"short-run\" effects generated from the initial periods of piracy or public sharing.")
         ("verify-periods,T", value(verify.periods), "    If non-zero, only use given simulation files with the last time period matching the given argument.")
         ("verify-piracy-begins,P", value(verify.piracy_begins), "If non-zero, only use given simulation files with piracy beginning in the given period.")
         ("verify-public-sharing-begins,G", value(verify.public_sharing_begins), "If non-zero, only use given simulation files with public sharing beginning in the given period.")

@@ -105,12 +105,18 @@ void thr_parse_file(
 
         SKIP_IF(post_pre-1 <= args.data_periods,
                 "simulation \"pre\" periods " << post_pre-2 << " < " << args.data_periods);
+
+        // If we're including both short-run and long-run effects, we need twice as many periods to
+        // avoid overlap.
+        unsigned periods_needed = args.data_periods;
+        if (not args.skip.short_run) periods_needed *= 2;
+
         if (not args.skip.piracy) {
-            SKIP_IF(post_piracy - piracy_begins < args.data_periods,
+            SKIP_IF(post_piracy - piracy_begins < periods_needed,
                     "simulation doesn't have enough piracy periods (t=" << piracy_begins << " through t=" << post_piracy-1 << ")");
         }
         if (not args.skip.public_sharing) {
-            SKIP_IF(post_public - public_sharing_begins < args.data_periods,
+            SKIP_IF(post_public - public_sharing_begins < periods_needed,
                     "simulation doesn't have enough public sharing periods (t=" << public_sharing_begins << " through t=" << post_public-1 << ")");
         }
 #undef SKIP_IF
@@ -136,7 +142,7 @@ void thr_parse_file(
         // pre_*:
         for (auto &d : data) {
             if (d.applies_to.pre) {
-                if (args.human_readable) output << std::setw(readable_name_width+1) << "pre_" + d.name + ":" << " ";
+                if (args.human_readable) output << std::setw(readable_name_width+1) << "pre." + d.name + ":" << " ";
                 else output << ",";
 
                 output << double_str(d.calculate(storage, post_pre - args.data_periods, post_pre - 1), args.double_precision);
@@ -146,14 +152,31 @@ void thr_parse_file(
         }
 
 
-        // piracy_*:
+        // piracy.SR.*:
+        // piracy.*:
         if (not args.skip.piracy) {
+            if (not args.skip.short_run) {
+                state_cache.clear();
+                for (eris_time_t t = 0; t < args.data_periods; t++) state_cache.push_back(storage[piracy_begins + t]);
+
+                for (auto &d : data) {
+                    if (d.applies_to.piracy) {
+                        if (args.human_readable) output << std::setw(readable_name_width+1) << "piracy.SR." + d.name + ":" << " ";
+                        else output << ",";
+
+                        output << double_str(d.calculate(storage, piracy_begins, piracy_begins + args.data_periods - 1), args.double_precision);
+
+                        if (args.human_readable) output << "\n";
+                    }
+                }
+            }
+
             state_cache.clear();
             for (eris_time_t t = post_piracy - args.data_periods; t < post_piracy; t++) state_cache.push_back(storage[t]);
 
             for (auto &d : data) {
                 if (d.applies_to.piracy) {
-                    if (args.human_readable) output << std::setw(readable_name_width+1) << "piracy_" + d.name + ":" << " ";
+                    if (args.human_readable) output << std::setw(readable_name_width+1) << "piracy." + d.name + ":" << " ";
                     else output << ",";
 
                     output << double_str(d.calculate(storage, post_piracy - args.data_periods, post_piracy - 1), args.double_precision);
@@ -163,14 +186,32 @@ void thr_parse_file(
             }
         }
 
-        // public_*:
+        // public.SR.*:
+        // public.*:
         if (not args.skip.public_sharing) {
+            if (not args.skip.short_run) {
+
+                state_cache.clear();
+                for (eris_time_t t = 0; t < args.data_periods; t++) state_cache.push_back(storage[public_sharing_begins + t]);
+
+                for (auto &d : data) {
+                    if (d.applies_to.public_sharing) {
+                        if (args.human_readable) output << std::setw(readable_name_width+1) << "public.SR." + d.name + ":" << " ";
+                        else output << ",";
+
+                        output << double_str(d.calculate(storage, public_sharing_begins, public_sharing_begins + args.data_periods - 1), args.double_precision);
+
+                        if (args.human_readable) output << "\n";
+                    }
+                }
+            }
+
             state_cache.clear();
             for (eris_time_t t = post_public - args.data_periods; t < post_public; t++) state_cache.push_back(storage[t]);
 
             for (auto &d : data) {
                 if (d.applies_to.public_sharing) {
-                    if (args.human_readable) output << std::setw(readable_name_width+1) << "public_" + d.name + ":" << " ";
+                    if (args.human_readable) output << std::setw(readable_name_width+1) << "public." + d.name + ":" << " ";
                     else output << ",";
 
                     output << double_str(d.calculate(storage, post_public - args.data_periods, post_public - 1), args.double_precision);
@@ -211,8 +252,14 @@ int main(int argc, char *argv[]) {
         output << "source";
         for (const auto &d : initial_data) output << ",param." << d.name;
         for (const auto &d : data) if (d.applies_to.pre) output << ",pre." << d.name;
-        if (not args.skip.piracy) for (const auto &d : data) if (d.applies_to.piracy) output << ",piracy." << d.name;
-        if (not args.skip.public_sharing) for (const auto &d : data) if (d.applies_to.public_sharing) output << "," << "public." << d.name;
+        if (not args.skip.piracy) {
+            if (not args.skip.short_run) for (const auto &d : data) if (d.applies_to.piracy) output << ",piracy.SR." << d.name;
+            for (const auto &d : data) if (d.applies_to.piracy) output << ",piracy." << d.name;
+        }
+        if (not args.skip.public_sharing) {
+            if (not args.skip.short_run) for (const auto &d : data) if (d.applies_to.public_sharing) output << ",public.SR." << d.name;
+            for (const auto &d : data) if (d.applies_to.public_sharing) output << ",public." << d.name;
+        }
         output << "\n";
         std::cout << output.str();
     }

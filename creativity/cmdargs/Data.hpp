@@ -31,6 +31,8 @@ class Data : public CmdArgs {
             bool piracy = false;
             /// Skip public sharing data if true
             bool public_sharing = false;
+            /// Skip short-run effects
+            bool short_run = false;
         } skip;
 
         /// If true, produce output in human-readable format; otherwise CSV output.

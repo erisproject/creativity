@@ -137,9 +137,79 @@ double book_gross_margin(const state::Storage &cs, eris::eris_time_t from, eris:
  */
 double book_profit(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
 
+/** Returns a sample quantile from the vector of values.  Linear interpolation is used for quantiles
+ * that lie between elements.  The interpolation is such that the quantile for 0 returns the
+ * smallest value and the quantile for 1 returns the largest value.
+ *
+ * \param vals the vector of double values
+ * \param prob the probability for which the quantile should be calculated; must be between 0 and 1.
+ * \returns NaN if the vector is empty, otherwise returns the requested quantile
+ */
+double quantile(const std::vector<double> &vals, double prob);
+
 /** Average quality of books written during the period range.
  */
 double book_quality(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+
+/** 5th percentile of quality of books written during the period range.
+ */
+double book_quality_5th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+
+/** 10th percentile of quality of books written during the period range.
+ */
+double book_quality_10th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+
+/** 25th percentile of quality of books written during the period range.
+ */
+double book_quality_25th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+
+/** Median quality of books written during the period range.
+ */
+double book_quality_median(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+
+/** 75th percentile of quality of books written during the period range.
+ */
+double book_quality_75th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+
+/** 90th percentile of quality of books written during the period range.
+ */
+double book_quality_90th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+
+/** 95th percentile of quality of books written during the period range.
+ */
+double book_quality_95th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+
+/** Mean author scale of books written during the period range (averaged over books).
+ */
+double book_author_scale_mean(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+
+/** 5th percentile of author scale of books written during the period range.
+ */
+double book_author_scale_5th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+
+/** 10th percentile of author scale of books written during the period range.
+ */
+double book_author_scale_10th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+
+/** 25th percentile of author scale of books written during the period range.
+ */
+double book_author_scale_25th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+
+/** Median author scale of books written during the period range.
+ */
+double book_author_scale_median(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+
+/** 75th percentile of author scale of books written during the period range.
+ */
+double book_author_scale_75th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+
+/** 90th percentile of author scale of books written during the period range.
+ */
+double book_author_scale_90th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+
+/** 95th percentile of author scale of books written during the period range.
+ */
+double book_author_scale_95th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
 
 /** Average number of books written per period.
  */

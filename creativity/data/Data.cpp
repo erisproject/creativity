@@ -229,25 +229,105 @@ double book_profit(const Storage &cs, eris_time_t from, eris_time_t to) {
     return profit_total / seen.size();
 }
 
-/** Average quality of books written during the period range.
- */
-double book_quality(const Storage &cs, eris_time_t from, eris_time_t to) {
-    if (from > to) throw std::logic_error("from > to");
-    double q_total = 0;
-    unsigned int count = 0;
+
+// Cache for all books written between from and to, inclusive.
+eris_time_t bq_cache_from = 0, bq_cache_to = 0;
+const Storage *bq_cache_cs = nullptr;
+std::vector<double> bq_cache;
+void load_bq_cache(const Storage &cs, eris_time_t from, eris_time_t to) {
+    if (bq_cache_cs == &cs and bq_cache_from == from and bq_cache_to == to) {
+        return; // Cache is good
+    }
+    bq_cache.clear();
+    bq_cache_cs = &cs;
+    bq_cache_from = from;
+    bq_cache_to = to;
+
     for (eris_time_t t = from; t <= to; t++) {
-        auto cst = cs[t];
-        for (auto &bp : cst->books) {
+        for (auto &bp : cs[t]->books) {
+            auto &b = bp.second;
+            if (b.created == t) bq_cache.push_back(b.quality);
+        }
+    }
+
+    std::sort(bq_cache.begin(), bq_cache.end());
+}
+
+// Cache for author scale values across books from from to to, inclusive.
+eris_time_t bas_cache_from = 0, bas_cache_to = 0;
+const Storage *bas_cache_cs = nullptr;
+std::vector<double> bas_cache;
+void load_bas_cache(const Storage &cs, eris_time_t from, eris_time_t to) {
+    if (bas_cache_cs == &cs and bas_cache_from == from and bas_cache_to == to) {
+        return; // Cache is good
+    }
+    bas_cache.clear();
+    bas_cache_cs = &cs;
+    bas_cache_from = from;
+    bas_cache_to = to;
+
+    for (eris_time_t t = from; t <= to; t++) {
+        for (auto &bp : cs[t]->books) {
             auto &b = bp.second;
             if (b.created == t) {
-                q_total += b.quality;
-                count++;
+                bas_cache.push_back(cs[t]->readers.at(b.author).creation_scale);
             }
         }
     }
 
-    return q_total / count;
+    std::sort(bas_cache.begin(), bas_cache.end());
 }
+
+double quantile(const std::vector<double> &vals, double prob) {
+    if (prob < 0 or prob > 1) throw std::logic_error("Requested quantile probability is invalid");
+    if (vals.empty()) return std::numeric_limits<double>::quiet_NaN();
+    double index = prob * (vals.size()-1);
+    unsigned below = std::floor(index), above = std::ceil(index);
+    if (below == above) return vals[above];
+    return (above - index) * vals[below] + (index - below) * vals[above];
+}
+
+/** Average quality of books written during the period range.
+ */
+double book_quality(const Storage &cs, eris_time_t from, eris_time_t to) {
+    if (from > to) throw std::logic_error("from > to");
+    load_bq_cache(cs, from, to);
+    if (bq_cache.empty()) return std::numeric_limits<double>::quiet_NaN();
+    double q_total = 0;
+    for (auto &bq : bq_cache) q_total += bq;
+    return q_total / bq_cache.size();
+}
+
+#define QUANTILE_FN(fn, cache, prob) double fn(const state::Storage &cs, eris_time_t from, eris_time_t to) { \
+    if (from > to) throw std::logic_error("from > to"); \
+    load_##cache(cs, from, to); \
+    return quantile(cache, prob); \
+}
+
+QUANTILE_FN(book_quality_5th, bq_cache, 0.05)
+QUANTILE_FN(book_quality_10th, bq_cache, 0.1)
+QUANTILE_FN(book_quality_25th, bq_cache, 0.25)
+QUANTILE_FN(book_quality_median, bq_cache, 0.5)
+QUANTILE_FN(book_quality_75th, bq_cache, 0.75)
+QUANTILE_FN(book_quality_90th, bq_cache, 0.9)
+QUANTILE_FN(book_quality_95th, bq_cache, 0.95)
+
+double book_author_scale_mean(const Storage &cs, eris_time_t from, eris_time_t to) {
+    if (from > to) throw std::logic_error("from > to");
+    load_bas_cache(cs, from, to);
+    if (bas_cache.empty()) return std::numeric_limits<double>::quiet_NaN();
+    double bas_total = 0;
+    for (auto &bas : bas_cache) bas_total += bas;
+    return bas_total / bas_cache.size();
+}
+
+QUANTILE_FN(book_author_scale_5th, bas_cache, 0.05)
+QUANTILE_FN(book_author_scale_10th, bas_cache, 0.1)
+QUANTILE_FN(book_author_scale_25th, bas_cache, 0.25)
+QUANTILE_FN(book_author_scale_median, bas_cache, 0.5)
+QUANTILE_FN(book_author_scale_75th, bas_cache, 0.75)
+QUANTILE_FN(book_author_scale_90th, bas_cache, 0.9)
+QUANTILE_FN(book_author_scale_95th, bas_cache, 0.95)
 
 /** Average number of books written per period.
  */
@@ -416,6 +496,7 @@ std::vector<initial_datum> initial_data_fields() {
     ADD_SETTING(cost_unit);
     ADD_SETTING(cost_piracy);
     ADD_SETTING(creation_time);
+    ADD_SETTING(creation_fixed);
     ADD_SETTING(income);
     ADD_SETTING(piracy_begins);
     ADD_SETTING(piracy_link_proportion);
@@ -453,6 +534,13 @@ std::vector<datum> data_fields() {
     ADD_DATUM(book_gross_margin);
     ADD_DATUM(book_profit);
     ADD_DATUM(book_quality);
+    ADD_DATUM(book_quality_5th);
+    ADD_DATUM(book_quality_10th);
+    ADD_DATUM(book_quality_25th);
+    ADD_DATUM(book_quality_median);
+    ADD_DATUM(book_quality_75th);
+    ADD_DATUM(book_quality_90th);
+    ADD_DATUM(book_quality_95th);
     ADD_DATUM(books_written);
     ADD_DATUM(books_bought);
     ADD_DATUM(books_pirated, false, true, true);
@@ -461,6 +549,14 @@ std::vector<datum> data_fields() {
     ADD_DATUM(reader_market_spending);
     ADD_DATUM(reader_piracy_spending, false, true, true);
     ADD_DATUM(reader_public_spending, false, false, true);
+    ADD_DATUM(book_author_scale_mean);
+    ADD_DATUM(book_author_scale_5th);
+    ADD_DATUM(book_author_scale_10th);
+    ADD_DATUM(book_author_scale_25th);
+    ADD_DATUM(book_author_scale_median);
+    ADD_DATUM(book_author_scale_75th);
+    ADD_DATUM(book_author_scale_90th);
+    ADD_DATUM(book_author_scale_95th);
 #undef ADD_DATUM
 
     return data;
