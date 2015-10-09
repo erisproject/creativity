@@ -326,8 +326,26 @@ void Reader::interOptimize() {
         double creation_base_cost = creativity_->parameters.creation_fixed;
         if (creativity_->parameters.creation_time == 0) creation_base_cost += cost_market;
 
-        if (income_available >= creation_base_cost) {
+        // Figure out what the minimum and maximum effort we can expend are.
+        //
+        // Set minimum effort to the effort required to get a book with a quality large enough to
+        // cover a book at distance 0, which is a reader's first book, and is sold for a price 5%
+        // above marginal cost.  The 5% is fairly innocuous: it's essentially just an extra amount
+        // to reflect that distance will never be 0, and price will never fall all the way to
+        // marginal cost.
+        //
+        // Marginal cost is the unit cost, but if we have public sharing, we'll use the public
+        // sharing cost (which is the minimum of unit cost and piracy cost) if that is lower (since
+        // that's what the public sharing marginal cost and price ends up being).
+        double marginal_cost = creativity_->parameters.cost_unit;
+        if (creativity_->publicSharing() and creativity_->parameters.cost_piracy < marginal_cost)
+            marginal_cost = creativity_->parameters.cost_piracy;
+        double min_effort = creationEffort(distancePenalty(0) + numBooksPenalty(1) + 1.05 * marginal_cost);
+        double max_effort = income_available - creation_base_cost;
+        // Don't even bother trying unless min_effort is actually obtainable
+        if (income_available >= creation_base_cost and max_effort > min_effort) {
             // Create a book if maximized (wrt effort) `E(profit(effort)) - effort > 0`
+
 
             if (usableBelief(*profit_belief_) and usableBelief(demand_belief_)) {
                 // NB: profit_belief_extrap_ is a copy or update of profit_belief_, so will also be usable
@@ -338,21 +356,7 @@ void Reader::interOptimize() {
 
                 std::pair<double, double> effort_profit{-1.0, -1.0};
                 create_price_ = std::numeric_limits<double>::quiet_NaN();
-                // Set minimum effort to the effort required to get a book with a quality large
-                // enough to cover a book at distance 0, which is a reader's first book, and is sold
-                // for a price 5% above marginal cost.  The 5% is fairly innocuous: it's essentially
-                // just an extra amount to reflect that distance will never be 0, and price will
-                // never fall all the way to marginal cost.
-                //
-                // Marginal cost is the unit cost, but if we have public sharing, we'll use the
-                // public sharing cost (which is the minimum of unit cost and piracy cost) if that
-                // is lower (since that's what the public sharing marginal cost and price ends up
-                // being).
-                double marginal_cost = creativity_->parameters.cost_unit;
-                if (creativity_->publicSharing() and creativity_->parameters.cost_piracy < marginal_cost)
-                    marginal_cost = creativity_->parameters.cost_piracy;
 
-                double min_effort = creationEffort(distancePenalty(0) + numBooksPenalty(1) + 1.05 * marginal_cost);
                 try {
                     effort_profit = profit_belief_extrap_->argmaxL(
                             creativity_->parameters.prediction_draws,
