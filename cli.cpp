@@ -27,6 +27,10 @@
 #include <cstdio>
 #include <boost/filesystem/path.hpp>
 #include <sys/stat.h>
+extern "C" {
+#include <unistd.h>
+#include <stdio.h>
+}
 
 using namespace creativity;
 using namespace creativity::state;
@@ -144,6 +148,7 @@ int main(int argc, char *argv[]) {
 
     unsigned int periods = cmd.periods;
 
+    bool tty = isatty(fileno(stdout));
     while (sim->t() < periods) {
         creativity->run();
 
@@ -163,11 +168,14 @@ int main(int argc, char *argv[]) {
         speed << std::setw(7) << sim->t() / std::chrono::duration<double>(now - started).count() << " Hz[A]";
         times.push(std::move(now));
 
-
-        std::cout << "\rRunning simulation [t=" << sim->t() << "; " <<
-            (sim->t() >= creativity->parameters.piracy_begins ? u8"P✔" : u8"P✘") <<
-            "; R=" << sim->countAgents<Reader>() << "; B=" << sim->countGoods<Book>() << "; Bnew=" <<
-            std::setw(max_bnew_digits) << bnew << "] " << speed.str() << std::flush;
+        if (tty) std::cout << "\r";
+        std::cout << "Running simulation [t=" << sim->t() << "; " <<
+            (creativity->piracy() ? u8"Piracy ✔; " : u8"Piracy ✘; ") <<
+            (creativity->publicSharing() ? u8"Public ✔; " : u8"Public ✘; ") <<
+            "R=" << sim->countAgents<Reader>() << "; B=" << sim->countGoods<Book>() << "; Bnew=" <<
+            std::setw(max_bnew_digits) << bnew << "] " << speed.str();
+        if (tty) std::cout << std::flush;
+        else std::cout << std::endl;
     }
 
     std::cout << "\nSimulation done.";
