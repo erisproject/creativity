@@ -18,8 +18,11 @@ std::pair<double, double> Profit::argmaxL(
         const std::function<double(const double &)> q,
         unsigned long previousBooks,
         unsigned long marketBooks,
+        double l_min,
         double l_max
 ) {
+
+    if (l_min > l_max) throw std::logic_error("Profit::argmaxL called with l_min > l_max");
 
     // Get the part of the prediction without the quality term:
     RowVectorXd X = profitRow(0.0, previousBooks, marketBooks);
@@ -31,7 +34,7 @@ std::pair<double, double> Profit::argmaxL(
         return predict(X, draws)[0] - l;
     };
 
-    double ell = eris::single_peak_search(profit, 0, l_max);
+    double ell = eris::single_peak_search(profit, l_min, l_max);
     double net_profit = predict(draws, q(ell), previousBooks, marketBooks) - ell;
     return std::pair<double, double>(ell, net_profit);
 }

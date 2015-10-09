@@ -338,11 +338,28 @@ void Reader::interOptimize() {
 
                 std::pair<double, double> effort_profit{-1.0, -1.0};
                 create_price_ = std::numeric_limits<double>::quiet_NaN();
+                // Set minimum effort to the effort required to get a book with a quality large
+                // enough to cover a book at distance 0, which is a reader's first book, and is sold
+                // for a price 5% above marginal cost.  The 5% is fairly innocuous: it's essentially
+                // just an extra amount to reflect that distance will never be 0, and price will
+                // never fall all the way to marginal cost.
+                //
+                // Marginal cost is the unit cost, but if we have public sharing, we'll use the
+                // public sharing cost (which is the minimum of unit cost and piracy cost) if that
+                // is lower (since that's what the public sharing marginal cost and price ends up
+                // being).
+                double marginal_cost = creativity_->parameters.cost_unit;
+                if (creativity_->publicSharing() and creativity_->parameters.cost_piracy < marginal_cost)
+                    marginal_cost = creativity_->parameters.cost_piracy;
+
+                double min_effort = creationEffort(distancePenalty(0) + numBooksPenalty(1) + 1.05 * marginal_cost);
                 try {
                     effort_profit = profit_belief_extrap_->argmaxL(
                             creativity_->parameters.prediction_draws,
                             [this] (double l) { return creationQuality(l); },
-                            authored_books, market_books, income_available - creation_base_cost
+                            authored_books, market_books,
+                            min_effort, // l_min
+                            income_available - creation_base_cost // l_max
                             );
 
                     // Also pick a price (just to make sure we *can* pick a price without draw
@@ -825,7 +842,7 @@ void Reader::intraOptimize() {
     // Map utility-minus-price values to `<buy, book>` pairs, where `buy` is true if the book is to
     // be purchased and false if the book is to be pirated from a friend (we don't store *which*
     // friend, but it'll only be true if there is at least one friend with a copy).
-    // 
+    //
     // This is sorted by net utility in highest-to-lowest order for the purposes of iterating from
     // best to worse options.
     std::map<double, std::vector<std::pair<bool, SharedMember<Book>>>, std::greater<double>> book_net_u;

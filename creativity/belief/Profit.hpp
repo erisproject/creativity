@@ -85,6 +85,11 @@ class Profit : public eris::belief::BayesianLinearRestricted {
          * substituted instead.
          * \param previousBooks the previous books of the author
          * \param marketBooks the books on the market in the previous period
+         * \param l_min the minimum value of `l` to consider.  The value is typically at least the
+         * effort level associated with book of `quality = MC + distancePenalty(0) +
+         * sizePenalty(1)`: as long as they can observe the quality, no reader would ever buy a book
+         * with lower quality.  (Note, however, that this assumes readers directly observe the
+         * quality and have identical penalty functions).
          * \param l_max the maximum value of `l` to consider.  This is typically the reader's
          * money (income) on hand.
          *
@@ -98,6 +103,7 @@ class Profit : public eris::belief::BayesianLinearRestricted {
                 unsigned int draws,
                 const std::function<double(const double &)> q,
                 unsigned long previousBooks, unsigned long marketBooks,
+                double l_min,
                 double l_max
                 );
 
