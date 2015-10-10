@@ -58,7 +58,9 @@ void thr_parse_file(
     while (input_it != input_it_end) {
         std::string source(*input_it++);
         input_it_mutex.unlock();
+        output_mutex.lock();
         std::cerr << "Processing " << source << "\n";
+        output_mutex.unlock();
 
         std::ostringstream output;
         output.precision(args.double_precision);
