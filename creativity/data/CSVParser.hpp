@@ -2,6 +2,7 @@
 #include <eris/noncopyable.hpp>
 #include <string>
 #include <unordered_set>
+#include <unordered_map>
 #include <vector>
 #include <fstream>
 #include <Eigen/Core>
@@ -89,6 +90,9 @@ class CSVParser : private eris::noncopyable {
          */
         const Eigen::RowVectorXd& row() const { return row_; }
 
+        /** Accesses any skipped fields in the most-recently-read row. */
+        const std::unordered_map<std::string, std::string>& rowSkipped() const { return row_skipped_; }
+
         // forward declaration
         class iterator;
 
@@ -109,6 +113,7 @@ class CSVParser : private eris::noncopyable {
         std::fstream f_;
         size_t lineno_; // Tracks the current line number
         Eigen::RowVectorXd row_; // The most-recently-read row (reused)
+        std::unordered_map<std::string, std::string> row_skipped_; // Any skipped fields on most-recently-read row
 };
 
 /** Iterator class that allows iterating through the file.  The iterator satisfies the requirements

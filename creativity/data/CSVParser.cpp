@@ -1,7 +1,5 @@
 #include "creativity/data/CSVParser.hpp"
 
-#include <iostream>
-
 namespace creativity { namespace data {
 
 CSVParser::CSVParser(const std::string &filename) {
@@ -36,9 +34,13 @@ bool CSVParser::readRow() {
         throw std::invalid_argument("Invalid data on line " + std::to_string(lineno_) + ": number of fields differs from that of the header");
 
     if ((size_t) row_.size() != fields_.size()) row_.resize(fields_.size());
+    row_skipped_.clear();
     size_t row_i = 0, parse_pos = 0;
     for (size_t fieldnum = 0; fieldnum < fields.size(); fieldnum++) {
-        if (not skip_.count(header_[fieldnum])) {
+        if (skip_.count(header_[fieldnum])) {
+            row_skipped_[header_[fieldnum]] = fields[fieldnum];
+        }
+        else {
             auto &field = fields[fieldnum];
             double d;
             try {
