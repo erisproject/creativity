@@ -24,7 +24,7 @@ void PublicTracker::interApply() {
         Bundle tax(creativity_->money, tax_);
         for (auto &r : simulation()->agents<Reader>()) {
             lock.add(r);
-            r->assets().transferApprox(tax, assets(), 1e-8);
+            r->assets().transferApprox(tax, assets(), 1e-6);
             lock.remove(r);
         }
     }
@@ -57,7 +57,7 @@ void PublicTracker::intraFinish() {
 
     if (total_copies > 0) {
         for (auto &ac : author_copies) {
-            assets().transferApprox(per_copy_payout * ac.second, ac.first->assets(), 1e-8);
+            assets().transferApprox(per_copy_payout * ac.second, ac.first->assets(), 1e-6);
         }
         for (auto &bc : book_copies) {
             bc.first->recordPrize(per_copy_payout[creativity_->money] * bc.second);

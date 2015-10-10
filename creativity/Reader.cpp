@@ -463,7 +463,7 @@ void Reader::interApply() {
     auto sim = simulation();
     if (create_starting_) {
         // Incur the creation effort cost as soon as we start creating
-        assets().transferApprox({ creativity_->money, create_effort_ + creativity_->parameters.creation_fixed });
+        assets().transferApprox({ creativity_->money, create_effort_ + creativity_->parameters.creation_fixed }, 1e-6);
         create_starting_ = false;
     }
     if (create_countdown_ > 0) {
@@ -477,7 +477,7 @@ void Reader::interApply() {
 
             if (assets().hasApprox(cost_market)) {
                 // Remove the first period fixed cost of bringing the book to market:
-                assets().transferApprox(cost_market);
+                assets().transferApprox(cost_market, 1e-6);
 
                 auto newbook = sim->spawn<Book>(creativity_, create_position_, sharedSelf(), wrote_.size(), create_quality_);
                 sim->spawn<BookMarket>(creativity_, newbook, create_price_);
@@ -512,7 +512,7 @@ void Reader::interApply() {
         // If it's staying on the market, update the price and incur the fixed cost
         if (new_prices_.count(b) > 0) {
             b->market()->setPrice(new_prices_[b]);
-            assets().transferApprox(cost_market);
+            assets().transferApprox(cost_market, 1e-6);
         }
         else {
             // No new price for an old book, which means we're removing the book from the market
@@ -981,7 +981,7 @@ void Reader::intraApply() {
         res.buy();
     }
     // Also remove any cost associated with obtaining pirated copies of books:
-    assets().transferApprox({ creativity_->money, reserved_piracy_cost_ });
+    assets().transferApprox({ creativity_->money, reserved_piracy_cost_ }, 1e-6);
     reserved_piracy_cost_ = 0.0;
     reservations_.clear();
 
