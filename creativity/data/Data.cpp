@@ -279,8 +279,12 @@ void load_bas_cache(const Storage &cs, eris_time_t from, eris_time_t to) {
 }
 
 double quantile(const std::vector<double> &vals, double prob) {
+    return quantile(Eigen::Map<const Eigen::VectorXd>(vals.data(), vals.size()), prob);
+}
+
+double quantile(const Eigen::Ref<const Eigen::VectorXd> &vals, double prob) {
     if (prob < 0 or prob > 1) throw std::logic_error("Requested quantile probability is invalid");
-    if (vals.empty()) return std::numeric_limits<double>::quiet_NaN();
+    if (vals.size() == 0) return std::numeric_limits<double>::quiet_NaN();
     double index = prob * (vals.size()-1);
     unsigned below = std::floor(index), above = std::ceil(index);
     if (below == above) return vals[above];

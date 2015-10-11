@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <type_traits>
 #include <eris/types.hpp>
+#include <Eigen/Core>
 
 /** \file
  * Various routines for generating data from stored creativity results.
@@ -146,6 +147,9 @@ double book_profit(const state::Storage &cs, eris::eris_time_t from, eris::eris_
  * \returns NaN if the vector is empty, otherwise returns the requested quantile
  */
 double quantile(const std::vector<double> &vals, double prob);
+
+/** Same as above, but operates on an Eigen vector-like object. */
+double quantile(const Eigen::Ref<const Eigen::VectorXd> &vals, double prob);
 
 /** Average quality of books written during the period range.
  */
