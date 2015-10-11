@@ -1,6 +1,7 @@
 #include "creativity/data/CSVParser.hpp"
 #include "creativity/data/SUR.hpp"
 #include "creativity/data/tabulate.hpp"
+#include "creativity/data/Data.hpp"
 #include "creativity/cmdargs/Results.hpp"
 #include <Eigen/Core>
 #include <cerrno>
@@ -85,7 +86,11 @@ void generateRow(
     for (auto &nan : nans) newrow[nan.second] = std::numeric_limits<double>::quiet_NaN();
     if (piracy_data) newrow[data_column.at("piracy")] = prefix.substr(0, 7) == "piracy." ? 1 : 0;
     if (public_data) newrow[data_column.at("public")] = prefix.substr(0, 7) == "public." ? 1 : 0;
-    if (piracy_sr or public_sr) newrow[data_column.at("shortrun")] = prefix.rfind(".SR.") == std::string::npos ? 0 : 1;
+    if (piracy_sr or public_sr) {
+        bool longrun = prefix.find(".SR.") == std::string::npos;
+        newrow[data_column.at("LR")] = longrun;
+        newrow[data_column.at("SR")] = !longrun;
+    }
 
     if (
             (data_column.count(".books_written") and newrow[data_column.at(".books_written")] < 0.2)
@@ -102,11 +107,11 @@ void readCSV(const std::string &filename) {
 
     // The data contains values like pre.whatever, piracy.whatever, piracy.SR.whatever,
     // public.whatever, public.SR.whatever.  We need to convert those into five rows:
-    // - one with `whatever' set to pre.whatever and piracy=public=shortrun=0
-    // - one with `whatever' set to piracy.SR.whatever, piracy=1, public=0, shortrun=1
-    // - one with `whatever' set to piracy.whatever, piracy=1, public=0
-    // - one with `whatever' set to public.SR.whatever, piracy=0, public=1, shortrun=1
-    // - one with `whatever' set to public.whatever, piracy=0, public=1
+    // - one with `whatever' set to pre.whatever and piracy=public=SR=0, LR=1
+    // - one with `whatever' set to piracy.SR.whatever, piracy=1, public=0, SR=1, LR=0
+    // - one with `whatever' set to piracy.whatever, piracy=1, public=0, SR=0, LR=1
+    // - one with `whatever' set to public.SR.whatever, piracy=0, public=1, SR=1, LR=0
+    // - one with `whatever' set to public.whatever, piracy=0, public=1, SR=0, LR=1
     //
     // The data might not, however, have any piracy and/or public and/or short run data, in which
     // case we omit the relevant row(s).
@@ -151,7 +156,10 @@ void readCSV(const std::string &filename) {
 
     if (piracy_data) data_column.insert({"piracy", next_col++}); // piracy dummy
     if (public_data) data_column.insert({"public", next_col++}); // public sharing dummy
-    if (piracy_sr or public_sr) data_column.insert({"shortrun", next_col++}); // shortrun periods dummy
+    if (piracy_sr or public_sr) {
+        data_column.insert({"SR", next_col++}); // short-run stage dummy
+        data_column.insert({"LR", next_col++}); // long-run stage dummy
+    }
 
     // Increase the matrix by 2520 row increments: 2520 is the lowest integer divisible by all
     // numbers from 1 to 10, so this will work properly for adding anywhere from 1 to 10 rows of
@@ -249,12 +257,42 @@ int main(int argc, char *argv[]) {
         "    " << nobs_wo_writing << " observations (from " << sims_wo_writing << " simulations) with zero books written during one or more situations\n";
 
 
+    for (bool with_writing : {true, false}) {
+        auto &d = with_writing ? data : data_nw;
+        if (&d == &data) std::cout << "Parameter values for " << sims_w_writing << " simulations with writing in all stages:\n";
+        else std::cout << "Parameter values for " << sims_wo_writing << " simulations WITHOUT writing in at least one stage:\n";
+        // Look at conditional means of parameters in periods with no activity vs parameters in periods
+        // with activity
+        std::cout << "    " << std::setw(30) << "Parameter" << std::setw(12) << "Mean" << std::setw(12) << "s.e." << std::setw(12) << "5%" << std::setw(12) << "median" << std::setw(12) << "95%" << "\n";
+        std::cout << "    " << std::setw(30) << "=========" << std::setw(12) << "====" << std::setw(12) << "====" << std::setw(12) << "==" << std::setw(12) << "======" << std::setw(12) << "===" << "\n";
+        for (const auto &p : {"readers","density","reader_step_mean","reader_creation_scale_range","creation_fixed","creation_time",
+                "cost_market","cost_unit","cost_piracy","initial.prob_write","initial.l_min","initial.l_range","initial.p_min",
+                "initial.p_range","initial.prob_keep","initial.keep_price","piracy_link_proportion","public_sharing_tax"}) {
+            VectorXd paramvals = d[std::string("param.") + p]->values();
+            std::sort(paramvals.data(), paramvals.data() + paramvals.size());
+            double mean = paramvals.mean();
+            double se = std::sqrt((paramvals.squaredNorm() - paramvals.size() * mean*mean) / (paramvals.size()-1));
+            std::cout << "    " << std::setw(30) << p << std::setw(12) << mean << std::setw(12) << se <<
+                std::setw(12) << quantile(paramvals, .05) << std::setw(12) << quantile(paramvals, .5) << std::setw(12) << quantile(paramvals, .95) <<
+                "\n";
+        }
+    }
+
+
     SUR avg_effects;
-    for (auto &y : {"net_u", "books_written", "book_quality", "book_p0", "book_revenue", "book_profit"}) {
+    for (auto &y : {"net_u", "books_written",
+            "book_quality", "book_quality_5th", "book_quality_median", "book_quality_95th",
+            "book_p0", "book_revenue", "book_profit",
+            "book_author_scale_mean", "book_author_scale_5th", "book_author_scale_median", "book_author_scale_95th"
+            }) {
         Equation eq(data[y]);
         eq % 1;
-        if (piracy_data) eq % data["piracy"];
-        if (public_data) eq % data["public"];
+        if (piracy_sr)        eq % (data["piracy"]*data["SR"]) + data["piracy"]*data["LR"];
+        else if (piracy_data) eq % data["piracy"];
+
+        if (public_sr)        eq % (data["public"]*data["SR"]) + data["public"]*data["LR"];
+        else if (public_data) eq % data["public"];
+
         avg_effects.add(std::move(eq));
     }
     avg_effects.gather();
@@ -267,8 +305,6 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    //std::cout << tabulate(avg_effects);
-    
     avg_effects.solve();
     std::cout << "Average effects:\n================\n" << avg_effects;
 

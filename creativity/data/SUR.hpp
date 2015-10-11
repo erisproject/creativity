@@ -143,18 +143,12 @@ class SUR {
         Eigen::VectorBlock<const Eigen::VectorXd> y(unsigned i) const;
 
         /** Returns the X data (without solving the model); `gather()` must have been called either
-         * explicitly or by calling `solve()`.  This is the X data for the entire model, that is,
-         * the X data for each equation in block diagonal form.
+         * explicitly or by calling `solve()`.  This is the vector of X data blocks for the entire
+         * model, that is, element [i] contains the data for equation i.
          *
          * \throws std::logic_error if neither `gather()` nor `solve()` has been called.
          */
-        const Eigen::MatrixXd& X() const;
-
-        /** Returns the `n()` by `k(i)` block of X() associated with observation `i`.
-         *
-         * \throws std::logic_error if neither `gather()` nor `solve()` has been called.
-         */
-        Eigen::Block<const Eigen::MatrixXd> X(unsigned i) const;
+        const std::vector<Eigen::MatrixXd>& X() const;
 
         /** Overloaded so that an SUR object can be sent to an output stream; the output consists of
          * the model followed by the model results if the model has been solved; just the model
@@ -176,7 +170,7 @@ class SUR {
         Eigen::VectorXd y_;
 
         /// The X matrix generated from the model
-        Eigen::MatrixXd X_;
+        std::vector<Eigen::MatrixXd> X_;
 
         /// The model sizes
         std::vector<unsigned> k_;

@@ -17,7 +17,7 @@ const std::vector<Equation>& SUR::equations() const { return eqs_; }
 
 void SUR::clear() {
     gathered_ = false;
-    X_.resize(0, 0);
+    X_.clear();
     y_.resize(0);
     solved_ = false;
     beta_.resize(0);
@@ -48,33 +48,30 @@ void SUR::gather() {
     unsigned int total_rows = per_eq_rows * eqs_.size();
 
     y_.resize(total_rows);
-    X_.resize(total_rows, total_cols);
+    X_.reserve(eqs_.size());
     // Second pass: actually populate
-    unsigned int r = 0, c = 0;
+    unsigned int r = 0, total_c = 0;
     for (const auto& eq : eqs_) {
         eq.depVar()->populate(y_.segment(r, per_eq_rows));
+        X_.emplace_back(per_eq_rows, eq.numVars());
+        int c = 0;
         for (const auto &var : eq) {
-            var->populate(X_.col(c++).segment(r, per_eq_rows));
+            var->populate(X_.back().col(c++));
         }
+        total_c += c;
         r += per_eq_rows;
     }
-    if (r != total_rows or c != total_cols) {
+    if (r != total_rows or total_c != total_cols) {
         throw std::runtime_error("Internal error: unexpected number of rows/columns");
     }
 
-    // FIXME: use a sparse matrix?
-    
     gathered_ = true;
 }
 
 const unsigned& SUR::k(unsigned i) const { return k_[i]; }
 int SUR::df(unsigned i) const { return n() - k(i); }
 
-const MatrixXd& SUR::X() const { requireGathered(); return X_; }
-Block<const MatrixXd> SUR::X(unsigned i) const {
-    requireGathered();
-    return Block<const MatrixXd>(X_, i*n(), offset_[i], n(), k_[i]);
-}
+const std::vector<MatrixXd>& SUR::X() const { requireGathered(); return X_; }
 const VectorXd& SUR::y() const { requireGathered(); return y_; }
 VectorBlock<const VectorXd> SUR::y(unsigned i) const {
     requireGathered();
@@ -87,45 +84,49 @@ void SUR::solve() {
     gather();
 
     // Step 1: run OLS
-    const unsigned int per_eq_rows = n(),
-          num_eqs = eqs_.size(),
-          K = X_.cols();
+    const unsigned per_eq_rows = n(), num_eqs = eqs_.size(), K = offset_.back() + k_.back();
 
-    if (X_.rows() < K) throw RankError("Cannot compute SUR estimates with N < K");
+    // FIXME: might want to iterate on the residuals!
 
-    JacobiSVD<MatrixXd> svd(X_, ComputeThinU | ComputeThinV);
-    if (svd.rank() < X_.cols()) throw RankError("Cannot compute SUR estimates: independent data is not full column rank (" + std::to_string(svd.rank()) + " < " + std::to_string(X_.cols()) + ")");
+    // First step: estimate each equation by OLS to get OLS residuals; stack these
+    // num_eq residual vectors into a matrix
+    MatrixXd residuals(per_eq_rows, num_eqs);
+    for (unsigned g = 0; g < num_eqs; g++) {
+        JacobiSVD<MatrixXd> svd(X_[g], ComputeThinU | ComputeThinV);
+        if (svd.rank() < k_[g]) throw RankError("Cannot compute SUR estimates: equation " + std::to_string(g) + " independent data is not full column rank (" + std::to_string(svd.rank()) + " < " + std::to_string(k_[g]) + ")");
 
-    // This is the full set of residuals from all the stacked equations:
-    MatrixXd res = y_ - X_ * svd.solve(y_);
-    // Reshape the matrix so that each column "i" is the residuals from equation i:
-    if (res.size() != per_eq_rows * num_eqs) throw std::logic_error("Internal error: residuals has unexpected size");
-    res.resize(per_eq_rows, num_eqs);
+        auto y_g = y(g);
+        residuals.col(g) = y_g - X_[g] * svd.solve(y_g);
+    }
 
     // Now get the Sigma estimate from the reshaped residuals, and its inverse
-    MatrixXd smallsigmahat = (1.0 / (double) per_eq_rows * res.transpose()) * res;
-    MatrixXd smallsigmahatinv = smallsigmahat.fullPivHouseholderQr().inverse();
+    MatrixXd Sigmahatinv = (residuals.transpose() * residuals / per_eq_rows).fullPivHouseholderQr().inverse();
 
-    // We're aiming at getting:
-    // beta = (X^T Z X)^{-1} X^T Z y
-    // where Z is sigmahatinv kronecker-product identity; calculate it first:
-    MatrixXd sigmahatinv_kron_I = MatrixXd::Zero(per_eq_rows * num_eqs, per_eq_rows * num_eqs);
-    for (unsigned int i = 0; i < num_eqs; i++) {
-        for (unsigned int j = 0; j < num_eqs; j++) {
-            sigmahatinv_kron_I.block(i*per_eq_rows, j*per_eq_rows, per_eq_rows, per_eq_rows).diagonal().setConstant(smallsigmahatinv(i,j));
+    MatrixXd sXtX(K, K);
+    VectorXd sXty = VectorXd::Zero(K);
+    // c.f. ETM equation (12.14)
+    for (unsigned i = 0; i < num_eqs; i++) {
+        for (unsigned j = 0; j < num_eqs; j++) {
+            // Set up per-inverted, first KxK matrix in (12.14)
+            sXtX.block(offset_[i], offset_[j], k_[i], k_[j]) = Sigmahatinv(i,j) * (X_[i].transpose() * X_[j]);
+
+            if (i != j) sXtX.block(offset_[j], offset_[i], k_[j], k_[i]) =
+                sXtX.block(offset_[i], offset_[j], k_[i], k_[j]).transpose();
+        }
+        for (unsigned j = 0; j < num_eqs; j++) {
+            // Set up right-hand vector expression in (12.14)
+            sXty.segment(offset_[i], k_[i]) += Sigmahatinv(i,j) * X_[i].transpose() * y_.segment(j*per_eq_rows, per_eq_rows);
         }
     }
 
-    // Precalculate the X^T Z part, since we need it twice:
-    MatrixXd xtsig = X_.transpose() * sigmahatinv_kron_I;
-
-    auto xtsigx_qr = (xtsig * X_).fullPivHouseholderQr();
-    beta_= xtsigx_qr.solve(xtsig * y_);
-
-    var_beta_= xtsigx_qr.inverse();
+    var_beta_ = sXtX.fullPivHouseholderQr().inverse();
+    beta_ = var_beta_ * sXty;
     se_= var_beta_.diagonal().cwiseSqrt();
 
-    residuals_ = y_ - X_ * beta_;
+    residuals_.resize(per_eq_rows * num_eqs);
+    for (unsigned i = 0; i < num_eqs; i++) {
+        residuals_.segment(i*per_eq_rows, per_eq_rows) = y(i) - X_[i] * beta_.segment(offset_[i], k_[i]);
+    }
     ssr_.resize(num_eqs, std::numeric_limits<double>::quiet_NaN());
     s2_.resize(num_eqs, std::numeric_limits<double>::quiet_NaN());
     R2_.resize(num_eqs, std::numeric_limits<double>::quiet_NaN());
