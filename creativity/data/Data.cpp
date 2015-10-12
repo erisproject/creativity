@@ -231,9 +231,9 @@ double book_profit(const Storage &cs, eris_time_t from, eris_time_t to) {
 
 
 // Cache for all books written between from and to, inclusive.
-eris_time_t bq_cache_from = 0, bq_cache_to = 0;
-const Storage *bq_cache_cs = nullptr;
-std::vector<double> bq_cache;
+thread_local eris_time_t bq_cache_from = 0, bq_cache_to = 0;
+thread_local const Storage *bq_cache_cs = nullptr;
+thread_local std::vector<double> bq_cache;
 void load_bq_cache(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (bq_cache_cs == &cs and bq_cache_from == from and bq_cache_to == to) {
         return; // Cache is good
@@ -254,9 +254,9 @@ void load_bq_cache(const Storage &cs, eris_time_t from, eris_time_t to) {
 }
 
 // Cache for author scale values across books from from to to, inclusive.
-eris_time_t bas_cache_from = 0, bas_cache_to = 0;
-const Storage *bas_cache_cs = nullptr;
-std::vector<double> bas_cache;
+thread_local eris_time_t bas_cache_from = 0, bas_cache_to = 0;
+thread_local const Storage *bas_cache_cs = nullptr;
+thread_local std::vector<double> bas_cache;
 void load_bas_cache(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (bas_cache_cs == &cs and bas_cache_from == from and bas_cache_to == to) {
         return; // Cache is good
