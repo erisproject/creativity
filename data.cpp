@@ -272,6 +272,7 @@ int main(int argc, char *argv[]) {
         thr_parse_file(args, initial_data, data, longest_name);
     }
     else {
+        Eigen::initParallel();
         std::vector<std::thread> threads;
         for (unsigned t = 0; t < args.threads; t++) {
             threads.emplace_back(thr_parse_file, args, initial_data, data, longest_name);
