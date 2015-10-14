@@ -576,6 +576,14 @@ std::vector<datum> data_fields() {
     ADD_DATUM(book_author_scale_75th);
     ADD_DATUM(book_author_scale_90th);
     ADD_DATUM(book_author_scale_95th);
+    ADD_DATUM(book_author_effort_mean);
+    ADD_DATUM(book_author_effort_5th);
+    ADD_DATUM(book_author_effort_10th);
+    ADD_DATUM(book_author_effort_25th);
+    ADD_DATUM(book_author_effort_median);
+    ADD_DATUM(book_author_effort_75th);
+    ADD_DATUM(book_author_effort_90th);
+    ADD_DATUM(book_author_effort_95th);
 #undef ADD_DATUM
 
     return data;
