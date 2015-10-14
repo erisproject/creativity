@@ -264,13 +264,13 @@ void load_bq_cache(const Storage &cs, eris_time_t from, eris_time_t to) {
 }
 
 void load_bas_cache(const Storage &cs, eris_time_t from, eris_time_t to) {
-    return load_book_quantile_cache(bq_cache, cs, from, to, [&cs](const BookState &b) {
+    return load_book_quantile_cache(bas_cache, cs, from, to, [&cs](const BookState &b) {
             return cs[b.created]->readers.at(b.author).creation_scale;
             });
 }
 
 void load_bel_cache(const Storage &cs, eris_time_t from, eris_time_t to) {
-    return load_book_quantile_cache(bq_cache, cs, from, to, [&cs](const BookState &b) {
+    return load_book_quantile_cache(bel_cache, cs, from, to, [&cs](const BookState &b) {
             auto &a = cs[b.created]->readers.at(b.author);
             return Reader::creationEffort(a.creation_shape, a.creation_scale, b.quality);
             });
