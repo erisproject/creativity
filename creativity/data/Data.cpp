@@ -19,22 +19,6 @@ using namespace eris;
 
 namespace creativity { namespace data {
 
-/** Calculates the average net utility over the given period.  Net utility is a reader's utility
- * minus the reader's income (since without any simulation activity, the reader's utility is
- * quasilinear, thus the reader receives exactly his income as utility).
- */
-double net_u(const Storage &cs, eris_time_t from, eris_time_t to) {
-    if (from > to) throw std::logic_error("from > to");
-    double net_u_total = 0;
-    for (eris_time_t t = from; t <= to; t++) {
-        auto cst = cs[t];
-        for (auto &r : cst->readers) {
-            net_u_total += r.second.u - cs.settings.income;
-        }
-    }
-    return net_u_total / (cs[from]->readers.size() * (to-from+1));
-}
-
 /** Calculates the average (private) market life of books written between `from` and `to`, in
  * simulation periods.  Books still on the market in period `to` aren't included (because they might
  * stay on the market).
@@ -233,47 +217,84 @@ struct quantile_cache {
     eris_time_t from = 0, to = 0;
     const Storage *cs = nullptr;
     std::vector<double> values;
+    double mean = std::numeric_limits<double>::quiet_NaN();
 };
-thread_local quantile_cache bq_cache;
-thread_local quantile_cache bas_cache;
-thread_local quantile_cache bel_cache;
+thread_local std::unordered_map<std::string, quantile_cache> q_cache;
 
 // Loads a quantile_cache with values calculated from books created in the given period range
-void load_book_quantile_cache(quantile_cache &cache, const Storage &cs, eris_time_t from, eris_time_t to,
-        const std::function<double(const BookState&)> &book_fn) {
+const quantile_cache& load_quantile_cache(const std::string &variable, const Storage &cs, eris_time_t from, eris_time_t to) {
+    if (from > to) throw std::logic_error("from > to");
+    auto &cache = q_cache[variable];
     if (cache.cs == &cs and cache.from == from and cache.to == to) {
-        return; // Cache is good
+        return cache; // Cache is good
     }
+
+    // We either loop through books, adding a data point for each book written in the period, or we
+    // loop through readers, calculating an average value for each reader through the period, then
+    // calculate the sd and quantiles from the per-reader temporal means.
+    bool books;
+    std::function<double(const BookState &b)> book_val;
+    std::function<double(const ReaderState &r)> reader_val;
+    if (variable == "book_quality") {
+        books = true;
+        book_val = [](const BookState &b) { return b.quality; };
+    }
+    else if (variable == "book_author_scale") {
+        books = true;
+        book_val = [&cs](const BookState &b) { return cs[b.created]->readers.at(b.author).creation_scale; };
+    }
+    else if (variable == "book_author_effort") {
+        books = true;
+        book_val = [&cs](const BookState &b) {
+            auto &a = cs[b.created]->readers.at(b.author);
+            return Reader::creationEffort(a.creation_shape, a.creation_scale, b.quality);
+        };
+    }
+    else if (variable == "net_u") {
+        books = false;
+        reader_val = [&cs](const ReaderState &r) { return r.u - cs.settings.income; };
+    }
+    else {
+        throw std::logic_error("Unknown quantile variable: " + variable);
+    }
+
     cache.values.clear();
     cache.cs = &cs;
     cache.from = from;
     cache.to = to;
+    cache.mean = 0;
 
-    for (eris_time_t t = from; t <= to; t++) {
-        for (auto &bp : cs[t]->books) {
-            auto &b = bp.second;
-            if (b.created == t) cache.values.push_back(book_fn(b));
+    if (books) {
+        for (eris_time_t t = from; t <= to; t++) {
+            for (auto &bp : cs[t]->books) {
+                auto &b = bp.second;
+                if (b.created == t) {
+                    cache.values.push_back(book_val(b));
+                    cache.mean += cache.values.back();
+                }
+            }
         }
     }
+    else {
+        std::map<eris_id_t, std::pair<double, unsigned>> reader_sum;
+        for (eris_time_t t = from; t <= to; t++) {
+            for (auto &rp : cs[t]->readers) {
+                auto &rm = reader_sum[rp.second.id];
+                rm.first += reader_val(rp.second);
+                rm.second++;
+            }
+        }
+        for (auto &id_val : reader_sum) {
+            cache.values.push_back(id_val.second.first / id_val.second.second);
+            cache.mean += cache.values.back();
+        }
+    }
+    if (cache.values.empty()) cache.mean = std::numeric_limits<double>::quiet_NaN();
+    else cache.mean /= cache.values.size();
 
     std::sort(cache.values.begin(), cache.values.end());
-}
 
-void load_bq_cache(const Storage &cs, eris_time_t from, eris_time_t to) {
-    return load_book_quantile_cache(bq_cache, cs, from, to, [](const BookState &b) { return b.quality; });
-}
-
-void load_bas_cache(const Storage &cs, eris_time_t from, eris_time_t to) {
-    return load_book_quantile_cache(bas_cache, cs, from, to, [&cs](const BookState &b) {
-            return cs[b.created]->readers.at(b.author).creation_scale;
-            });
-}
-
-void load_bel_cache(const Storage &cs, eris_time_t from, eris_time_t to) {
-    return load_book_quantile_cache(bel_cache, cs, from, to, [&cs](const BookState &b) {
-            auto &a = cs[b.created]->readers.at(b.author);
-            return Reader::creationEffort(a.creation_shape, a.creation_scale, b.quality);
-            });
+    return cache;
 }
 
 double quantile(const std::vector<double> &vals, double prob) {
@@ -289,64 +310,61 @@ double quantile(const Eigen::Ref<const Eigen::VectorXd> &vals, double prob) {
     return (above - index) * vals[below] + (index - below) * vals[above];
 }
 
-/** Average quality of books written during the period range.
- */
-double book_quality_mean(const Storage &cs, eris_time_t from, eris_time_t to) {
-    if (from > to) throw std::logic_error("from > to");
-    load_bq_cache(cs, from, to);
-    if (bq_cache.values.empty()) return std::numeric_limits<double>::quiet_NaN();
-    double q_total = 0;
-    for (auto &bq : bq_cache.values) q_total += bq;
-    return q_total / bq_cache.values.size();
+double variance(const std::vector<double> &vals, double mean) {
+    if (vals.size() < 2) return std::numeric_limits<double>::quiet_NaN();
+    if (std::isnan(mean)) {
+        mean = 0;
+        for (const auto &v : vals) mean += v;
+        mean /= vals.size();
+    }
+    // Keep a sum of the demeaned values: mathematically they should equal 0, but numerical error
+    // can creep in, and so this is essentially collecting the numerical error so that it can be
+    // corrected for.
+    double demeaned_squares = 0, demeaned_sum = 0;
+    for (const auto &v : vals) {
+        double d = v - mean;
+        demeaned_squares += d*d;
+        demeaned_sum += d;
+    }
+    return (demeaned_squares - demeaned_sum*demeaned_sum / vals.size()) / (vals.size()-1);
 }
 
-#define QUANTILE_FN(fn, cache, prob) double fn(const state::Storage &cs, eris_time_t from, eris_time_t to) { \
-    if (from > to) throw std::logic_error("from > to"); \
-    load_##cache(cs, from, to); \
-    return quantile(cache.values, prob); \
+#define MEAN_FN(variable) double variable(const Storage &cs, eris_time_t from, eris_time_t to) { \
+    return load_quantile_cache(#variable, cs, from, to).mean; \
 }
-
-QUANTILE_FN(book_quality_5th, bq_cache, 0.05)
-QUANTILE_FN(book_quality_10th, bq_cache, 0.1)
-QUANTILE_FN(book_quality_25th, bq_cache, 0.25)
-QUANTILE_FN(book_quality_median, bq_cache, 0.5)
-QUANTILE_FN(book_quality_75th, bq_cache, 0.75)
-QUANTILE_FN(book_quality_90th, bq_cache, 0.9)
-QUANTILE_FN(book_quality_95th, bq_cache, 0.95)
-
-double book_author_effort_mean(const Storage &cs, eris_time_t from, eris_time_t to) {
-    if (from > to) throw std::logic_error("from > to");
-    load_bel_cache(cs, from, to);
-    if (bel_cache.values.empty()) return std::numeric_limits<double>::quiet_NaN();
-    double bel_total = 0;
-    for (auto &bel : bel_cache.values) bel_total += bel;
-    return bel_total / bel_cache.values.size();
+#define SD_FN(variable) double variable##_sd(const Storage &cs, eris_time_t from, eris_time_t to) { \
+    const auto &cache = load_quantile_cache(#variable, cs, from, to); \
+    if (cache.values.size() < 2) return std::numeric_limits<double>::quiet_NaN(); \
+    return std::sqrt(variance(cache.values, cache.mean)); \
 }
-
-QUANTILE_FN(book_author_effort_5th, bel_cache, 0.05)
-QUANTILE_FN(book_author_effort_10th, bel_cache, 0.1)
-QUANTILE_FN(book_author_effort_25th, bel_cache, 0.25)
-QUANTILE_FN(book_author_effort_median, bel_cache, 0.5)
-QUANTILE_FN(book_author_effort_75th, bel_cache, 0.75)
-QUANTILE_FN(book_author_effort_90th, bel_cache, 0.9)
-QUANTILE_FN(book_author_effort_95th, bel_cache, 0.95)
-
-double book_author_scale_mean(const Storage &cs, eris_time_t from, eris_time_t to) {
-    if (from > to) throw std::logic_error("from > to");
-    load_bas_cache(cs, from, to);
-    if (bas_cache.values.empty()) return std::numeric_limits<double>::quiet_NaN();
-    double bas_total = 0;
-    for (auto &bas : bas_cache.values) bas_total += bas;
-    return bas_total / bas_cache.values.size();
+#define QUANTILE_FN(variable, suffix, prob) double variable##_##suffix(const state::Storage &cs, eris_time_t from, eris_time_t to) { \
+    return quantile(load_quantile_cache(#variable, cs, from, to).values, prob); \
 }
+#define DIST_FNS(variable) \
+MEAN_FN(variable) \
+SD_FN(variable) \
+QUANTILE_FN(variable, min, 0) \
+QUANTILE_FN(variable, 5th, 0.05) \
+QUANTILE_FN(variable, 10th, 0.1) \
+QUANTILE_FN(variable, 25th, 0.25) \
+QUANTILE_FN(variable, median, 0.5) \
+QUANTILE_FN(variable, 75th, 0.75) \
+QUANTILE_FN(variable, 90th, 0.9) \
+QUANTILE_FN(variable, 95th, 0.95) \
+QUANTILE_FN(variable, max, 1)
 
-QUANTILE_FN(book_author_scale_5th, bas_cache, 0.05)
-QUANTILE_FN(book_author_scale_10th, bas_cache, 0.1)
-QUANTILE_FN(book_author_scale_25th, bas_cache, 0.25)
-QUANTILE_FN(book_author_scale_median, bas_cache, 0.5)
-QUANTILE_FN(book_author_scale_75th, bas_cache, 0.75)
-QUANTILE_FN(book_author_scale_90th, bas_cache, 0.9)
-QUANTILE_FN(book_author_scale_95th, bas_cache, 0.95)
+DIST_FNS(net_u)
+
+DIST_FNS(book_quality)
+
+DIST_FNS(book_author_scale)
+
+DIST_FNS(book_author_effort)
+
+#undef MEAN_FN
+#undef SD_FN
+#undef QUANTILE_FN
+#undef DIST_FNS
 
 /** Average number of books written per period.
  */
@@ -543,7 +561,19 @@ std::vector<datum> data_fields() {
     std::vector<datum> data;
 
 #define ADD_DATUM(D, ...) data.emplace_back(#D, D, ##__VA_ARGS__)
-    ADD_DATUM(net_u);
+#define ADD_DIST_DATA(variable) \
+    ADD_DATUM(variable); \
+    ADD_DATUM(variable##_sd); \
+    ADD_DATUM(variable##_min); \
+    ADD_DATUM(variable##_5th); \
+    ADD_DATUM(variable##_10th); \
+    ADD_DATUM(variable##_25th); \
+    ADD_DATUM(variable##_median); \
+    ADD_DATUM(variable##_75th); \
+    ADD_DATUM(variable##_90th); \
+    ADD_DATUM(variable##_95th); \
+    ADD_DATUM(variable##_max);
+    ADD_DIST_DATA(net_u);
     ADD_DATUM(book_market_periods);
     ADD_DATUM(book_p0);
     ADD_DATUM(book_p1);
@@ -552,14 +582,7 @@ std::vector<datum> data_fields() {
     ADD_DATUM(book_revenue);
     ADD_DATUM(book_gross_margin);
     ADD_DATUM(book_profit);
-    ADD_DATUM(book_quality_mean);
-    ADD_DATUM(book_quality_5th);
-    ADD_DATUM(book_quality_10th);
-    ADD_DATUM(book_quality_25th);
-    ADD_DATUM(book_quality_median);
-    ADD_DATUM(book_quality_75th);
-    ADD_DATUM(book_quality_90th);
-    ADD_DATUM(book_quality_95th);
+    ADD_DIST_DATA(book_quality);
     ADD_DATUM(books_written);
     ADD_DATUM(books_bought);
     ADD_DATUM(books_pirated, false, true, true);
@@ -568,22 +591,8 @@ std::vector<datum> data_fields() {
     ADD_DATUM(reader_market_spending);
     ADD_DATUM(reader_piracy_spending, false, true, true);
     ADD_DATUM(reader_public_spending, false, false, true);
-    ADD_DATUM(book_author_scale_mean);
-    ADD_DATUM(book_author_scale_5th);
-    ADD_DATUM(book_author_scale_10th);
-    ADD_DATUM(book_author_scale_25th);
-    ADD_DATUM(book_author_scale_median);
-    ADD_DATUM(book_author_scale_75th);
-    ADD_DATUM(book_author_scale_90th);
-    ADD_DATUM(book_author_scale_95th);
-    ADD_DATUM(book_author_effort_mean);
-    ADD_DATUM(book_author_effort_5th);
-    ADD_DATUM(book_author_effort_10th);
-    ADD_DATUM(book_author_effort_25th);
-    ADD_DATUM(book_author_effort_median);
-    ADD_DATUM(book_author_effort_75th);
-    ADD_DATUM(book_author_effort_90th);
-    ADD_DATUM(book_author_effort_95th);
+    ADD_DIST_DATA(book_author_scale);
+    ADD_DIST_DATA(book_author_effort);
 #undef ADD_DATUM
 
     return data;

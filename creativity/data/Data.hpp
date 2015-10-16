@@ -69,12 +69,6 @@ struct datum {
         : name(std::move(name)), calculate(std::move(calc)), applies_to{pre, piracy, public_sharing} {}
 };
 
-/** Calculates the average net utility over the given period.  Net utility is a reader's utility
- * minus the reader's income (since without any simulation activity, the reader's utility is
- * quasilinear, thus the reader receives exactly his income as utility).
- */
-double net_u(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
-
 /** Calculates the average market life of books written between `from` and `to`, in simulation
  * periods.  Books still on the market in period `to` aren't included (because they might stay on
  * the market).
@@ -151,56 +145,55 @@ double quantile(const std::vector<double> &vals, double prob);
 /** Same as above, but operates on an Eigen vector-like object. */
 double quantile(const Eigen::Ref<const Eigen::VectorXd> &vals, double prob);
 
-///  Average quality of books written during the period range.
-double book_quality_mean(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
-///  5th percentile of quality of books written during the period range.
-double book_quality_5th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
-///  10th percentile of quality of books written during the period range.
-double book_quality_10th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
-///  25th percentile of quality of books written during the period range.
-double book_quality_25th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
-///  Median quality of books written during the period range.
-double book_quality_median(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
-///  75th percentile of quality of books written during the period range.
-double book_quality_75th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
-///  90th percentile of quality of books written during the period range.
-double book_quality_90th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
-///  95th percentile of quality of books written during the period range.
-double book_quality_95th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+/** Calculates and returns the sample variance of the given vector of values.  If the mean of the
+ * vector is already known it can be passed in as mean, otherwise the default, NaN, calculates the
+ * mean from the vector.
+ */
+double variance(const std::vector<double> &vals, double mean = std::numeric_limits<double>::quiet_NaN());
 
-/// Returns the mean author effort of books written during the period range (averaged over books).
-double book_author_effort_mean(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
-/// 5th percentile of books' author effort level.
-double book_author_effort_5th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
-/// 10th percentile of books' author effort level.
-double book_author_effort_10th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
-/// 25th percentile of books' author effort level.
-double book_author_effort_25th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
-/// median of books' author effort level.
-double book_author_effort_median(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
-/// 75th percentile of books' author effort level.
-double book_author_effort_75th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
-/// 90th percentile of books' author effort level.
-double book_author_effort_90th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
-/// 95th percentile of books' author effort level.
-double book_author_effort_95th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+/// Macro to generate mean, sd, and quantile functions for a given variable
+#define DIST_FNS(variable) \
+double variable(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to); \
+double variable##_sd(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to); \
+double variable##_min(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to); \
+double variable##_5th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to); \
+double variable##_10th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to); \
+double variable##_25th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to); \
+double variable##_median(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to); \
+double variable##_75th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to); \
+double variable##_90th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to); \
+double variable##_95th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to); \
+double variable##_max(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+///@{
+/** Distribution values (mean, standard deviation, min, max, quantiles) for quality of books written
+ * during the period range.
+ */
+DIST_FNS(book_quality)
+///@}
 
-/// Mean author scale of books written during the period range (averaged over books).
-double book_author_scale_mean(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
-/// 5th percentile of author scale of books written during the period range.
-double book_author_scale_5th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
-/// 10th percentile of author scale of books written during the period range.
-double book_author_scale_10th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
-/// 25th percentile of author scale of books written during the period range.
-double book_author_scale_25th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
-/// Median author scale of books written during the period range.
-double book_author_scale_median(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
-/// 75th percentile of author scale of books written during the period range.
-double book_author_scale_75th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
-/// 90th percentile of author scale of books written during the period range.
-double book_author_scale_90th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
-/// 95th percentile of author scale of books written during the period range.
-double book_author_scale_95th(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+///@{
+/** Distribution values (mean, standard deviation, min, max, quantiles) for author creation scale of
+ * the author of each book created during the period range.
+ */
+DIST_FNS(book_author_level)
+///@}
+
+///@{
+/** Distribution values (mean, standard deviation, min, max, quantiles) for author effort level of
+ * each book created during the period range.
+ */
+DIST_FNS(book_author_effort)
+///@}
+
+///@{
+/** Distribution of reader net utility values over the period range.  This is net of the utility
+ * readers would have if there were no book activity at all, which is simply the reader's exogenous
+ * income level.
+ */
+DIST_FNS(net_u)
+///@}
+
+#undef DIST_FNS
 
 /** Average number of books written per period.
  */
