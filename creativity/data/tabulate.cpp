@@ -2,8 +2,6 @@
 #include <sstream>
 #include <iomanip>
 
-#include <iostream> // DEBUG
-
 using namespace Eigen;
 
 namespace creativity { namespace data {
@@ -31,11 +29,13 @@ std::string tabulate_text(
         auto &width = col_width[c];
         width = colname(colnames, c).length();
         for (unsigned r = 0; r < matrix.rows(); r++) {
-            std::ostringstream out;
-            out.precision(options.precision);
-            out << matrix(r,c);
-            unsigned len = out.str().length();
-            if (len > width) width = len;
+            if (r < c ? options.matrix.upper : r > c ? options.matrix.lower : options.matrix.diagonal) {
+                std::ostringstream out;
+                out.precision(options.precision);
+                out << matrix(r,c);
+                unsigned len = out.str().length();
+                if (len > width) width = len;
+            }
         }
     }
     size_t extraw = 0;
@@ -49,7 +49,7 @@ std::string tabulate_text(
 
     std::ostringstream table;
     table.precision(options.precision);
-    table << options.indent << std::setw(rownames_width) << "";
+    table << options.indent << std::setw(rownames_width) << (colnames.size() == (unsigned) matrix.cols()+1 ? colnames[matrix.cols()] : "");
     for (unsigned c = 0; c < matrix.cols(); c++) {
         table << interrow << std::setw(col_width[c]) << colname(colnames, c);
     }
@@ -59,7 +59,11 @@ std::string tabulate_text(
     for (unsigned r = 0; r < matrix.rows(); r++) {
         table << options.indent << std::setw(rownames_width) << rowname(rownames, r);
         for (unsigned c = 0; c < matrix.cols(); c++) {
-            table << interrow << std::right << std::setw(col_width[c]) << matrix(r, c);
+            table << interrow << std::right << std::setw(col_width[c]);
+            if (r < c ? options.matrix.upper : r > c ? options.matrix.lower : options.matrix.diagonal)
+                table << matrix(r, c);
+            else
+                table << "";
         }
         if (r+1 < extracol.size()) table << std::left << std::setw(extraw) << extracol[r+1];
         table << "\n";
@@ -132,7 +136,6 @@ std::string tabulate(
     unsigned cols = 0;
     for (auto &eq : sur.equations()) {
         cols += eq.numVars() + 1;
-        std::cerr << eq.depVar()->name() << ": " << eq.depVar()->size() << " rows\n";
     }
 
     Eigen::MatrixXd mat(sur.equations().front().depVar()->size(), cols);

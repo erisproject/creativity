@@ -21,6 +21,15 @@ struct tabulation_options {
     unsigned precision;
     /// The indent (only applies when `format` is Text)
     std::string indent;
+    /// The possible matrix sections to display
+    struct {
+        /// If true (the default), display the diagonal
+        bool diagonal = true;
+        /// If true (the default), display the part below the diagonal
+        bool lower = true;
+        /// If true (the default), display the part above the diagonal
+        bool upper = true;
+    } matrix;
     /** Constructs a tabulation_options struct.
      *
      * \param format the table format, one of the TableFormat enum values; defaults to Text
@@ -40,7 +49,8 @@ struct tabulation_options {
  * \param rownames the row names to use.  If too short (including empty, the default), unspecified
  * rows will be named `[r,]` where r is the row index beginning at 0.
  * \param colnames the column names to use.  If too short (including empty, the default), unprovided
- * columns will be named `[,c]`, where c is the column index beginning at 0.
+ * columns will be named `[,c]`, where c is the column index beginning at 0.  If the size is exactly
+ * equal to the matrix columns plus 1, the last value is used as a header for the row names.
  * \param extracol is an extra column of string values to display to the right of the last matrix
  * column.  If empty (the default), no extra column is added.  The first value is the column title
  * (if any), the remaining `matrix.rows()` values are values to display.  If the matrix is too

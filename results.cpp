@@ -23,12 +23,14 @@ using namespace eris;
 using namespace Eigen;
 
 // rawdata holds the data for rows with positive number of books written under piracy/public,
-// raw_no_writing holds the data for rows with no books written under one or more situations.
-MatrixXd rawdata, raw_no_writing;
-std::unordered_map<std::string, std::shared_ptr<const SimpleVariable>> data_;
-std::unordered_map<std::string, std::shared_ptr<const SimpleVariable>> data_nw_;
+// raw_no_writing holds the data for rows with books in pre but no books in one or more later situations.
+// raw_no_writing_pir holds data for rows with no piracy writing, but with writing under public sharing
+// raw_no_writing_pre holds the data for rows with no books written under pre-piracy.
+MatrixXd rawdata, raw_no_writing, raw_no_writing_pre, raw_no_writing_pir;
+std::unordered_map<std::string, std::shared_ptr<const SimpleVariable>>
+    data_, data_nw_, data_nw_pir_, data_nw_pre_;
 // Map row numbers to filenames:
-std::vector<std::string> data_source, data_nw_source;
+std::vector<std::string> data_source, data_nw_source, data_nw_pir_source, data_nw_pre_source;
 // Track fields that don't exist in some of the stages:
 std::unordered_map<std::string, int> pre_nan_, piracy_nan_, public_nan_;
 bool piracy_data = false, // True if we have piracy data
@@ -58,7 +60,7 @@ class DataWrapper {
     private:
         decltype(data_) &d_;
 };
-DataWrapper data(data_), data_nw(data_nw_);
+DataWrapper data(data_), data_nw(data_nw_), data_nw_pre(data_nw_pre_), data_nw_pir(data_nw_pir_);
 
 
 // Generate a row of data from a CSV row
@@ -67,7 +69,7 @@ void generateRow(
         Ref<RowVectorXd, 0, InnerStride<>> newrow, // Row to set
         const std::unordered_map<std::string, int> &data_column, // field to column map
         const std::unordered_map<std::string, int> &nans, // Fields to set to nan
-        bool &no_writing, // Will be set true if books_written is less than 0.2
+        bool &no_writing, // Will be set true if books_written is less than 0.2 (won't be changed otherwise)
         const std::string &prefix, // Prefix to match (in addition to param.)
         const std::string &notprefix = "" // If non-empty, prefix to avoid even if prefix matches--typically `whatever.SR.`
         ) {
@@ -168,6 +170,8 @@ void readCSV(const std::string &filename) {
     constexpr unsigned rowincr = 2*2*2*3*3*5*7;
     rawdata.resize(0, next_col);
     raw_no_writing.resize(0, next_col);
+    raw_no_writing_pre.resize(0, next_col);
+    raw_no_writing_pir.resize(0, next_col);
 
     // Some fields don't have all three (for example, books_pirated has piracy_ and public_ values
     // but not a pre_ value; books_public_copies is only under public_), so we need to fill in some
@@ -183,7 +187,7 @@ void readCSV(const std::string &filename) {
         }
     }
 
-    unsigned raw_rows = 0, rawnp_rows = 0;
+    unsigned raw_rows = 0, rawnw_rows = 0, rawnwpre_rows = 0, rawnwpir_rows = 0;
     while (csv.readRow()) {
         MatrixXd newrows(1 + piracy_data + public_data + piracy_sr + public_sr, rawdata.cols());
         unsigned rownum = 0;
@@ -192,14 +196,16 @@ void readCSV(const std::string &filename) {
 
         // First row: pre values
         generateRow(csv, newrows.row(rownum++), data_column, pre_nan_, no_writing, "pre.");
+        bool no_pre_writing = no_writing;
 
+        bool no_pir_writing = false;
         // Second: short run piracy
         if (piracy_sr) {
             generateRow(csv, newrows.row(rownum++), data_column, piracy_nan_, no_writing, "piracy.SR.");
         }
         // Third: long run piracy
         if (piracy_data) {
-            generateRow(csv, newrows.row(rownum++), data_column, piracy_nan_, no_writing, "piracy.", "piracy.SR.");
+            generateRow(csv, newrows.row(rownum++), data_column, piracy_nan_, no_pir_writing, "piracy.", "piracy.SR.");
         }
         // Fourth: short run public
         if (public_sr) {
@@ -210,9 +216,9 @@ void readCSV(const std::string &filename) {
             generateRow(csv, newrows.row(rownum++), data_column, public_nan_, no_writing, "public.", "public.SR.");
         }
 
-        MatrixXd &rawmatrix = (no_writing ? raw_no_writing : rawdata);
-        auto &rawrows = (no_writing ? rawnp_rows : raw_rows);
-        auto &source = (no_writing ? data_nw_source : data_source);
+        MatrixXd &rawmatrix = (no_pre_writing ? raw_no_writing_pre : no_writing ? raw_no_writing : no_pir_writing ? raw_no_writing_pir : rawdata);
+        auto &rawrows = (no_pre_writing ? rawnwpre_rows : no_writing ? rawnw_rows : no_pir_writing ? rawnwpir_rows : raw_rows);
+        auto &source = (no_pre_writing ? data_nw_pre_source : no_writing ? data_nw_source : no_pir_writing ? data_nw_pir_source : data_source);
         if (rawrows + newrows.rows() >= rawmatrix.rows()) {
             rawmatrix.conservativeResize(rawmatrix.rows() + rowincr, NoChange);
         }
@@ -225,7 +231,9 @@ void readCSV(const std::string &filename) {
 
     // Resize the probably-oversized data matrices back to the number of rows we actually filled
     if (rawdata.rows() > raw_rows) rawdata.conservativeResize(raw_rows, NoChange);
-    if (raw_no_writing.rows() > rawnp_rows) raw_no_writing.conservativeResize(rawnp_rows, NoChange);
+    if (raw_no_writing.rows() > rawnw_rows) raw_no_writing.conservativeResize(rawnw_rows, NoChange);
+    if (raw_no_writing_pre.rows() > rawnwpre_rows) raw_no_writing_pre.conservativeResize(rawnwpre_rows, NoChange);
+    if (raw_no_writing_pir.rows() > rawnwpir_rows) raw_no_writing_pir.conservativeResize(rawnwpir_rows, NoChange);
 
     for (auto &dc : data_column) {
         if (dc.first.substr(0, 4) == "pre." or dc.first.substr(0, 7) == "public." or dc.first.substr(0, 7) == "piracy.")
@@ -234,6 +242,8 @@ void readCSV(const std::string &filename) {
         if (dc.first[0] == '.') name = dc.first.substr(1);
         data_.insert({name, SimpleVariable::create(name, rawdata.col(dc.second))});
         data_nw_.insert({name, SimpleVariable::create(name, raw_no_writing.col(dc.second))});
+        data_nw_pre_.insert({name, SimpleVariable::create(name, raw_no_writing_pre.col(dc.second))});
+        data_nw_pir_.insert({name, SimpleVariable::create(name, raw_no_writing_pir.col(dc.second))});
     }
 }
 
@@ -249,41 +259,116 @@ int main(int argc, char *argv[]) {
     }
 
     unsigned nobs_per_sim = 1 + piracy_data + public_data + public_sr + piracy_sr;
-    unsigned nobs_w_writing = data["net_u"]->size(), nobs_wo_writing = data_nw["net_u"]->size();
-    unsigned sims_w_writing = nobs_w_writing / nobs_per_sim, sims_wo_writing = nobs_wo_writing / nobs_per_sim;
+    unsigned nobs_w_writing = data["net_u"]->size(),
+             nobs_wo_writing = data_nw["net_u"]->size(),
+             nobs_wo_pir_writing = data_nw_pir["net_u"]->size(),
+             nobs_wo_pre_writing = data_nw_pre["net_u"]->size();
+    unsigned sims_w_writing = nobs_w_writing / nobs_per_sim,
+             sims_wo_writing = nobs_wo_writing / nobs_per_sim,
+             sims_wo_pir_writing = nobs_wo_pir_writing / nobs_per_sim,
+             sims_wo_pre_writing = nobs_wo_pre_writing / nobs_per_sim;
     std::cout << "Data summary:\n" <<
-        "    " << nobs_w_writing + nobs_wo_writing << " total observations (from " << sims_w_writing+sims_wo_writing << " simulations)\n" <<
-        "    " << nobs_w_writing << " observations (from " << sims_w_writing << " simulations) with non-zero # books written during each situation\n" <<
+        "    " << nobs_w_writing + nobs_wo_writing + nobs_wo_pre_writing + nobs_wo_pir_writing <<
+                    " total observations (from " << sims_w_writing+sims_wo_writing+sims_wo_pre_writing+sims_wo_pir_writing << " simulations)\n" <<
+        "    " << nobs_w_writing << " observations (from " << sims_w_writing << " simulations) with non-zero # books written during each stage\n" <<
+        "    " << nobs_wo_pre_writing << " observations (from " << sims_wo_pre_writing << " simulations) with zero books written during pre-piracy stage\n" <<
+        "    " << nobs_wo_pir_writing << " observations (from " << sims_wo_pir_writing << " simulations) with zero books written during piracy, but positive books written during public sharing\n" <<
         "    " << nobs_wo_writing << " observations (from " << sims_wo_writing << " simulations) with zero books written during one or more situations\n";
 
+    if (args.analysis.write_or_not) {
+        tabulation_options tab_opts(args.format.type, args.format.precision, "    ");
+        tabulation_options cor_opts(args.format.type, args.format.precision, "    ");
+        cor_opts.matrix.diagonal = false;
+        const std::vector<std::string> params({
+                "readers", "density", "reader_step_mean", "reader_creation_scale_range", "creation_fixed",
+                "creation_time", "cost_market", "cost_unit", "cost_piracy", "initial.prob_write", "initial.l_min",
+                "initial.l_range", "initial.p_min", "initial.p_range", "initial.prob_keep", "initial.keep_price",
+                "piracy_link_proportion", "public_sharing_tax"});
+        const std::vector<std::string> pre_fields({
+                "net_u", "book_p0", "book_sales", "book_profit", "book_quality", "books_written"});
+        std::vector<std::string> params_abbrev;
+        std::regex word_re("([a-zA-Z0-9])[a-zA-Z0-9]+");
+        for (const auto &p : params) params_abbrev.push_back(std::regex_replace(p, word_re, "$1"));
+        enum : unsigned { f_mean, f_se, f_min, f_5, f_25, f_median, f_75, f_95, f_max, /* last: captures size: */ num_fields };
+        std::vector<std::string> colnames({
+                "Mean", "s.e.", "Min", "5th %", "25th %", "Median", "75th %", "95th %", "Max",
+                "Parameter"});
+        for (auto d : {&data, &data_nw_pre, &data_nw, &data_nw_pir}) {
+            std::cout << "Parameter values for ";
+            if (d == &data) std::cout << sims_w_writing << " simulations with writing in all stages:\n";
+            else if (d == &data_nw_pre) std::cout << sims_wo_pre_writing << " simulations WITHOUT writing in last pre-piracy stages:\n";
+            else if (d == &data_nw_pir) std::cout << sims_wo_pir_writing << " simulations with no writing in piracy stage, but with writing in public sharing stage:\n";
+            else std::cout << sims_wo_writing << " simulations WITHOUT writing in either piracy or public sharing stages:\n";
+            // Look at conditional means of parameters in periods with no activity vs parameters in
+            // periods with activity
 
-    for (bool with_writing : {true, false}) {
-        auto &d = with_writing ? data : data_nw;
-        if (&d == &data) std::cout << "Parameter values for " << sims_w_writing << " simulations with writing in all stages:\n";
-        else std::cout << "Parameter values for " << sims_wo_writing << " simulations WITHOUT writing in at least one stage:\n";
-        // Look at conditional means of parameters in periods with no activity vs parameters in periods
-        // with activity
-        std::cout << "    " << std::setw(30) << "Parameter" << std::setw(12) << "Mean" << std::setw(12) << "s.e." << std::setw(12) << "5%" << std::setw(12) << "median" << std::setw(12) << "95%" << "\n";
-        std::cout << "    " << std::setw(30) << "=========" << std::setw(12) << "====" << std::setw(12) << "====" << std::setw(12) << "==" << std::setw(12) << "======" << std::setw(12) << "===" << "\n";
-        for (const auto &p : {"readers","density","reader_step_mean","reader_creation_scale_range","creation_fixed","creation_time",
-                "cost_market","cost_unit","cost_piracy","initial.prob_write","initial.l_min","initial.l_range","initial.p_min",
-                "initial.p_range","initial.prob_keep","initial.keep_price","piracy_link_proportion","public_sharing_tax"}) {
-            VectorXd paramvals = d[std::string("param.") + p]->values();
-            std::sort(paramvals.data(), paramvals.data() + paramvals.size());
-            double mean = paramvals.mean();
-            double se = std::sqrt((paramvals.squaredNorm() - paramvals.size() * mean*mean) / (paramvals.size()-1));
-            std::cout << "    " << std::setw(30) << p << std::setw(12) << mean << std::setw(12) << se <<
-                std::setw(12) << quantile(paramvals, .05) << std::setw(12) << quantile(paramvals, .5) << std::setw(12) << quantile(paramvals, .95) <<
-                "\n";
+            MatrixXd results(params.size() + pre_fields.size(), (unsigned) num_fields);
+            MatrixXd X((*d)["param.readers"]->size() / nobs_per_sim, params.size() + pre_fields.size());
+            int i = 0;
+            for (const auto &p : params) {
+                VectorXd rawvals = (*d)[std::string("param.") + p]->values();
+                VectorXd paramvals = VectorXd::Map(rawvals.data(), rawvals.size()/nobs_per_sim, InnerStride<Dynamic>(nobs_per_sim));
+                std::sort(paramvals.data(), paramvals.data() + paramvals.size());
+                results(i, f_min) = quantile(paramvals, 0);
+                results(i, f_5) = quantile(paramvals, .05);
+                results(i, f_25) = quantile(paramvals, .25);
+                results(i, f_median) = quantile(paramvals, .5);
+                results(i, f_75) = quantile(paramvals, .75);
+                results(i, f_95) = quantile(paramvals, .95);
+                results(i, f_max) = quantile(paramvals, 1);
+                X.col(i++) = paramvals;
+            }
+            for (const auto &p : pre_fields) {
+                VectorXd rawvals = (*d)[p]->values();
+                // Start at 0, increment by nobs_per_sim: that should keep us in the pre-sim rows
+                VectorXd prevals = VectorXd::Map(rawvals.data(), rawvals.size()/nobs_per_sim, InnerStride<Dynamic>(nobs_per_sim));
+                std::sort(prevals.data(), prevals.data() + prevals.size());
+                results(i, f_min) = quantile(prevals, 0);
+                results(i, f_5) = quantile(prevals, .05);
+                results(i, f_25) = quantile(prevals, .25);
+                results(i, f_median) = quantile(prevals, .5);
+                results(i, f_75) = quantile(prevals, .75);
+                results(i, f_95) = quantile(prevals, .95);
+                results(i, f_max) = quantile(prevals, 1);
+                X.col(i++) = prevals;
+            }
+            RowVectorXd mu = X.colwise().mean();
+            results.col(f_mean) = mu.transpose();
+            // Demean X:
+            X.rowwise() -= mu;
+            // Calculate covariance matrix:
+            MatrixXd corr = (X.transpose() * X) / (X.rows()-1);
+            // Extract the diagonals for the se values:
+            results.col(f_se) = corr.diagonal().cwiseSqrt();
+
+            std::vector<std::string> row_names(params);
+            for (const auto &pre : pre_fields) row_names.push_back("pre." + pre);
+
+            std::cout << tabulate(results, tab_opts, row_names, colnames) << "\n";
+
+            if (args.analysis.write_or_not_corrcov) {
+                // Convert lower triangle of covariance matrix into correlation values:
+                for (int c = 0; c < corr.cols(); c++) {
+                    for (int r = c+1; r < corr.rows(); r++)
+                        corr(r,c) /= sqrt(corr(c,c) * corr(r,r));
+                }
+
+
+                std::cout << "Correlations (below diagonal) and covariance (above diagonal):\n" << tabulate(
+                        corr.topLeftCorner(params.size(), params.size()), cor_opts, params, params_abbrev) << "\n";
+            }
         }
     }
 
 
     SUR avg_effects;
-    for (auto &y : {"net_u", "books_written",
+    for (auto &y : {
+            "net_u", "net_u_5th", "net_u_median", "net_u_95th",
+            "books_written",
             "book_quality", "book_quality_5th", "book_quality_median", "book_quality_95th",
             "book_p0", "book_revenue", "book_profit",
-            "book_author_scale_mean", "book_author_scale_5th", "book_author_scale_median", "book_author_scale_95th"
+            "book_author_scale", "book_author_scale_5th", "book_author_scale_median", "book_author_scale_95th",
+            "book_author_effort", "book_author_effort_5th", "book_author_effort_median", "book_author_effort_95th"
             }) {
         Equation eq(data[y]);
         eq % 1;
@@ -307,6 +392,8 @@ int main(int argc, char *argv[]) {
 
     avg_effects.solve();
     std::cout << "Average effects:\n================\n" << avg_effects;
+
+
 
     SUR marg_effects;
     for (auto &y : {"net_u", "books_written", "book_quality", "book_p0", "book_revenue", "book_profit"}) {
