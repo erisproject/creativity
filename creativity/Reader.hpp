@@ -330,8 +330,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
         const std::vector<double>& numBooksPenaltyPolynomial() const;
 
         /** The default penality polynomial coefficients.  The default is the function
-         * \f$\frac{b^2}{4}\f$, which has first few values (beginning at 0 books): (0, 0.25, 1,
-         * 2.25, 4)
+         * \f$b^2\f$.
          */
         static constexpr std::initializer_list<double> default_num_books_penalty_polynomial{0, 0, 1};
 
