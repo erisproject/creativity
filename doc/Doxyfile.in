@@ -48,6 +48,8 @@ INCLUDED_BY_GRAPH      = YES
 #CALLER_GRAPH           = YES
 GRAPHICAL_HIERARCHY    = YES
 
+DISTRIBUTE_GROUP_DOC   = YES
+
 
 #---------------------------------------------------------------------------
 # Configuration options related to the preprocessor
