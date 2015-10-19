@@ -19,10 +19,6 @@ using namespace eris;
 
 namespace creativity { namespace data {
 
-/** Calculates the average (private) market life of books written between `from` and `to`, in
- * simulation periods.  Books still on the market in period `to` aren't included (because they might
- * stay on the market).
- */
 double book_market_periods(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (from > to) throw std::logic_error("from > to");
     unsigned long total = 0;
@@ -39,9 +35,6 @@ double book_market_periods(const Storage &cs, eris_time_t from, eris_time_t to) 
     return total / (double) count;
 }
 
-/** Returns the average first-sale-period price of books written in the given period range.  (This
- * is absolute price, not price less marginal cost).
- */
 double book_p0(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (from > to) throw std::logic_error("from > to");
     double p_total = 0;
@@ -60,13 +53,6 @@ double book_p0(const Storage &cs, eris_time_t from, eris_time_t to) {
     return p_total / count;
 }
 
-/** Returns the average second-period price of books written in the given period range.  (This is
- * absolute price, not price less marginal cost).  Note that books written in period `to` are not
- * considered (because their 2nd-period price occurs in `to+1`), but books written in period
- * `from-1` are.
- *
- * If there are no suitable books that were on the market for 2+ periods at all, NaN is returned.
- */
 double book_p1(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (from > to) throw std::logic_error("from > to");
     double p_total = 0;
@@ -85,13 +71,6 @@ double book_p1(const Storage &cs, eris_time_t from, eris_time_t to) {
     return p_total / count;
 }
 
-/** Returns the average third-period price of books.  (This is absolute price, not price less
- * marginal cost).  Note that books written in period `to` and `to-1` are not included, since their
- * third-period occurs later than `to`, but books written in periods `from-1` and `from-2` are
- * considered.
- *
- * If there are no suitable books that were on the market for 3+ periods at all, NaN is returned.
- */
 double book_p2(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (from > to) throw std::logic_error("from > to");
     double p_total = 0;
@@ -110,9 +89,6 @@ double book_p2(const Storage &cs, eris_time_t from, eris_time_t to) {
     return p_total / count;
 }
 
-/** Average private copies sold per book.  All books on the private market in the given range are
- * included.  The average is per book seen in the period, not per simulation period.
- */
 double book_sales(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (from > to) throw std::logic_error("from > to");
     long sales_total = 0;
@@ -130,14 +106,6 @@ double book_sales(const Storage &cs, eris_time_t from, eris_time_t to) {
     return sales_total / (double) seen.size();
 }
 
-/** Average per-book revenue over the given period.  Books written before `from` are included (if
- * revenue in incurred in [from,to]; for books who continue selling after `to`, only the revenue up
- * to `to` is included.  All books on the market in the given period range (even if sales are 0) are
- * included.
- *
- * The average is calculated based on the number of books seen, not the number of simulation
- * periods.
- */
 double book_revenue(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (from > to) throw std::logic_error("from > to");
     double revenue_total = 0;
@@ -146,8 +114,8 @@ double book_revenue(const Storage &cs, eris_time_t from, eris_time_t to) {
         auto cst = cs[t];
         for (auto &bp : cst->books) {
             auto &b = bp.second;
-            if (b.market_private) {
-                revenue_total += b.revenue;
+            if (b.created >= from or b.revenue > 0 or b.prize > 0) {
+                revenue_total += b.revenue + b.prize;
                 seen.insert(b.id);
             }
         }
@@ -156,13 +124,6 @@ double book_revenue(const Storage &cs, eris_time_t from, eris_time_t to) {
     return revenue_total / seen.size();
 }
 
-/** Average gross margin (i.e. P-MC) of book over the given period.  Books written before `from` are
- * included (if revenue in incurred in [from,to]; for books who continue selling after `to`, only
- * the revenue up to `to` is included.  All books on the market (even if sales are 0) are included.
- *
- * The average is calculated based on the number of books seen, not the number of simulation
- * periods.
- */
 double book_gross_margin(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (from > to) throw std::logic_error("from > to");
     double margin_total = 0;
@@ -181,14 +142,6 @@ double book_gross_margin(const Storage &cs, eris_time_t from, eris_time_t to) {
     return margin_total / seen.size();
 }
 
-/** Average net profit (i.e. profit minus writing cost and keep-on-market costs) of a book.  Only
- * costs incurred during the period are included.  In particular, this means profits from
- * pre-`from`-written books are included but (some) fixed costs are not, and some near-`to` books
- * will have fixed costs but may omit some earned profits.
- *
- * The average is calculated based on the number of books seen, not the number of simulation
- * periods.
- */
 double book_profit(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (from > to) throw std::logic_error("from > to");
     double profit_total = 0;
@@ -197,13 +150,17 @@ double book_profit(const Storage &cs, eris_time_t from, eris_time_t to) {
         auto period = cs[t];
         for (const auto &bp : period->books) {
             auto &b = bp.second;
-            if (b.market_private) {
+            if (b.created >= from or b.market_private or b.revenue > 0 or b.prize > 0) {
                 seen.insert(b.id);
-                profit_total += b.revenue - cs.settings.cost_unit * b.sales - cs.settings.cost_market;
+                profit_total += b.revenue + b.prize;
+                if (b.market_private)
+                    profit_total -= cs.settings.cost_market + b.sales * cs.settings.cost_unit;
+
                 if (b.created == t) {
-                    // In the creation period, subtract the effort that had to be expended to write
-                    // the book
+                    // In the creation period, subtract the cost and effort that had to be expended
+                    // to write the book
                     auto &r = period->readers.at(b.author);
+                    profit_total -= cs.settings.creation_fixed;
                     profit_total -= Reader::creationEffort(r.creation_shape, r.creation_scale, b.quality);
                 }
             }
@@ -366,8 +323,6 @@ DIST_FNS(book_author_effort)
 #undef QUANTILE_FN
 #undef DIST_FNS
 
-/** Average number of books written per period.
- */
 double books_written(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (from > to) throw std::logic_error("from > to");
     unsigned int count = 0;
@@ -384,8 +339,6 @@ double books_written(const Storage &cs, eris_time_t from, eris_time_t to) {
     return count / (double) (to-from+1);
 }
 
-/** Average number of books purchased privately per period (aggregate, not per-reader)
- */
 double books_bought(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (from > to) throw std::logic_error("from > to");
     unsigned long count = 0;
@@ -402,9 +355,6 @@ double books_bought(const Storage &cs, eris_time_t from, eris_time_t to) {
     return count / (double) (to-from+1);
 }
 
-/** Average number of books pirated per period (aggreate, not per-reader).  Note that pirated copies
- * of books that left the market before `from` are still included.
- */
 double books_pirated(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (from > to) throw std::logic_error("from > to");
     unsigned long count = 0;
@@ -420,8 +370,6 @@ double books_pirated(const Storage &cs, eris_time_t from, eris_time_t to) {
     return count / (double) (to-from+1);
 }
 
-/** Average number of public copies of books provided per period (aggreate, not per-reader).
- */
 double books_public_copies(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (from > to) throw std::logic_error("from > to");
     unsigned long count = 0;

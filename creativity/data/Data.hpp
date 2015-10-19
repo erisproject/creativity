@@ -104,11 +104,13 @@ double book_p2(const state::Storage &cs, eris::eris_time_t from, eris::eris_time
 double book_sales(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
 
 /** Average per-book revenue over the given period.  Books written before `from` are included (if
- * revenue in incurred in [from,to]; for books who continue selling after `to`, only the revenue up
- * to `to` is included.  All books on the market in the given period range (even if sales are 0) are
+ * revenue is received in [from,to]; for books who continue selling after `to`, only the revenue up
+ * to `to` is included.  All books created in the given period range (even if revenue is 0) are
  * included.
  *
- * The average is calculated based on the number of books seen, not the number of simulation
+ * Prize revenue (i.e. public market payouts) is counted as revenue.
+ *
+ * The average is calculated based on the number of books included, not the number of simulation
  * periods.
  */
 double book_revenue(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
@@ -122,10 +124,12 @@ double book_revenue(const state::Storage &cs, eris::eris_time_t from, eris::eris
  */
 double book_gross_margin(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
 
-/** Average net profit (i.e. profit minus writing cost and keep-on-market costs) of a book.  Only
- * costs incurred during the period are included.  In particular, this means profits from
+/** Average profit (i.e. profit minus writing cost and keep-on-market costs) of a book.  Only costs
+ * incurred during the period are included.  In particular, this means profits from
  * pre-`from`-written books are included but (some) fixed costs are not, and some near-`to` books
  * will have fixed costs but may omit some earned profits.
+ *
+ * Prize revenue (i.e. public market payours) are included.
  *
  * The average is calculated based on the number of books seen, not the number of simulation
  * periods.
