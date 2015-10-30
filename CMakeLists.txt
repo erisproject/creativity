@@ -200,7 +200,7 @@ if (DATA)
     add_library(libcreativity-data SHARED ${cr_data_libsrc})
     set_target_properties(libcreativity-data PROPERTIES
         OUTPUT_NAME creativity-data
-        VERSION "${LIBCRD_CUR}.${LIBCR_REV}.${LIBCR_AGE}"
+        VERSION "${LIBCRD_CUR}.${LIBCRD_REV}.${LIBCRD_AGE}"
         SOVERSION "${LIBCRD_CUR}"
     )
     target_link_libraries(libcreativity-data libcreativity)
@@ -219,8 +219,8 @@ if (GUI)
     add_library(libcreativity-gui SHARED ${cr_gui_libsrc})
     set_target_properties(libcreativity-gui PROPERTIES
         OUTPUT_NAME creativity-gui
-        VERSION "${LIBCRD_CUR}.${LIBCR_REV}.${LIBCR_AGE}"
-        SOVERSION "${LIBCRD_CUR}"
+        VERSION "${LIBCRG_CUR}.${LIBCRG_REV}.${LIBCRG_AGE}"
+        SOVERSION "${LIBCRG_CUR}"
     )
     foreach(pkg ${creativity_gui_pkgconfig})
         target_link_libraries(libcreativity-gui ${${pkg}_LIBRARIES})
@@ -265,35 +265,6 @@ endif()
 
 add_subdirectory(scratch)
 
-
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/CPackProjectConfig.cmake.in
-    ${CMAKE_CURRENT_BINARY_DIR}/CPackProjectConfig.cmake
-    @ONLY)
-set(CPACK_PROJECT_CONFIG_FILE ${CMAKE_CURRENT_BINARY_DIR}/CPackProjectConfig.cmake)
-
-set(CPACK_DEBIAN_PACKAGE_SECTION mathematics)
-set(CPACK_DEBIAN_PACKAGE_MAINTAINER "${creativity_author}")
-set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
-set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "${creativity_url}")
-set(CPACK_DEBIAN_PACKAGE_DESCRIPTION "${creativity_description}")
-
-set(CPACK_PACKAGE_VERSION_MAJOR ${ERIS_VERSION_MAJOR})
-set(CPACK_PACKAGE_VERSION_MINOR ${ERIS_VERSION_MINOR})
-set(CPACK_PACKAGE_VERSION_PATCH ${ERIS_VERSION_PATCH})
-
-set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
-if(NOT CPACK_GENERATOR)
-    set(CPACK_GENERATOR DEB)
-endif()
-
-set(CPACK_COMPONENTS_GROUPING ALL_COMPONENTS_IN_ONE)
-
-
-include(CPack)
-
-#install(TARGETS eris
-#    DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-#    COMPONENT libs)
 install(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/creativity/"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/creativity/"
     COMPONENT headers
