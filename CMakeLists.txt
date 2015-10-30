@@ -34,11 +34,17 @@ set(ERIS_VERSION_REQUIRED "0.3.5")
 # interface, and that code that links against liberis-2.* can link against this
 # version, but code that links against liberis-1.* cannot.
 # Main library so:
-set(LIBCR_CUR 0); set(LIBCR_REV 0); set(LIBCR_AGE 0)
+set(LIBCR_CUR 0)
+set(LIBCR_REV 0)
+set(LIBCR_AGE 0)
 # Data library so:
-set(LIBCRD_CUR 0); set(LIBCRD_REV 0); set(LIBCRD_AGE 0)
+set(LIBCRD_CUR 0)
+set(LIBCRD_REV 0)
+set(LIBCRD_AGE 0)
 # GUI library so:
-set(LIBCRG_CUR 0); set(LIBCRG_REV 0); set(LIBCRG_AGE 0)
+set(LIBCRG_CUR 0)
+set(LIBCRG_REV 0)
+set(LIBCRG_AGE 0)
 
 # No in-source building
 include(MacroEnsureOutOfSourceBuild)
