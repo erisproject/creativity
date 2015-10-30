@@ -11,7 +11,9 @@ Build-Depends: debhelper (>= 9),
                libboost-dev,
                doxygen,
                graphviz,
-               libgtkmm-3.0-dev
+               libgtkmm-3.0-dev,
+               libboost-filesystem-dev,
+               libboost-program-options-dev
 
 Package: libcreativity0
 Section: libs
