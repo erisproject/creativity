@@ -210,6 +210,7 @@ if (DATA)
         SOVERSION "${LIBCRD_CUR}"
     )
     target_link_libraries(libcreativity-data libcreativity)
+    list(APPEND creativity_install_targets libcreativity-data)
 
     add_executable(creativity-data data.cpp)
     target_link_libraries(creativity-data libcreativity-data)
