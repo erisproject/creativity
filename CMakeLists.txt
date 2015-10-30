@@ -16,6 +16,30 @@ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/Modules)
 
 set(ERIS_VERSION_REQUIRED "0.3.5")
 
+# library versions (CURRENT.REVISION.AGE), which is totally separate
+# from the above.  See http://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html
+# Basic rules for updating these when releasing a new eris version:
+# - If the new release has an API change:
+#   - CURRENT gets updated
+#   - REVISION gets set to 0
+#   - If the API change was purely an addition, increment AGE
+#   - Otherwise (i.e. an API change or removal), reset AGE to 0
+# - Otherwise, if the release has no API change but has code changes:
+#   - REVISION gets incremented
+#   - (CURRENT and AGE stay the same)
+# If there is no code change (e.g. the release is just a documentation update)
+# then none of these change.
+#
+# (So something like 3.7.1 indicates the 8th revision of the libwhatever-3
+# interface, and that code that links against liberis-2.* can link against this
+# version, but code that links against liberis-1.* cannot.
+# Main library so:
+set(LIBCR_CUR 0); set(LIBCR_REV 0); set(LIBCR_AGE 0)
+# Data library so:
+set(LIBCRD_CUR 0); set(LIBCRD_REV 0); set(LIBCRD_AGE 0)
+# GUI library so:
+set(LIBCRG_CUR 0); set(LIBCRG_REV 0); set(LIBCRG_AGE 0)
+
 # No in-source building
 include(MacroEnsureOutOfSourceBuild)
 macro_ensure_out_of_source_build("${PROJECT_NAME} requires an out-of-source build.  Create a build directory and run 'cmake ${CMAKE_SOURCE_DIR} [options]'.")
@@ -149,7 +173,11 @@ endif()
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
 
 add_library(libcreativity SHARED ${cr_libsrc})
-set_target_properties(libcreativity PROPERTIES OUTPUT_NAME creativity)
+set_target_properties(libcreativity PROPERTIES
+    OUTPUT_NAME creativity
+    VERSION "${LIBCR_CUR}.${LIBCR_REV}.${LIBCR_AGE}"
+    SOVERSION "${LIBCR_CUR}"
+)
 foreach(pkg ${creativity_pkgconfig})
     target_link_libraries(libcreativity ${${pkg}_LIBRARIES})
 endforeach()
@@ -170,9 +198,12 @@ list(APPEND creativity_install_targets creativity-info)
 
 if (DATA)
     add_library(libcreativity-data SHARED ${cr_data_libsrc})
-    set_target_properties(libcreativity-data PROPERTIES OUTPUT_NAME creativity-data)
+    set_target_properties(libcreativity-data PROPERTIES
+        OUTPUT_NAME creativity-data
+        VERSION "${LIBCRD_CUR}.${LIBCR_REV}.${LIBCR_AGE}"
+        SOVERSION "${LIBCRD_CUR}"
+    )
     target_link_libraries(libcreativity-data libcreativity)
-
 
     add_executable(creativity-data data.cpp)
     target_link_libraries(creativity-data libcreativity-data)
@@ -186,7 +217,11 @@ endif()
 
 if (GUI)
     add_library(libcreativity-gui SHARED ${cr_gui_libsrc})
-    set_target_properties(libcreativity-gui PROPERTIES OUTPUT_NAME creativity-gui)
+    set_target_properties(libcreativity-gui PROPERTIES
+        OUTPUT_NAME creativity-gui
+        VERSION "${LIBCRD_CUR}.${LIBCR_REV}.${LIBCR_AGE}"
+        SOVERSION "${LIBCRD_CUR}"
+    )
     foreach(pkg ${creativity_gui_pkgconfig})
         target_link_libraries(libcreativity-gui ${${pkg}_LIBRARIES})
     endforeach()
