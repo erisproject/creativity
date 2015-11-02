@@ -93,6 +93,7 @@ Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
 Depends: ${shlibs:Depends}, ${misc:Depends}
+Suggests: creativity
 Description: Economic creativity and piracy simulator (GTK3 interface)
  Creativity is an economics agent-based model that simulates the creative process,
  including creation, sales, and piracy of creative works.
