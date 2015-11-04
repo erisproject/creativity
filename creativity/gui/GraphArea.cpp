@@ -24,7 +24,7 @@ using namespace creativity::state;
 namespace creativity { namespace gui {
 
 GraphArea::GraphArea(GUI &gui) :
-    gui_{gui}, wpb_({0.0,0.0})
+    gui_(gui), wpb_({0.0,0.0})
 {}
 
 Cairo::Matrix GraphArea::graph_to_canvas() const {
