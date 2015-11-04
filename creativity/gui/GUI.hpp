@@ -23,8 +23,6 @@
 #include <condition_variable>
 #include <memory>
 
-namespace sigc { SIGC_FUNCTORS_DEDUCE_RESULT_TYPE_WITH_DECLTYPE }
-
 namespace Gdk { class Cursor; }
 namespace Glib { class Dispatcher; }
 namespace Gtk { class Application; }
