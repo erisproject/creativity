@@ -41,7 +41,7 @@ bool piracy_data = false, // True if we have piracy data
 // Stupid wrapper class so that data["foo"] works (so data.at("foo") isn't needed)
 class DataWrapper {
     public:
-        DataWrapper(decltype(data_) &data) : d_{data} {}
+        DataWrapper(decltype(data_) &data) : d_(data) {}
         std::shared_ptr<const SimpleVariable> operator[](const std::string &field) {
             try { return d_.at(field); }
             catch (const std::out_of_range &re) {
