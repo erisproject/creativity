@@ -1,0 +1,234 @@
+From: Jason Rhinelander <jason@imaginary.ca>
+Date: Mon, 2 Nov 2015 15:55:07 -0500
+Subject: Use boost::regex instead of std::regex
+
+gcc 4.8 doesn't implement <regex>, so use Boost's instead.
+---
+ CMakeLists.txt                    |  2 +-
+ creativity/cmdargs/Simulator.cpp  |  4 ++--
+ creativity/cmdargs/Validation.hpp |  4 ++--
+ creativity/cmdargs/strings.cpp    | 10 +++++-----
+ creativity/data/Variable.cpp      | 10 +++++-----
+ info.cpp                          |  6 +++---
+ random.cpp                        | 22 +++++++++++-----------
+ results.cpp                       |  5 +++--
+ 8 files changed, 32 insertions(+), 31 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 3f8c7fa..999f4cf 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -132,7 +132,7 @@ endif()
+ find_package(Eigen3 REQUIRED)
+ include_directories(${EIGEN3_INCLUDE_DIR})
+ 
+-find_package(Boost REQUIRED COMPONENTS filesystem program_options system)
++find_package(Boost REQUIRED COMPONENTS filesystem program_options system regex)
+ include_directories(${Boost_INCLUDE_DIRS})
+ link_directories(${Boost_LIBRARY_DIRS})
+ 
+diff --git a/creativity/cmdargs/Simulator.cpp b/creativity/cmdargs/Simulator.cpp
+index 4e4c43c..c0ee739 100644
+--- a/creativity/cmdargs/Simulator.cpp
++++ b/creativity/cmdargs/Simulator.cpp
+@@ -5,7 +5,7 @@
+ #include <boost/program_options/errors.hpp>
+ #include <boost/program_options/value_semantic.hpp>
+ #include <cstdint>
+-#include <regex>
++#include <boost/regex.hpp>
+ #include <sstream>
+ namespace boost { namespace program_options { class variables_map; } }
+ 
+@@ -103,7 +103,7 @@ void Simulator::postParse(boost::program_options::variables_map &) {
+     }
+ 
+     if (not output.empty()) {
+-        output = std::regex_replace(output, std::regex("SEED"), std::to_string(eris::Random::seed()));
++        output = boost::regex_replace(output, boost::regex("SEED"), std::to_string(eris::Random::seed()));
+     }
+ 
+     s_.boundary = Creativity::boundaryFromDensity(s_.readers, s_.dimensions, density_);
+diff --git a/creativity/cmdargs/Validation.hpp b/creativity/cmdargs/Validation.hpp
+index 17b3794..36ce7a5 100644
+--- a/creativity/cmdargs/Validation.hpp
++++ b/creativity/cmdargs/Validation.hpp
+@@ -5,7 +5,7 @@
+ #include <boost/program_options/positional_options.hpp>
+ #include <boost/program_options/value_semantic.hpp>
+ #include <string>
+-#include <regex>
++#include <boost/regex.hpp>
+ 
+ namespace creativity { namespace cmdargs {
+ 
+@@ -162,7 +162,7 @@ void validate(boost::any &v, const std::vector<std::string> &values, V*, int) {
+     // Check that only a single value was given, and get it:
+     std::string s(validators::get_single_string(values));
+ 
+-    if (std::is_unsigned<typename V::value_type>::value and std::regex_search(s, std::regex("^\\s*-")))
++    if (std::is_unsigned<typename V::value_type>::value and boost::regex_search(s, boost::regex("^\\s*-")))
+         throw invalid_option_value(s);
+ 
+     try {
+diff --git a/creativity/cmdargs/strings.cpp b/creativity/cmdargs/strings.cpp
+index a08d17a..f2849e2 100644
+--- a/creativity/cmdargs/strings.cpp
++++ b/creativity/cmdargs/strings.cpp
+@@ -1,5 +1,5 @@
+ #include "creativity/cmdargs/strings.hpp"
+-#include <regex>
++#include <boost/regex.hpp>
+ #include <string>
+ #include <sstream>
+ 
+@@ -7,11 +7,11 @@ namespace creativity { namespace cmdargs {
+ 
+ template <>
+ std::string output_string(double v) {
+-    return std::regex_replace(
+-            std::regex_replace(std::to_string(v),
+-                std::regex("(\\.\\d*?)0+$"),
++    return boost::regex_replace(
++            boost::regex_replace(std::to_string(v),
++                boost::regex("(\\.\\d*?)0+$"),
+                 "$1"),
+-            std::regex("\\.$"),
++            boost::regex("\\.$"),
+             "");
+ }
+ 
+diff --git a/creativity/data/Variable.cpp b/creativity/data/Variable.cpp
+index 6ae035b..07fcf62 100644
+--- a/creativity/data/Variable.cpp
++++ b/creativity/data/Variable.cpp
+@@ -1,5 +1,5 @@
+ #include "creativity/data/Variable.hpp"
+-#include <regex>
++#include <boost/regex.hpp>
+ #include <sstream>
+ 
+ using namespace Eigen;
+@@ -7,11 +7,11 @@ using namespace Eigen;
+ namespace creativity { namespace data {
+ 
+ std::string to_string(double d) {
+-    return std::regex_replace(
+-            std::regex_replace(std::to_string(d),
+-                std::regex("(\\.\\d*?)0+$"),
++    return boost::regex_replace(
++            boost::regex_replace(std::to_string(d),
++                boost::regex("(\\.\\d*?)0+$"),
+                 "$1"),
+-            std::regex("\\.$"),
++            boost::regex("\\.$"),
+             "");
+ }
+ 
+diff --git a/info.cpp b/info.cpp
+index 2d9b854..9911ed4 100644
+--- a/info.cpp
++++ b/info.cpp
+@@ -11,7 +11,7 @@
+ #include <utility>
+ #include <iostream>
+ #include <iomanip>
+-#include <regex>
++#include <boost/regex.hpp>
+ 
+ using namespace creativity;
+ using namespace creativity::state;
+@@ -118,8 +118,8 @@ int main(int argc, char *argv[]) {
+         ADD_SAME(initial.keep_price);
+         ADD("--belief-threshold", initial.belief_threshold);
+ 
+-        std::smatch smatch;
+-        if (regex_search(args.input, smatch, std::regex("-(\\d+)\\.(?:crstate\\b|\\w+$)"))) {
++        boost::smatch smatch;
++        if (regex_search(args.input, smatch, boost::regex("-(\\d+)\\.(?:crstate\\b|\\w+$)"))) {
+             std::cout << " --seed " << smatch[1] << "\n";
+         }
+         else  {
+diff --git a/random.cpp b/random.cpp
+index 4760ff8..e5e0146 100644
+--- a/random.cpp
++++ b/random.cpp
+@@ -1,5 +1,5 @@
+ #include <eris/Random.hpp>
+-#include <regex>
++#include <boost/regex.hpp>
+ #include <functional>
+ #include <string>
+ #include <sstream>
+@@ -54,11 +54,11 @@ const std::string
+     re_int("[-+]?[0-9]+"),
+     re_int_pos("\\+?[0-9]+");
+ 
+-std::vector<std::pair<std::regex, std::function<std::string(const std::smatch&)>>> load_patterns() {
++std::vector<std::pair<boost::regex, std::function<std::string(const boost::smatch&)>>> load_patterns() {
+     decltype(load_patterns()) callbacks;
+     // U[a,b]
+-    callbacks.emplace_back(std::regex("^U[\\[(](" + re_double + ")\\s*,\\s*(" + re_double + ")[\\])]$", std::regex::icase),
+-        [](const std::smatch &m) -> std::string {
++    callbacks.emplace_back(boost::regex("^U[\\[(](" + re_double + ")\\s*,\\s*(" + re_double + ")[\\])]$", boost::regex::icase),
++        [](const boost::smatch &m) -> std::string {
+             double a = std::stod(m[1]);
+             double b = std::stod(m[2]);
+             if (b <= a) throw std::logic_error("Error in input: `" + m[0].str() + "' is invalid (max <= min)");
+@@ -68,17 +68,17 @@ std::vector<std::pair<std::regex, std::function<std::string(const std::smatch&)>
+             return result.str();
+         });
+     // iU[a,b]
+-    callbacks.emplace_back(std::regex("^iU[\\[(](" + re_int + ")\\s*,\\s*(" + re_int + ")[\\])]$", std::regex::icase),
+-        [](const std::smatch &m) -> std::string {
++    callbacks.emplace_back(boost::regex("^iU[\\[(](" + re_int + ")\\s*,\\s*(" + re_int + ")[\\])]$", boost::regex::icase),
++        [](const boost::smatch &m) -> std::string {
+             long a = std::stol(m[1]);
+             long b = std::stol(m[2]);
+             if (b <= a) throw std::logic_error("Error in input: `" + m[0].str() + "' is invalid (max <= min)");
+             return std::to_string(std::uniform_int_distribution<long>(a, b)(eris::Random::rng()));
+         });
+     // All the normal variants
+-    callbacks.emplace_back(std::regex("^(i)?N\\((" + re_double + ")\\s*,\\s*(" + re_double + ")\\)" + 
+-                "(?:(\\+)|\\[(" + re_double_inf + ")?\\s*,\\s*(" + re_double_inf + ")?\\])?$", std::regex::icase),
+-        [](const std::smatch &m) -> std::string {
++    callbacks.emplace_back(boost::regex("^(i)?N\\((" + re_double + ")\\s*,\\s*(" + re_double + ")\\)" + 
++                "(?:(\\+)|\\[(" + re_double_inf + ")?\\s*,\\s*(" + re_double_inf + ")?\\])?$", boost::regex::icase),
++        [](const boost::smatch &m) -> std::string {
+             bool round = m[1].matched;
+             double mean = std::stod(m[2]);
+             double sd = std::stod(m[3]);
+@@ -127,8 +127,8 @@ int main (int argc, const char* argv[]) {
+     for (auto &arg : args) {
+         if (arg == "--help") help = true;
+         else for (auto &p : try_match) {
+-            std::smatch match_res;
+-            if (std::regex_match(arg, match_res, p.first)) {
++            boost::smatch match_res;
++            if (boost::regex_match(arg, match_res, p.first)) {
+                 found = true;
+                 arg = p.second(match_res);
+                 break;
+diff --git a/results.cpp b/results.cpp
+index dcaeba3..aa26e53 100644
+--- a/results.cpp
++++ b/results.cpp
+@@ -16,6 +16,7 @@
+ #include <iomanip>
+ #include <list>
+ #include <unordered_map>
++#include <boost/regex.hpp>
+ 
+ using creativity::cmdargs::Results;
+ using namespace creativity::data;
+@@ -287,8 +288,8 @@ int main(int argc, char *argv[]) {
+         const std::vector<std::string> pre_fields({
+                 "net_u", "book_p0", "book_sales", "book_profit", "book_quality", "books_written"});
+         std::vector<std::string> params_abbrev;
+-        std::regex word_re("([a-zA-Z0-9])[a-zA-Z0-9]+");
+-        for (const auto &p : params) params_abbrev.push_back(std::regex_replace(p, word_re, "$1"));
++        boost::regex word_re("([a-zA-Z0-9])[a-zA-Z0-9]+");
++        for (const auto &p : params) params_abbrev.push_back(boost::regex_replace(p, word_re, "$1"));
+         enum : unsigned { f_mean, f_se, f_min, f_5, f_25, f_median, f_75, f_95, f_max, /* last: captures size: */ num_fields };
+         std::vector<std::string> colnames({
+                 "Mean", "s.e.", "Min", "5th %", "25th %", "Median", "75th %", "95th %", "Max",
