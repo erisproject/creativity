@@ -1,5 +1,5 @@
-creativity (1.2.0-1~jessie1) stable; urgency=medium
+creativity (1.2.0-1~trusty) trusty; urgency=low
 
-  * Initial release backported to jessie.
+  * Initial release backported to trusty.
 
- -- Jason Rhinelander <jason@imaginary.ca>  Fri, 30 Oct 2015 18:17:57 -0400
+ -- Jason Rhinelander <jason@imaginary.ca>  Wed, 04 Nov 2015 16:59:56 -0500
