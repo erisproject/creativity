@@ -43,7 +43,10 @@ void OLS::solve() {
     if (n < k) throw RankError("Cannot compute OLS estimates with n < k");
 
     JacobiSVD<MatrixXd> svd(X_, ComputeThinU | ComputeThinV);
+#if EIGEN_VERSION_AT_LEAST(3,2,2)
+// svd.rank() was added in 3.2.2; for previous versions just skip the rank safety test
     if (svd.rank() < X_.cols()) throw RankError("Cannot compute OLS estimates: independent data is not full column rank (" + std::to_string(svd.rank()) + " < " + std::to_string(X_.cols()) + ")");
+#endif
 
     beta_ = svd.solve(y_);
 

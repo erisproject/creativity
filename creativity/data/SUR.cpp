@@ -93,7 +93,10 @@ void SUR::solve() {
     MatrixXd residuals(per_eq_rows, num_eqs);
     for (unsigned g = 0; g < num_eqs; g++) {
         JacobiSVD<MatrixXd> svd(X_[g], ComputeThinU | ComputeThinV);
+#if EIGEN_VERSION_AT_LEAST(3,2,2)
+// svd.rank() was added in 3.2.2; for previous versions just skip the rank safety test
         if (svd.rank() < k_[g]) throw RankError("Cannot compute SUR estimates: equation " + std::to_string(g) + " independent data is not full column rank (" + std::to_string(svd.rank()) + " < " + std::to_string(k_[g]) + ")");
+#endif
 
         auto y_g = y(g);
         residuals.col(g) = y_g - X_[g] * svd.solve(y_g);
