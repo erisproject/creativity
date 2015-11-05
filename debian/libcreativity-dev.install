@@ -1,2 +1,2 @@
 usr/lib/*/*.so
-usr/include/[a-fh-zA-Z]*
+usr/include/creativity/[a-fh-zA-Z]*
