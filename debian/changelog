@@ -1,5 +1,6 @@
-creativity (1.2.0-1~trusty) trusty; urgency=low
+creativity (1.2.0-1~trusty1) trusty; urgency=low
 
   * Initial release backported to trusty.
+  * Don't build GUI packages: gtk on trusty is too old.
 
  -- Jason Rhinelander <jason@imaginary.ca>  Wed, 04 Nov 2015 16:59:56 -0500
