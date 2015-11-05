@@ -66,7 +66,7 @@ Description: Economic creativity and piracy simulator (data tools shared library
  Creativity is an economics agent-based model that simulates the creative process,
  including creation, sales, and piracy of creative works.
  .
- This package contains the shared library needed for the GTK3 creativity GUI.
+ This package contains the headers needed to develop code using creativity.
 
 Package: creativity
 Section: science
