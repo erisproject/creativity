@@ -1,0 +1,21 @@
+From: Jason Rhinelander <jason@imaginary.ca>
+Date: Wed, 4 Nov 2015 19:13:32 -0500
+Subject: creativity-random needs boost for regex support
+
+---
+ CMakeLists.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 999f4cf..79e4fd6 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -195,7 +195,7 @@ target_link_libraries(creativity-cli libcreativity)
+ list(APPEND creativity_install_targets creativity-cli)
+ 
+ add_executable(creativity-random random.cpp)
+-target_link_libraries(creativity-random ${ERIS_LIBRARIES})
++target_link_libraries(creativity-random ${ERIS_LIBRARIES} ${Boost_LIBRARIES})
+ list(APPEND creativity_install_targets creativity-random)
+ 
+ add_executable(creativity-info info.cpp)

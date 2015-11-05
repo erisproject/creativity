@@ -1,2 +1,3 @@
 0001-Use-boost-regex-instead-of-std-regex.patch
 0002-Brace-initializers-confuse-poor-g-4.8-2.patch
+0003-creativity-random-needs-boost-for-regex-support.patch
