@@ -1,2 +1,2 @@
 usr/lib/*/*.so
-usr/include
+usr/include/[a-fh-zA-Z]*
