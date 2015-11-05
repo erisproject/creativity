@@ -1,0 +1,21 @@
+From: Jason Rhinelander <jason@imaginary.ca>
+Date: Wed, 4 Nov 2015 18:57:55 -0500
+Subject: Brace initializers confuse poor g++-4.8 (2)
+
+---
+ results.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/results.cpp b/results.cpp
+index aa26e53..4f85bf4 100644
+--- a/results.cpp
++++ b/results.cpp
+@@ -42,7 +42,7 @@ bool piracy_data = false, // True if we have piracy data
+ // Stupid wrapper class so that data["foo"] works (so data.at("foo") isn't needed)
+ class DataWrapper {
+     public:
+-        DataWrapper(decltype(data_) &data) : d_{data} {}
++        DataWrapper(decltype(data_) &data) : d_(data) {}
+         std::shared_ptr<const SimpleVariable> operator[](const std::string &field) {
+             try { return d_.at(field); }
+             catch (const std::out_of_range &re) {
