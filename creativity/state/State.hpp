@@ -7,7 +7,13 @@
 #include <limits>
 #include <map>
 
-namespace creativity { namespace state {
+namespace creativity {
+/** Namespace for all simulation state classes.  These classes represent and store the state of the
+ * model at the end of each time period, generated from the current state of simulation members at
+ * the end of each stage.  These states are stored (either to disk or in memory) so as to permit
+ * review and analysis of simulation results.
+ */
+namespace state {
 
 /** Class storing the state of the simulation at the end of a simulation period. */
 class State final {

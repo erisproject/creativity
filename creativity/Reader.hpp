@@ -19,6 +19,8 @@
 namespace creativity {
 
 class Creativity;
+
+/// Namespace for reader belief classes
 namespace belief { class Profit; }
 
 /** A Reader is an agent that both consumes previously unread books and potentially writes new books

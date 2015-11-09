@@ -33,7 +33,9 @@ namespace Gtk { class Window; }
 namespace creativity { class Creativity; }
 namespace creativity { namespace state { class State; } }
 
-namespace creativity { namespace gui {
+namespace creativity {
+/// Namespace for all gtkmm creativity GUI classes
+namespace gui {
 
 // Forward declarations
 class ReaderStore;

@@ -14,7 +14,9 @@
 namespace creativity { struct CreativitySettings; }
 namespace creativity { namespace state { class Storage; } }
 
-namespace creativity { namespace data {
+namespace creativity {
+/// Namespace for classes related to generating and processing simulation data.
+namespace data {
 
 /** Struct for holding a simulator parameter. */
 struct initial_datum {

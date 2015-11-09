@@ -11,6 +11,7 @@
 namespace creativity { class Book; }
 namespace creativity { namespace state { class Storage; } }
 
+/// Primary namespace for all Creativity library code.
 namespace creativity {
 
 /** Central class for a creativity simulation; this class handles setting up the simulation
