@@ -32,21 +32,25 @@ You can install directly to the system (usually under /usr/local) using:
 
     make install
 
-or alternatively simply run the executables directly from the build directory.
-To build a .deb to install on a Debian derivative, run:
+## Debian/Ubuntu packages
 
-    make package
+Regularly updated library, header, and documentation packages are available for
+amd64 systems by adding one of the following lines to /etc/apt/sources.list:
 
-followed by an appropriate package command to install the package, such as:
+    deb https://imaginary.ca/debian jessie main
+    deb https://imaginary.ca/debian sid main
+    deb https://imaginary.ca/ubuntu trusty main
+    deb https://imaginary.ca/ubuntu wily main
 
-    dpkg -i eris_x.y.z~gityyyymmdd~tag_amd64.deb
+The first is for debian stable; the second for debian testing and unstable; the
+last two are for the referenced Ubuntu releases.
 
-You may also be able to use:
+The required key signature for package verification can be installed using:
 
-    cpack -G RPM
+    curl -s https://imaginary.ca/public.gpg | sudo apt-key add -
 
-to generate a .rpm package instead of a .deb, but this functionality is
-untested by the author.
+The 'creativity' package contains the command-line tools, the 'creativity-gui' package includes
+the graphical simulation interface.
 
 ## License
 
