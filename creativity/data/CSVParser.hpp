@@ -70,6 +70,20 @@ class CSVParser : private eris::noncopyable {
          */
         const std::vector<std::string>& fields() const;
 
+        /** Returns true if fields() contains the requested field name.  This is optimized for
+         * multiple calls: the first call puts all fields into a set; subsequent calls reuse the
+         * set.
+         */
+        bool hasField(const std::string &field) const;
+
+        /** Returns the value (in the current row) of the given field.
+         *
+         * \throws std::out_of_range if the given field doesn't exist.
+         * \throws std::logic_error if there is no current row (either no row has been read yet, or
+         * eof() is true).
+         */
+        double field(const std::string &field) const;
+
         /** Reads the next line of the CSV file, storing it in row(), replacing what was previously
          * stored there.  Returns true if a row was read, false if the end of the file was hit,
          * throws an exception if something goes wrong.
@@ -110,6 +124,7 @@ class CSVParser : private eris::noncopyable {
         std::unordered_set<std::string> skip_{{"source"}}; // things to skip in header_ when making fields_
         std::vector<std::string> header_; // the header read from the file
         std::vector<std::string> fields_; // the header fields remaining after skipping skip_
+        mutable std::unordered_map<std::string, unsigned> field_pos_; // Map from field name to row position (created from fields_ on-demand)
         std::fstream f_;
         size_t lineno_; // Tracks the current line number
         Eigen::RowVectorXd row_; // The most-recently-read row (reused)

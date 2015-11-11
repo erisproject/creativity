@@ -102,6 +102,29 @@ const std::vector<std::string>& CSVParser::fields() const {
     return fields_;
 }
 
+bool CSVParser::hasField(const std::string &field) const {
+    if (field_pos_.count(field) > 0) return true;
+    if (field_pos_.empty() and not fields_.empty()) {
+        field_pos_.reserve(fields_.size());
+        unsigned i = 0;
+        for (auto f : fields_) {
+            field_pos_.emplace(std::move(f), i++);
+        }
+        return field_pos_.count(field) > 0;
+    }
+    return false;
+}
+
+double CSVParser::field(const std::string &field) const {
+    if (row_.size() == 0) throw std::logic_error("Can't call field without a current row");
+
+    if (field_pos_.empty() and not fields_.empty()) {
+        hasField(field); // will populate field_pos_
+    }
+
+    return row_[field_pos_.at(field)];
+}
+
 void CSVParser::updateFields() {
     fields_.clear();
     fields_.reserve(header_.size() - skip_.size());
