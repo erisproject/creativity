@@ -41,53 +41,53 @@ int main(int argc, char *argv[]) {
     // The minimum value of books_written that needs to be satisified to count as writing occuring
     // during a period:
     double writing_threshold = 0.2;
+#define WRITING_AND_MARKET(var) ((var)->value("books_written") >= writing_threshold and not std::isnan((var)->value("book_p0")))
     // Observations with writing in every (LR) stage:
     TreatmentFilter data_writing_always(data, [&writing_threshold](const TreatmentFilter::Properties &p) {
-            // Filter out any observations that have no writing in any (LR) stage:
-            for (const auto sp : {&p.pre, &p.piracy, &p.public_sharing}) {
-                if (*sp and ((*sp)->value("books_written") < writing_threshold or std::isnan((*sp)->value("book_p0"))))
-                    return false;
-            }
-            return true;
+            // Only allow simulations that have writing in every LR stage contained in the data
+            return (not p.pre or WRITING_AND_MARKET(p.pre))
+                and (not p.piracy or WRITING_AND_MARKET(p.piracy))
+                and (not p.public_sharing or WRITING_AND_MARKET(p.public_sharing));
     });
     // Observations with no writing in LR piracy, but with writing in LR public (and pre)
     TreatmentFilter data_no_piracy_writing(data, [&writing_threshold](const TreatmentFilter::Properties &p) {
-            // Require writing in pre and LR public:
-            if (not p.pre or p.pre->value("books_written") < writing_threshold or std::isnan(p.pre->value("book_p0"))) return false;
-            if (not p.public_sharing or p.public_sharing->value("books_written") < writing_threshold) return false;
-            // Require no (or at least, very little) writing in LR piracy
-            if (not p.piracy or p.piracy->value("books_written") >= writing_threshold) return false;
-            return true;
+            // Require that this data actually has pre, piracy, and public:
+            if (not p.pre or not p.piracy or not p.public_sharing) return false;
+            // writing in pre and LR public:
+            return WRITING_AND_MARKET(p.pre)
+                and not WRITING_AND_MARKET(p.piracy)
+                and WRITING_AND_MARKET(p.public_sharing);
     });
-    // Observations with pre writing but no post-pre (LR) writing:
+    // Observations with pre writing but no public (LR) writing:
     TreatmentFilter data_no_post_writing(data, [&writing_threshold](const TreatmentFilter::Properties &p) {
+            // Require that this data actually has pre, piracy, and public:
+            if (not p.pre or not p.piracy or not p.public_sharing) return false;
             // Require writing in pre"
-            if (not p.pre or p.pre->value("books_written") < writing_threshold or std::isnan(p.pre->value("book_p0"))) return false;
-            // Require no writing in LR piracy, public:
-            if (not p.piracy or p.piracy->value("books_written") >= writing_threshold) return false;
-            if (not p.public_sharing or p.public_sharing->value("books_written") >= writing_threshold) return false;
-            return true;
+            return WRITING_AND_MARKET(p.pre)
+                and not WRITING_AND_MARKET(p.piracy)
+                and not WRITING_AND_MARKET(p.public_sharing);
     });
     // Observations with no pre writing:
     TreatmentFilter data_no_pre_writing(data, [&writing_threshold](const TreatmentFilter::Properties &p) {
-            return p.pre and p.pre->value("books_written") < writing_threshold;
+            return p.pre and not WRITING_AND_MARKET(p.pre);
+    });
+    // Observations with pre and piracy, but not public writing:
+    TreatmentFilter data_no_pub_writing(data, [&writing_threshold](const TreatmentFilter::Properties &p) {
+            // Require that this data actually has pre, piracy, and public:
+            if (not p.pre or not p.piracy or not p.public_sharing) return false;
+            // Require writing in pre"
+            return WRITING_AND_MARKET(p.pre)
+                and WRITING_AND_MARKET(p.piracy)
+                and not WRITING_AND_MARKET(p.public_sharing);
     });
 
-    unsigned nobs_w_writing = data_writing_always.data().rows(),
-             nobs_wo_writing = data_no_post_writing.data().rows(),
-             nobs_wo_pir_writing = data_no_piracy_writing.data().rows(),
-             nobs_wo_pre_writing = data_no_pre_writing.data().rows();
-    unsigned sims_w_writing = nobs_w_writing / data_writing_always.rowsPerObservation(),
-             sims_wo_writing = nobs_wo_writing / data_no_post_writing.rowsPerObservation(),
-             sims_wo_pir_writing = nobs_wo_pir_writing / data_no_piracy_writing.rowsPerObservation(),
-             sims_wo_pre_writing = nobs_wo_pre_writing / data_no_pre_writing.rowsPerObservation();
     std::cout << "Data summary:\n" <<
-        "    " << nobs_w_writing + nobs_wo_writing + nobs_wo_pre_writing + nobs_wo_pir_writing <<
-                    " total observations (from " << sims_w_writing+sims_wo_writing+sims_wo_pre_writing+sims_wo_pir_writing << " simulations)\n" <<
-        "    " << nobs_w_writing << " observations (from " << sims_w_writing << " simulations) with non-zero # books written during each stage\n" <<
-        "    " << nobs_wo_pre_writing << " observations (from " << sims_wo_pre_writing << " simulations) with zero books written during pre-piracy stage\n" <<
-        "    " << nobs_wo_pir_writing << " observations (from " << sims_wo_pir_writing << " simulations) with zero books written during piracy, but positive books written during public sharing\n" <<
-        "    " << nobs_wo_writing << " observations (from " << sims_wo_writing << " simulations) with zero books written during one or more situations\n";
+        "    " << data.simulations() << " total simulations (with " << data.rowsPerSimulation() << " data rows per simulation)\n" <<
+        "    " << data_writing_always.simulations() << " simulations with non-zero # books written during each stage\n" <<
+        "    " << data_no_pre_writing.simulations() << " simulations with zero books written during pre-piracy stage\n" <<
+        "    " << data_no_piracy_writing.simulations() << " simulations with zero books written under piracy, but writing resuming under public sharing\n" <<
+        "    " << data_no_post_writing.simulations() << " simulations with zero books written during piracy and no recovery under public sharing\n" <<
+        "    " << data_no_pub_writing.simulations() << " simulations with writing under piracy, but no writing under public sharing\n";
 
     if (args.analysis.write_or_not) {
         tabulation_options tab_opts(args.format.type, args.format.precision, "    ");
@@ -108,21 +108,22 @@ int main(int argc, char *argv[]) {
                 "Mean", "s.e.", "Min", "5th %", "25th %", "Median", "75th %", "95th %", "Max",
                 "Parameter"});
 
-        for (auto d : {&data_writing_always, &data_no_pre_writing, &data_no_piracy_writing, &data_no_post_writing}) {
-            std::cout << "Parameter values for ";
-            if (d == &data_writing_always) std::cout << sims_w_writing << " simulations with writing in all stages:\n";
-            else if (d == &data_no_pre_writing) std::cout << sims_wo_pre_writing << " simulations WITHOUT writing in last pre-piracy stages:\n";
-            else if (d == &data_no_piracy_writing) std::cout << sims_wo_pir_writing << " simulations with no writing in piracy stage, but with writing in public sharing stage:\n";
-            else std::cout << sims_wo_writing << " simulations WITHOUT writing in either piracy or public sharing stages:\n";
+        for (auto d : {&data_writing_always, &data_no_piracy_writing, &data_no_pre_writing, &data_no_post_writing, &data_no_pub_writing}) {
+            std::cout << "Parameter values for " << d->simulations() << " simulations " <<
+                (d == &data_writing_always ? "with writing in all stages" :
+                 d == &data_no_pre_writing ? "without pre-piracy writing" :
+                 d == &data_no_piracy_writing ? "with no piracy writing, but recovery under public sharing" :
+                 d == &data_no_post_writing ? "without piracy or public sharing writing" :
+                 "with piracy writing but not public sharing writing") << "\n";
             // Look at conditional means of parameters in periods with no activity vs parameters in
             // periods with activity
 
             MatrixXd results(params.size() + pre_fields.size(), (unsigned) num_fields);
-            MatrixXd X(d->data().rows() / d->rowsPerObservation(), params.size() + pre_fields.size());
+            MatrixXd X(d->data().rows() / d->rowsPerSimulation(), params.size() + pre_fields.size());
             int i = 0;
             for (const auto &p : params) {
                 VectorXd rawvals = (*d)["param." + p]->values();
-                VectorXd paramvals = VectorXd::Map(rawvals.data(), rawvals.size()/d->rowsPerObservation(), InnerStride<Dynamic>(d->rowsPerObservation()));
+                VectorXd paramvals = VectorXd::Map(rawvals.data(), rawvals.size()/d->rowsPerSimulation(), InnerStride<Dynamic>(d->rowsPerSimulation()));
                 std::sort(paramvals.data(), paramvals.data() + paramvals.size());
                 results(i, f_min) = quantile(paramvals, 0);
                 results(i, f_5) = quantile(paramvals, .05);
@@ -136,7 +137,7 @@ int main(int argc, char *argv[]) {
             for (const auto &p : pre_fields) {
                 VectorXd rawvals = (*d)[p]->values();
                 // Start at 0, increment by nobs_per_sim: that should keep us in the pre-sim rows
-                VectorXd prevals = VectorXd::Map(rawvals.data(), rawvals.size()/d->rowsPerObservation(), InnerStride<Dynamic>(d->rowsPerObservation()));
+                VectorXd prevals = VectorXd::Map(rawvals.data(), rawvals.size()/d->rowsPerSimulation(), InnerStride<Dynamic>(d->rowsPerSimulation()));
                 std::sort(prevals.data(), prevals.data() + prevals.size());
                 results(i, f_min) = quantile(prevals, 0);
                 results(i, f_5) = quantile(prevals, .05);

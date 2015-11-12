@@ -52,7 +52,7 @@ void Treatment::readCSV(CSVParser &&csv) {
     }
 
     // The pre-data plus each treatment effect contributes an output row
-    rows_per_obs_ = 1 + has_piracy_ + has_piracy_sr_ + has_public_ + has_public_sr_;
+    rows_per_sim_ = 1 + has_piracy_ + has_piracy_sr_ + has_public_ + has_public_sr_;
 
     // Add dummy columns (even if the data means they will always be 0/1)
     data_column_.insert({"piracy", next_col++}); // piracy dummy
@@ -62,7 +62,7 @@ void Treatment::readCSV(CSVParser &&csv) {
 
     // Increment the matrix by 1000 *file* rows at a time (i.e. we need to do a relatively expensive
     // matrix resize every 1000 input rows).
-    const unsigned rowincr = 1000 * rows_per_obs_;
+    const unsigned rowincr = 1000 * rows_per_sim_;
     data_ = MatrixXd(rowincr, next_col);
 
     unsigned pos = 0;

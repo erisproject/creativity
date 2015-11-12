@@ -40,8 +40,13 @@ class Treatment {
         /// True if the source data has short-run public data
         const bool& hasPublicSR() const { return has_public_sr_; }
 
-        /// The number of data rows per observation.  This equals 1 plus the number of treatments.
-        const unsigned int& rowsPerObservation() const { return rows_per_obs_; }
+        /// The number of data rows per simulation input.  This equals 1 plus the number of treatments.
+        const unsigned int& rowsPerSimulation() const { return rows_per_sim_; }
+
+        /** The number of simulation files contributing to this data: this is simply an alias for
+         * `obj.data().rows() / obj.rowsPerSimulation()`
+         */
+        unsigned int simulations() const { return data().rows() / rowsPerSimulation(); }
 
         /** The full set of data.
          *
@@ -50,14 +55,14 @@ class Treatment {
         const Eigen::MatrixXd& data() const { return data_; }
 
         /** The simulation source values.  Data in row `x` is from source file at index `x /
-         * rowsPerObservation()`.
+         * rowsPerSimulation()`.
          */
         const std::vector<std::string>& sourceFiles() const { return source_; }
 
         /** Return the source file associated with row r.  This is simply an alias for
-         * `sourceFiles().at(r / rowsPerObservation())`.
+         * `sourceFiles().at(r / rowsPerSimulation())`.
          */
-        const std::string& sourceFile(unsigned r) const { return sourceFiles().at(r / rowsPerObservation()); }
+        const std::string& sourceFile(unsigned r) const { return sourceFiles().at(r / rowsPerSimulation()); }
 
         /** Accesses the map of field name to column indices.  Data fields (e.g. "books_written")
          * are not prefixed with "pre.", "piracy.", etc.; parameters (e.g. "param.readers") are
@@ -88,7 +93,7 @@ class Treatment {
              has_public_{false}, ///< True if the data contains LR public treatment rows
              has_public_sr_{false}; ///< True if the data contains SR public treatment rows
         /// The number of treatment row observations per source data rows (i.e. per simulation)
-        unsigned int rows_per_obs_{0};
+        unsigned int rows_per_sim_{0};
 
         /// Field name to column map.
         std::unordered_map<std::string, unsigned> data_column_;
