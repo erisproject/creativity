@@ -213,7 +213,7 @@ int main(int argc, char *argv[]) {
         auto yi = avg_effects.y(i);
         for (unsigned r = 0; r < yi.size(); r++) {
             if (std::isnan(yi[r])) {
-                std::cerr << "Error: found NaN for " << avg_effects.equations()[i].depVar()->name() << ", source file " << data_writing_always.sourceFile(r) << "\n";
+                std::cerr << "Error: found NaN for " << avg_effects.equations()[i].depVar()->name() << "\n"", source file " << data_writing_always.sourceFile(r) << "\n";
             }
         }
     }
@@ -229,7 +229,7 @@ int main(int argc, char *argv[]) {
         eq % 1;
         if (data_writing_always.hasPiracy()) eq % data_writing_always["piracy"];
         if (data_writing_always.hasPublic()) eq % data_writing_always["public"];
-        for (auto &x : {"param.density", "param.cost_market", "param.cost_unit", "param.creation_time", "param.creation_fixed"}) {
+        for (auto &x : {"param.density", "param.cost_market", "param.creation_time", "param.creation_fixed", "param.cost_unit"}) {
             eq % data_writing_always[x];
             if (data_writing_always.hasPiracy()) eq % (data_writing_always["piracy"] * data_writing_always[x]);
             if (data_writing_always.hasPublic()) eq % (data_writing_always["public"] * data_writing_always[x]);
