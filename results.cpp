@@ -225,23 +225,23 @@ int main(int argc, char *argv[]) {
 
     SUR marg_effects;
     for (auto &y : {"net_u", "books_written", "book_quality", "book_p0", "book_revenue", "book_profit"}) {
-        Equation eq(data[y]);
+        Equation eq(data_writing_always[y]);
         eq % 1;
-        if (data_writing_always.hasPiracy()) eq % data["piracy"];
-        if (data_writing_always.hasPublic()) eq % data["public"];
+        if (data_writing_always.hasPiracy()) eq % data_writing_always["piracy"];
+        if (data_writing_always.hasPublic()) eq % data_writing_always["public"];
         for (auto &x : {"param.density", "param.cost_market", "param.cost_unit", "param.creation_time", "param.creation_fixed"}) {
-            eq % data[x];
-            if (data_writing_always.hasPiracy()) eq % (data["piracy"] * data[x]);
-            if (data_writing_always.hasPublic()) eq % (data["public"] * data[x]);
+            eq % data_writing_always[x];
+            if (data_writing_always.hasPiracy()) eq % (data_writing_always["piracy"] * data_writing_always[x]);
+            if (data_writing_always.hasPublic()) eq % (data_writing_always["public"] * data_writing_always[x]);
         }
         // These don't get included in "pre":
         for (auto &x : {"param.cost_piracy", "param.piracy_link_proportion"}) {
-            if (data_writing_always.hasPiracy()) eq % (data["piracy"] * data[x]);
-            if (data_writing_always.hasPublic()) eq % (data["public"] * data[x]);
+            if (data_writing_always.hasPiracy()) eq % (data_writing_always["piracy"] * data_writing_always[x]);
+            if (data_writing_always.hasPublic()) eq % (data_writing_always["public"] * data_writing_always[x]);
         }
         // These don't get included in "pre" or "piracy":
         for (auto &x : {"param.public_sharing_tax"}) {
-            if (data_writing_always.hasPublic()) eq % (data["public"] * data[x]);
+            if (data_writing_always.hasPublic()) eq % (data_writing_always["public"] * data_writing_always[x]);
         }
         marg_effects.add(eq);
     }
