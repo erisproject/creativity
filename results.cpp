@@ -177,76 +177,82 @@ int main(int argc, char *argv[]) {
     }
 
 
-    SUR avg_effects;
-    for (auto &y : {
-            "net_u", "net_u_5th", "net_u_median", "net_u_95th",
-            "books_written",
-            "book_quality", "book_quality_5th", "book_quality_median", "book_quality_95th",
-            "book_p0", "book_revenue", "book_profit",
-            "book_author_scale", "book_author_scale_5th", "book_author_scale_median", "book_author_scale_95th",
-            "book_author_effort", "book_author_effort_5th", "book_author_effort_median", "book_author_effort_95th"
-            }) {
-        Equation eq(data_writing_always[y]);
-        eq % 1;
-        if (data_writing_always.hasPiracy()) {
-            if (data_writing_always.hasPiracySR())
-                eq % (data_writing_always["piracy"]*data_writing_always["SR"])
-                    + data_writing_always["piracy"]*data_writing_always["LR"];
-            else
+    if (args.analysis.average) {
+        std::cout << "\n\n\nAverage effects:\n================\n";
+        SUR avg_effects;
+        for (auto &y : {
+                "net_u", "net_u_5th", "net_u_median", "net_u_95th",
+                "books_written",
+                "book_quality", "book_quality_5th", "book_quality_median", "book_quality_95th",
+                "book_p0", "book_revenue", "book_profit",
+                "book_author_scale", "book_author_scale_5th", "book_author_scale_median", "book_author_scale_95th",
+                "book_author_effort", "book_author_effort_5th", "book_author_effort_median", "book_author_effort_95th"
+                }) {
+            Equation eq(data_writing_always[y]);
+            eq % 1;
+            if (data_writing_always.hasPiracy()) {
+                if (data_writing_always.hasPiracySR())
+                    eq % (data_writing_always["piracy"]*data_writing_always["SR"])
+                        + data_writing_always["piracy"]*data_writing_always["LR"];
+                else
+                    eq % data_writing_always["piracy"];
+            }
+            else if (data_writing_always.hasPiracy())
                 eq % data_writing_always["piracy"];
-        }
-        else if (data_writing_always.hasPiracy())
-            eq % data_writing_always["piracy"];
 
-        if (data_writing_always.hasPublic()) {
-            if (data_writing_always.hasPublicSR())
-                eq % (data_writing_always["public"]*data_writing_always["SR"])
-                    + data_writing_always["public"]*data_writing_always["LR"];
-            else
-                eq % data_writing_always["public"];
-        }
+            if (data_writing_always.hasPublic()) {
+                if (data_writing_always.hasPublicSR())
+                    eq % (data_writing_always["public"]*data_writing_always["SR"])
+                        + data_writing_always["public"]*data_writing_always["LR"];
+                else
+                    eq % data_writing_always["public"];
+            }
 
-        avg_effects.add(std::move(eq));
-    }
-    avg_effects.gather();
-    for (unsigned i = 0; i < avg_effects.equations().size(); i++) {
-        auto yi = avg_effects.y(i);
-        for (unsigned r = 0; r < yi.size(); r++) {
-            if (std::isnan(yi[r])) {
-                std::cerr << "Error: found NaN for " << avg_effects.equations()[i].depVar()->name() << "\n"", source file " << data_writing_always.sourceFile(r) << "\n";
+            avg_effects.add(std::move(eq));
+        }
+        avg_effects.gather();
+        for (unsigned i = 0; i < avg_effects.equations().size(); i++) {
+            auto yi = avg_effects.y(i);
+            for (unsigned r = 0; r < yi.size(); r++) {
+                if (std::isnan(yi[r])) {
+                    std::cerr << "Error: found NaN for " << avg_effects.equations()[i].depVar()->name() << "\n"", source file " << data_writing_always.sourceFile(r) << "\n";
+                }
             }
         }
+
+        avg_effects.solve();
+        std::cout << avg_effects;
     }
 
-    avg_effects.solve();
-    std::cout << "Average effects:\n================\n" << avg_effects;
 
+    if (args.analysis.marginal) {
+        std::cout << "\n\n\nMarginal effects:\n=================\n";
 
+        SUR marg_effects;
+        for (auto &y : {"net_u", "books_written", "book_quality", "book_p0", "book_revenue", "book_profit"}) {
+            Equation eq(data_writing_always[y]);
+            eq % 1;
+            if (data_writing_always.hasPiracy()) eq % data_writing_always["piracy"];
+            if (data_writing_always.hasPublic()) eq % data_writing_always["public"];
+            for (auto &x : {"param.density", "param.cost_market", "param.creation_time", "param.creation_fixed", "param.cost_unit"}) {
+                eq % data_writing_always[x];
+                if (data_writing_always.hasPiracy()) eq % (data_writing_always["piracy"] * data_writing_always[x]);
+                if (data_writing_always.hasPublic()) eq % (data_writing_always["public"] * data_writing_always[x]);
+            }
+            // These don't get included in "pre":
+            for (auto &x : {"param.cost_piracy", "param.piracy_link_proportion"}) {
+                if (data_writing_always.hasPiracy()) eq % (data_writing_always["piracy"] * data_writing_always[x]);
+                if (data_writing_always.hasPublic()) eq % (data_writing_always["public"] * data_writing_always[x]);
+            }
+            // These don't get included in "pre" or "piracy":
+            for (auto &x : {"param.public_sharing_tax"}) {
+                if (data_writing_always.hasPublic()) eq % (data_writing_always["public"] * data_writing_always[x]);
+            }
+            marg_effects.add(eq);
+        }
 
-    SUR marg_effects;
-    for (auto &y : {"net_u", "books_written", "book_quality", "book_p0", "book_revenue", "book_profit"}) {
-        Equation eq(data_writing_always[y]);
-        eq % 1;
-        if (data_writing_always.hasPiracy()) eq % data_writing_always["piracy"];
-        if (data_writing_always.hasPublic()) eq % data_writing_always["public"];
-        for (auto &x : {"param.density", "param.cost_market", "param.creation_time", "param.creation_fixed", "param.cost_unit"}) {
-            eq % data_writing_always[x];
-            if (data_writing_always.hasPiracy()) eq % (data_writing_always["piracy"] * data_writing_always[x]);
-            if (data_writing_always.hasPublic()) eq % (data_writing_always["public"] * data_writing_always[x]);
-        }
-        // These don't get included in "pre":
-        for (auto &x : {"param.cost_piracy", "param.piracy_link_proportion"}) {
-            if (data_writing_always.hasPiracy()) eq % (data_writing_always["piracy"] * data_writing_always[x]);
-            if (data_writing_always.hasPublic()) eq % (data_writing_always["public"] * data_writing_always[x]);
-        }
-        // These don't get included in "pre" or "piracy":
-        for (auto &x : {"param.public_sharing_tax"}) {
-            if (data_writing_always.hasPublic()) eq % (data_writing_always["public"] * data_writing_always[x]);
-        }
-        marg_effects.add(eq);
+        marg_effects.solve();
+        std::cout << marg_effects;
     }
-
-    marg_effects.solve();
-    std::cout << "\n\n\nMarginal effects:\n=================\n" << marg_effects;
 }
 

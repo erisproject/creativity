@@ -63,8 +63,10 @@ void Results::postParse(boost::program_options::variables_map&) {
         throw po::required_option("FILENAME");
     }
 
-    if (analysis.none and (analysis.all or analysis.write_or_not or analysis.average or analysis.marginal))
-        throw std::logic_error("Option --none cannot be combined with --all, --write-vs-nowrite, --average-effects, --marginal-effects");
+    if (analysis.none) {
+        if (analysis.all or analysis.write_or_not or analysis.average or analysis.marginal)
+            throw std::logic_error("Option --none cannot be combined with --all, --write-vs-nowrite, --average-effects, --marginal-effects");
+    }
     else if (analysis.all)
         analysis.write_or_not = analysis.average = analysis.marginal = true;
     else if (not analysis.write_or_not and not analysis.average and not analysis.marginal)
