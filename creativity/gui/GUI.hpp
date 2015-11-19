@@ -1,5 +1,6 @@
 #pragma once
 #include "creativity/cmdargs/GUI.hpp"
+#include "creativity/gui/GraphArea.hpp"
 #include <eris/noncopyable.hpp>
 #include <eris/Position.hpp>
 #include <eris/types.hpp>
@@ -41,7 +42,6 @@ namespace gui {
 class ReaderStore;
 class BookStore;
 class InfoWindow;
-class GraphArea;
 
 /** Class that runs a GUI in a thread, collecting its events into a queue to be processed
  * periodically (e.g. between iterations) via GUIShim.
@@ -368,6 +368,78 @@ class GUI : eris::noncopyable {
          * The given cmdargs::GUI object should have already parsed command-line arguments.
          */
         void thr_run(const cmdargs::GUI &args);
+
+        /** Sets up the handlers for visualization setting `field`, which is controlled by
+         * "enable_<field>" and "colour_<field>" GUI elements.  To set up just one or the other of
+         * these, see thr_connect_vis_colour() or thr_connect_vis_enabled() -- this method simply
+         * calls both of those.
+         *
+         * \param the name of the field
+         * \param enabled the bool reference controlling whether this field is enabled
+         * \param colour the Colour reference controlling the colour associated with this field
+         * \param affects_rtree whether changing this setting requires a rebuild of the rtree
+         * (mapping clickable elements): this should be true if the field enables/disables clickable
+         * elements.
+         * \param needs_all if non-empty, this field will be set insensitive if any of the given
+         * elements are disabled.
+         * \param needs_any if non-empty, this field will be set insensitive if all of the given
+         * elements are disabled.
+         */
+        void thr_connect_vis_setting(
+                const std::string &field,
+                bool &enabled,
+                GraphArea::Colour &colour,
+                bool affects_rtree = false,
+                const std::vector<std::string> &needs_all = {},
+                const std::vector<std::string> &needs_any = {});
+
+        /** Sets up the "enable_field" handler in the GUI to adjust the internal GUI parameter
+         * enabling or disabling the feature.
+         *
+         * \param the field name (not prefixed with "enable_")
+         * \param enabled reference to the bool value to enable/disable as the GUI setting is
+         * changed
+         * \param affects_rtree whether changing this setting requires a rebuild of the rtree
+         * (mapping clickable elements): this should be true if the field enables/disables clickable
+         * elements.
+         * \param needs_all if non-empty, this field will be set insensitive if any of the given
+         * elements are disabled.
+         * \param needs_any if non-empty, this field will be set insensitive if all of the given
+         * elements are disabled.
+         * \sa thr_connect_vis_setting
+         */
+        void thr_connect_vis_enabled(
+                const std::string &field,
+                bool &enabled,
+                bool affects_rtree = false,
+                const std::vector<std::string> &needs_all = {},
+                const std::vector<std::string> &needs_any = {});
+
+        /** Sets up the "colour_field" handler in the GUI to adjust the internal GUI colour for the
+         * associated field.
+         *
+         * \param the field name (not prefixed with "enable_")
+         * \param colour the internal Colour value to change when the GUI setting is changed.
+         * \param needs_all if non-empty, this field will be set insensitive if any of the given
+         * elements are disabled.
+         * \param needs_any if non-empty, this field will be set insensitive if all of the given
+         * elements are disabled.
+         * \sa thr_connect_vis_setting
+         */
+        void thr_connect_vis_colour(
+                const std::string &field,
+                GraphArea::Colour &colour,
+                const std::vector<std::string> &needs_all = {},
+                const std::vector<std::string> &needs_any = {});
+
+        /** Sets the widget `widget` to be enabled whenever everything in needs_all is enabled, and
+         * anything in needs_any is enabled.  (Both are considered satisfied when the relevent
+         * vector is empty).  Does nothing at all if both are empty.
+         */
+        void thr_connect_vis_deps(
+                Gtk::Widget *widget,
+                const std::vector<std::string> &needs_all,
+                const std::vector<std::string> &needs_any);
 
         /** When called, this updates the simulation parameters displayed in the GUI to match the
          * current creativity_->parameters values.

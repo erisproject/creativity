@@ -408,55 +408,29 @@ void GUI::thr_run(const cmdargs::GUI &args) {
         return false;
     });
 
-
     // Set up handlers and defaults for the visualization settings
-#define GUI_SETUP_VIS_COLOUR(FIELD) {\
-        auto colour_button = widget<Gtk::ColorButton>("colour_" #FIELD); \
-        double r, g, b, a; Gdk::RGBA rgba; \
-        graph_->design.colour.FIELD->get_rgba(r, g, b, a); \
-        rgba.set_red(r); rgba.set_green(g); rgba.set_blue(b); rgba.set_alpha(a); \
-        colour_button->set_rgba(rgba); \
-        colour_button->signal_color_set().connect([this,colour_button] { \
-            auto colour = colour_button->get_rgba(); \
-            graph_->design.colour.FIELD = Cairo::SolidPattern::create_rgba(colour.get_red(), colour.get_green(), colour.get_blue(), colour.get_alpha()); \
-            graph_->resetCache(); \
-            graph_->queue_draw(); \
-        }); \
-    }
-#define GUI_SETUP_VIS_SETTING_(FIELD, AFFECTS_RTREE) {\
-        auto enable_button = widget<Gtk::CheckButton>("enable_" #FIELD); \
-        enable_button->set_active(graph_->design.enabled.FIELD); \
-        enable_button->signal_toggled().connect([this,enable_button] { \
-            bool was = graph_->design.enabled.FIELD; \
-            bool now = enable_button->get_active(); \
-            if (was != now) { \
-                graph_->design.enabled.FIELD = now; \
-                graph_->resetCache(); \
-                graph_->queue_draw(); \
-                if (AFFECTS_RTREE) thr_reset_rtrees(); \
-            } \
-        }); \
-    } \
-    GUI_SETUP_VIS_COLOUR(FIELD)
-#define GUI_SETUP_VIS_SETTING(FIELD) GUI_SETUP_VIS_SETTING_(FIELD, false)
-#define GUI_SETUP_VIS_SETTING_AFFECTS_RTREE(FIELD) GUI_SETUP_VIS_SETTING_(FIELD, true)
-
-    GUI_SETUP_VIS_SETTING_AFFECTS_RTREE(reader)
-    GUI_SETUP_VIS_SETTING_AFFECTS_RTREE(book_live)
-    GUI_SETUP_VIS_SETTING_AFFECTS_RTREE(book_dead)
-    GUI_SETUP_VIS_SETTING_AFFECTS_RTREE(book_public)
-    GUI_SETUP_VIS_SETTING(friendship)
-    GUI_SETUP_VIS_SETTING(movement)
-    GUI_SETUP_VIS_SETTING(author_live)
-    GUI_SETUP_VIS_SETTING(author_dead)
-    GUI_SETUP_VIS_SETTING(author_public)
-    GUI_SETUP_VIS_SETTING(reading)
-    GUI_SETUP_VIS_SETTING(utility_gain)
-    GUI_SETUP_VIS_SETTING(utility_loss)
-    GUI_SETUP_VIS_SETTING(axes)
-    GUI_SETUP_VIS_COLOUR(background)
-#undef GUI_SETUP_VIS_SETTING
-#undef GUI_SETUP_VIS_COLOUR
+    thr_connect_vis_setting("reader", graph_->design.enabled.reader, graph_->design.colour.reader, true);
+    thr_connect_vis_setting("book_live", graph_->design.enabled.book_live, graph_->design.colour.book_live, true);
+    thr_connect_vis_setting("book_dead", graph_->design.enabled.book_dead, graph_->design.colour.book_dead, true);
+    thr_connect_vis_setting("book_public", graph_->design.enabled.book_public, graph_->design.colour.book_public, true);
+    thr_connect_vis_setting("friendship", graph_->design.enabled.friendship, graph_->design.colour.friendship,
+            false, {"reader"});
+    thr_connect_vis_setting("movement", graph_->design.enabled.movement, graph_->design.colour.movement,
+            false, {"reader"});
+    thr_connect_vis_setting("author_live", graph_->design.enabled.author_live, graph_->design.colour.author_live,
+            false, {"reader","book_live"});
+    thr_connect_vis_setting("author_dead", graph_->design.enabled.author_dead, graph_->design.colour.author_dead,
+            false, {"reader","book_dead"});
+    thr_connect_vis_setting("author_public", graph_->design.enabled.author_public, graph_->design.colour.author_public,
+            false, {"reader","book_public"});
+    thr_connect_vis_setting("reading", graph_->design.enabled.reading, graph_->design.colour.reading,
+            false, {"reader"}, {"book_live", "book_dead", "book_public"});
+    thr_connect_vis_setting("utility_gain", graph_->design.enabled.utility_gain, graph_->design.colour.utility_gain,
+            false, {"reader"});
+    thr_connect_vis_setting("utility_loss", graph_->design.enabled.utility_loss, graph_->design.colour.utility_loss,
+            false, {"reader"});
+    thr_connect_vis_setting("axes", graph_->design.enabled.axes, graph_->design.colour.axes);
+    thr_connect_vis_colour("background", graph_->design.colour.background);
 
     // Copy parameters (which will be the defaults) into the Agent Attributes settings
     thr_update_parameters();
@@ -523,6 +497,99 @@ void GUI::thr_run(const cmdargs::GUI &args) {
     queueEvent(Event::Type::quit);
     lock.lock();
     dispatcher_.reset();
+}
+
+void GUI::thr_connect_vis_enabled(
+        const std::string &field,
+        bool &enabled,
+        const bool affects_rtree,
+        const std::vector<std::string> &needs_all,
+        const std::vector<std::string> &needs_any) {
+    // Set up the enable button:
+    auto enable_button = widget<Gtk::CheckButton>("enable_" + field);
+    enable_button->set_active(enabled);
+    enable_button->signal_toggled().connect([this,&enabled,enable_button,affects_rtree] {
+        if (enabled != enable_button->get_active()) {
+            enabled = not enabled;
+            graph_->resetCache();
+            graph_->queue_draw();
+            if (affects_rtree) thr_reset_rtrees();
+        }
+    });
+
+    thr_connect_vis_deps(enable_button, needs_all, needs_any);
+}
+void GUI::thr_connect_vis_colour(
+        const std::string &field,
+        GraphArea::Colour &colour,
+        const std::vector<std::string> &needs_all,
+        const std::vector<std::string> &needs_any) {
+
+    // Set up the colour chooser button to change the GUI colour:
+    auto colour_button = widget<Gtk::ColorButton>("colour_" + field);
+    double r, g, b, a;
+    colour->get_rgba(r, g, b, a);
+    Gdk::RGBA rgba;
+    rgba.set_red(r);
+    rgba.set_green(g);
+    rgba.set_blue(b);
+    rgba.set_alpha(a);
+    colour_button->set_rgba(rgba);
+    colour_button->signal_color_set().connect([this,&colour,colour_button] {
+        auto new_colour = colour_button->get_rgba();
+        colour = Cairo::SolidPattern::create_rgba(new_colour.get_red(),  new_colour.get_green(), new_colour.get_blue(), new_colour.get_alpha());
+        graph_->resetCache();
+        graph_->queue_draw();
+    });
+
+    thr_connect_vis_deps(colour_button, needs_all, needs_any);
+}
+
+void GUI::thr_connect_vis_deps(
+        Gtk::Widget *w,
+        const std::vector<std::string> &needs_all,
+        const std::vector<std::string> &needs_any) {
+
+    if (needs_all.empty() and needs_any.empty()) return;
+
+    std::vector<Gtk::CheckButton*> allbuttons, anybuttons;
+    for (const auto &dep : needs_all) allbuttons.push_back(widget<Gtk::CheckButton>("enable_" + dep));
+    for (const auto &dep : needs_any) anybuttons.push_back(widget<Gtk::CheckButton>("enable_" + dep));
+
+    auto check_enable = [this,allbuttons,anybuttons,w] {
+        bool enable = true;
+        for (const auto &d : allbuttons) {
+            if (not d->get_active()) {
+                enable = false;
+                break;
+            }
+        }
+        if (enable and not anybuttons.empty()) {
+            bool any = false;
+            for (const auto &d : anybuttons) {
+                if (d->get_active()) {
+                    any = true;
+                    break;
+                }
+            }
+            if (not any) enable = false;
+        }
+        w->set_sensitive(enable);
+    };
+    for (const auto &d : allbuttons) d->signal_toggled().connect(check_enable);
+    for (const auto &d : anybuttons) d->signal_toggled().connect(check_enable);
+    check_enable();
+}
+
+void GUI::thr_connect_vis_setting(
+        const std::string &field,
+        bool &enabled,
+        GraphArea::Colour &colour,
+        const bool affects_rtree,
+        const std::vector<std::string> &needs_all,
+        const std::vector<std::string> &needs_any) {
+    thr_connect_vis_enabled(field, enabled, affects_rtree, needs_all, needs_any);
+    thr_connect_vis_colour(field, colour, needs_all, needs_any);
 }
 
 void GUI::thr_set_state(unsigned long t) {

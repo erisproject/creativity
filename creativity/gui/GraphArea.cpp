@@ -124,7 +124,7 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
         // unfortunately.
 
         // Draw reader movement lines (if the reader existed in the previous period).
-        if (design.enabled.movement and prev_state) {
+        if (design.enabled.reader and design.enabled.movement and prev_state) {
             cr->save();
             cr->set_dash(design.dash.movement, 0);
             cr->set_line_width(design.stroke_width.movement);
@@ -144,7 +144,8 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
 
         // Draw lines from readers to newly purchased books (unless we're not showing newly
         // purchased books)
-        if (design.enabled.reading) {
+        if (design.enabled.reading and design.enabled.reader and
+                (design.enabled.book_live or design.enabled.book_dead or design.enabled.book_public)) {
             cr->save();
             cr->set_source(design.colour.reading);
             cr->set_dash(design.dash.reading, 0);
@@ -154,7 +155,11 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
 
                 for (auto &book_id : r.new_books) {
                     auto &b = state->books.at(book_id);
-                    drawLine(cr, trans, r.position, b.position);
+                    bool show = (b.market_private ? design.enabled.book_live :
+                            b.market_public() ? design.enabled.book_public :
+                            design.enabled.book_dead);
+                    if (show)
+                        drawLine(cr, trans, r.position, b.position);
                 }
             }
             cr->stroke();
@@ -162,7 +167,7 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
         }
 
         // Draw friendship/sharing links
-        if (design.enabled.friendship) {
+        if (design.enabled.friendship and design.enabled.reader) {
             cr->save();
             cr->set_source(design.colour.friendship);
             cr->set_dash(design.dash.friendship, 0);
@@ -216,7 +221,7 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
         // Readers have utility circles, indicating how much about the base 1000 utility the reader
         // was in the period.  (Don't draw anything in the initialization period, though, since
         // everyone just has 0 utility then).
-        if ((design.enabled.utility_gain or design.enabled.utility_loss) and state->t > 0) {
+        if ((design.enabled.utility_gain or design.enabled.utility_loss) and design.enabled.reader and state->t > 0) {
             cr->save();
             cr->set_dash(design.dash.utility, 0);
             cr->set_line_width(design.stroke_width.utility);
@@ -239,9 +244,9 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
         }
 
         // Lines from each book to its author
-        bool show_author_on = design.enabled.author_live and design.enabled.book_live,
-             show_author_off = design.enabled.author_dead and design.enabled.book_dead,
-             show_author_pub = design.enabled.author_public and design.enabled.book_public;
+        bool show_author_on = design.enabled.reader and design.enabled.author_live and design.enabled.book_live,
+             show_author_off = design.enabled.reader and design.enabled.author_dead and design.enabled.book_dead,
+             show_author_pub = design.enabled.reader and design.enabled.author_public and design.enabled.book_public;
 
         if (show_author_on or show_author_off or show_author_pub) {
             cr->save();
