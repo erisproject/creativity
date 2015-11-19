@@ -1081,28 +1081,29 @@ void GUI::initializeSim() {
     auto &set = creativity_->set();
 #define COPY_SB_D(PARAMETER) set.PARAMETER = sb("set_"#PARAMETER)
 #define COPY_SB_I(PARAMETER) set.PARAMETER = lround(sb("set_"#PARAMETER))
+
+    // Structure:
     COPY_SB_I(dimensions);
     COPY_SB_I(readers);
     set.boundary = Creativity::boundaryFromDensity(set.readers, set.dimensions, sb("set_density"));
-    COPY_SB_I(piracy_begins);
-    COPY_SB_D(piracy_link_proportion) * 0.01; // From percentage
+    COPY_SB_D(reader_step_mean);
     COPY_SB_D(book_distance_mean);
     COPY_SB_D(book_quality_sd);
-    COPY_SB_D(reader_step_mean);
+
+    // Authorship:
+    COPY_SB_I(creation_fixed);
+    COPY_SB_I(creation_time);
     COPY_SB_D(reader_creation_shape);
     COPY_SB_D(reader_creation_scale_min);
     COPY_SB_D(reader_creation_scale_range);
+
+    // Costs:
     COPY_SB_D(income);
     COPY_SB_D(cost_market);
     COPY_SB_D(cost_unit);
     COPY_SB_D(cost_piracy);
-    COPY_SB_D(prior_scale);
-    COPY_SB_D(prior_scale_piracy);
-    COPY_SB_D(prior_scale_burnin);
-    COPY_SB_I(burnin_periods);
-    COPY_SB_I(prediction_draws);
-    COPY_SB_I(creation_time);
-    COPY_SB_I(creation_fixed);
+
+    // Initial behaviour:
 #define COPY_SB_INIT_D(PARAMETER) set.initial.PARAMETER = sb("set_init_"#PARAMETER)
     COPY_SB_INIT_D(prob_write);
     COPY_SB_INIT_D(l_min);
@@ -1111,8 +1112,26 @@ void GUI::initializeSim() {
     COPY_SB_INIT_D(p_range);
     COPY_SB_INIT_D(prob_keep);
     COPY_SB_INIT_D(keep_price);
+#undef COPY_SB_INIT_D
+
+    // Beliefs structure:
+    COPY_SB_D(prior_scale);
+    COPY_SB_I(prediction_draws);
+    COPY_SB_D(prior_scale_burnin);
+    COPY_SB_I(burnin_periods);
+
+    // Piracy:
+    COPY_SB_I(piracy_begins);
+    COPY_SB_D(piracy_link_proportion) * 0.01; // From percentage
+    COPY_SB_D(prior_scale_piracy);
+
+    // Public sharing:
+    COPY_SB_I(public_sharing_begins);
+    COPY_SB_D(public_sharing_tax);
+    COPY_SB_D(prior_scale_public_sharing);
+
 #undef COPY_SB_D
-#undef SET_INIT_SB
+#undef COPY_SB_I
 
     // Other non-simulation options need to be queued via a configure event:
     Parameter p;
