@@ -191,7 +191,7 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
                     /// The colour of off-market books
                     book_dead = Cairo::SolidPattern::create_rgb(0.5, 0.5, 0.5),
                     /// The colour of public-market books
-                    book_public = Cairo::SolidPattern::create_rgb(0, 1, .4),
+                    book_public = Cairo::SolidPattern::create_rgb(0.306, 0.604, 0.024),
                     /// Authorship lines from author to book for on-market books
                     author_live = Cairo::SolidPattern::create_rgba(0.5, 0.2, 0.5, 0.5),
                     /// Authorship lines from author to book for off-market books
