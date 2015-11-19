@@ -239,26 +239,30 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
         }
 
         // Lines from each book to its author
-        if (design.enabled.author_live or design.enabled.author_dead) {
+        bool show_author_on = design.enabled.author_live and design.enabled.book_live,
+             show_author_off = design.enabled.author_dead and design.enabled.book_dead,
+             show_author_pub = design.enabled.author_public and design.enabled.book_public;
+
+        if (show_author_on or show_author_off or show_author_pub) {
             cr->save();
             for (auto &bpair : state->books) {
                 auto &b = bpair.second;
                 if (b.market_private) {
-                    if (not design.enabled.author_live) continue;
+                    if (not show_author_on) continue;
 
                     cr->set_source(design.colour.author_live);
                     cr->set_dash(design.dash.author_live, 0);
                     cr->set_line_width(design.stroke_width.author_live);
                 }
-                if (b.market_public()) {
-                    if (not design.enabled.author_public) continue;
+                else if (b.market_public()) {
+                    if (not show_author_pub) continue;
 
                     cr->set_source(design.colour.author_public);
                     cr->set_dash(design.dash.author_public, 0);
                     cr->set_line_width(design.stroke_width.author_public);
                 }
                 else {
-                    if (not design.enabled.author_dead) continue;
+                    if (not show_author_off) continue;
 
                     cr->set_source(design.colour.author_dead);
                     cr->set_dash(design.dash.author_dead, 0);
