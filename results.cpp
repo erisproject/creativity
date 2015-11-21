@@ -81,13 +81,16 @@ int main(int argc, char *argv[]) {
                 and not WRITING_AND_MARKET(p.public_sharing);
     });
 
-    std::cout << "Data summary:\n" <<
-        "    " << data.simulations() << " total simulations (with " << data.rowsPerSimulation() << " data rows per simulation)\n" <<
-        "    " << data_writing_always.simulations() << " simulations with non-zero # books written during each stage\n" <<
-        "    " << data_no_pre_writing.simulations() << " simulations with zero books written during pre-piracy stage\n" <<
-        "    " << data_no_piracy_writing.simulations() << " simulations with zero books written under piracy, but writing resuming under public sharing\n" <<
-        "    " << data_no_post_writing.simulations() << " simulations with zero books written during piracy and no recovery under public sharing\n" <<
-        "    " << data_no_pub_writing.simulations() << " simulations with writing under piracy, but no writing under public sharing\n";
+    std::cout << tabulate_preamble(args.format.type);
+
+    std::cout << tabulate_escape(std::string("Data summary:\n") +
+        "    " + std::to_string(data.simulations()) + " total simulations (with " + std::to_string(data.rowsPerSimulation()) + " data rows per simulation)\n" +
+        "    " + std::to_string(data_writing_always.simulations()) + " simulations with non-zero # books written during each stage\n" +
+        "    " + std::to_string(data_no_pre_writing.simulations()) + " simulations with zero books written during pre-piracy stage\n" +
+        "    " + std::to_string(data_no_piracy_writing.simulations()) + " simulations with zero books written under piracy, but writing resuming under public sharing\n" +
+        "    " + std::to_string(data_no_post_writing.simulations()) + " simulations with zero books written during piracy and no recovery under public sharing\n" +
+        "    " + std::to_string(data_no_pub_writing.simulations()) + " simulations with writing under piracy, but no writing under public sharing\n",
+        args.format.type);
 
     if (args.analysis.write_or_not) {
         tabulation_options tab_opts(args.format.type, args.format.precision, "    ");
@@ -104,17 +107,15 @@ int main(int argc, char *argv[]) {
         std::regex word_re("([a-zA-Z0-9])[a-zA-Z0-9]+");
         for (const auto &p : params) params_abbrev.push_back(std::regex_replace(p, word_re, "$1"));
         enum : unsigned { f_mean, f_se, f_min, f_5, f_25, f_median, f_75, f_95, f_max, /* last: captures size: */ num_fields };
-        std::vector<std::string> colnames({
-                "Mean", "s.e.", "Min", "5th %", "25th %", "Median", "75th %", "95th %", "Max",
-                "Parameter"});
+        std::vector<std::string> colnames({"Mean", "s.e.", "Min", "5th %", "25th %", "Median", "75th %", "95th %", "Max"});
 
         for (auto d : {&data_writing_always, &data_no_piracy_writing, &data_no_pre_writing, &data_no_post_writing, &data_no_pub_writing}) {
-            std::cout << "Parameter values for " << d->simulations() << " simulations " <<
+            tab_opts.title = "Parameter values for " + std::to_string(d->simulations()) + " simulations " +
                 (d == &data_writing_always ? "with writing in all stages" :
                  d == &data_no_pre_writing ? "without pre-piracy writing" :
                  d == &data_no_piracy_writing ? "with no piracy writing, but recovery under public sharing" :
                  d == &data_no_post_writing ? "without piracy or public sharing writing" :
-                 "with piracy writing but not public sharing writing") << "\n";
+                 "with piracy writing but not public sharing writing");
             // Look at conditional means of parameters in periods with no activity vs parameters in
             // periods with activity
 
@@ -157,7 +158,9 @@ int main(int argc, char *argv[]) {
             // Extract the diagonals for the se values:
             results.col(f_se) = corr.diagonal().cwiseSqrt();
 
-            std::vector<std::string> row_names(params);
+            std::vector<std::string> row_names;
+            row_names.push_back("Parameter");
+            row_names.insert(row_names.end(), params.begin(), params.end());
             for (const auto &pre : pre_fields) row_names.push_back("pre." + pre);
 
             std::cout << tabulate(results, tab_opts, row_names, colnames) << "\n";
@@ -170,7 +173,7 @@ int main(int argc, char *argv[]) {
                 }
 
 
-                std::cout << "Correlations (below diagonal) and covariance (above diagonal):\n" << tabulate(
+                std::cout << "Correlations (below diagonal), variance (diagonal), and covariance (above diagonal):\n" << tabulate(
                         corr.topLeftCorner(params.size(), params.size()), cor_opts, params, params_abbrev) << "\n";
             }
         }
@@ -221,7 +224,8 @@ int main(int argc, char *argv[]) {
         }
 
         avg_effects.solve();
-        std::cout << avg_effects;
+
+        std::cout << tabulate(avg_effects);
     }
 
 
@@ -252,7 +256,10 @@ int main(int argc, char *argv[]) {
         }
 
         marg_effects.solve();
+
         std::cout << marg_effects;
     }
+
+    std::cout << tabulate_postamble(args.format.type);
 }
 

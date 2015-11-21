@@ -35,6 +35,7 @@ void Results::addOptions() {
         ("latex,l", value(format.latex), "Output the results in LaTeX tables.  This cannot be used with --text or --html.")
         ("precision", range<2,std::numeric_limits<double>::max_digits10>(format.precision), "      Specifies the precision level for result values.  The default is 6.")
         ;
+    options_.add(format_desc);
 
     output_desc.add_options()
         ("output,o", value(output.filename), "If specified, data analysis results will be written to the given filename instead of displayed.  The file must not exist unless --overwrite is specified.")

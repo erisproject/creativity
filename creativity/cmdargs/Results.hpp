@@ -26,7 +26,7 @@ class Results : public CmdArgs {
             bool latex = false;
 
             /// The number of significant digits in output values
-            unsigned int precision = 6;
+            unsigned int precision = 5;
         } format;
 
         /// Whether to run various types of analysis

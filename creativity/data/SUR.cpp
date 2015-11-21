@@ -199,7 +199,8 @@ std::ostream& operator<<(std::ostream &os, const SUR &sur) {
         os << ":\n\n";
         for (unsigned j = 0; j < sur.eqs_.size(); j++) {
             auto &eq = sur.equations()[j];
-            os << "Equation " << j+1 << ": " << eq << ":\n";
+            std::ostringstream title;
+            title << "Equation " << j+1 << ": " << eq << ":";
             Eigen::MatrixXd results(sur.k(j), 4);
             results.col(0) = sur.beta(j);
             results.col(1) = sur.se(j);
@@ -224,7 +225,7 @@ std::ostream& operator<<(std::ostream &os, const SUR &sur) {
                         " ");
             }
 
-            os << tabulate(results, tabulation_options(TableFormat::Text, os.precision(), "\t"), rownames,
+            os << tabulate(results, tabulation_options(title.str(), TableFormat::Text, os.precision(), "\t"), rownames,
                     {"Coefficient", "std.err.", "t-stat", "p-value"}, stars);
 
             double mean_y = sur.y(j).mean();

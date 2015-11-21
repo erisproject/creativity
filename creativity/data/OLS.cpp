@@ -108,7 +108,8 @@ OLS::ftest OLS::fTest() const {
 
 
 std::ostream& operator<<(std::ostream &os, const OLS &ols) {
-    os << "OLS for model: " << ols.model();
+    std::ostringstream title;
+    title << "OLS for model: " << ols.model() << "; n=" << ols.n() << " observations";
 
     if (ols.solved_) {
         Eigen::MatrixXd results(ols.beta_.size(), 4);
@@ -134,7 +135,7 @@ std::ostream& operator<<(std::ostream &os, const OLS &ols) {
                     " ");
         }
 
-        os << "; n=" << ols.n() << " observations\n" << tabulate(results, TableFormat::Text, rownames, {"Coefficient", "std.err.", "t-stat", "p-value"}, stars);
+        os << tabulate(results, tabulation_options(title.str(), TableFormat::Text), rownames, {"Coefficient", "std.err.", "t-stat", "p-value"}, stars);
         os << "---\nSignificance: 0 `***' .001 `**' .01 `*' .05 `.' .1 ` ' 1\n\n";
         os << "Residual s.e.: " << std::sqrt(ols.s2()) << " on " << ols.df() << " d.f.\n";
         auto ftest = ols.fTest();
