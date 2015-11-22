@@ -81,7 +81,9 @@ int main(int argc, char *argv[]) {
                 and not WRITING_AND_MARKET(p.public_sharing);
     });
 
-    std::cout << tabulate_preamble(args.format.type);
+    if (not args.output.no_preamble) {
+        std::cout << tabulate_preamble(args.format.type);
+    }
 
     std::cout << tabulate_escape(std::string("Data summary:\n") +
         "    " + std::to_string(data.simulations()) + " total simulations (with " + std::to_string(data.rowsPerSimulation()) + " data rows per simulation)\n" +
@@ -260,6 +262,8 @@ int main(int argc, char *argv[]) {
         std::cout << marg_effects;
     }
 
-    std::cout << tabulate_postamble(args.format.type);
+    if (not args.output.no_preamble) {
+        std::cout << tabulate_postamble(args.format.type);
+    }
 }
 

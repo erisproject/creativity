@@ -56,6 +56,8 @@ class Results : public CmdArgs {
             //std::string dump_nowriting; ///< CSV output of "nowriting" data
 
             bool overwrite = false; ///< If true, overwrite the above, otherwise throw exception.
+
+            bool no_preamble = false; ///< If true, suppress preamble/postamble (HTML/LaTeX only)
         } output;
 
 

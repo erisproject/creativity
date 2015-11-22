@@ -43,6 +43,7 @@ void Results::addOptions() {
         //("dump-nowrite", value(output.dump_nowriting), "If specified, dump intermediate data of simulations *without* writing in one or more stages to the given CSV file.  The file must not exist unless --overwrite is specified.")
         //("overwrite,O", value(output.overwrite), "If specified, files given to --output, --dump-write or --dump-nowrite will be overwritten if they exist.")
         ("overwrite,O", value(output.overwrite), "If specified, filename given to --output will be overwritten if it exists.")
+        ("no-preamble,P", value(output.no_preamble), "Suppress preamble/postamble for HTML or LaTeX output formats.  The default, without this option, includes preamble/postamble output that makes the output a valid HTML/LaTeX document; with this option, only the relevent document fragment is output.");
         ;
     options_.add(output_desc);
 
