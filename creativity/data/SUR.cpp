@@ -159,32 +159,64 @@ void SUR::solve() {
 }
 
 VectorBlock<const VectorXd> SUR::beta(unsigned i) const {
-    requireSolved();
+    requireSolved(i);
     return VectorBlock<const VectorXd>(beta_, offset_[i], k_[i]);
 }
+std::vector<std::string> SUR::varNames(unsigned i) const {
+    requireEquation(i);
+    std::vector<std::string> names;
+    names.reserve(k_[i]+1); // Reserve an extra because this is sometimes used in tabulate with a header prepended
+    for (const auto &var : eqs_[i]) {
+        names.push_back(var->name());
+    }
+    return names;
+}
 Block<const MatrixXd> SUR::covariance(unsigned i) const {
-    requireSolved();
+    requireSolved(i);
     return Block<const MatrixXd>(var_beta_, offset_[i], offset_[i], k_[i], k_[i]);
 }
 VectorBlock<const VectorXd> SUR::residuals(unsigned i) const {
-    requireSolved();
+    requireSolved(i);
     return VectorBlock<const VectorXd>(residuals_, i*n(), n());
 }
 
-const double& SUR::s2(unsigned i) const { requireSolved(); return s2_[i]; }
-const double& SUR::ssr(unsigned i) const { requireSolved(); return ssr_[i]; }
-const double& SUR::Rsq(unsigned i) const { requireSolved(); return R2_[i]; }
+const double& SUR::s2(unsigned i) const { requireSolved(i); return s2_[i]; }
+const double& SUR::ssr(unsigned i) const { requireSolved(i); return ssr_[i]; }
+const double& SUR::Rsq(unsigned i) const { requireSolved(i); return R2_[i]; }
 VectorBlock<const VectorXd> SUR::se(unsigned i) const {
-    requireSolved();
+    requireSolved(i);
     return VectorBlock<const VectorXd>(se_, offset_[i], k_[i]);
 }
 VectorBlock<const VectorXd> SUR::tRatios(unsigned i) const {
-    requireSolved();
+    requireSolved(i);
     return VectorBlock<const VectorXd>(t_ratios_, offset_[i], k_[i]);
 }
 VectorBlock<const VectorXd> SUR::pValues(unsigned i) const {
-    requireSolved();
+    requireSolved(i);
     return VectorBlock<const VectorXd>(p_values_, offset_[i], k_[i]);
+}
+const std::map<double, std::string> SUR::default_pstar_threshold{{{.001,"***"}, {.01,"**"}, {.05,"*"}, {.01,"."}}};
+std::vector<std::string> SUR::pStars(unsigned i, const std::map<double, std::string> &threshold) const {
+    requireSolved(i);
+    std::vector<std::string> stars(k_[i], "");
+
+    auto p = pValues(i);
+    auto notfound = threshold.end();
+    for (unsigned j = 0; j < k_[i]; j++) {
+        auto it = threshold.lower_bound(p[j]);
+        if (it != notfound) stars[j] = it->second;
+    }
+    return stars;
+}
+
+MatrixX4d SUR::summary(unsigned i) const {
+    requireSolved(i);
+    MatrixX4d summary(k_[i], 4);
+    summary.col(0) = beta(i);
+    summary.col(1) = se(i);
+    summary.col(2) = tRatios(i);
+    summary.col(3) = pValues(i);
+    return summary;
 }
 
 std::ostream& operator<<(std::ostream &os, const SUR &sur) {
@@ -197,36 +229,14 @@ std::ostream& operator<<(std::ostream &os, const SUR &sur) {
     }
     else {
         os << ":\n\n";
+        tabulation_options opts(TableFormat::Text, os.precision(), "\t");
         for (unsigned j = 0; j < sur.eqs_.size(); j++) {
             auto &eq = sur.equations()[j];
             std::ostringstream title;
             title << "Equation " << j+1 << ": " << eq << ":";
-            Eigen::MatrixXd results(sur.k(j), 4);
-            results.col(0) = sur.beta(j);
-            results.col(1) = sur.se(j);
-            results.col(2) = sur.tRatios(j);
-            results.col(3) = sur.pValues(j);
+            opts.title = title.str();
 
-            std::vector<std::string> rownames;
-            for (const auto &var : sur.eqs_[j]) {
-                rownames.emplace_back(var->name());
-            }
-
-            std::vector<std::string> stars;
-            stars.push_back("");
-            auto pvalues = sur.pValues(j);
-            for (int i = 0; i < pvalues.size(); i++) {
-                const double &p = pvalues[i];
-                stars.push_back(
-                        p < .001 ? " ***" :
-                        p < .01 ? " **" :
-                        p < .05 ? " *" :
-                        p < .1 ? " ." :
-                        " ");
-            }
-
-            os << tabulate(results, tabulation_options(title.str(), TableFormat::Text, os.precision(), "\t"), rownames,
-                    {"Coefficient", "std.err.", "t-stat", "p-value"}, stars);
+            os << tabulate(sur.summary(j), opts, sur.varNames(j), {"Coefficient", "std.err.", "t-stat", "p-value"}, sur.pStars(j));
 
             double mean_y = sur.y(j).mean();
             double sd_y = std::sqrt((sur.y(j).squaredNorm() - sur.n() * mean_y * mean_y) / (sur.n()-1));

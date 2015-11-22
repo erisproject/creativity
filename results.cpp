@@ -118,8 +118,7 @@ int main(int argc, char *argv[]) {
         args.format.type);
 
     if (args.analysis.write_or_not) {
-        tabulation_options tab_opts(args.format.type, args.format.precision, "    ");
-        tabulation_options cor_opts(args.format.type, args.format.precision, "    ");
+        auto param_opts = tabopts, cor_opts = tabopts;
         cor_opts.matrix.diagonal = false;
         const std::vector<std::string> params({
                 "readers", "density", "reader_step_mean", "reader_creation_scale_range", "creation_fixed",
@@ -135,7 +134,7 @@ int main(int argc, char *argv[]) {
         std::vector<std::string> colnames({"Mean", "s.e.", "Min", "5th %", "25th %", "Median", "75th %", "95th %", "Max"});
 
         for (auto d : {&data_writing_always, &data_no_piracy_writing, &data_no_pre_writing, &data_no_post_writing, &data_no_pub_writing}) {
-            tab_opts.title = "Parameter values for " + std::to_string(d->simulations()) + " simulations " +
+            param_opts.title = "Parameter values for " + std::to_string(d->simulations()) + " simulations " +
                 (d == &data_writing_always ? "with writing in all stages" :
                  d == &data_no_pre_writing ? "without pre-piracy writing" :
                  d == &data_no_piracy_writing ? "with no piracy writing, but recovery under public sharing" :
@@ -188,7 +187,7 @@ int main(int argc, char *argv[]) {
             row_names.insert(row_names.end(), params.begin(), params.end());
             for (const auto &pre : pre_fields) row_names.push_back("pre." + pre);
 
-            out << tabulate(results, tab_opts, row_names, colnames) << "\n";
+            out << tabulate(results, param_opts, row_names, colnames) << "\n";
 
             if (args.analysis.write_or_not_corrcov) {
                 // Convert lower triangle of covariance matrix into correlation values:
@@ -250,7 +249,15 @@ int main(int argc, char *argv[]) {
 
         avg_effects.solve();
 
-        out << tabulate(avg_effects);
+        auto avg_opts = tabopts;
+        for (unsigned j = 0; j < avg_effects.equations().size(); j++) {
+            auto &eq = avg_effects.equations()[j];
+            std::ostringstream title;
+            title << "Equation " << j+1 << ": " << eq << ":";
+            avg_opts.title = title.str();
+
+            out << tabulate(avg_effects.summary(j), avg_opts, avg_effects.varNames(j), {"Coefficient", "std.err.", "t-stat", "p-value"}, avg_effects.pStars(j));
+        }
     }
 
 
@@ -282,7 +289,15 @@ int main(int argc, char *argv[]) {
 
         marg_effects.solve();
 
-        out << marg_effects;
+        auto marg_opts = tabopts;
+        for (unsigned j = 0; j < marg_effects.equations().size(); j++) {
+            auto &eq = marg_effects.equations()[j];
+            std::ostringstream title;
+            title << "Equation " << j+1 << ": " << eq << ":";
+            marg_opts.title = title.str();
+
+            out << tabulate(marg_effects.summary(j), marg_opts, marg_effects.varNames(j), {"Coefficient", "std.err.", "t-stat", "p-value"}, marg_effects.pStars(j));
+        }
     }
 
     if (not args.output.no_preamble) {

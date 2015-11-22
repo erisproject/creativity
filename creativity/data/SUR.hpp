@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <ostream>
 #include <limits>
+#include <map>
 
 namespace creativity { namespace data {
 
@@ -75,6 +76,9 @@ class SUR {
         /// Returns the vector of beta values for equation `i`
         Eigen::VectorBlock<const Eigen::VectorXd> beta(unsigned i) const;
 
+        /// Returns a vector of strings of the variable names associated with the `beta(i)` elements.
+        std::vector<std::string> varNames(unsigned i) const;
+
         /** Returns the number of variables for equation `i` in this SUR object.  `sur.k(i)` is the
          * number of variables in equation `sur.equations()[i]`.
          */
@@ -107,6 +111,27 @@ class SUR {
          * \throws std::logic_error if the model has not been solved yet by calling `solve()`.
          */
         Eigen::VectorBlock<const Eigen::VectorXd> pValues(unsigned i) const;
+
+        /** Specifies the default threshold/string map for pStars, to be used if pStars is called
+         * without an explicit map.  The default produces:
+         *
+         *     *** <= 0.001 < ** <= 0.01 < * <= 0.05 < . <= 0.1
+         */
+        static const std::map<double, std::string> default_pstar_threshold;
+
+        /** Returns a vector of star values associated with p-value thresholds.  Takes a map of
+         * thresholds to string values: the default threshold is `default_pstar_threshold`.
+         *
+         * To produce, for example, the pattern:
+         *
+         *     *** <= 0.01 < ** <= 0.05 < * <= 0.1
+         *
+         * you would typically call `pStars(i, {{0.01, "***"}, {0.05, "**"}, {0.1, "*"}})`
+         *
+         * If a p-value is larger than any given threshold value, the associated element will be an
+         * empty string.
+         */
+        std::vector<std::string> pStars(unsigned i, const std::map<double, std::string> &threshold = default_pstar_threshold) const;
 
         /** Returns \f$s^2\f$, the square of the regression standard error, for equation `i`.
          *
@@ -149,6 +174,19 @@ class SUR {
          * \throws std::logic_error if neither `gather()` nor `solve()` has been called.
          */
         const std::vector<Eigen::MatrixXd>& X() const;
+
+        /** Constructs and returns a matrix of estimation results for equation `i`.  The returned
+         * matrix has the following columns, in order:
+         * - Coefficient estimate
+         * - Coefficient estimate standard error
+         * - t-ratio (for a coefficient-equals-0 test)
+         * - p-value associated with the t-ratio
+         * with one row per estimate coefficient in equation `i`.
+         *
+         * This is designed to be combined, once per equation, with the tabulate() function to
+         * output an estimation summary (and is used as such if an SUR is sent to an output stream).
+         */
+        Eigen::MatrixX4d summary(unsigned i) const;
 
         /** Overloaded so that an SUR object can be sent to an output stream; the output consists of
          * the model followed by the model results if the model has been solved; just the model
@@ -209,6 +247,15 @@ class SUR {
 
         /// Throws a std::logic_error if the model hasn't been solved.
         void requireSolved() const { if (!solved_) throw std::logic_error("Cannot obtain model estimates before calling solve()"); }
+
+        /// Throws an std::out_of_range error if the model does not have an equation with index `i`
+        void requireEquation(unsigned i) const { if (i >= eqs_.size()) throw std::out_of_range("Equation " + std::to_string(i) + " does not exist"); }
+
+        /// Shortcut for `requiredGathered(); requireEquation(i);`
+        void requireGathered(unsigned i) const { requireGathered(); requireEquation(i); }
+
+        /// Shortcut for `requiredSolved(); requireEquation(i);`
+        void requireSolved(unsigned i) const { requireSolved(); requireEquation(i); }
 };
 
 
