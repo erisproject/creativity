@@ -24,28 +24,14 @@
 #include <iostream>
 #include <fstream>
 #include <iomanip>
-#include <cstdio>
 #include <boost/filesystem/path.hpp>
-#include <sys/stat.h>
-extern "C" {
-#include <unistd.h>
-#include <stdio.h>
-}
+#include <boost/filesystem/operations.hpp>
 
 using namespace creativity;
 using namespace creativity::state;
 using namespace eris;
 
-
-bool exists_dir(const std::string &p) {
-    struct stat buffer;
-    return (stat(p.c_str(), &buffer) == 0 and S_ISDIR(buffer.st_mode));
-}
-
-bool exists(const std::string &p) {
-    struct stat buffer;
-    return (stat(p.c_str(), &buffer) == 0);
-}
+namespace fs = boost::filesystem;
 
 std::string random_filename(const std::string &basename) {
     std::random_device rd;
@@ -76,18 +62,15 @@ int main(int argc, char *argv[]) {
     // Filename output
 
     try {
+        fs::path outpath(args_out);
         // If the user didn't specify --overwrite, make sure the file doesn't exist.  (It might
         // get created before we finish the simulation, but at least we can abort now in a
         // typical case).
-        if (not overwrite) {
-            if (exists(args_out)) {
-                std::cerr << "Error: `" << args_out << "' already exists; specify a different file or add `--overwrite' option to overwrite\n";
-                exit(1);
-            }
+        if (not overwrite and fs::exists(outpath)) {
+            std::cerr << "Error: `" << args_out << "' already exists; specify a different file or add `--overwrite' option to overwrite\n";
+            exit(1);
         }
 
-
-        boost::filesystem::path outpath(args_out);
         std::string basename = outpath.filename().string();
         std::string dirname = outpath.parent_path().string();
         if (dirname.empty()) dirname = ".";
@@ -95,7 +78,7 @@ int main(int argc, char *argv[]) {
         if (basename.empty()) throw std::runtime_error("Invalid output filename (" + args_out + ")");
 
         // Make sure the parent of the output file exists
-        if (not exists_dir(dirname))
+        if (not fs::is_directory(dirname))
             throw std::runtime_error("Directory `" + dirname + "' does not exist or is not a directory");
 
         // We always write to an intermediate file, then move it into place at the end; by
@@ -105,7 +88,7 @@ int main(int argc, char *argv[]) {
         const auto &tmpdir = cmd.tmpdir;
         if (not tmpdir.empty()) {
             // First check and make sure that the parent of the requested output file exists
-            if (not exists_dir(tmpdir))
+            if (not fs::is_directory(tmpdir))
                 throw std::runtime_error("Error: --tmpdir `" + tmpdir + "' does not exist or is not a directory");
 
             dirname = tmpdir;
@@ -116,7 +99,7 @@ int main(int argc, char *argv[]) {
         do {
             if (tries++ > 10) { std::cerr << "Error: unable to generate suitable tmpfile name (tried 10 times)\n"; exit(2); }
             tmpfile = dirname + "/" + random_filename(basename);
-        } while (exists(tmpfile));
+        } while (fs::exists(tmpfile));
 
         creativity->fileWrite(tmpfile);
         results_out = tmpfile;
@@ -202,7 +185,7 @@ int main(int argc, char *argv[]) {
         int error = std::rename(results_out.c_str(), args_out.c_str());
         if (error) { // Rename failed (perhaps across filesystems) so do a copy-and-delete
             if (not overwrite) {
-                if (exists(args_out)) {
+                if (fs::exists(args_out)) {
                     std::cerr << "\nError: `" << args_out << "' already exists; specify a different file or add `--overwrite' option to overwrite\n";
                     exit(1);
                 }

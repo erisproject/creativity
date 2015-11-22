@@ -1,7 +1,6 @@
 #include "creativity/state/FileStorage.hpp"
 #include <cerrno>
 #include <cstring>
-#include <sys/stat.h>
 #include <limits>
 #include <map>
 #include <algorithm>
@@ -10,6 +9,7 @@
 #include "creativity/belief/Profit.hpp"
 #include "creativity/belief/ProfitStream.hpp"
 #include <boost/math/constants/constants.hpp>
+#include <boost/filesystem/operations.hpp>
 
 #ifdef ERIS_DEBUG
 #define FILESTORAGE_DEBUG_WRITE_START \
@@ -31,6 +31,7 @@ using namespace eris::belief;
 using namespace creativity::belief;
 using namespace Eigen;
 using DrawMode = BayesianLinearRestricted::DrawMode;
+namespace fs = boost::filesystem;
 
 /// Member definitions for header/cblock constants
 constexpr unsigned int
@@ -101,11 +102,6 @@ void FileStorage::throwParseError(const std::string& message) const {
     throw ParseError("Parsing file failed [pos=" + (pos == -1 ? std::string{"(error)"} : std::to_string(pos)) + "]: " + message);
 }
 
-inline bool file_exists(const std::string &name) {
-    struct stat buffer;
-    return stat(name.c_str(), &buffer) == 0;
-}
-
 FileStorage::FileStorage(const std::string &filename, MODE mode) {
     try {
         f_.exceptions(f_.failbit | f_.badbit);
@@ -125,13 +121,13 @@ FileStorage::FileStorage(const std::string &filename, MODE mode) {
                 parse = false;
                 break;
             case MODE::APPEND:
-                if (file_exists(filename)) {
+                if (fs::exists(filename)) {
                     f_.open(filename, open_readwrite);
                     f_.seekg(0, f_.end);
                     parse = f_.tellp() > 0; // Parse if the file is non-empty, write otherwise
                 }
                 else {
-                    // Open if overwrite mode if the file doesn't exist (open in read-write mode
+                    // Open in overwrite mode if the file doesn't exist (open in read-write mode
                     // fails if the file doesn't exist (unless also truncating)).
                     f_.open(filename, open_overwrite);
                     parse = false;
