@@ -52,8 +52,8 @@ class Results : public CmdArgs {
         struct {
             std::string filename; ///< Result analysis output; empty means output to stdout
 
-            std::string dump_writing; ///< CSV output of "writing" data
-            std::string dump_nowriting; ///< CSV output of "nowriting" data
+            //std::string dump_writing; ///< CSV output of "writing" data
+            //std::string dump_nowriting; ///< CSV output of "nowriting" data
 
             bool overwrite = false; ///< If true, overwrite the above, otherwise throw exception.
         } output;
