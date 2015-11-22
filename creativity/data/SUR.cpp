@@ -229,7 +229,8 @@ std::ostream& operator<<(std::ostream &os, const SUR &sur) {
     }
     else {
         os << ":\n\n";
-        tabulation_options opts(TableFormat::Text, os.precision(), "\t");
+        tabulation_options opts(TableFormat::Text, os.precision(), true);
+        opts.indent = "\t";
         for (unsigned j = 0; j < sur.eqs_.size(); j++) {
             auto &eq = sur.equations()[j];
             std::ostringstream title;

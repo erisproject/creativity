@@ -16,9 +16,11 @@ enum class TableFormat {
 /// Struct holding various options controlling tabulation output
 struct tabulation_options {
     /// The format (Text, HTML, or LaTeX)
-    TableFormat format;
+    TableFormat format = TableFormat::Text;
     /// The precision for numerical values
-    unsigned precision;
+    unsigned precision = 6;
+    /// Whether the decimal point and significant 0's are shown (see std::showpoint)
+    bool showpoint = false;
     /// The indent (only applies when `format` is Text)
     std::string indent;
     /** The title of the table; if non-empty, this title will be displayed as a heading in some
@@ -72,19 +74,19 @@ struct tabulation_options {
      * in LaTeX); other characters will not be escaped.
      * \param format the table format, one of the TableFormat enum values; defaults to Text
      * \param precision the precision of double values; defaults to 6
-     * \param indent the per-line indent to use (only for `format == Text`); defaults to an empty
-     * string
+     * \param showpoint whether trailing 0s (and possibly the decimal point) should be shown for
+     * displayed values; defaults to false (trailing 0s and/or decimal point are suppressed).
      */
-    explicit tabulation_options(const std::string &title = "", TableFormat format = TableFormat::Text, unsigned precision = 6, const std::string &indent = "")
-        : format{format}, precision{precision}, indent{indent}, title{title} {}
+    explicit tabulation_options(const std::string &title = "", TableFormat format = TableFormat::Text, unsigned precision = 6, bool showpoint = false)
+        : format{format}, precision{precision}, showpoint{showpoint}, title{title} {}
 
     /** Constructs a tabulation_options struct without a title but with a specified format.  This is
      * exactly equivalent to calling the constructor with an empty string title plus the given
      * arguments.  Unlike the above, this constructor is not explicit, which allows implicit
      * conversion from a TableFormat to a tabulation_options struct.
      */
-    tabulation_options(TableFormat format, unsigned precision = 6, const std::string &indent = "")
-        : tabulation_options("", format, precision, indent) {}
+    tabulation_options(TableFormat format, unsigned precision = 6, bool showpoint = false)
+        : tabulation_options("", format, precision, showpoint) {}
 };
 
 

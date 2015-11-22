@@ -27,7 +27,7 @@ std::string tabulate_text(
         const std::vector<std::string> &colnames,
         const std::vector<std::string> &extracol) {
 
-    std::string interrow("  ");
+    std::string intercol("  ");
 
     std::vector<unsigned> col_width(matrix.cols());
     for (unsigned c = 0; c < matrix.cols(); c++) {
@@ -52,14 +52,19 @@ std::string tabulate_text(
     }
 
     std::ostringstream table;
+    // Set value precision and showpoint:
+    table << std::setprecision(options.precision) << (options.showpoint ? std::showpoint : std::noshowpoint);
+
+    // Output title, if there is one:
     if (not options.title.empty())
         table << options.title << "\n" << std::setfill('-') << std::setw(options.title.length()) << "" << std::setfill(' ') << "\n";
 
-    table.precision(options.precision);
+    // Output the header row:
     table << options.indent << std::setw(rownames_width) << (options.rows_align_left ? std::left : std::right) << (have_rowname_header ? rownames[0] : "");
     for (unsigned c = 0; c < matrix.cols(); c++)
-        table << interrow << std::setw(col_width[c]) << colname(colnames, c);
+        table << intercol << std::setw(col_width[c]) << colname(colnames, c);
 
+    // Figure out if we need space for an extra column of strings:
     size_t extraw = 0;
     for (auto &s : extracol) extraw = std::max(extraw, s.length());
     unsigned extracol_offset = 0;
@@ -73,18 +78,20 @@ std::string tabulate_text(
     }
     table << "\n";
 
+    // Output matrix rows:
     for (unsigned r = 0; r < matrix.rows(); r++) {
         table << options.indent << std::setw(rownames_width) << (options.rows_align_left ? std::left : std::right)
             << rowname(rownames, r, have_rowname_header ? 1 : 0);
         for (unsigned c = 0; c < matrix.cols(); c++) {
-            table << interrow << std::right << std::setw(col_width[c]);
+            table << intercol << std::right << std::setw(col_width[c]);
             if (r < c ? options.matrix.upper : r > c ? options.matrix.lower : options.matrix.diagonal)
                 table << matrix(r, c);
             else
                 table << "";
         }
+        // Append the extra column value, if applicable
         if (extraw > 0 and extracol.size() > r+extracol_offset)
-            table << (options.extracol_align_left ? std::left : std::right) << std::setw(extraw) << extracol[r+extracol_offset];
+            table << intercol << (options.extracol_align_left ? std::left : std::right) << std::setw(extraw) << extracol[r+extracol_offset];
         table << "\n";
     }
 
@@ -98,6 +105,7 @@ std::string tabulate_html(
         const std::vector<std::string> &colnames,
         const std::vector<std::string> &extracol) {
     return "HTML FIXME\n";
+    if (false and (matrix.cols() or options.precision or rownames.empty() or colnames.empty() or extracol.empty())) {} // Silence unused var warnings
 }
 
 

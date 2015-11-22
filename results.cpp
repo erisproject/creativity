@@ -102,7 +102,8 @@ int main(int argc, char *argv[]) {
     std::ostream &out = args.output.filename.empty() ? std::cout : f;
 
 
-    tabulation_options tabopts(args.format.type, args.format.precision, "    ");
+    tabulation_options tabopts(args.format.type, args.format.precision, true);
+    tabopts.indent = "    "; // Has an effect in text mode only
 
     if (not args.output.no_preamble) {
         out << tabulate_preamble(args.format.type);
