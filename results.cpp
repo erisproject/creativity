@@ -18,11 +18,13 @@
 #include <iomanip>
 #include <list>
 #include <unordered_map>
+#include <boost/filesystem/operations.hpp>
 
 using creativity::cmdargs::Results;
 using namespace creativity::data;
 using namespace eris;
 using namespace Eigen;
+namespace fs = boost::filesystem;
 
 int main(int argc, char *argv[]) {
     Results args;
@@ -81,11 +83,32 @@ int main(int argc, char *argv[]) {
                 and not WRITING_AND_MARKET(p.public_sharing);
     });
 
+    std::ofstream f;
+    if (not args.output.filename.empty()) {
+        if (not args.output.overwrite and fs::exists(args.output.filename)) {
+            std::cerr << "Error: `" << args.output.filename << "' already exists; specify a different file or add `--overwrite' option to overwrite\n";
+            exit(1);
+        }
+
+        try {
+            f.exceptions(f.failbit | f.badbit);
+            f.open(args.output.filename, std::ios_base::trunc);
+        }
+        catch (std::ios_base::failure &c) {
+            // Catch, wrap message, and rethrow:
+            throw std::ios_base::failure("Unable to open " + args.output.filename + ": " + strerror(errno));
+        }
+    }
+    std::ostream &out = args.output.filename.empty() ? std::cout : f;
+
+
+    tabulation_options tabopts(args.format.type, args.format.precision, "    ");
+
     if (not args.output.no_preamble) {
-        std::cout << tabulate_preamble(args.format.type);
+        out << tabulate_preamble(args.format.type);
     }
 
-    std::cout << tabulate_escape(std::string("Data summary:\n") +
+    out << tabulate_escape(std::string("Data summary:\n") +
         "    " + std::to_string(data.simulations()) + " total simulations (with " + std::to_string(data.rowsPerSimulation()) + " data rows per simulation)\n" +
         "    " + std::to_string(data_writing_always.simulations()) + " simulations with non-zero # books written during each stage\n" +
         "    " + std::to_string(data_no_pre_writing.simulations()) + " simulations with zero books written during pre-piracy stage\n" +
@@ -165,7 +188,7 @@ int main(int argc, char *argv[]) {
             row_names.insert(row_names.end(), params.begin(), params.end());
             for (const auto &pre : pre_fields) row_names.push_back("pre." + pre);
 
-            std::cout << tabulate(results, tab_opts, row_names, colnames) << "\n";
+            out << tabulate(results, tab_opts, row_names, colnames) << "\n";
 
             if (args.analysis.write_or_not_corrcov) {
                 // Convert lower triangle of covariance matrix into correlation values:
@@ -175,7 +198,7 @@ int main(int argc, char *argv[]) {
                 }
 
 
-                std::cout << "Correlations (below diagonal), variance (diagonal), and covariance (above diagonal):\n" << tabulate(
+                out << "Correlations (below diagonal), variance (diagonal), and covariance (above diagonal):\n" << tabulate(
                         corr.topLeftCorner(params.size(), params.size()), cor_opts, params, params_abbrev) << "\n";
             }
         }
@@ -183,7 +206,7 @@ int main(int argc, char *argv[]) {
 
 
     if (args.analysis.average) {
-        std::cout << "\n\n\nAverage effects:\n================\n";
+        out << "\n\n\nAverage effects:\n================\n";
         SUR avg_effects;
         for (auto &y : {
                 "net_u", "net_u_5th", "net_u_median", "net_u_95th",
@@ -227,12 +250,12 @@ int main(int argc, char *argv[]) {
 
         avg_effects.solve();
 
-        std::cout << tabulate(avg_effects);
+        out << tabulate(avg_effects);
     }
 
 
     if (args.analysis.marginal) {
-        std::cout << "\n\n\nMarginal effects:\n=================\n";
+        out << "\n\n\nMarginal effects:\n=================\n";
 
         SUR marg_effects;
         for (auto &y : {"net_u", "books_written", "book_quality", "book_p0", "book_revenue", "book_profit"}) {
@@ -259,11 +282,11 @@ int main(int argc, char *argv[]) {
 
         marg_effects.solve();
 
-        std::cout << marg_effects;
+        out << marg_effects;
     }
 
     if (not args.output.no_preamble) {
-        std::cout << tabulate_postamble(args.format.type);
+        out << tabulate_postamble(args.format.type);
     }
 }
 
