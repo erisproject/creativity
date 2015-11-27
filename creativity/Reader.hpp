@@ -296,7 +296,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          */
         const std::vector<double>& distancePenaltyPolynomial() const;
 
-        /** The default distance penalty polynomial coefficients.  The default is {0, 0, 0.5}.
+        /** The default distance penalty polynomial coefficients.  The default is {0, 0, 3}.
          */
         static constexpr std::initializer_list<double> default_distance_penalty_polynomial{0, 0, 3};
 
