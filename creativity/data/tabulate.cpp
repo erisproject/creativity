@@ -173,7 +173,7 @@ std::string tabulate_latex(
 #define E(s) escape(s, options)
 
     latex << "\\begin{center}\n\n";
-    if (not options.title.empty()) latex << std::regex_replace(E(options.title), std::regex("(?=\n)"), "\\\\") << "\n\n\\vspace{1em}\n\n";
+    if (not options.title.empty()) latex << std::regex_replace(E(options.title), std::regex("(?=\n)"), "\\\\") << "\n\n\\nopagebreak";
 
     latex << "\\begin{tabular}{" << (options.rows_align_left ? "l" : "r");
     for (int i = 0; i < matrix.cols(); i++) latex << "r@{.}l";
