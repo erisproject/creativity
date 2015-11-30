@@ -25,7 +25,7 @@ void Results::addOptions() {
         ("average-effects,A", value(analysis.average), "Show average model effects across different simulation stages.")
         ("marginal-effects,M", value(analysis.marginal), "Show marginal model effects across different simulation stages and model parameters.")
         ("all,a", value(analysis.all), "Implies --write-vs-nowrite --average-effects --marginal-effects, but not --write-vs-nowrite-corr.  If none of the above nor --none are given, this is the default.")
-        ("none,n", value(analysis.none), "Show none of the above analysis.  May not be combined with any of this above.  This flag is intended for use with the --dump-* options.")
+//        ("none,n", value(analysis.none), "Show none of the above analysis.  May not be combined with any of this above.  This flag is intended for use with the --dump-* options.")
         ;
     options_.add(analysis_desc);
 
