@@ -285,7 +285,7 @@ int main(int argc, char *argv[]) {
             std::vector<std::string> depvars, stars;
 #define LATEX_NAME(v, textit) {v, "$\\mathit{" textit "}$"}
 #define LATEX_NAME_SUB(v, textit, sub) {v, "$\\mathit{" textit "}_{" sub "}$"}
-#define LATEX_NAME_QUANTILE(v, t) LATEX_NAME_SUB(v, t), LATEX_NAME_SUB(v"_5th", t, "(Q=.05)"), LATEX_NAME_SUB(v"_median", t, "(Q=.50)"), LATEX_NAME_SUB(v"_95th", t, "(Q=.95)")
+#define LATEX_NAME_QUANTILE(v, t) LATEX_NAME(v, t), LATEX_NAME_SUB(v"_5th", t, "(Q=.05)"), LATEX_NAME_SUB(v"_median", t, "(Q=.50)"), LATEX_NAME_SUB(v"_95th", t, "(Q=.95)")
             std::unordered_map<std::string, std::string> latex_name({
                     LATEX_NAME_QUANTILE("net_u", "net\\ utility"),
                     LATEX_NAME("books_written", "books\\ written"),
