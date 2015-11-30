@@ -126,7 +126,12 @@ int main(int argc, char *argv[]) {
     }
 
     if (args.analysis.write_or_not) {
+        if (not args.no_headings)
+            out << "Write-vs-nowrite analysis:\n==========================\n";
+
         auto param_opts = tabopts, cor_opts = tabopts;
+        param_opts.showpoint = false;
+        param_opts.dot_align = false;
         cor_opts.matrix.diagonal = false;
         const std::vector<std::string> params({
                 "readers", "density", "reader_step_mean", "reader_creation_scale_range", "creation_fixed",
@@ -147,7 +152,7 @@ int main(int argc, char *argv[]) {
                  d == &data_no_pre_writing ? "without pre-piracy writing" :
                  d == &data_no_piracy_writing ? "with no piracy writing, but recovery under public sharing" :
                  d == &data_no_post_writing ? "without piracy or public sharing writing" :
-                 "with piracy writing but not public sharing writing");
+                 "with piracy writing but not public sharing writing") + ":";
             // Look at conditional means of parameters in periods with no activity vs parameters in
             // periods with activity
 
@@ -213,7 +218,9 @@ int main(int argc, char *argv[]) {
 
 
     if (args.analysis.average) {
-        out << "\n\n\nAverage effects:\n================\n";
+        if (not args.no_headings and not args.condensed)
+            out << "\n\n\nAverage effects:\n================\n";
+
         SUR avg_effects;
 #define VALUE_PLUS_DIST(v) v, v"_5th", v"_median", v"_95th"
         for (auto &y : {
@@ -276,12 +283,33 @@ int main(int argc, char *argv[]) {
             // Condensed form: all results in one table
             Eigen::MatrixXd condensed(avg_effects.equations().size(), 3);
             std::vector<std::string> depvars, stars;
-            stars.push_back("  Signif. pre/pir/pub");
+#define LATEX_NAME(v, textit) {v, "$\\mathit{" textit "}$"}
+#define LATEX_NAME_SUB(v, textit, sub) {v, "$\\mathit{" textit "}_{" sub "}$"}
+#define LATEX_NAME_QUANTILE(v, t) LATEX_NAME_SUB(v, t), LATEX_NAME_SUB(v"_5th", t, "(Q=.05)"), LATEX_NAME_SUB(v"_median", t, "(Q=.50)"), LATEX_NAME_SUB(v"_95th", t, "(Q=.95)")
+            std::unordered_map<std::string, std::string> latex_name({
+                    LATEX_NAME_QUANTILE("net_u", "net\\ utility"),
+                    LATEX_NAME("books_written", "books\\ written"),
+                    LATEX_NAME_QUANTILE("book_quality", "book\\ quality"),
+                    LATEX_NAME_SUB("book_p0", "book\\ p", "t=0"),
+                    LATEX_NAME("book_revenue", "book\\ revenue"),
+                    LATEX_NAME("book_profit", "book\\ profit"),
+                    LATEX_NAME_QUANTILE("book_author_scale", "book\\ author\\ } {\\alpha"),
+                    LATEX_NAME_QUANTILE("book_author_effort", "book\\ author\\ } {\\ell")
+                    });
+
             for (unsigned j = 0; j < avg_effects.equations().size(); j++) {
-                if (args.format.latex)
-                    depvars.push_back(tabulate_escape(avg_effects.equations()[j].depVar()->name(), TableFormat::LaTeX));
+                std::string y_name = avg_effects.equations()[j].depVar()->name();
+                if (args.format.latex) {
+                    if (latex_name.count(y_name) > 0) {
+                        depvars.push_back(latex_name.at(y_name));
+                    }
+                    else {
+                        depvars.push_back(tabulate_escape(y_name, TableFormat::LaTeX));
+                        std::cerr << "Warning: no LaTeX name substitute found for " << y_name << "\n";
+                    }
+                }
                 else
-                    depvars.push_back(avg_effects.equations()[j].depVar()->name());
+                    depvars.push_back(y_name);
 
                 condensed.row(j) = avg_effects.beta(j).transpose();
                 auto st = avg_effects.pStars(j);
@@ -289,7 +317,8 @@ int main(int argc, char *argv[]) {
                 else stars.push_back(st[0] + "/" + st[1] + "/" + st[2]);
             }
 
-            avg_opts.title = "Average effects:";
+            if (not args.no_headings)
+                avg_opts.title = "Average effects:";
             avg_opts.dot_align = false;
             avg_opts.showpoint = true;
 
@@ -310,7 +339,8 @@ int main(int argc, char *argv[]) {
 
 
     if (args.analysis.marginal) {
-        out << "\n\n\nMarginal effects:\n=================\n";
+        if (not args.no_headings)
+            out << "\n\n\nMarginal effects:\n=================\n";
 
         SUR marg_effects;
         for (auto &y : {"net_u", "books_written", "book_quality", "book_p0", "book_revenue", "book_profit"}) {
