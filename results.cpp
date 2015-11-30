@@ -215,13 +215,16 @@ int main(int argc, char *argv[]) {
     if (args.analysis.average) {
         out << "\n\n\nAverage effects:\n================\n";
         SUR avg_effects;
+#define VALUE_PLUS_DIST(v) v, v"_5th", v"_median", v"_95th"
         for (auto &y : {
-                "net_u", "net_u_5th", "net_u_median", "net_u_95th",
+                VALUE_PLUS_DIST("net_u"),
                 "books_written",
-                "book_quality", "book_quality_5th", "book_quality_median", "book_quality_95th",
-                "book_p0", "book_revenue", "book_profit",
-                "book_author_scale", "book_author_scale_5th", "book_author_scale_median", "book_author_scale_95th",
-                "book_author_effort", "book_author_effort_5th", "book_author_effort_median", "book_author_effort_95th"
+                VALUE_PLUS_DIST("book_quality"),
+                "book_p0",
+                "book_revenue",
+                "book_profit",
+                VALUE_PLUS_DIST("book_author_scale"),
+                VALUE_PLUS_DIST("book_author_effort")
                 }) {
             Equation eq(data_writing_always[y]);
             eq % 1;
