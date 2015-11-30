@@ -50,6 +50,9 @@ class Results : public CmdArgs {
             bool none = false;
         } analysis;
 
+        /// Condensed table output (currently only for average effects model)
+        bool condensed = false;
+
         /// Output files
         struct {
             std::string filename; ///< Result analysis output; empty means output to stdout

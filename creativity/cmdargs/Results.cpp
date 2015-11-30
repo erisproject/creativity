@@ -35,6 +35,7 @@ void Results::addOptions() {
         ("html,h", value(format.html), "Output the results in HTML tables.  This cannot be used with --text or --latex.")
         ("latex,l", value(format.latex), "Output the results in LaTeX tables.  This cannot be used with --text or --html.")
         ("precision", range<2,std::numeric_limits<double>::max_digits10>(format.precision), "      Specifies the precision level for result values.  The default is 6.")
+        ("condensed", value(condensed), "Output tables in condensed form; currently only has an effect with --average-effects analysis.")
         ;
     options_.add(format_desc);
 

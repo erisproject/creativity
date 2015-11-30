@@ -258,13 +258,50 @@ int main(int argc, char *argv[]) {
         avg_effects.solve();
 
         auto avg_opts = tabopts;
-        for (unsigned j = 0; j < avg_effects.equations().size(); j++) {
-            auto &eq = avg_effects.equations()[j];
-            std::ostringstream title;
-            title << "Equation " << j+1 << ": " << eq << ":";
-            avg_opts.title = title.str();
+        if (not args.condensed) {
+            // Full set of tables
+            for (unsigned j = 0; j < avg_effects.equations().size(); j++) {
+                auto &eq = avg_effects.equations()[j];
+                std::ostringstream title;
+                title << "Equation " << j+1 << ": " << eq << ":";
+                avg_opts.title = title.str();
 
-            out << tabulate(avg_effects.summary(j), avg_opts, avg_effects.varNames(j), {"Coefficient", "std.err.", "t-stat", "p-value"}, avg_effects.pStars(j));
+                out << tabulate(avg_effects.summary(j), avg_opts, avg_effects.varNames(j), {"Coefficient", "std.err.", "t-stat", "p-value"}, avg_effects.pStars(j));
+            }
+        }
+        else {
+            // Condensed form: all results in one table
+            Eigen::MatrixXd condensed(avg_effects.equations().size(), 3);
+            std::vector<std::string> depvars, stars;
+            stars.push_back("  Signif. pre/pir/pub");
+            for (unsigned j = 0; j < avg_effects.equations().size(); j++) {
+                if (args.format.latex)
+                    depvars.push_back(tabulate_escape(avg_effects.equations()[j].depVar()->name(), TableFormat::LaTeX));
+                else
+                    depvars.push_back(avg_effects.equations()[j].depVar()->name());
+
+                condensed.row(j) = avg_effects.beta(j).transpose();
+                auto st = avg_effects.pStars(j);
+                if (st[0] == st[1] and st[0] == st[2]) stars.push_back(st[0]);
+                else stars.push_back(st[0] + "/" + st[1] + "/" + st[2]);
+            }
+
+            avg_opts.title = "Average effects:";
+            avg_opts.dot_align = false;
+            avg_opts.showpoint = true;
+
+            std::vector<std::string> columns;
+            columns.push_back("Constant");
+            if (args.format.latex) {
+                avg_opts.escape = false;
+                columns.push_back("$\\Delta$ Piracy");
+                columns.push_back("$\\Delta$ Public");
+            }
+            else {
+                columns.push_back("Piracy");
+                columns.push_back("Public");
+            }
+            out << tabulate(condensed, avg_opts, depvars, columns, stars);
         }
     }
 
