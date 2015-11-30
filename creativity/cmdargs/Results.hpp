@@ -31,6 +31,8 @@ class Results : public CmdArgs {
 
         /// Whether to run various types of analysis
         struct {
+            /// Summary of number of simulations in each category
+            bool summary = false;
             /// Conditional analysis of parameter distributions in write vs non-write simulations
             bool write_or_not = false;
             /// Include correlation/covariance matrix in write_or_not analysis

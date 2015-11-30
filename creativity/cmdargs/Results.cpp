@@ -20,11 +20,12 @@ void Results::addOptions() {
     po::options_description output_desc("Output"), analysis_desc("Results analysis"), input_desc("Input file"), format_desc("Format options");
 
     analysis_desc.add_options()
+        ("summary,S", value(analysis.summary), "Show data summary: number of simulations in total, and number in each category.")
         ("write-vs-nowrite,W", value(analysis.write_or_not), "Show parameter distributions conditional on simulations with consistent writing and simulations with no-writing stages.")
         ("write-vs-nowrite-corr,C", value(analysis.write_or_not_corrcov), "Include parameter correlations (only has effect when --write-vs-nowrite is activated); disabled by default.")
         ("average-effects,A", value(analysis.average), "Show average model effects across different simulation stages.")
         ("marginal-effects,M", value(analysis.marginal), "Show marginal model effects across different simulation stages and model parameters.")
-        ("all,a", value(analysis.all), "Implies --write-vs-nowrite --average-effects --marginal-effects, but not --write-vs-nowrite-corr.  If none of the above nor --none are given, this is the default.")
+        ("all,a", value(analysis.all), "Implies --summary --write-vs-nowrite --average-effects --marginal-effects, but not --write-vs-nowrite-corr.  If none of the above nor --none are given, this is the default.")
 //        ("none,n", value(analysis.none), "Show none of the above analysis.  May not be combined with any of this above.  This flag is intended for use with the --dump-* options.")
         ;
     options_.add(analysis_desc);
@@ -67,14 +68,13 @@ void Results::postParse(boost::program_options::variables_map&) {
     }
 
     if (analysis.none) {
-        if (analysis.all or analysis.write_or_not or analysis.average or analysis.marginal)
+        if (analysis.all or analysis.summary or analysis.write_or_not or analysis.average or analysis.marginal)
             throw std::logic_error("Option --none cannot be combined with --all, --write-vs-nowrite, --average-effects, --marginal-effects");
     }
-    else if (analysis.all)
-        analysis.write_or_not = analysis.average = analysis.marginal = true;
-    else if (not analysis.write_or_not and not analysis.average and not analysis.marginal)
-        // Default: show everything except the write_or_not correlations/covariance
-        analysis.write_or_not = analysis.average = analysis.marginal = true;
+    else if (
+            analysis.all or // --all explicitly given
+            (not analysis.write_or_not and not analysis.average and not analysis.marginal)) // Nothing given: --all is default
+        analysis.summary = analysis.write_or_not = analysis.average = analysis.marginal = true;
 }
 
 std::string Results::usage() const {

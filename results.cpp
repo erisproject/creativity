@@ -114,14 +114,16 @@ int main(int argc, char *argv[]) {
         out << tabulate_preamble(args.format.type);
     }
 
-    out << tabulate_escape(std::string("Data summary:\n") +
-        "    " + std::to_string(data.simulations()) + " total simulations (with " + std::to_string(data.rowsPerSimulation()) + " data rows per simulation)\n" +
-        "    " + std::to_string(data_writing_always.simulations()) + " simulations with non-zero # books written during each stage\n" +
-        "    " + std::to_string(data_no_pre_writing.simulations()) + " simulations with zero books written during pre-piracy stage\n" +
-        "    " + std::to_string(data_no_piracy_writing.simulations()) + " simulations with zero books written under piracy, but writing resuming under public sharing\n" +
-        "    " + std::to_string(data_no_post_writing.simulations()) + " simulations with zero books written during piracy and no recovery under public sharing\n" +
-        "    " + std::to_string(data_no_pub_writing.simulations()) + " simulations with writing under piracy, but no writing under public sharing\n",
-        args.format.type);
+    if (args.analysis.summary) {
+        out << tabulate_escape(std::string("Data summary:\n") +
+                "    " + std::to_string(data.simulations()) + " total simulations (with " + std::to_string(data.rowsPerSimulation()) + " data rows per simulation)\n" +
+                "    " + std::to_string(data_writing_always.simulations()) + " simulations with non-zero # books written during each stage\n" +
+                "    " + std::to_string(data_no_pre_writing.simulations()) + " simulations with zero books written during pre-piracy stage\n" +
+                "    " + std::to_string(data_no_piracy_writing.simulations()) + " simulations with zero books written under piracy, but writing resuming under public sharing\n" +
+                "    " + std::to_string(data_no_post_writing.simulations()) + " simulations with zero books written during piracy and no recovery under public sharing\n" +
+                "    " + std::to_string(data_no_pub_writing.simulations()) + " simulations with writing under piracy, but no writing under public sharing\n",
+                args.format.type);
+    }
 
     if (args.analysis.write_or_not) {
         auto param_opts = tabopts, cor_opts = tabopts;
