@@ -43,22 +43,27 @@ int main(int argc, char *argv[]) {
     // The minimum value of books_written that needs to be satisified to count as writing occuring
     // during a period:
     double writing_threshold = 0.2;
+// Macro that is true if at least writing_threshold books were written and the mean initial price is
+// a number
 #define WRITING_AND_MARKET(var) ((var)->value("books_written") >= writing_threshold and not std::isnan((var)->value("book_p0")))
+// Macro that is true whenever WRITING_AND_MARKET is true and either the shortrun variable does not
+// exist, or else it also satisfied the above.
+#define WRITING_AND_MARKET_SRLR(var) (WRITING_AND_MARKET(var) and (not (var##_SR) or WRITING_AND_MARKET(var##_SR)))
     // Observations with writing in every (LR) stage:
     TreatmentFilter data_writing_always(data, [&writing_threshold](const TreatmentFilter::Properties &p) {
             // Only allow simulations that have writing in every LR stage contained in the data
             return (not p.pre or WRITING_AND_MARKET(p.pre))
-                and (not p.piracy or WRITING_AND_MARKET(p.piracy))
-                and (not p.public_sharing or WRITING_AND_MARKET(p.public_sharing));
+                and (not p.piracy or WRITING_AND_MARKET_SRLR(p.piracy))
+                and (not p.public_sharing or WRITING_AND_MARKET_SRLR(p.public_sharing));
     });
-    // Observations with no writing in LR piracy, but with writing in LR public (and pre)
+    // Observations with no writing under piracy, but with writing in public (and pre)
     TreatmentFilter data_no_piracy_writing(data, [&writing_threshold](const TreatmentFilter::Properties &p) {
             // Require that this data actually has pre, piracy, and public:
             if (not p.pre or not p.piracy or not p.public_sharing) return false;
             // writing in pre and LR public:
             return WRITING_AND_MARKET(p.pre)
-                and not WRITING_AND_MARKET(p.piracy)
-                and WRITING_AND_MARKET(p.public_sharing);
+                and not WRITING_AND_MARKET_SRLR(p.piracy)
+                and WRITING_AND_MARKET_SRLR(p.public_sharing);
     });
     // Observations with pre writing but no public (LR) writing:
     TreatmentFilter data_no_post_writing(data, [&writing_threshold](const TreatmentFilter::Properties &p) {
@@ -66,8 +71,8 @@ int main(int argc, char *argv[]) {
             if (not p.pre or not p.piracy or not p.public_sharing) return false;
             // Require writing in pre"
             return WRITING_AND_MARKET(p.pre)
-                and not WRITING_AND_MARKET(p.piracy)
-                and not WRITING_AND_MARKET(p.public_sharing);
+                and not WRITING_AND_MARKET_SRLR(p.piracy)
+                and not WRITING_AND_MARKET_SRLR(p.public_sharing);
     });
     // Observations with no pre writing:
     TreatmentFilter data_no_pre_writing(data, [&writing_threshold](const TreatmentFilter::Properties &p) {
@@ -79,8 +84,8 @@ int main(int argc, char *argv[]) {
             if (not p.pre or not p.piracy or not p.public_sharing) return false;
             // Require writing in pre"
             return WRITING_AND_MARKET(p.pre)
-                and WRITING_AND_MARKET(p.piracy)
-                and not WRITING_AND_MARKET(p.public_sharing);
+                and WRITING_AND_MARKET_SRLR(p.piracy)
+                and not WRITING_AND_MARKET_SRLR(p.public_sharing);
     });
 
     std::ofstream f;
