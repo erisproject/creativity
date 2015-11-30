@@ -170,13 +170,10 @@ std::string tabulate_latex(
 
     if (options.preamble) latex << tabulate_preamble(options);
 
-    // Set value precision and showpoint:
-    latex << std::setprecision(options.precision) << (options.showpoint ? std::showpoint : std::noshowpoint);
-
 #define E(s) escape(s, options)
 
     latex << "\\begin{center}\n\n";
-    if (not options.title.empty()) latex << std::regex_replace(E(options.title), std::regex("(?=\n)"), "\\\\") << "\n\n\\nopagebreak";
+    if (not options.title.empty()) latex << std::regex_replace(E(options.title), std::regex("(?=\n)"), "\\\\") << "\n\\nopagebreak\\\\\n";
 
     latex << "\\begin{tabular}{" << (options.rows_align_left ? "l" : "r");
     for (int i = 0; i < matrix.cols(); i++) latex << (options.dot_align ? "r@{.}l" : "r");
@@ -193,8 +190,8 @@ std::string tabulate_latex(
     latex << " \\\\[1ex]\n";
 
 
-    std::regex dotexp(R"/((?:\.(\d*))?[eE](?:\+|(-))0*(\d+)$)/");
-    std::string dotexp_replace("&$1$$\\times 10^{$2$3}$$");
+    std::regex dotexp(options.dot_align ? R"/((?:\.(\d*))?[eE](?:\+|(-))0*(\d+)$)/" : R"/([eE](?:\+|(-))0*(\d+)$)/");
+    std::string dotexp_replace(options.dot_align ? "&$1$$\\times 10^{$2$3}$$" : "$$\\times 10^{$1$2}$$");
     int rowname_offset = (rownames.size() > 0 and rownames.size() != (unsigned) matrix.rows()) ? 1 : 0;
     int extracol_offset = (extracol.size() > 0 and extracol.size() != (unsigned) matrix.rows()) ? 1 : 0;
     for (unsigned r = 0; r < matrix.rows(); r++) {
@@ -203,31 +200,28 @@ std::string tabulate_latex(
             latex << " &\n" << std::setw(2*c+2) << "";
 
             if (r < c ? options.matrix.upper : r > c ? options.matrix.lower : options.matrix.diagonal) {
-                if (not options.dot_align) {
-                    latex << matrix(r, c);
+                double val = matrix(r, c);
+                std::string value;
+                {
+                    std::ostringstream valstream;
+                    // Set value precision and showpoint:
+                    valstream << std::setprecision(options.precision) << (options.showpoint ? std::showpoint : std::noshowpoint);
+                    valstream << matrix(r, c);
+                    value = valstream.str();
                 }
-                else {
-                    double val = matrix(r, c);
-                    std::string value;
-                    {
-                        std::ostringstream valstream;
-                        // Set value precision and showpoint:
-                        valstream << std::setprecision(options.precision) << (options.showpoint ? std::showpoint : std::noshowpoint);
-                        valstream << matrix(r, c);
-                        value = valstream.str();
-                    }
 
-                    // If we have a finite value, replace a "." in the value with an & (the . gets put
-                    // in by the latex header specification).
-                    if (std::isfinite(val)) {
-                        // If an floating-point notation number, use the dotexp regex to replace the .
-                        // with a &, and replace the 'e' with '$\times 10^{...}$' (plus some minor
-                        // cleanup in the regexp).
-                        std::smatch m;
-                        if (std::regex_search(value, m, dotexp)) {
-                            latex << m.prefix() << m.format(dotexp_replace);
-                        }
-                        else {
+                // If we have a finite value, replace a "." in the value with an & (the . gets put
+                // in by the latex header specification).
+                if (std::isfinite(val)) {
+                    // If an floating-point notation number, use the dotexp regex to replace the
+                    // .  with a & (if in dot align mode), and replace the 'e' with '$\times
+                    // 10^{...}$' (plus some minor cleanup in the regexp).
+                    std::smatch m;
+                    if (std::regex_search(value, m, dotexp)) {
+                        latex << m.prefix() << m.format(dotexp_replace);
+                    }
+                    else {
+                        if (options.dot_align) {
                             // Not floating-point notation: if it has a ., replace it with an &;
                             // otherwise stick the & at the end.
                             auto dotpos = value.find_first_of('.');
@@ -236,22 +230,26 @@ std::string tabulate_latex(
                             else
                                 latex << value.substr(0, dotpos) << "&" << value.substr(dotpos+1);
                         }
-                    }
-                    // Otherwise, for infinity, use the infinty symbol; otherwise (i.e. for NaN) just
-                    // leave the string "nan" as-is In either case, we make the field take up 2 columns
-                    // (since it has no "." separator)
-                    else {
-                        latex << "\\multicolumn{2}{c}{";
-                        if (std::isinf(val)) {
-                            latex << "$";
-                            if (val < 0) latex << "-";
-                            latex << "\\infty$";
-                        }
                         else {
+                            // Not dot-aligning: just spit it out as-is:
                             latex << value;
                         }
-                        latex << "}";
                     }
+                }
+                // Otherwise, for infinity, use the infinty symbol; otherwise (i.e. for NaN) just
+                // leave the string "nan" as-is In either case, we make the field take up 2 columns
+                // (since it has no "." separator)
+                else {
+                    latex << (options.dot_align ? "\\multicolumn{2}{c}{" : "{");
+                    if (std::isinf(val)) {
+                        latex << "$";
+                        if (val < 0) latex << "-";
+                        latex << "\\infty$";
+                    }
+                    else {
+                        latex << value;
+                    }
+                    latex << "}";
                 }
             }
             else {
