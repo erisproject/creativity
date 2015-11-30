@@ -21,6 +21,8 @@ struct tabulation_options {
     unsigned precision = 6;
     /// Whether the decimal point and significant 0's are shown (see std::showpoint)
     bool showpoint = false;
+    /// Whether numeric columns are aligned on .'s (only works in TableFormat::LaTeX)
+    bool dot_align = true;
     /// The indent (only applies when `format` is Text)
     std::string indent;
     /** The title of the table; if non-empty, this title will be displayed as a heading in some

@@ -170,13 +170,16 @@ std::string tabulate_latex(
 
     if (options.preamble) latex << tabulate_preamble(options);
 
+    // Set value precision and showpoint:
+    latex << std::setprecision(options.precision) << (options.showpoint ? std::showpoint : std::noshowpoint);
+
 #define E(s) escape(s, options)
 
     latex << "\\begin{center}\n\n";
     if (not options.title.empty()) latex << std::regex_replace(E(options.title), std::regex("(?=\n)"), "\\\\") << "\n\n\\nopagebreak";
 
     latex << "\\begin{tabular}{" << (options.rows_align_left ? "l" : "r");
-    for (int i = 0; i < matrix.cols(); i++) latex << "r@{.}l";
+    for (int i = 0; i < matrix.cols(); i++) latex << (options.dot_align ? "r@{.}l" : "r");
     if (not extracol.empty()) latex << (options.extracol_align_left ? "l" : "r");
     latex << "}\n";
 
@@ -185,7 +188,7 @@ std::string tabulate_latex(
 
     for (unsigned c = 0; c < matrix.cols(); c++) {
         if (c > 0) latex << " &\n";
-        latex << std::setw(2*c+2) << "" << "\\multicolumn{2}{c}{" << E(colname(colnames, c)) << "}";
+        latex << std::setw(2*c+2) << "" << (options.dot_align ? "\\multicolumn{2}{c}{" : "{") << E(colname(colnames, c)) << "}";
     }
     latex << " \\\\[1ex]\n";
 
@@ -200,52 +203,60 @@ std::string tabulate_latex(
             latex << " &\n" << std::setw(2*c+2) << "";
 
             if (r < c ? options.matrix.upper : r > c ? options.matrix.lower : options.matrix.diagonal) {
-                double val = matrix(r, c);
-                std::string value;
-                {
-                    std::ostringstream valstream;
-                    valstream.precision(options.precision);
-                    valstream << matrix(r, c);
-                    value = valstream.str();
+                if (not options.dot_align) {
+                    latex << matrix(r, c);
                 }
-                // If we have a finite value, replace a "." in the value with an & (the . gets put
-                // in by the latex header specification).
-                if (std::isfinite(val)) {
-                    // If an floating-point notation number, use the dotexp regex to replace the .
-                    // with a &, and replace the 'e' with '$\times 10^{...}$' (plus some minor
-                    // cleanup in the regexp).
-                    std::smatch m;
-                    if (std::regex_search(value, m, dotexp)) {
-                        latex << m.prefix() << m.format(dotexp_replace);
-                    }
-                    else {
-                        // Not floating-point notation: if it has a ., replace it with an &;
-                        // otherwise stick the & at the end.
-                        auto dotpos = value.find_first_of('.');
-                        if (dotpos == value.npos)
-                            latex << value << "&";
-                        else
-                            latex << value.substr(0, dotpos) << "&" << value.substr(dotpos+1);
-                    }
-                }
-                // Otherwise, for infinity, use the infinty symbol; otherwise (i.e. for NaN) just
-                // leave the string "nan" as-is In either case, we make the field take up 2 columns
-                // (since it has no "." separator)
                 else {
-                    latex << "\\multicolumn{2}{c}{";
-                    if (std::isinf(val)) {
-                        latex << "$";
-                        if (val < 0) latex << "-";
-                        latex << "\\infty$";
+                    double val = matrix(r, c);
+                    std::string value;
+                    {
+                        std::ostringstream valstream;
+                        // Set value precision and showpoint:
+                        valstream << std::setprecision(options.precision) << (options.showpoint ? std::showpoint : std::noshowpoint);
+                        valstream << matrix(r, c);
+                        value = valstream.str();
                     }
+
+                    // If we have a finite value, replace a "." in the value with an & (the . gets put
+                    // in by the latex header specification).
+                    if (std::isfinite(val)) {
+                        // If an floating-point notation number, use the dotexp regex to replace the .
+                        // with a &, and replace the 'e' with '$\times 10^{...}$' (plus some minor
+                        // cleanup in the regexp).
+                        std::smatch m;
+                        if (std::regex_search(value, m, dotexp)) {
+                            latex << m.prefix() << m.format(dotexp_replace);
+                        }
+                        else {
+                            // Not floating-point notation: if it has a ., replace it with an &;
+                            // otherwise stick the & at the end.
+                            auto dotpos = value.find_first_of('.');
+                            if (dotpos == value.npos)
+                                latex << value << "&";
+                            else
+                                latex << value.substr(0, dotpos) << "&" << value.substr(dotpos+1);
+                        }
+                    }
+                    // Otherwise, for infinity, use the infinty symbol; otherwise (i.e. for NaN) just
+                    // leave the string "nan" as-is In either case, we make the field take up 2 columns
+                    // (since it has no "." separator)
                     else {
-                        latex << value;
+                        latex << "\\multicolumn{2}{c}{";
+                        if (std::isinf(val)) {
+                            latex << "$";
+                            if (val < 0) latex << "-";
+                            latex << "\\infty$";
+                        }
+                        else {
+                            latex << value;
+                        }
+                        latex << "}";
                     }
-                    latex << "}";
                 }
             }
             else {
-                latex << "\\multicolumn{2}{c}{}\n";
+                if (options.dot_align) latex << "\\multicolumn{2}{c}{}\n";
+                else latex << "{}\n";
             }
         }
 
