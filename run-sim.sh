@@ -8,7 +8,7 @@ for a in "$@"; do
 Usage: $0 [ARGUMENTS]
 
 Invokes ./creativity-cli via ./creativity-random, using a suitable set of
-randomized parameters.  Any given arguments override the default values.
+randomized parameters.
 
 Output is placed in ./results/DATE~~HASH/creativity-SEED.crstate where DATE and
 HASH are generated from the current git commit date and hash.
