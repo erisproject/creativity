@@ -28,7 +28,12 @@ namespace fs = boost::filesystem;
 
 int main(int argc, char *argv[]) {
     Results args;
-    args.parse(argc, argv);
+    try {
+        args.parse(argc, argv);
+    } catch (const std::exception &e) {
+        std::cerr << "Invalid argument(s): " << e.what() << std::endl;
+        exit(2);
+    }
 
     // data holds all the data read from the file.
     Treatment data;
