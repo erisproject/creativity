@@ -25,6 +25,35 @@ class Treatment {
         /// Reads the data from the given CSVParser
         void readCSV(CSVParser &&csv);
 
+        /** Requires that the parsed data contain piracy observations.  If the data has already been
+         * parsed, this throws an exception immediately if the data does not contain piracy; if not
+         * yet parsed, this causes the next readCSV() to throw an exception if piracy data is not
+         * present.
+         *
+         * \param require defaults to true of omitted; can be explicitly specified as false to
+         * cancel a previous requirePiracy() call.
+         */
+        void requirePiracy(bool require = true);
+
+        /// Like requirePiracy(), but for public sharing data
+        void requirePublic(bool require = true);
+
+        /// Like requirePiracy(), but for pre-piracy data
+        void requirePre(bool require = true);
+
+        /** Requires short-run data for long-run piracy/public data that exists in the source data.
+         * In particular, if this option is enabled, the data must contain short-run observations
+         * for each category with equivalent long-run observations: that is, if there is long-run
+         * piracy data, there must also be short-run piracy data, and likewise for public sharing
+         * data.  If the source data does not contain long-run piracy data, this option will not
+         * require short-run piracy data.
+         *
+         * Like requirePiracy(), this throws immediately if data has already been parsed; if not,
+         * the exception will be raised if attempting to read data that doesn't contain the required
+         * short-run data.
+         */
+        void requireSR(bool require = true);
+
         /// True if this treatment data pre-piracy observations
         const bool& hasPre() const { return has_pre_; }
 
@@ -39,6 +68,12 @@ class Treatment {
 
         /// True if the source data has short-run public data
         const bool& hasPublicSR() const { return has_public_sr_; }
+
+        /** True if the source data has short-run data for each type of associated long-run data.
+         * That is, if the data has piracy data, it must also have short-run piracy data; likewise
+         * for public data.
+         */
+        bool hasShortrun() const { return (hasPublicSR() or not hasPublic()) and (hasPiracySR() or not hasPiracy()); }
 
         /// The number of data rows per simulation input.  This equals 1 plus the number of treatments.
         const unsigned int& rowsPerSimulation() const { return rows_per_sim_; }
@@ -87,11 +122,16 @@ class Treatment {
         Eigen::MatrixXd data_; ///< The data matrix.
         std::vector<std::string> source_; ///< In-order source values for data.
 
-        bool has_pre_{false}, ///< True if the data contains pre-piracy, non-treatment rows
+        bool have_data_{false}, ///< True once we've parsed a data file
+             has_pre_{false}, ///< True if the data contains pre-piracy, non-treatment rows
              has_piracy_{false}, ///< True if the data contains LR piracy treatment rows
              has_piracy_sr_{false}, ///< True if the data contains SR piracy treatment rows
              has_public_{false}, ///< True if the data contains LR public treatment rows
-             has_public_sr_{false}; ///< True if the data contains SR public treatment rows
+             has_public_sr_{false}, ///< True if the data contains SR public treatment rows
+             require_pre_{false}, ///< True if pre data is required
+             require_piracy_{false}, ///< True if piracy data is required
+             require_public_{false}, ///< True if public data is required
+             require_sr_{false}; ///< True if short-run data is required for each type of long-run data
         /// The number of treatment row observations per source data rows (i.e. per simulation)
         unsigned int rows_per_sim_{0};
 

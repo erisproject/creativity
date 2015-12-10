@@ -30,6 +30,9 @@ void Treatment::readCSV(CSVParser &&csv) {
     // values described above; anything else is unrecognized and will throw an exception.  Only the
     // "param." prefixes are preserved: all other prefixes are removed.
 
+    if (have_data_) throw std::logic_error("Treatment::readCSV() can only be called once");
+    have_data_ = true;
+
     int next_col = 0;
     for (auto &f : csv.fields()) {
         std::string data_field;
@@ -52,7 +55,15 @@ void Treatment::readCSV(CSVParser &&csv) {
     }
 
     // The pre-data plus each treatment effect contributes an output row
-    rows_per_sim_ = 1 + has_piracy_ + has_piracy_sr_ + has_public_ + has_public_sr_;
+    rows_per_sim_ = has_pre_ + has_piracy_ + has_piracy_sr_ + has_public_ + has_public_sr_;
+
+    if (rows_per_sim_ == 0) throw std::runtime_error("CSV file contains no usable data (no pre, piracy, or public observations found)");
+
+    // Check required data
+    requirePre(require_pre_);
+    requirePiracy(require_piracy_);
+    requirePublic(require_public_);
+    requireSR(require_sr_);
 
     // Add dummy columns (even if the data means they will always be 0/1)
     data_column_.insert({"piracy", next_col++}); // piracy dummy
@@ -124,5 +135,20 @@ void Treatment::generateRow(
     }
 }
 
+#define REQUIRE(Meth, var, name) \
+void Treatment::require##Meth(bool req) { \
+    require_##var##_ = req; \
+    if (have_data_ and require_##var##_ and not has_##var##_) throw std::runtime_error("CSV file is missing required `" name "' data"); \
+}
+REQUIRE(Pre, pre, "pre-piracy")
+REQUIRE(Piracy, piracy, "piracy")
+REQUIRE(Public, public, "public")
+void Treatment::requireSR(bool req) {
+    require_sr_ = req;
+    if (have_data_ and require_sr_) {
+        if (has_piracy_ and not has_piracy_sr_) throw std::runtime_error("CSV file has long-run but no short-run piracy data");
+        if (has_public_ and not has_public_sr_) throw std::runtime_error("CSV file has long-run but no short-run public data");
+    }
+}
 
 }}

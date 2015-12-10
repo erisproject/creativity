@@ -27,6 +27,7 @@ void Results::addOptions() {
         ("marginal-effects,M", value(analysis.marginal), "Show marginal model effects across different simulation stages and model parameters.")
         ("all,a", value(analysis.all), "Implies --summary --write-vs-nowrite --average-effects --marginal-effects, but not --write-vs-nowrite-corr.  If none of the above nor --none are given, this is the default.")
 //        ("none,n", value(analysis.none), "Show none of the above analysis.  May not be combined with any of this above.  This flag is intended for use with the --dump-* options.")
+        ("short-run,s", value(analysis.shortrun), "Include short-run piracy/public analysis in the results.  The data file must have short-run analysis (i.e. it must not have been created with --skip-short-run).  Short-run analysis is skipped by default.")
         ;
     options_.add(analysis_desc);
 

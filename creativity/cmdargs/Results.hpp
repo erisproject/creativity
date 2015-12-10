@@ -48,6 +48,9 @@ class Results : public CmdArgs {
             bool all = false;
             /// None of the above; none of the above will be true.
             bool none = false;
+
+            /// If true, do short-run analysis (will raise error if it doesn't exist in the data file)
+            bool shortrun = false;
         } analysis;
 
         /// Condensed table output (currently only for average effects model)
