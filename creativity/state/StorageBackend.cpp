@@ -45,20 +45,24 @@ void StorageBackend::thread_inserter_() {
 
     while (true) {
         queue_cv_.wait(lock, [&] { return thread_quit_ or not queue_.empty(); });
-        if (thread_quit_) return;
 
-        // Pop off one at a time here so that if a thread_quit_ comes in, we'll respond (without
-        // having to wait to write out the entire queue).
-        auto st = queue_.front();
-        queue_.pop();
+        while (not thread_quit_ and not queue_.empty()) {
+            // Pop off one at a time here so that if a thread_quit_ comes in, we'll respond (without
+            // having to wait to write out the entire queue).
+            auto st = queue_.front();
+            queue_.pop();
 
-        lock.unlock();
-        thread_insert(std::move(st));
-        lock.lock();
+            lock.unlock();
+            thread_insert(std::move(st));
+            lock.lock();
+        }
 
         // If the queue is empty now, send a signal in case the main thread is waiting (during
         // a flush)
         if (queue_.empty()) queue_finished_cv_.notify_one();
+
+        // If asked to quit, do so:
+        if (thread_quit_) return;
     }
 }
 #endif
