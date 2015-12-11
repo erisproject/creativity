@@ -1,5 +1,5 @@
 #include "creativity/Creativity.hpp"
-#include "creativity/data/Data.hpp"
+#include "creativity/data/simdata.hpp"
 #include "creativity/state/Storage.hpp"
 #include "creativity/cmdargs/Data.hpp"
 #include <eris/types.hpp>

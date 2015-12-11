@@ -138,25 +138,6 @@ double book_gross_margin(const state::Storage &cs, eris::eris_time_t from, eris:
  */
 double book_profit(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
 
-/** Returns a sample quantile from the vector of values.  Linear interpolation is used for quantiles
- * that lie between elements.  The interpolation is such that the quantile for 0 returns the
- * smallest value and the quantile for 1 returns the largest value.
- *
- * \param vals the vector of double values
- * \param prob the probability for which the quantile should be calculated; must be between 0 and 1.
- * \returns NaN if the vector is empty, otherwise returns the requested quantile
- */
-double quantile(const std::vector<double> &vals, double prob);
-
-/** Same as above, but operates on an Eigen vector-like object. */
-double quantile(const Eigen::Ref<const Eigen::VectorXd> &vals, double prob);
-
-/** Calculates and returns the sample variance of the given vector of values.  If the mean of the
- * vector is already known it can be passed in as mean, otherwise the default, NaN, calculates the
- * mean from the vector.
- */
-double variance(const std::vector<double> &vals, double mean = std::numeric_limits<double>::quiet_NaN());
-
 /// Macro to generate mean, sd, and quantile functions for a given variable
 #define DIST_FNS(variable) \
 double variable(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to); \
