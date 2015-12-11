@@ -15,7 +15,8 @@
 #include <cstring>
 #include <iostream>
 #include <iomanip>
-#include <list>
+#include <vector>
+#include <set>
 #include <fstream>
 #include <sstream>
 
@@ -28,7 +29,7 @@ using namespace eris;
 // The series we want to calculate, as given to --series
 std::unordered_set<std::string> series_wanted;
 // Results: "books_written" -> array of periods -> array of values
-std::unordered_map<std::string, std::vector<std::vector<double>>> values;
+std::unordered_map<std::string, std::vector<std::multiset<double>>> values;
 unsigned int values_count, error_count;
 std::mutex values_mutex; // Guards values, output_count, error_count
 decltype(cmdargs::Series::input.cbegin()) input_it, input_it_end;
@@ -145,7 +146,7 @@ void thr_parse_file(
                 // Only copy finite values (this mainly excluded NaNs as nothing should be capable
                 // of generating infinity).
                 double value = v.second[t];
-                if (std::isfinite(value)) vstore[t].push_back(value);
+                if (std::isfinite(value)) vstore[t].insert(value);
             }
         }
         values_count++;
@@ -264,11 +265,10 @@ int main(int argc, char *argv[]) {
     std::cout << "Successfully processed " << values_count << "/" << (values_count+error_count) << " simulation files.\n\n";
 
     for (auto &v : values) {
+        // Figure out how many "nth" headers we need for this series:
         unsigned n = 0;
-        // Sort all the values of each inner values vector
         for (auto &time : v.second) {
             if (time.size() > n) n = time.size();
-            std::sort(time.begin(), time.end());
         }
 
         // Write an output file
