@@ -275,7 +275,7 @@ int main(int argc, char *argv[]) {
         std::string output_file = args.output_dir + "/series-" + v.first + ".csv";
         std::ofstream out(output_file, std::ios::out | std::ios::trunc);
         out << "t";
-        for (unsigned i = 1; i < n; i++) {
+        for (unsigned i = 1; i <= n; i++) {
             out << "," << i << (
                 (i % 10 == 1 and not i % 100 == 11) ? "st" :
                 (i % 10 == 2 and not i % 100 == 12) ? "nd" :
