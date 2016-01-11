@@ -276,7 +276,11 @@ int main(int argc, char *argv[]) {
         std::ofstream out(output_file, std::ios::out | std::ios::trunc);
         out << "t";
         for (unsigned i = 1; i < n; i++) {
-            out << "," << i << (i >= 11 and i <= 13 ? "th" : i % 10 == 1 ? "st" : i % 10 == 2 ? "nd" : i % 10 == 3 ? "rd" : "th");
+            out << "," << i << (
+                (i % 10 == 1 and not i % 100 == 11) ? "st" :
+                (i % 10 == 2 and not i % 100 == 12) ? "nd" :
+                (i % 10 == 3 and not i % 100 == 13) ? "rd" :
+                "th");
         }
         out << "\n";
         for (eris_time_t t = 0; t < v.second.size(); t++) {
