@@ -30,18 +30,20 @@ bool CSVParser::readRow() {
     if (row[0] == '#') return readRow();
 
     auto fields = split(row);
-    if (fields.size() != header_.size())
-        throw std::invalid_argument("Invalid data on line " + std::to_string(lineno_) + ": number of fields differs from that of the header");
+    if (fields.size() > header_.size() or header_.size() - fields.size() > allow_missing_values)
+        throw std::invalid_argument("Invalid data on line " + std::to_string(lineno_) + ": number of fields (" + std::to_string(fields.size())
+                + ") differs from that of the header (" + std::to_string(header_.size()) + ")");
 
-    if ((size_t) row_.size() != fields_.size()) row_.resize(fields_.size());
+    if ((size_t) row_.size() != fields.size()) row_.resize(fields.size());
     row_skipped_.clear();
-    size_t row_i = 0, parse_pos = 0;
+    long row_i = 0;
     for (size_t fieldnum = 0; fieldnum < fields.size(); fieldnum++) {
         if (skip_.count(header_[fieldnum])) {
             row_skipped_[header_[fieldnum]] = fields[fieldnum];
         }
         else {
             auto &field = fields[fieldnum];
+            size_t parse_pos = 0;
             double d;
             try {
                 d = std::stod(field, &parse_pos);
@@ -54,6 +56,8 @@ bool CSVParser::readRow() {
             row_[row_i++] = d;
         }
     }
+
+    if (row_.size() != row_i) row_.conservativeResize(row_i);
 
     return true;
 }

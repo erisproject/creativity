@@ -31,7 +31,7 @@ std::string double_str(double d, unsigned precision = std::numeric_limits<double
  * that lie between elements.  The interpolation is such that the quantile for 0 returns the
  * smallest value and the quantile for 1 returns the largest value.
  *
- * \param vals the vector of sorted double values
+ * \param vals the vector of pre-sorted double values
  * \param prob the probability for which the quantile should be calculated; must be between 0 and 1.
  * \returns NaN if the vector is empty, otherwise returns the requested quantile
  */

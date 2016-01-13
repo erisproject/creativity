@@ -84,6 +84,13 @@ class CSVParser : private eris::noncopyable {
          */
         double field(const std::string &field) const;
 
+        /** The number of values that may be missing from the end of a data row for subsequent read
+         * rows.  If left at the default value, 0, data rows must contain exactly the same number of
+         * values as the file's header; if set to a value `n`, up to `n` values may be missing from
+         * the end of data rows.
+         */
+        size_t allow_missing_values = 0;
+
         /** Reads the next line of the CSV file, storing it in row(), replacing what was previously
          * stored there.  Returns true if a row was read, false if the end of the file was hit,
          * throws an exception if something goes wrong.
@@ -106,6 +113,9 @@ class CSVParser : private eris::noncopyable {
 
         /** Accesses any skipped fields in the most-recently-read row. */
         const std::unordered_map<std::string, std::string>& rowSkipped() const { return row_skipped_; }
+
+        /** Accesses the most-recently-read line number. */
+        const size_t& lineNumber() const { return lineno_; }
 
         // forward declaration
         class iterator;

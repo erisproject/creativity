@@ -220,6 +220,10 @@ if (DATA)
     target_link_libraries(creativity-series libcreativity-data)
     list(APPEND creativity_install_targets creativity-series)
 
+    add_executable(creativity-s2q s2q.cpp)
+    target_link_libraries(creativity-s2q libcreativity-data)
+    list(APPEND creativity_install_targets creativity-s2q)
+
     add_executable(creativity-results results.cpp)
     target_link_libraries(creativity-results libcreativity-data)
     list(APPEND creativity_install_targets creativity-results)
