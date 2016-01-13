@@ -42,7 +42,7 @@ class CSVParser : private eris::noncopyable {
         explicit CSVParser(const std::string &filename);
 
         /** The set of fields to skip; all non-numeric fields must be added here before attempting
-         * to parse a line.  The default contains 'source'.
+         * to read a data row.
          *
          * \sa skip(const std::string &name)
          * \sa dontSkip()
@@ -131,7 +131,7 @@ class CSVParser : private eris::noncopyable {
         static std::vector<std::string> split(const std::string &csr);
 
         void updateFields(); // regenerate fields, omitting things in skip_
-        std::unordered_set<std::string> skip_{{"source"}}; // things to skip in header_ when making fields_
+        std::unordered_set<std::string> skip_; // things to skip in header_ when making fields_
         std::vector<std::string> header_; // the header read from the file
         std::vector<std::string> fields_; // the header fields remaining after skipping skip_
         mutable std::unordered_map<std::string, unsigned> field_pos_; // Map from field name to row position (created from fields_ on-demand)

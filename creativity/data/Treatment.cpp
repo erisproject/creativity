@@ -33,6 +33,8 @@ void Treatment::readCSV(CSVParser &&csv) {
     if (have_data_) throw std::logic_error("Treatment::readCSV() can only be called once");
     have_data_ = true;
 
+    csv.skip("source");
+
     int next_col = 0;
     for (auto &f : csv.fields()) {
         std::string data_field;
