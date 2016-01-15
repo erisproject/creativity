@@ -7,11 +7,11 @@
 
 namespace creativity { namespace cmdargs {
 
-/** CmdArgs subclass for creativity-s2q arguments (for extracting quantiles from series files). */
-class SeriesToQuantiles : public CmdArgs {
+/** CmdArgs subclass for creativity-series-quantiles arguments (for extracting quantiles from series files). */
+class SeriesQuantiles : public CmdArgs {
     public:
         /// Constructor for series arguments; takes no arguments
-        SeriesToQuantiles();
+        SeriesQuantiles();
 
         /** Quantiles to extract.  If not specified, defaults to {0, 0.005, 0.01, 0.025, 0.05, 0.25,
          * 0.5, 0.75, 0.95, 0.975, 0.99, 0.995, 1}.  The 0 quantile is defined to be the minimum

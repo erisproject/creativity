@@ -1,5 +1,5 @@
 #include "creativity/data/CSVParser.hpp"
-#include "creativity/cmdargs/SeriesToQuantiles.hpp"
+#include "creativity/cmdargs/SeriesQuantiles.hpp"
 #include "creativity/data/util.hpp"
 #include <boost/filesystem/operations.hpp>
 #include <cerrno>
@@ -20,10 +20,10 @@ std::unordered_set<std::string> series_wanted;
 // Results: "books_written" -> array of periods -> array of values
 std::unordered_map<std::string, std::vector<std::multiset<double>>> values;
 unsigned int values_count, error_count;
-decltype(cmdargs::SeriesToQuantiles::input.cbegin()) input_it, input_it_end;
+decltype(cmdargs::SeriesQuantiles::input.cbegin()) input_it, input_it_end;
 
 int main(int argc, char *argv[]) {
-    cmdargs::SeriesToQuantiles args;
+    cmdargs::SeriesQuantiles args;
     try {
         args.parse(argc, argv);
     }

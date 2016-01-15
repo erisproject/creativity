@@ -1,4 +1,4 @@
-#include "creativity/cmdargs/SeriesToQuantiles.hpp"
+#include "creativity/cmdargs/SeriesQuantiles.hpp"
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/variables_map.hpp>
 #include <boost/program_options/errors.hpp>
@@ -10,9 +10,9 @@ namespace creativity { namespace cmdargs {
 
 namespace po = boost::program_options;
 
-SeriesToQuantiles::SeriesToQuantiles() {}
+SeriesQuantiles::SeriesQuantiles() {}
 
-void SeriesToQuantiles::addOptions() {
+void SeriesQuantiles::addOptions() {
 
     CmdArgs::addOptions(); // for --help, --version
 
@@ -32,11 +32,11 @@ void SeriesToQuantiles::addOptions() {
     positional_.add("input-files", -1);
 }
 
-std::string SeriesToQuantiles::usage() const {
+std::string SeriesQuantiles::usage() const {
     return CmdArgs::usage() + " FILE [FILE ...]";
 }
 
-std::string SeriesToQuantiles::help() const {
+std::string SeriesQuantiles::help() const {
     return CmdArgs::help() + "Input files:\n" +
         "  FILE [FILE ...]                       One or more series input files from which to\n" +
         "                                        calculate quantiles.  At least one must\n" +
@@ -45,7 +45,7 @@ std::string SeriesToQuantiles::help() const {
         "and retains the existing sample quantiles for each period in the series files.\n\n";
 }
 
-std::string SeriesToQuantiles::versionSuffix() const {
+std::string SeriesQuantiles::versionSuffix() const {
     return " -- simulation data series quantile converter";
 }
 
