@@ -2,7 +2,6 @@
 #include "creativity/cmdargs/SeriesQuantiles.hpp"
 #include "creativity/data/util.hpp"
 #include <boost/filesystem/operations.hpp>
-#include <cerrno>
 #include <exception>
 #include <string>
 #include <iostream>
@@ -14,13 +13,6 @@ using namespace creativity::data;
 using namespace eris;
 
 namespace fs = boost::filesystem;
-
-// The series we want to calculate, as given to --series
-std::unordered_set<std::string> series_wanted;
-// Results: "books_written" -> array of periods -> array of values
-std::unordered_map<std::string, std::vector<std::multiset<double>>> values;
-unsigned int values_count, error_count;
-decltype(cmdargs::SeriesQuantiles::input.cbegin()) input_it, input_it_end;
 
 int main(int argc, char *argv[]) {
     cmdargs::SeriesQuantiles args;
