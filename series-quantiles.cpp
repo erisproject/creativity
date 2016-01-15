@@ -1,6 +1,6 @@
 #include "creativity/data/CSVParser.hpp"
 #include "creativity/cmdargs/SeriesQuantiles.hpp"
-#include "creativity/data/util.hpp"
+#include "creativity/data/quantiles.hpp"
 #include <boost/filesystem/operations.hpp>
 #include <exception>
 #include <string>
@@ -58,15 +58,7 @@ int main(int argc, char *argv[]) {
     {
         std::ostringstream headerss;
         headerss << "t";
-        for (auto q : quantiles) {
-            if (q == 0) headerss << ",min";
-            else if (q == 0.5) headerss << ",median";
-            else if (q == 1) headerss << ",max";
-            else {
-                auto qstr = double_str(q, std::numeric_limits<double>::max_digits10);
-                headerss << ",q" << (qstr.substr(0, 2) == "0." ? qstr.substr(2) : qstr);
-            }
-        }
+        for (auto q : quantiles) headerss << "," << quantile_field(q);
         headerss << "\n";
         output_header = headerss.str();
     }
@@ -81,6 +73,7 @@ int main(int argc, char *argv[]) {
         exit(2);
     }
 
+    std::regex ordinal("(?:\\d*[02-9])?(?:1st|2nd|3rd)|\\d*1[123]th|\\d*[04-9]th");
     std::vector<std::string> output;
     output.reserve(args.input.size());
     for (const auto &input : args.input) {
@@ -113,7 +106,6 @@ int main(int argc, char *argv[]) {
         std::ostringstream output_data;
         output_data << output_header;
         try {
-            std::regex ordinal("\\d+(st|nd|rd|th)");
             if (parser.fields()[0] != "t") throw std::invalid_argument("first field != t");
             for (size_t i = 1; i < parser.fields().size(); i++) {
                 if (not std::regex_match(parser.fields()[i], ordinal))
