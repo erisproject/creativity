@@ -49,6 +49,10 @@ int main(int argc, char *argv[]) {
         std::cerr << "Invalid quantile(s) provided; aborting.\n\n";
         exit(1);
     }
+    else if (quantiles.empty()) {
+        std::cerr << "No quantiles provided; aborting.\n\n";
+        exit(1);
+    }
 
     std::string output_header;
     {
@@ -66,8 +70,6 @@ int main(int argc, char *argv[]) {
         headerss << "\n";
         output_header = headerss.str();
     }
-    std::cout << "header: " << output_header << "\n";
-
 
     if (args.output_prefix == args.output_unprefix) {
         std::cerr << "Invalid arguments: --prefix and --unprefix cannot be the same.\n\n";
