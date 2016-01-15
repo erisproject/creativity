@@ -119,14 +119,17 @@ bool CSVParser::hasField(const std::string &field) const {
     return false;
 }
 
-double CSVParser::field(const std::string &field) const {
-    if (row_.size() == 0) throw std::logic_error("Can't call field without a current row");
-
+size_t CSVParser::fieldPosition(const std::string &field) const {
     if (field_pos_.empty() and not fields_.empty()) {
         hasField(field); // will populate field_pos_
     }
+    return field_pos_.at(field);
+}
 
-    return row_[field_pos_.at(field)];
+double CSVParser::field(const std::string &field) const {
+    if (row_.size() == 0) throw std::logic_error("Can't call field without a current row");
+
+    return row_[fieldPosition(field)];
 }
 
 void CSVParser::updateFields() {

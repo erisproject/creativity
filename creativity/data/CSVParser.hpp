@@ -76,7 +76,14 @@ class CSVParser : private eris::noncopyable {
          */
         bool hasField(const std::string &field) const;
 
-        /** Returns the value (in the current row) of the given field.
+        /** Returns the column index of the given field.
+         *
+         * \throws std::out_of_range if the given field doesn't exist.
+         */
+        size_t fieldPosition(const std::string &field) const;
+
+        /** Returns the value (in the current row) of the given field.  Shortcut for
+         * `row()[fieldPosition(field)]`.
          *
          * \throws std::out_of_range if the given field doesn't exist.
          * \throws std::logic_error if there is no current row (either no row has been read yet, or

@@ -73,7 +73,6 @@ int main(int argc, char *argv[]) {
         exit(2);
     }
 
-    std::regex ordinal("(?:\\d*[02-9])?(?:1st|2nd|3rd)|\\d*1[123]th|\\d*[04-9]th");
     std::vector<std::string> output;
     output.reserve(args.input.size());
     for (const auto &input : args.input) {
@@ -108,7 +107,7 @@ int main(int argc, char *argv[]) {
         try {
             if (parser.fields()[0] != "t") throw std::invalid_argument("first field != t");
             for (size_t i = 1; i < parser.fields().size(); i++) {
-                if (not std::regex_match(parser.fields()[i], ordinal))
+                if (not std::regex_match(parser.fields()[i], ordinal_regex))
                     throw std::invalid_argument("field " + std::to_string(i) + " (" + parser.fields()[i] + ") is not an ordinal value");
             }
 

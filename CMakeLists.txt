@@ -56,13 +56,20 @@ macro_ensure_out_of_source_build("${PROJECT_NAME} requires an out-of-source buil
 
 include(GNUInstallDirs)
 
+include(CheckIncludeFileCXX)
+
 # Use pkg-config to find the includes/libs we need
 find_package(PkgConfig REQUIRED)
 set(creativity_pkgconfig_GTKMM gtkmm-3.0)
 set(creativity_pkgconfig_ERIS liberis)
+set(creativity_pkgconfig_LIBPNG libpng)
+set(creativity_pkgconfig_CAIRO cairomm-1.0 cairomm-svg-1.0 cairomm-pdf-1.0)
 
 # pkg-config required packages for libcreativity.so:
 set(creativity_pkgconfig ERIS)
+
+# pkg-config required packages for libcreativity-data.so:
+set(creativity_data_pkgconfig)
 
 option(DEBUG "Enable debugging output" OFF)
 if (DEBUG)
@@ -74,7 +81,7 @@ endif()
 
 option(GUI "Enable gtkmm GUI interface" ON)
 if (GUI)
-    # required packages for libcreativitygui.so:
+    # required packages for libcreativity-gui.so:
     set(creativity_gui_pkgconfig GTKMM)
     message(STATUS "GUI enabled (-DGUI=off to disable)")
 else()
@@ -83,8 +90,15 @@ else()
 endif()
 
 option(DATA "Enable data parsing and results library and binaries" ON)
+option(DATA_GRAPHING "Enable data graphing capabilites (requires DATA=ON)" ON)
 if (DATA)
     message(STATUS "Data libraries and binaries enabled (-DDATA=off to disable)")
+    if (DATA_GRAPHING)
+        message(STATUS "    ... with graphing enabled (-DDATA_GRAPHING=OFF to disable)")
+        set(creativity_data_pkgconfig ${creativity_data_pkgconfig} CAIRO LIBPNG)
+    else()
+        message(STATUS "    ... without graphing enabled (-DDATA_GRAPHING=ON to enable)")
+    endif()
 else()
     message(STATUS "Data libraries and binaries disabled (-DDATA=on to enable)")
 endif()
@@ -118,12 +132,19 @@ else()
     message(STATUS "API documentation generation disabled (-DAPI_DOCS=on to enable)")
 endif()
 
-foreach(pkg ${creativity_pkgconfig} ${creativity_gui_pkgconfig})
+foreach(pkg ${creativity_pkgconfig} ${creativity_gui_pkgconfig} ${creativity_data_pkgconfig})
     pkg_check_modules(${pkg} REQUIRED ${creativity_pkgconfig_${pkg}})
     include_directories(${${pkg}_INCLUDE_DIRS})
     link_directories(${${pkg}_LIBRARY_DIRS})
     add_definitions(${${pkg}_CFLAGS_OTHER})
 endforeach()
+
+if (DATA AND DATA_GRAPHING)
+    CHECK_INCLUDE_FILE_CXX("png++/png.hpp" PNGPP_FOUND)
+    if (NOT PNGPP_FOUND)
+        message(FATAL_ERROR "libpng++ not found")
+    endif()
+endif()
 
 if(ERIS_VERSION VERSION_LESS "${ERIS_VERSION_REQUIRED}")
     message(FATAL_ERROR "Eris v${ERIS_VERSION_REQUIRED} or above is required, but only v${ERIS_VERSION} was found")
@@ -154,6 +175,10 @@ if (NOT DATA)
     # When not building the data library/binaries, also omit the data headers
     file(GLOB_RECURSE cr_data_headers RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} creativity/data/*.hpp creativity/cmdargs/Data.hpp creativity/cmdargs/Series*.hpp creativity/cmdargs/Results.hpp)
     list(REMOVE_ITEM cr_headers ${cr_data_headers})
+elseif(NOT DATA_GRAPHING)
+    # Remove the data graphic headers
+    file(GLOB_RECURSE cr_data_graph_headers RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} creativity/data/graphing/*.hpp creativity/cmdargs/SeriesGraphs.hpp)
+    list(REMOVE_ITEM cr_headers ${cr_data_graph_headers})
 endif()
 
 foreach(h ${cr_headers})
@@ -209,12 +234,20 @@ if (DATA)
         VERSION "${LIBCRD_CUR}.${LIBCRD_REV}.${LIBCRD_AGE}"
         SOVERSION "${LIBCRD_CUR}"
     )
+    foreach(pkg ${creativity_data_pkgconfig})
+        target_link_libraries(libcreativity-data ${${pkg}_LIBRARIES})
+    endforeach()
+
     target_link_libraries(libcreativity-data libcreativity)
     list(APPEND creativity_install_targets libcreativity-data)
 
     add_executable(creativity-data data.cpp)
     target_link_libraries(creativity-data libcreativity-data)
     list(APPEND creativity_install_targets creativity-data)
+
+    add_executable(creativity-results results.cpp)
+    target_link_libraries(creativity-results libcreativity-data)
+    list(APPEND creativity_install_targets creativity-results)
 
     add_executable(creativity-series series.cpp)
     target_link_libraries(creativity-series libcreativity-data)
@@ -224,9 +257,11 @@ if (DATA)
     target_link_libraries(creativity-series-quantiles libcreativity-data)
     list(APPEND creativity_install_targets creativity-series-quantiles)
 
-    add_executable(creativity-results results.cpp)
-    target_link_libraries(creativity-results libcreativity-data)
-    list(APPEND creativity_install_targets creativity-results)
+    if (DATA_GRAPHING)
+        add_executable(creativity-series-graphs series-graphs.cpp)
+        target_link_libraries(creativity-series-graphs libcreativity-data)
+        list(APPEND creativity_install_targets creativity-series-graphs)
+    endif()
 endif()
 
 
