@@ -2,6 +2,6 @@
 
 namespace creativity { namespace data { namespace graph {
 
-const Gdk::RGBA transparent("rgba(0,0,0,0)");
+const RGBA transparent(0, 0, 0, 0);
 
 }}}

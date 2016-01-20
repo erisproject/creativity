@@ -74,6 +74,13 @@ int main(int argc, char *argv[]) {
     };
     std::list<data> input;
 
+    // DEBUG:
+    auto trim = common_ends(args.input.begin(), args.input.end());
+    std::cout << "Trimmed names:\n";
+    for (const auto &file : args.input) {
+        std::cout << "    " << file << ": (" << trim.first << "," << trim.second << ")" <<  file.substr(trim.first, file.length()-trim.second-trim.first) << "\n";
+    }
+
     for (const auto &file : args.input) {
         fs::path input_path(file);
         if (not fs::is_regular_file(input_path)) {
