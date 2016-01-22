@@ -6,18 +6,14 @@ if(NOT DOXYGEN_DOT_FOUND)
     message(FATAL_ERROR "Could NOT find dot (required for doxygen documentation generation)")
 endif()
 
-# Can set NO_MATHJAX to true to skip looking for the system MathJax, in which
-# case the default (MathJax via public CDN) will be used by doxygen.
+# Can set MATHJAX_CDN to use the MathJax CDN (instead of requiring a local
+# MathJax).
 set(mathjax_usable_path "")
-if (MATHJAX_PATH)
+if (MATHJAX_CDN)
+    message(STATUS "Using public MathJax CDN")
+else ()
+    find_package(MathJax 2.3 REQUIRED)
     set(mathjax_usable_path "MATHJAX_RELPATH = ${MATHJAX_PATH}")
-elseif (NOT NO_MATHJAX)
-    find_package(MathJax 2.3)
-    if(MATHJAX_FOUND)
-        set(mathjax_usable_path "MATHJAX_RELPATH = ${MATHJAX_PATH}")
-    else()
-        message(STATUS "System MathJax not found: using public MathJax CDN instead.  If MathJax is installed, try setting MATHJAX_ROOT")
-    endif()
 endif()
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile @ONLY)
