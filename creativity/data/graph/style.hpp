@@ -10,6 +10,18 @@ struct RGBA {
         if (r<0 or r>1 or g<0 or g>1 or b<0 or b>1 or a<0 or a>1)
             throw std::invalid_argument("Invalid RGBA value: all values must be >= 0 and <= 1");
     }
+    /// Compares two RGBA objects: they are considered equal if all components are equal.
+    bool operator==(const RGBA& other) {
+        return equalsRGB(other) and alpha == other.alpha;
+    }
+    /// Negation of ==
+    bool operator!=(const RGBA& other) { return not (*this == other); }
+    /** Returns true if the red, green, and blue channels are equal.  The alpha values do not have
+     * to match.
+     */
+    bool equalsRGB(const RGBA& other) {
+        return red == other.red and blue == other.blue and green == other.green;
+    }
     /** Creates the struct from an object with get_red(), get_green(), get_blue(), and get_alpha()
      * methods.  In particular, this is designed to be used with Gdk::RGBA (but we don't want to
      * have to depend on gdkmm, so this is left as a templated constructor).
@@ -27,8 +39,10 @@ struct RGBA {
            alpha; ///< The alpha channel value (1 == opaque, 0 == transparent)
 };
 
-/// Pre-declared transparent colour; the colour is actually black, but has opacity set to 0.
-extern const RGBA transparent;
+extern const RGBA
+    Transparent, ///< Pre-declared Transparent colour; the colour is actually black, but with alpha set to 0
+    Black, ///< Pre-declared black colour, with full opacity
+    White; ///< Pre-declared white colour, with full opacity
 
 /** Style class for a drawn line. */
 struct LineStyle {
@@ -46,18 +60,18 @@ struct LineStyle {
 /** Style class for a filled region. */
 struct FillStyle {
     /** Constructs a FillStyle using just a fill colour: the borders will be omitted (i.e.
-     * transparent). */
-    FillStyle(RGBA fill) : FillStyle(std::move(fill), transparent) {};
+     * transparent and 0 width). */
+    FillStyle(RGBA fill) : FillStyle(std::move(fill), LineStyle(Transparent, 0)) {};
     /** Constructs a FillStyle using a fill colour and line style for the borders. */
     FillStyle(RGBA fill, LineStyle border) : fill_colour{std::move(fill)}, border{std::move(border)} {}
     /// Constructs a FillStyle using just a LineStyle; the fill will be omitted (i.e. transparent).
-    FillStyle(LineStyle border) : FillStyle(transparent, border) {}
+    FillStyle(LineStyle border) : FillStyle(Transparent, border) {}
     /// The fill colour for the region
     RGBA fill_colour;
     /** The width of the vertical line for any "stray" elements (i.e. elements without a `t`
      * neighbour with finite values).
      */
-    double stray_thickness = 2;
+    double stray_thickness = 1;
 
     /// The border colour for the region
     LineStyle border;

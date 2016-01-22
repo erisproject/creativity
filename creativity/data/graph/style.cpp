@@ -2,6 +2,8 @@
 
 namespace creativity { namespace data { namespace graph {
 
-const RGBA transparent(0, 0, 0, 0);
+const RGBA Transparent(0, 0, 0, 0),
+      Black(0, 0, 0),
+      White(1, 1, 1);
 
 }}}

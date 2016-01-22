@@ -17,16 +17,17 @@ int main() {
         {3,25.},
         {4,28.},
         {5,25.},
-        {6,NaN},
+        {6,26.},
         {7,30.},
         {8,0.},
         {9,-10.},
         {11,-11.},
-        {12,INF},
+        {12,-5.},
         {14,14},
         {16,16},
         {18,18},
         {19,19},
+        {20,20},
         {21,21}
     };
     std::map<unsigned, std::pair<double, double>> myci{
@@ -45,6 +46,7 @@ int main() {
         {16,{16,16}},
         {18,{-2,28}},
         {19,{17,21}},
+        {20,{14,30}},
         {21,{20,22}}
     };
 
@@ -79,15 +81,60 @@ int main() {
 
 
     Series s(pdf, myline.begin()->first, myline.rbegin()->first, min, max);
-    s.addLine(myline, RGBA(1,0,0,1));
+    s.legend_font.set_family("5yearsoldfont");
+    s.legend_font.set_size(5 * Pango::SCALE);
+    LineStyle linestyle(RGBA(1,0,0));
+    s.addLine(myline, linestyle);
+    std::string linemarkup = "TEST line OMG <span foreground=\"blue\">OMG</span> <span background=\"red\" font_weight=\"bold\">OMG</span> <b>OMG</b> OMG <span font=\"Serif 3\">OMG <big>OMG <big>OMG <big>OMG <big>OMG <big>OMG <big>OMG <big>OMG <big>OMG <big>OMG</big></big></big></big></big></big></big></big></big></span>";
+    s.addLegendItem(linemarkup, FillStyle(Transparent, linestyle), false);
 
     s.newPage();
 
-    s.addRegion(myci);
-    s.addLine(myline);
+    FillStyle cistyle(RGBA(0,0,1,1./3.));
+    s.addRegion(myci, cistyle);
+    s.addLine(myline, linestyle);
+    s.addLegendItem(linemarkup, FillStyle(Transparent, linestyle), false, FillStyle(cistyle.fill_colour, Black));
+    s.addLegendItem("90% confidence boundary", cistyle, false);
 
     s.newPage();
-    s.addRegion(mybiggerci, FillStyle(RGBA(1,0,0,0.25), LineStyle(RGBA(0,0.5,0,0.75))));
-    s.addRegion(myci);
-    s.addLine(myline);
+    FillStyle bigcistyle(RGBA(1,0,0,0.25), LineStyle(RGBA(0,0.5,0,0.5)));
+    s.addRegion(myci, cistyle);
+    s.addRegion(mybiggerci, bigcistyle);
+    s.addLine(myline, linestyle);
+
+#define SET_RGBA(X) set_source_rgba(X.red, X.green, X.blue, X.alpha)
+    s.addLegendItem(linemarkup, [&](Cairo::RefPtr<Cairo::Context> ctx, const Cairo::Matrix &m) {
+            double x = 0, y = 0, w = 1, h = 1;
+            m.transform_point(x, y);
+            m.transform_distance(w, h);
+            ctx->save();
+            ctx->move_to(x, y);
+            Series::drawRectangle(ctx, w, h, FillStyle(cistyle.fill_colour, Black), true);
+            ctx->SET_RGBA(bigcistyle.fill_colour);
+            ctx->paint();
+            ctx->SET_RGBA(linestyle.colour);
+            ctx->set_line_width(linestyle.thickness);
+            ctx->move_to(x, y+0.5*h);
+            ctx->rel_line_to(x+w, 0);
+            ctx->stroke();
+    });
+
+    s.addLegendItem("90% confidence boundary", [&](Cairo::RefPtr<Cairo::Context> ctx, const Cairo::Matrix &m) {
+            double x = 0, y = 0, w = 1, h = 1;
+            m.transform_point(x, y);
+            m.transform_distance(w, h);
+            ctx->save();
+            ctx->move_to(x, y);
+            Series::drawRectangle(ctx, w, h, FillStyle(Transparent, Black), true);
+            ctx->rectangle(x, y+0.5*h, w, 0.5*h);
+            ctx->SET_RGBA(cistyle.fill_colour);
+            ctx->fill();
+            ctx->SET_RGBA(bigcistyle.fill_colour);
+            ctx->paint();
+    });
+
+    s.addLegendItem("68% confidence level", bigcistyle, false);
+
+//    s.addLegendItem("transition1", nested_ci, false, std::list<FillStyle>(1, FillStyle(bigcistyle.fill_colour, Black)));
+
 }
