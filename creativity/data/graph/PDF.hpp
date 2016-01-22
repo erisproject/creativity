@@ -12,18 +12,18 @@ class PDF : public Target {
         /// Creates and returns a Cairo::Context that writes to the current page
         virtual Cairo::RefPtr<Cairo::Surface> surface() override;
 
-        /** Returns the transformation matrix that converts [0,1]x[0,1] coordinates into the full
-         * surface area.
-         */
-        virtual const Cairo::Matrix& unitTransformation() const override;
+        /// Returns the surface width
+        virtual const double& width() const override;
+
+        /// Returns the surface height
+        virtual const double& height() const override;
 
         /// Writes the current surface to disk and starts a new page
         virtual void newPage() override;
 
     private:
         Cairo::RefPtr<Cairo::PdfSurface> pdf_;
-        Cairo::Matrix unit_trans_;
-
+        double width_, height_;
 };
 
 }}}

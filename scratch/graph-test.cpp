@@ -80,7 +80,9 @@ int main() {
     std::cout << "min=" << min <<", max=" << max << "\n";
 
 
-    Series s(pdf, myline.begin()->first, myline.rbegin()->first, min, max);
+    Series s(pdf, "<b>Hi there!</b>\n<small><small>This is <u>my</u> <i>title</i>.</small></small>", myline.begin()->first, myline.rbegin()->first, min, max);
+    s.title_font.set_family("5yearsoldfont");
+    s.title_font.set_size(12*Pango::SCALE);
     s.legend_font.set_family("5yearsoldfont");
     s.legend_font.set_size(5 * Pango::SCALE);
     LineStyle linestyle(RGBA(1,0,0));

@@ -5,27 +5,17 @@
 
 namespace creativity { namespace data { namespace graph {
 
-Series::Series(Target &target, int tmin, int tmax, double ymin, double ymax)
-    : target_{target}, tmin_{tmin}, tmax_{tmax}, ymin_{ymin}, ymax_{ymax}
+Series::Series(Target &target, std::string title_markup, int tmin, int tmax, double ymin, double ymax)
+    : title_markup{std::move(title_markup)}, target_{target}, tmin_{tmin}, tmax_{tmax}, ymin_{ymin}, ymax_{ymax}
 {
     if (tmin_ >= tmax_ or ymin_ >= ymax_) throw std::invalid_argument("Series error: invalid graph region: graph must have tmin < tmax and ymin < ymax");
 }
 
-const Cairo::Matrix& Series::translateUnit() const {
-    return target_.unitTransformation();
-}
-
 Cairo::Matrix Series::translateGraph() const {
-    double left = graph_left, right = graph_right, top = graph_top, bottom = graph_bottom;
-    auto &unit = translateUnit();
-    unit.transform_point(left, top);
-    unit.transform_point(right, bottom);
-    // left/right/top/bottom right now are the outside of the border; adjust to be the inside of the
-    // padding:
-    left += graph_style.border.thickness + graph_padding_left;
-    right -= graph_style.border.thickness + graph_padding_right;
-    top += graph_style.border.thickness + graph_padding_top;
-    bottom -= graph_style.border.thickness + graph_padding_bottom;
+    double left = graph_left + graph_style.border.thickness + graph_padding_left,
+           right = target_.width() - graph_right - graph_style.border.thickness - graph_padding_right,
+           top = graph_top + graph_style.border.thickness + graph_padding_top,
+           bottom = target_.height() - graph_bottom - graph_style.border.thickness - graph_padding_bottom;
 
     return Cairo::Matrix(
             (right - left) / (tmax_ - tmin_), // xx
@@ -52,15 +42,28 @@ void Series::initializePage() {
     ctx->save();
     ctx->SET_RGBA(White);
     ctx->paint();
+
     // Draw the border:
-    double left = graph_left, right = graph_right, top = graph_top, bottom = graph_bottom;
-    auto &unit = translateUnit();
-    unit.transform_point(left, top);
-    unit.transform_point(right, bottom);
+    double left = graph_left, right = target_.width()-graph_right, top = graph_top, bottom = target_.height()-graph_bottom;
     ctx->move_to(left, top);
     drawRectangle(ctx, right-left, bottom-top, graph_style);
     ctx->restore();
     page_initialized_ = true;
+
+    // Write the title
+    double title_max_height = std::max(graph_top - title_padding_top - title_padding_bottom, 0.);
+
+    Pango::init();
+    auto pango_layout = Pango::Layout::create(ctx);
+    pango_layout->set_font_description(title_font);
+    pango_layout->set_width((target_.width() - title_padding_left - title_padding_right)*Pango::SCALE);
+    pango_layout->set_height(title_max_height*Pango::SCALE);
+    pango_layout->set_ellipsize(Pango::EllipsizeMode::ELLIPSIZE_END);
+    pango_layout->set_alignment(Pango::Alignment::ALIGN_CENTER);
+    pango_layout->set_markup(title_markup);
+    ctx->move_to(title_padding_left, title_padding_top);
+    ctx->SET_RGBA(Black);
+    pango_layout->show_in_cairo_context(ctx);
 
     // Restore any saved legend items
     for (const auto &l : legend_) addLegendItem(l.first, l.second, false);
@@ -168,16 +171,14 @@ void Series::addLegendItem(std::string markup, const Series::LegendPainterCallba
 
     auto ctx = Cairo::Context::create(target_.surface());
 
-    double left = legend_left, top = legend_top;
-    translateUnit().transform_point(left, top);
+    double left = target_.width() - graph_right + legend_left,
+           top = graph_top + legend_top;
     top += legend_next_;
 
     // We have to handle the text before the box y position, because the size of the text determines
     // where the box ends up.
     double text_x = left + legend_box_width + legend_box_text_gap,
-           text_right = legend_right,
-           dontcare = 0;
-    translateUnit().transform_point(text_right, dontcare);
+           text_right = target_.width() - legend_right;
     double text_width = text_right - text_x;
 
     Pango::init();
@@ -199,8 +200,8 @@ void Series::addLegendItem(std::string markup, const Series::LegendPainterCallba
         legend_next_ += legend_box_height + legend_spacing;
     }
     else {
-        // The text box is bigger, so `top` needs adjustment to move the box down to center it with
-        // the text
+        // The text box is bigger, so `top` needs adjustment to move the box down (to center it with
+        // the text)
         ctx->move_to(text_x, top);
         top += 0.5*(actual_height - legend_box_height);
         legend_next_ += actual_height + legend_spacing;
@@ -260,10 +261,7 @@ void Series::addLegendItem(std::string markup, FillStyle lower, bool preserve, F
 }
 
 void Series::clipToGraph(Cairo::RefPtr<Cairo::Context> ctx, bool border) const {
-    double left = graph_left, top = graph_top, width = graph_right - graph_left, height = graph_bottom - graph_top;
-    auto &unit = translateUnit();
-    unit.transform_point(left, top);
-    unit.transform_distance(width, height);
+    double left = graph_left, top = graph_top, width = target_.width() - graph_right - graph_left, height = target_.height() - graph_bottom - graph_top;
     if (not border) {
         // Don't include the border in the clip region:
         left += graph_style.border.thickness;

@@ -17,12 +17,13 @@ class Series {
         /** Constructs a new series plot that plots to the given Cairo context.
          *
          * \param target the Target object to which the graph should be drawn
+         * \param title_markup the title of the graph (which may contain pango markup)
          * \param tmin the left-hand-side t value
          * \param tmax the right-hand-side t value
          * \param ymin the minimum y value at the bottom of the plot region
          * \param ymax the maximum y value at the top of the plot region
          */
-        Series(Target &target, int tmin, int tmax, double ymin, double ymax);
+        Series(Target &target, std::string title_markup, int tmin, int tmax, double ymin, double ymax);
 
         /** Writes the current graph to disk and begins a new graph.  If a multi-page surface
          * format, this will be a new page in the output file; otherwise it will be a new file.
@@ -109,17 +110,22 @@ class Series {
          */
         static void drawRectangle(Cairo::RefPtr<Cairo::Context> ctx, double width, double height, const FillStyle &style, bool clip = false);
 
-        ///@{
-        /** The graph area boundary as a proportion of the draw surface area width or height.  The
-         * graph (including the boundary) will be contained entirely within this space.  Note for
-         * top and bottom that 0 corresponds to the top edge of the image surface and 1 corresponds
-         * to the bottom edge.
+        /** The surface units between the top graph border and top surface (image) edge. 
+         * Note that this space contains the graph title.
          */
-        double graph_left = 0.1,
-                 graph_right = 0.8,
-                 graph_top = 0.1,
-                 graph_bottom = 0.8;
-        ///@}
+        double graph_top = 40;
+
+        /// The surface units between the left graph border and left surface (image) edge
+        double graph_left = 40;
+
+        /// The surface units between the bottom graph border and bottom surface (image) edge
+        double graph_bottom = 40;
+
+        /** The surface units between the right graph border and right surface (image) edge.  Note
+         * that this space typically contains any legend items.
+         */
+        double graph_right = 80;
+
         /** The graph area background and border.  Note that even if the border is transparent, the
          * width is still taken into account when determining the graph area.
          */
@@ -132,34 +138,43 @@ class Series {
                graph_padding_bottom = 2;
         ///@}
 
-        /// The left edge of the legend boxes as a proportion of the overall surface width.
-        double legend_left = 0.82;
-        /// The top edge of the first legend item as a proportion of the overall surface height.
-        double legend_top = 0.1;
-        /// The right edge of the legend text area as a proportion of the overall surface width.
-        double legend_right = 0.99;
-        /// The width of the legend box, in surface units.
+        /// The left edge of the legend boxes relative to the right edge of the graph.
+        double legend_left = 8;
+        /// The top edge of the legend boxes relative to the top edge of the graph.
+        double legend_top = 0;
+        /// The distance between the right edge of the legend text area and the right edge of the graph.
+        double legend_right = 4;
+        /// The width of the legend image box, in surface units.
         double legend_box_width = 15;
         /// The height of the legend box, in surface units.
         double legend_box_height = 15;
-        /// The horizontal gap between the legend box and legend text region, in surface units.
+        /// The gap between the legend box and legend text region, in surface units.
         double legend_box_text_gap = 5;
         /** The maximum height of the box that legend text may occupy (beyond which text is
          * ellipsized), in surface units.  The text will be aligned with the middle of the legend
          * box, and the total legend item height will be the larger of the legend box or text
-         * region.
+         * region.  Note that a legend will always contain at least one line of text, and so it is
+         * possible for a legend item to exceed this size if this is set smaller than the required
+         * height for a line of text.
          */
         double legend_text_max_height = 40;
-        /** The font to use for text. */
+        /** The font to use for legend text. */
         Pango::FontDescription legend_font = Pango::FontDescription("serif 8");
-        /** The space to put between legend items.
-         */
+        /// The vertical space to put between legend items.
         double legend_spacing = 3;
 
-        /** Returns a Cairo::Matrix that transforms [0,1]x[0,1] points into the full surface area of
-         * the image.  (0,0) corresponds to the top-left corner, (1,1) to the bottom-right corner.
-         */
-        const Cairo::Matrix& translateUnit() const;
+        /// The graph title text, which may contain pango markup.
+        std::string title_markup;
+        /// The font to use for the title
+        Pango::FontDescription title_font = Pango::FontDescription("serif 13");
+        /// The space between the top of the image and the top of the title, in surface units.
+        double title_padding_top = 2;
+        /// The space between the bottom of the title and the top of the graph, in surface units.
+        double title_padding_bottom = 2;
+        /// The space between the left of the surface and the title, in surface units.
+        double title_padding_left = 20;
+        /// The space between the right of the surface and the title, in surface units.
+        double title_padding_right = 20;
 
         /** Returns a Cairo::Matrix that transforms coordinates to be graphed into the interior
          * graph area of the image, based on the tmin/tmax/ymin/ymax values given when constructing
