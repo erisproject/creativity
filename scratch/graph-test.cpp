@@ -80,7 +80,8 @@ int main() {
     std::cout << "min=" << min <<", max=" << max << "\n";
 
 
-    Series s(pdf, "<b>Hi there!</b>\n<small><small>This is <u>my</u> <i>title</i>.</small></small>", myline.begin()->first, myline.rbegin()->first, min, max);
+    Series s(pdf, "<b>Hi there!</b>\n<small><small>This is <u>my</u> <i>title</i>.</small></small>\n<small><small><small>(If you want your own title, ask nicely.)</small></small></small>", myline.begin()->first, myline.rbegin()->first, min, max);
+    s.autospaceTitle();
     s.title_font.set_family("5yearsoldfont");
     s.title_font.set_size(12*Pango::SCALE);
     s.legend_font.set_family("5yearsoldfont");
@@ -91,6 +92,7 @@ int main() {
     s.addLegendItem(linemarkup, FillStyle(Transparent, linestyle), false);
 
     s.newPage();
+    s.autospaceTitle("Title 2");
 
     FillStyle cistyle(RGBA(0,0,1,1./3.));
     s.addRegion(myci, cistyle);
@@ -99,6 +101,7 @@ int main() {
     s.addLegendItem("90% confidence boundary", cistyle, false);
 
     s.newPage();
+    s.autospaceTitle("");
     FillStyle bigcistyle(RGBA(1,0,0,0.25), LineStyle(RGBA(0,0.5,0,0.5)));
     s.addRegion(myci, cistyle);
     s.addRegion(mybiggerci, bigcistyle);

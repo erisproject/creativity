@@ -31,6 +31,31 @@ void Series::newPage() {
     legend_next_ = 0;
 }
 
+void Series::autospaceTitle(std::string new_title) {
+    title_markup = std::move(new_title);
+    autospaceTitle();
+}
+
+void Series::autospaceTitle() {
+    if (page_initialized_) throw std::logic_error("autospaceTitle() must be called before adding anything that initializes a page");
+
+    if (title_markup.empty()) {
+        graph_top = title_padding_top + title_padding_bottom;
+    }
+    else {
+        Pango::init();
+        auto pango_layout = Pango::Layout::create(Cairo::Context::create(target_.surface()));
+        pango_layout->set_font_description(title_font);
+        pango_layout->set_width((target_.width() - title_padding_left - title_padding_right)*Pango::SCALE);
+        pango_layout->set_ellipsize(Pango::EllipsizeMode::ELLIPSIZE_NONE);
+        pango_layout->set_alignment(Pango::Alignment::ALIGN_CENTER);
+        pango_layout->set_markup(title_markup);
+        int pw, ph;
+        pango_layout->get_size(pw, ph);
+        graph_top = title_padding_top + title_padding_bottom + ph/(double)Pango::SCALE;
+    }
+}
+
 /** Helpful alias to allow ctx->SET_RGBA(blah) as a stand-in for
  * `ctx->set_source_rgba(blah.red, blah.green, blah.blue, blah.alpha)`.
  */
@@ -50,20 +75,22 @@ void Series::initializePage() {
     ctx->restore();
     page_initialized_ = true;
 
-    // Write the title
-    double title_max_height = std::max(graph_top - title_padding_top - title_padding_bottom, 0.);
+    // Draw the title
+    if (not title_markup.empty()) {
+        double title_max_height = std::max(graph_top - title_padding_top - title_padding_bottom, 0.);
 
-    Pango::init();
-    auto pango_layout = Pango::Layout::create(ctx);
-    pango_layout->set_font_description(title_font);
-    pango_layout->set_width((target_.width() - title_padding_left - title_padding_right)*Pango::SCALE);
-    pango_layout->set_height(title_max_height*Pango::SCALE);
-    pango_layout->set_ellipsize(Pango::EllipsizeMode::ELLIPSIZE_END);
-    pango_layout->set_alignment(Pango::Alignment::ALIGN_CENTER);
-    pango_layout->set_markup(title_markup);
-    ctx->move_to(title_padding_left, title_padding_top);
-    ctx->SET_RGBA(Black);
-    pango_layout->show_in_cairo_context(ctx);
+        Pango::init();
+        auto pango_layout = Pango::Layout::create(ctx);
+        pango_layout->set_font_description(title_font);
+        pango_layout->set_width((target_.width() - title_padding_left - title_padding_right)*Pango::SCALE);
+        pango_layout->set_height(title_max_height*Pango::SCALE);
+        pango_layout->set_ellipsize(Pango::EllipsizeMode::ELLIPSIZE_END);
+        pango_layout->set_alignment(Pango::Alignment::ALIGN_CENTER);
+        pango_layout->set_markup(title_markup);
+        ctx->move_to(title_padding_left, title_padding_top);
+        ctx->SET_RGBA(Black);
+        pango_layout->show_in_cairo_context(ctx);
+    }
 
     // Restore any saved legend items
     for (const auto &l : legend_) addLegendItem(l.first, l.second, false);

@@ -110,8 +110,9 @@ class Series {
          */
         static void drawRectangle(Cairo::RefPtr<Cairo::Context> ctx, double width, double height, const FillStyle &style, bool clip = false);
 
-        /** The surface units between the top graph border and top surface (image) edge. 
-         * Note that this space contains the graph title.
+        /** The surface units between the top graph border and top surface (image) edge.  Note that
+         * this space contains the graph title, but see the autospaceTitle() method, which can set
+         * this value to exactly fit a desired title.
          */
         double graph_top = 40;
 
@@ -175,6 +176,28 @@ class Series {
         double title_padding_left = 20;
         /// The space between the right of the surface and the title, in surface units.
         double title_padding_right = 20;
+
+        /** Makes graph_top as small as possible while still being able to fit the current title.
+         *
+         * If the current title is an empty string, graph_top will simply be set to
+         * title_padding_top + title_padding_bottom.
+         *
+         * This method must be called before the page is initialized, i.e. before any of
+         * addLine/addRegion/addLegend have been called for the initial or a new page.
+         *
+         * If you *don't* call this method after changing the title, the title area may be larger or
+         * smaller than the text contained within it, but the graph position will be the same across
+         * images regardless of the title size.
+         *
+         * \throws std::logic_error if the current page has already been initialized.
+         */
+        void autospaceTitle();
+
+        /** Sets a new title, then calls autospaceTitle() to adjust graph_top to exactly fit the new title.
+         *
+         * \sa autospaceTitle()
+         */
+        void autospaceTitle(std::string title_markup);
 
         /** Returns a Cairo::Matrix that transforms coordinates to be graphed into the interior
          * graph area of the image, based on the tmin/tmax/ymin/ymax values given when constructing
