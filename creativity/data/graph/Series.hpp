@@ -50,9 +50,13 @@ class Series {
          * \param style FillStyle the fill style of the region.  The border of the fill style will
          * be used only for the top and bottom border of the region (i.e. the sides will have no
          * border).  Defaults to a 1/3 opacity blue fill with no (i.e. fully transparent) border.
+         * \param stray_thickness the thickness of stray data points (data points without a
+         * finite-value neighbour).
          */
         void addRegion(const std::map<unsigned, std::pair<double, double>> &intervals,
-                const FillStyle &style = FillStyle(RGBA(0,0,1,1./3.)));
+                const FillStyle &style = FillStyle(RGBA(0,0,1,1./3.)),
+                double stray_thickness = 1.
+                );
 
         /** Adds a simple legend item.  The legend box has two main drawing components; each can be
          * transparent to suppress the element.
@@ -109,6 +113,9 @@ class Series {
          * \param clip if true, clip the context to the interior of the rectangle before returning
          */
         static void drawRectangle(Cairo::RefPtr<Cairo::Context> ctx, double width, double height, const FillStyle &style, bool clip = false);
+
+        /// The background colour of the page
+        RGBA background_colour = White;
 
         /** The surface units between the top graph border and top surface (image) edge.  Note that
          * this space contains the graph title, but see the autospaceTitle() method, which can set

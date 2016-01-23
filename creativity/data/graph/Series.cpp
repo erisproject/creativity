@@ -56,16 +56,13 @@ void Series::autospaceTitle() {
     }
 }
 
-/** Helpful alias to allow ctx->SET_RGBA(blah) as a stand-in for
- * `ctx->set_source_rgba(blah.red, blah.green, blah.blue, blah.alpha)`.
- */
-#define SET_RGBA(X) set_source_rgba(X.red, X.green, X.blue, X.alpha)
-
 void Series::initializePage() {
     if (page_initialized_) return;
     auto ctx = Cairo::Context::create(target_.surface());
     ctx->save();
-    ctx->SET_RGBA(White);
+
+    // Background:
+    background_colour.applyTo(ctx);
     ctx->paint();
 
     // Draw the border:
@@ -88,7 +85,7 @@ void Series::initializePage() {
         pango_layout->set_alignment(Pango::Alignment::ALIGN_CENTER);
         pango_layout->set_markup(title_markup);
         ctx->move_to(title_padding_left, title_padding_top);
-        ctx->SET_RGBA(Black);
+        Black.applyTo(ctx);
         pango_layout->show_in_cairo_context(ctx);
     }
 
@@ -102,8 +99,7 @@ void Series::drawRectangle(Cairo::RefPtr<Cairo::Context> ctx, double width, doub
     if (style.border.thickness > 0 and style.border.colour.alpha > 0) {
         ctx->rectangle(left + 0.5*style.border.thickness, top + 0.5*style.border.thickness,
                 width - style.border.thickness, height - style.border.thickness);
-        ctx->SET_RGBA(style.border.colour);
-        ctx->set_line_width(style.border.thickness);
+        style.border.applyTo(ctx);
         ctx->stroke();
     }
     ctx->rectangle(left + style.border.thickness, top + style.border.thickness,
@@ -111,7 +107,7 @@ void Series::drawRectangle(Cairo::RefPtr<Cairo::Context> ctx, double width, doub
 
     if (clip) ctx->clip_preserve();
 
-    ctx->SET_RGBA(style.fill_colour);
+    style.fill_colour.applyTo(ctx);
     ctx->fill();
 }
 
@@ -140,9 +136,8 @@ void Series::addLine(const std::map<unsigned, double> &points, const LineStyle &
     auto ctx = Cairo::Context::create(target_.surface());
     ctx->save();
     clipToGraph(ctx);
-    ctx->set_line_width(style.thickness);
+    style.applyTo(ctx);
     ctx->set_line_cap(Cairo::LineCap::LINE_CAP_ROUND);
-    ctx->SET_RGBA(style.colour);
 
     double clip_top, clip_height;
     {
@@ -233,7 +228,7 @@ void Series::addLegendItem(std::string markup, const Series::LegendPainterCallba
         top += 0.5*(actual_height - legend_box_height);
         legend_next_ += actual_height + legend_spacing;
     }
-    ctx->SET_RGBA(Black);
+    Black.applyTo(ctx);
     pango_layout->show_in_cairo_context(ctx);
 
     // The text is done, and the top-left corner of the box is (left,top).
@@ -273,14 +268,14 @@ void Series::addLegendItem(std::string markup, FillStyle lower, bool preserve, F
             // The x/width/height are too big, but no matter: it's clipped to the space we want anyway
             ctx->rectangle(box_x, box_y + 0.5*(box_height + lower.border.thickness),
                     box_width, 0.5*box_height);
-            ctx->SET_RGBA(lower.fill_colour);
+            lower.fill_colour.applyTo(ctx);
             ctx->fill();
         }
         // Lower border line
         if (lower.border.thickness > 0 and lower.border.colour.alpha > 0) {
             ctx->move_to(box_x, box_y + 0.5*box_height);
             ctx->rel_line_to(box_width, 0);
-            ctx->SET_RGBA(lower.border.colour);
+            lower.border.colour.applyTo(ctx);
             ctx->stroke();
         }
         ctx->restore(); // Unclip the legend box
@@ -326,7 +321,7 @@ void Series::boundRegion(
     ctx->close_path();
 }
 
-void Series::addRegion(const std::map<unsigned, std::pair<double, double>> &intervals, const FillStyle &style) {
+void Series::addRegion(const std::map<int, std::pair<double, double>> &intervals, const FillStyle &style, double stray_thickness) {
     initializePage();
     auto end = intervals.upper_bound(tmax_);
 
@@ -360,7 +355,7 @@ void Series::addRegion(const std::map<unsigned, std::pair<double, double>> &inte
         }
 
         // Fill the groups
-        ctx->SET_RGBA(style.fill_colour);
+        style.fill_colour.applyTo(ctx);
         ctx->fill();
 
         // Now add line segments for any strays
@@ -370,8 +365,8 @@ void Series::addRegion(const std::map<unsigned, std::pair<double, double>> &inte
         }
 
         ctx->restore(); // Undo translation (so stroke width with be right)
-        ctx->set_line_width(style.stray_thickness);
-        ctx->SET_RGBA(style.fill_colour);
+        ctx->set_line_width(stray_thickness);
+        style.fill_colour.applyTo(ctx);
         ctx->stroke();
     }
 

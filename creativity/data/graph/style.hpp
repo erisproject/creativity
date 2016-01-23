@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include <cairomm/context.h>
 namespace creativity { namespace data { namespace graph {
 
 /// Simple struct holding red, green, blue, and alpha values.  Each should be a value in [0,1].
@@ -22,6 +23,8 @@ struct RGBA {
     bool equalsRGB(const RGBA& other) {
         return red == other.red and blue == other.blue and green == other.green;
     }
+    /// Applies the colour to the given Cairo::Context
+    void applyTo(Cairo::RefPtr<Cairo::Context> ctx) const { ctx->set_source_rgba(red, green, blue, alpha); }
     /** Creates the struct from an object with get_red(), get_green(), get_blue(), and get_alpha()
      * methods.  In particular, this is designed to be used with Gdk::RGBA (but we don't want to
      * have to depend on gdkmm, so this is left as a templated constructor).
@@ -51,6 +54,8 @@ struct LineStyle {
         : colour{std::move(rgba)}, thickness{std::move(thickness)}
     {}
 
+    /** Applies the line style to the given Cairo::Context */
+    void applyTo(Cairo::RefPtr<Cairo::Context> ctx) const { colour.applyTo(ctx); ctx->set_line_width(thickness); }
     /// The colour of the line
     RGBA colour;
     /// The thickness of the line
@@ -68,10 +73,6 @@ struct FillStyle {
     FillStyle(LineStyle border) : FillStyle(Transparent, border) {}
     /// The fill colour for the region
     RGBA fill_colour;
-    /** The width of the vertical line for any "stray" elements (i.e. elements without a `t`
-     * neighbour with finite values).
-     */
-    double stray_thickness = 1;
 
     /// The border colour for the region
     LineStyle border;
