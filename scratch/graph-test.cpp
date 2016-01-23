@@ -11,7 +11,7 @@ int main() {
 
 #define NaN std::numeric_limits<double>::quiet_NaN()
 #define INF std::numeric_limits<double>::infinity()
-    std::map<unsigned, double> myline{
+    std::map<int, double> myline{
         {1,10.},
         {2,20.},
         {3,25.},
@@ -30,7 +30,7 @@ int main() {
         {20,20},
         {21,21}
     };
-    std::map<unsigned, std::pair<double, double>> myci{
+    std::map<int, std::pair<double, double>> myci{
         {1,{5.,15.}},
         {2,{17.,26.}},
         {3,{45.,5.}},
@@ -50,7 +50,7 @@ int main() {
         {21,{20,22}}
     };
 
-    std::map<unsigned, std::pair<double, double>> mybiggerci(myci);
+    std::map<int, std::pair<double, double>> mybiggerci(myci);
     for (auto p : myline) {
         auto &ci = mybiggerci.at(p.first);
         ci.first = p.second + (ci.first-p.second)*1.5;
@@ -93,6 +93,7 @@ int main() {
 
     s.newPage();
     s.autospaceTitle("Title 2");
+    s.recalcTicks(10, 8, Series::TickEnds::Replace);
 
     FillStyle cistyle(RGBA(0,0,1,1./3.));
     s.addRegion(myci, cistyle);
@@ -102,6 +103,7 @@ int main() {
 
     s.newPage();
     s.autospaceTitle("");
+    s.recalcTicks(10, 8, Series::TickEnds::Add);
     FillStyle bigcistyle(RGBA(1,0,0,0.25), LineStyle(RGBA(0,0.5,0,0.5)));
     s.addRegion(myci, cistyle);
     s.addRegion(mybiggerci, bigcistyle);

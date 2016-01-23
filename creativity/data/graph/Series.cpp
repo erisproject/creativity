@@ -9,6 +9,56 @@ Series::Series(Target &target, std::string title_markup, int tmin, int tmax, dou
     : title_markup{std::move(title_markup)}, target_{target}, tmin_{tmin}, tmax_{tmax}, ymin_{ymin}, ymax_{ymax}
 {
     if (tmin_ >= tmax_ or ymin_ >= ymax_) throw std::invalid_argument("Series error: invalid graph region: graph must have tmin < tmax and ymin < ymax");
+
+    recalcTicks();
+}
+
+void Series::recalcTicks(unsigned xmax, unsigned ymax, TickEnds end_mode) {
+    if (xmax < 2 or ymax < 2) throw std::logic_error("Series::recalcTicks error: both arguments must be >= 2");
+    // The increment to consider (will possibly increase this)
+    int t_incr = 1;
+    // The first and last ticks to be added; first will be >= tmin_, last will be <= tmax_, and both
+    // will be multiples of t_incr.
+    int first = tmin_, last = tmax_;
+    // Tracks the tick increment: we multiply by the repeating cycle (2,2,5/4,8/5,5/4) (starting at
+    // the second value) to get the pattern 1 2 2.5 4 5 10 20 25 40 50 100 200 250 400 500 1000 ...
+    // (except we skip 2.5 because it's not an integer) which seems a reasonable set of "round"
+    // increments (in particular, they are all the multiples which give a nice round number at least
+    // every 4 or 5 steps).
+    unsigned n = 0;
+
+    while ((unsigned) ((last - first) / t_incr) >= xmax) {
+        // Error out before we overflow:
+        if (t_incr > std::numeric_limits<int>::max() / 2) throw std::overflow_error("recalcTicks failed: t increment too large");
+        ++n %= 5;
+        if (t_incr == 2) { n++; t_incr = 4; } // Skip over 2.5
+        else if (n < 2) t_incr *= 2;
+        else if (n == 3) t_incr = 8 * (t_incr / 5);
+        else t_incr = 5 * (t_incr / 4);
+        first = tmin_ + t_incr - 1 - (tmin_ + t_incr - 1) % t_incr;
+        last = tmax_ - (tmax_ % t_incr);
+    }
+    t_ticks.clear();
+    if (end_mode == TickEnds::Replace) {
+        first += t_incr;
+        last -= t_incr;
+    }
+    if ((end_mode == TickEnds::Replace or end_mode == TickEnds::Add) and tmin_ != first)
+        t_ticks.emplace(tmin_);
+
+    for (int i = first; i <= last; i += t_incr) {
+        t_ticks.emplace_hint(t_ticks.end(), i);
+    }
+
+    if ((end_mode == TickEnds::Replace or end_mode == TickEnds::Add) and tmax_ != first)
+        t_ticks.emplace_hint(t_ticks.end(), tmax_);
+
+
+    // Now do something similar for y, except we can't start from 1 and go up: we start from 1 and
+    // then either go down (1 -> 0.5 -> 0.25 -> 0.1 -> ...) *or* up (1 -> 2 -> 5 -> 10 -> ...)
+    y_ticks.clear();
+    y_ticks.emplace(ymin_);
+    y_ticks.emplace(ymax_);
 }
 
 Cairo::Matrix Series::translateGraph() const {
@@ -59,18 +109,72 @@ void Series::autospaceTitle() {
 void Series::initializePage() {
     if (page_initialized_) return;
     auto ctx = Cairo::Context::create(target_.surface());
+
     ctx->save();
 
     // Background:
     background_colour.applyTo(ctx);
     ctx->paint();
 
-    // Draw the border:
+    // Border:
     double left = graph_left, right = target_.width()-graph_right, top = graph_top, bottom = target_.height()-graph_bottom;
     ctx->move_to(left, top);
     drawRectangle(ctx, right-left, bottom-top, graph_style);
-    ctx->restore();
-    page_initialized_ = true;
+
+    // Tick marks; these are in the same colour as the graph style border
+    auto translate_graph = translateGraph();
+    Pango::init();
+    auto pango_layout = Pango::Layout::create(ctx);
+    // Horizontal axis ticks:
+    if (not t_ticks.empty()) {
+        double tick_top = bottom;
+        pango_layout->set_font_description(tick_font);
+        for (const auto &t : t_ticks) {
+            double tick_x = t, dontcare = 0;
+            translate_graph.transform_point(tick_x, dontcare);
+            if (tick_style.length > 0 and tick_style.thickness > 0) {
+                tick_style.applyTo(ctx);
+                ctx->move_to(tick_x, tick_top);
+                ctx->rel_line_to(0, tick_style.length);
+                ctx->stroke();
+            }
+            if (tick_font_colour.alpha > 0) {
+                pango_layout->set_text(std::to_string(t));
+                int tvw, tvh;
+                pango_layout->get_size(tvw, tvh);
+                double width = (double)tvw / Pango::SCALE;
+                ctx->move_to(tick_x - 0.5*width, tick_top + tick_style.length);
+                tick_font_colour.applyTo(ctx);
+                pango_layout->show_in_cairo_context(ctx);
+            }
+        }
+    }
+    // Vertical axis ticks:
+    if (not y_ticks.empty()) {
+        double tick_right = graph_left;
+        pango_layout->set_font_description(tick_font);
+        for (double y : y_ticks) {
+            double dontcare = 0, tick_y = y;
+            translate_graph.transform_point(dontcare, tick_y);
+            if (tick_style.length > 0 and tick_style.thickness > 0) {
+                tick_style.applyTo(ctx);
+                ctx->move_to(tick_right, tick_y);
+                ctx->rel_line_to(-tick_style.length, 0);
+                ctx->stroke();
+            }
+            if (tick_font_colour.alpha > 0) {
+                std::ostringstream oss;
+                oss << y;
+                pango_layout->set_text(oss.str());
+                int tvw, tvh;
+                pango_layout->get_size(tvw, tvh);
+                double width = (double)tvw / Pango::SCALE, height = (double)tvh / Pango::SCALE;
+                ctx->move_to(tick_right - tick_style.length - width, tick_y - 0.5*height);
+                tick_font_colour.applyTo(ctx);
+                pango_layout->show_in_cairo_context(ctx);
+            }
+        }
+    }
 
     // Draw the title
     if (not title_markup.empty()) {
@@ -88,6 +192,9 @@ void Series::initializePage() {
         Black.applyTo(ctx);
         pango_layout->show_in_cairo_context(ctx);
     }
+
+    ctx->restore();
+    page_initialized_ = true;
 
     // Restore any saved legend items
     for (const auto &l : legend_) addLegendItem(l.first, l.second, false);
@@ -111,12 +218,12 @@ void Series::drawRectangle(Cairo::RefPtr<Cairo::Context> ctx, double width, doub
     ctx->fill();
 }
 
-void Series::addLine(const std::map<unsigned, double> &points, const LineStyle &style) {
+void Series::addLine(const std::map<int, double> &points, const LineStyle &style) {
     initializePage();
     auto end = points.upper_bound(tmax_);
     bool have_prev = false;
     // List of list of line segments; the inner list will be contiguous
-    std::list<std::list<std::pair<unsigned, double>>> segments;
+    std::list<std::list<std::pair<int, double>>> segments;
     for (auto it = points.lower_bound(tmin_); it != end; it++) {
         bool have_curr = std::isfinite(it->second);
 
@@ -298,9 +405,9 @@ void Series::clipToGraph(Cairo::RefPtr<Cairo::Context> ctx, bool border) const {
 
 void Series::boundRegion(
                 Cairo::RefPtr<Cairo::Context> ctx,
-                std::map<unsigned, std::pair<double, double>>::const_iterator first,
-                std::map<unsigned, std::pair<double, double>>::const_iterator last,
-                std::map<unsigned, std::pair<double, double>> &strays) {
+                std::map<int, std::pair<double, double>>::const_iterator first,
+                std::map<int, std::pair<double, double>>::const_iterator last,
+                std::map<int, std::pair<double, double>> &strays) {
     if (first == last) {
         strays.insert(*first);
         return;
@@ -334,7 +441,7 @@ void Series::addRegion(const std::map<int, std::pair<double, double>> &intervals
         ctx->save();
         ctx->set_matrix(translateGraph());
 
-        std::map<unsigned, std::pair<double, double>> strays;
+        std::map<int, std::pair<double, double>> strays;
         for (auto it = intervals.lower_bound(tmin_); it != end; prev_it = it++) {
             bool have_curr = std::isfinite(it->second.first) and std::isfinite(it->second.second);
             // If we don't have a current element or we have a gap, but there is was an active group
@@ -374,7 +481,7 @@ void Series::addRegion(const std::map<int, std::pair<double, double>> &intervals
 
     // Now draw the border lines (if any)
     if (style.border.colour.alpha > 0) {
-        std::map<unsigned, double> max_line, min_line;
+        std::map<int, double> max_line, min_line;
         for (auto it = intervals.lower_bound(tmin_); it != end; it++) {
             const auto &a = it->second.first, &b = it->second.second;
             if (std::isfinite(a) and std::isfinite(b)) {

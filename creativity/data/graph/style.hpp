@@ -50,8 +50,8 @@ extern const RGBA
 /** Style class for a drawn line. */
 struct LineStyle {
     /** Constructs a line style directly from an Gdk::RGBA object. */
-    LineStyle(RGBA rgba, double thickness = 1.0)
-        : colour{std::move(rgba)}, thickness{std::move(thickness)}
+    LineStyle(RGBA rgba, double thickness = 1.0, double length = std::numeric_limits<double>::quiet_NaN())
+        : colour{std::move(rgba)}, thickness{std::move(thickness)}, length{std::move(length)}
     {}
 
     /** Applies the line style to the given Cairo::Context */
@@ -60,6 +60,11 @@ struct LineStyle {
     RGBA colour;
     /// The thickness of the line
     double thickness;
+    /** Length of the line, if applicable.  This is used for things like tick marks where
+     * `thickness` is the line width and this is the line length.  In other cases, this value is
+     * unused.
+     */
+    double length;
 };
 
 /** Style class for a filled region. */

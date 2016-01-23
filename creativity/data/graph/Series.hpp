@@ -5,6 +5,7 @@
 #include <pangomm/fontdescription.h>
 #include <pangomm/font.h>
 #include <map>
+#include <set>
 
 namespace creativity { namespace data { namespace graph {
 
@@ -37,7 +38,7 @@ class Series {
          * \param points the map of time to value coordinates to plot
          * \param style the LineStyle; defaults to a 1-unit-wide black line.
          */
-        void addLine(const std::map<unsigned, double> &points,
+        void addLine(const std::map<int, double> &points,
                 const LineStyle &style = LineStyle(RGBA(0,0,0))
                 );
 
@@ -53,7 +54,7 @@ class Series {
          * \param stray_thickness the thickness of stray data points (data points without a
          * finite-value neighbour).
          */
-        void addRegion(const std::map<unsigned, std::pair<double, double>> &intervals,
+        void addRegion(const std::map<int, std::pair<double, double>> &intervals,
                 const FillStyle &style = FillStyle(RGBA(0,0,1,1./3.)),
                 double stray_thickness = 1.
                 );
@@ -116,6 +117,17 @@ class Series {
 
         /// The background colour of the page
         RGBA background_colour = White;
+
+        /** The line style (including length) of tick marks.  Defaults to a black, 0.5-width,
+         * 3-length line.  The `length` parameter of the style controls the length of tick marks; if
+         * 0, tick marks are suppressed. */
+        LineStyle tick_style = LineStyle(Black, 0.5, 3);
+
+        /** The font colour for tick values.  If completely transparent, tick values are not drawn. */
+        RGBA tick_font_colour = Black;
+
+        /** The font for tick values */
+        Pango::FontDescription tick_font = Pango::FontDescription("serif 6");
 
         /** The surface units between the top graph border and top surface (image) edge.  Note that
          * this space contains the graph title, but see the autospaceTitle() method, which can set
@@ -184,6 +196,16 @@ class Series {
         /// The space between the right of the surface and the title, in surface units.
         double title_padding_right = 20;
 
+        /** X-axis (t) tick mark locations, calculated during construction.  Can be recalculated by
+         * calling recalcTicks().  If cleared, no horizontal axis ticks are displayed.
+         */
+        std::set<int> t_ticks;
+
+        /** Y-axis tick mark locations, calculated during construction.  Can be recalculated by
+         * calling recalcTicks().  If cleared, no vertical axis ticks are displayed.
+         */
+        std::set<double> y_ticks;
+
         /** Makes graph_top as small as possible while still being able to fit the current title.
          *
          * If the current title is an empty string, graph_top will simply be set to
@@ -205,6 +227,24 @@ class Series {
          * \sa autospaceTitle()
          */
         void autospaceTitle(std::string title_markup);
+
+        /** Different modes for what to do with the tick end points. */
+        enum class TickEnds {
+            Add, ///< If an end isn't already in the calculated ticks, add it.  This can result in up to two more than the requested maximum number of ticks.
+            Replace, ///< If an end isn't already in the calculated ticks, replaced the first/last tick with a tick at the end
+            None ///< Don't do anything with tick end values.  Tick ends will only show up if the ends happen to coincide with multiple of the tick increments
+        };
+
+        /** Calculates where tick marks should go.  This will be applied the next time the graph is
+         * drawn, and so has to be called before adding any graph elements to have an effect on the
+         * current page.
+         *
+         * \param xmax the maximum number of tick marks on the x axis.  Defaults to 10
+         * \param ymax the maximum number of tick marks on the y axis.  Defaults to 8
+         * \param end_mode what to do with the ends (i.e. tmin, tmax, ymin, ymax given during
+         * construction).  The default is TickEnds::None.
+         */
+        void recalcTicks(unsigned xmax = 10, unsigned ymax = 8, TickEnds end_mode = TickEnds::None);
 
         /** Returns a Cairo::Matrix that transforms coordinates to be graphed into the interior
          * graph area of the image, based on the tmin/tmax/ymin/ymax values given when constructing
@@ -270,9 +310,9 @@ class Series {
          */
         static void boundRegion(
                 Cairo::RefPtr<Cairo::Context> ctx,
-                std::map<unsigned, std::pair<double, double>>::const_iterator first,
-                std::map<unsigned, std::pair<double, double>>::const_iterator last,
-                std::map<unsigned, std::pair<double, double>> &strays);
+                std::map<int, std::pair<double, double>>::const_iterator first,
+                std::map<int, std::pair<double, double>>::const_iterator last,
+                std::map<int, std::pair<double, double>> &strays);
 };
 
 }}}
