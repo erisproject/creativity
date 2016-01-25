@@ -123,6 +123,11 @@ class Series {
          * 0, tick marks are suppressed. */
         LineStyle tick_style = LineStyle(Black, 0.5, 3);
 
+        /** The line style to draw for ticks grid lines on the graph itself (*not* the tick marks
+         * themselves, which show up outside the graph area). Defaults to transparent (i.e. no grid
+         * lines). */
+        LineStyle tick_grid_style = LineStyle(Transparent, 0.5);
+
         /** The font colour for tick values.  If completely transparent, tick values are not drawn. */
         RGBA tick_font_colour = Black;
 
@@ -206,6 +211,22 @@ class Series {
          */
         std::set<double> y_ticks;
 
+        /** X-axis (t) grid mark locations, calculated during construction.  Can be recalculated by
+         * calling recalcTicks().  If cleared, no vertical grid lines are drawn.
+         *
+         * This will, by default, be equal to t_ticks if recalcTicks() is called with TickEnds::Add;
+         * for the other end modes, the grid end points can differ.
+         */
+        std::set<int> t_grid;
+
+        /** Y-axis grid mark locations, calculated during construction.  Can be recalculated by
+         * calling recalcTicks().  If cleared, no horizontal grid lines are drawn.
+         *
+         * This will, by default, be equal to y_ticks if recalcTicks() is called with TickEnds::None;
+         * for the other end modes, the grid end points can differ.
+         */
+        std::set<int> y_grid;
+
         /** Makes graph_top as small as possible while still being able to fit the current title.
          *
          * If the current title is an empty string, graph_top will simply be set to
@@ -228,23 +249,60 @@ class Series {
          */
         void autospaceTitle(std::string title_markup);
 
-        /** Different modes for what to do with the tick end points. */
+        /** Different modes for what to do with the tmin/tmax/ymin/ymax graph end points given
+         * during construction. */
         enum class TickEnds {
-            Add, ///< If an end isn't already in the calculated ticks, add it.  This can result in up to two more than the requested maximum number of ticks.
-            Replace, ///< If an end isn't already in the calculated ticks, replaced the first/last tick with a tick at the end
-            None ///< Don't do anything with tick end values.  Tick ends will only show up if the ends happen to coincide with multiple of the tick increments
+            /** If an end point isn't equal to or very close to a calculated tick mark, add it.
+             * This can result in up to two more than the requested maximum number of ticks.  Very
+             * close is considered to be within one-quarter of a tick from the first or last
+             * calculated tick.
+             *
+             * For example, if the end points result in calculated tick marks are 5 10 15 20 25 30
+             * 35, with TickEnds::Add an extra tick would be added to the beginning for a minimum
+             * value in (0, 3.75], and would be added to the end for a maximum value in [36.25, 40);
+             * ticks are not added for end points within 1.25 (1/4 of a tick) of the calculated
+             * minimum/maximum ticks.
+             */
+            Add,
+            Replace, ///< The first and last calculated tick marks are removed and replaced with the min/max graph axis values.
+            None ///< Don't do anything with tick end values.  Value range ends will only show up if the ends happen to coincide with multiple of the tick increments
         };
 
-        /** Calculates where tick marks should go.  This will be applied the next time the graph is
-         * drawn, and so has to be called before adding any graph elements to have an effect on the
-         * current page.
+        /** Calculates where tick marks and grid lines should go.  This will be applied the next
+         * time the graph is drawn, and so has to be called before adding any graph elements to have
+         * an effect on the current page.
+         *
+         * This method simply calls recalcTicksT() and recalcTicksY().
          *
          * \param xmax the maximum number of tick marks on the x axis.  Defaults to 10
          * \param ymax the maximum number of tick marks on the y axis.  Defaults to 8
          * \param end_mode what to do with the ends (i.e. tmin, tmax, ymin, ymax given during
-         * construction).  The default is TickEnds::None.
+         * construction).  The default is TickEnds::None.  Grid lines are not affected by this
+         * option.
          */
         void recalcTicks(unsigned xmax = 10, unsigned ymax = 8, TickEnds end_mode = TickEnds::None);
+
+        /** Recalculates just the t tick marks and grid lines on the graph, leaving y ticks
+         * unchanged.  The tick marks are calculated to have a round increment which is the smallest
+         * of 1, 2, 4, 5, 10, 20, 25, 40, 50, 100, 200, 250, 400, 500, ... such that no more than
+         * `max` ticks are needed to cover the range of t data.
+         *
+         * \param max the maximum number of tick marks on the t/x axis.  Defaults to 10.
+         * \param end_mode what to do with the ends (i.e. tmin, tmax) for tick marks.  The default
+         * is TickEnds::None.  Grid lines are not affected by this option.
+         */
+        void recalcTicksT(unsigned max = 10, TickEnds end_mode = TickEnds::None);
+
+        /** Recalculates just the y tick marks and grid lines on the graph, leaving t ticks
+         * unchanged.  The space between tick marks is calculated to be smallest value of (1, 2,
+         * 2.5, 4, 5) times a power of ten that results in no more than `max` ticks to cover the
+         * span of the data given during construction.
+         *
+         * \param max the maximum number of tick marks on the y axis.  Defaults to 8.
+         * \param end_mode what to do with the ends (i.e. ymin, ymax).  The default is
+         * TickEnds::None.  Grid lines are not affected by this option.
+         */
+        void recalcTicksY(unsigned max = 8, TickEnds end_mode = TickEnds::None);
 
         /** Returns a Cairo::Matrix that transforms coordinates to be graphed into the interior
          * graph area of the image, based on the tmin/tmax/ymin/ymax values given when constructing
@@ -305,7 +363,7 @@ class Series {
          * points correspond to the graph region.
          * \param first the iterator to the first element in the group
          * \param last the iterator to the last element in the group (NOT the past-the-end iterator)
-         * \param stays a map to store a "stray" (that is, single-time-period) observation in (only
+         * \param strays a map to store a "stray" (that is, single-time-period) observation in (only
          * when first == last).
          */
         static void boundRegion(

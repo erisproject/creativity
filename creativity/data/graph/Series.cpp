@@ -14,7 +14,13 @@ Series::Series(Target &target, std::string title_markup, int tmin, int tmax, dou
 }
 
 void Series::recalcTicks(unsigned xmax, unsigned ymax, TickEnds end_mode) {
-    if (xmax < 2 or ymax < 2) throw std::logic_error("Series::recalcTicks error: both arguments must be >= 2");
+    recalcTicksT(xmax, end_mode);
+    recalcTicksY(ymax, end_mode);
+}
+
+void Series::recalcTicksT(unsigned max, TickEnds end_mode) {
+    if (max < 2) throw std::logic_error("Series::recalcTicksT: max ticks must be >= 2");
+
     // The increment to consider (will possibly increase this)
     int t_incr = 1;
     // The first and last ticks to be added; first will be >= tmin_, last will be <= tmax_, and both
@@ -27,7 +33,7 @@ void Series::recalcTicks(unsigned xmax, unsigned ymax, TickEnds end_mode) {
     // every 4 or 5 steps).
     unsigned n = 0;
 
-    while ((unsigned) ((last - first) / t_incr) >= xmax) {
+    while ((unsigned) ((last - first) / t_incr) >= max) {
         // Error out before we overflow:
         if (t_incr > std::numeric_limits<int>::max() / 2) throw std::overflow_error("recalcTicks failed: t increment too large");
         ++n %= 5;
@@ -38,27 +44,109 @@ void Series::recalcTicks(unsigned xmax, unsigned ymax, TickEnds end_mode) {
         first = tmin_ + t_incr - 1 - (tmin_ + t_incr - 1) % t_incr;
         last = tmax_ - (tmax_ % t_incr);
     }
+    t_grid.clear();
+    t_grid.emplace(first);
+    auto grid_last_it = t_grid.emplace(last).first;
     t_ticks.clear();
+    auto ticks_end_it = t_ticks.end();
     if (end_mode == TickEnds::Replace) {
+        t_ticks.emplace(tmin_);
+        ticks_end_it = t_ticks.emplace_hint(ticks_end_it, tmax_);
         first += t_incr;
         last -= t_incr;
     }
-    if ((end_mode == TickEnds::Replace or end_mode == TickEnds::Add) and tmin_ != first)
-        t_ticks.emplace(tmin_);
-
-    for (int i = first; i <= last; i += t_incr) {
-        t_ticks.emplace_hint(t_ticks.end(), i);
+    else if (end_mode == TickEnds::Add) {
+        if (4*(first - tmin_) >= t_incr) t_ticks.emplace(tmin_);
+        if (4*(tmax_ - last)  >= t_incr) ticks_end_it = t_ticks.emplace_hint(ticks_end_it, tmax_);
     }
 
-    if ((end_mode == TickEnds::Replace or end_mode == TickEnds::Add) and tmax_ != first)
-        t_ticks.emplace_hint(t_ticks.end(), tmax_);
+    for (int i = first; i <= last; i += t_incr) {
+        t_ticks.emplace_hint(ticks_end_it, i);
+        t_grid.emplace_hint(grid_last_it, i);
+    }
+}
 
-
+void Series::recalcTicksY(unsigned max, TickEnds end_mode) {
     // Now do something similar for y, except we can't start from 1 and go up: we start from 1 and
     // then either go down (1 -> 0.5 -> 0.25 -> 0.1 -> ...) *or* up (1 -> 2 -> 5 -> 10 -> ...)
     y_ticks.clear();
-    y_ticks.emplace(ymin_);
-    y_ticks.emplace(ymax_);
+
+    constexpr std::array<double, 5> base{{1, 2, 2.5, 4, 5}};
+
+    unsigned base_i = 0;
+    int exp10 = int(std::log10(ymax_ - ymin_));
+    // Start out somewhere close (roughly within an order of magnitude):
+    double y_incr = base[base_i] * std::pow(10, exp10);
+    double last_y_incr = y_incr;
+
+    int first = -max, last = max;
+    unsigned last_ticks = 0;
+    while (true) {
+        if (not std::isfinite(y_incr) or y_incr <= 0)
+            throw std::logic_error("recalcTicksY internal error: non-positive increment");
+        int try_first = (int) (ymin_ / y_incr);
+        if (ymin_ > 0 and std::fmod(ymin_, y_incr) > 0) try_first++;
+        int try_last = (int) (ymax_ / y_incr);
+        if (ymax_ < 0 and std::fmod(ymax_, y_incr) < 0) try_last--;
+
+        unsigned ticks = try_last - try_first + 1;
+        if (last_ticks > max and ticks <= max) {
+            // This step moved from too-many-ticks to an okay number, so we're done
+            first = try_first;
+            last = try_last;
+            break;
+        }
+        else if (last_ticks > 0 and last_ticks <= max and ticks > max) {
+            // This step would move from an okay number to too many ticks, so the last step is what
+            // we want.
+            y_incr = last_y_incr;
+            break;
+        }
+        else {
+            last_ticks = ticks;
+            first = try_first;
+            last = try_last;
+            if (last_ticks > max) {
+                // Too many ticks: need a bigger tick increment
+                if (++base_i == base.size()) {
+                    base_i = 0;
+                    exp10++;
+                }
+            }
+            else {
+                // Too few: need a smaller tick increment
+                if (base_i == 0) {
+                    base_i = base.size();
+                    exp10--;
+                }
+                base_i--;
+            }
+            last_y_incr = y_incr;
+            y_incr = base[base_i] * std::pow(10, exp10);
+        }
+    }
+
+
+    y_grid.clear();
+    y_grid.emplace(first*y_incr);
+    auto grid_last_it = y_grid.emplace(last*y_incr).first;
+    y_ticks.clear();
+    auto ticks_end_it = y_ticks.end();
+    if (end_mode == TickEnds::Replace) {
+        y_ticks.emplace(ymin_);
+        ticks_end_it = y_ticks.emplace_hint(ticks_end_it, ymax_);
+        first++;
+        last--;
+    }
+    else if (end_mode == TickEnds::Add) {
+        if (first*y_incr - ymin_ >= 0.25*y_incr) y_ticks.emplace(ymin_);
+        if (ymax_ - last*y_incr >= 0.25*y_incr) ticks_end_it = y_ticks.emplace_hint(ticks_end_it, ymax_);
+    }
+
+    for (int i = first; i <= last; i++) {
+        y_ticks.emplace_hint(ticks_end_it, i*y_incr);
+        y_grid.emplace_hint(grid_last_it, i*y_incr);
+    }
 }
 
 Cairo::Matrix Series::translateGraph() const {
@@ -153,7 +241,7 @@ void Series::initializePage() {
     if (not y_ticks.empty()) {
         double tick_right = graph_left;
         pango_layout->set_font_description(tick_font);
-        for (double y : y_ticks) {
+        for (const auto &y : y_ticks) {
             double dontcare = 0, tick_y = y;
             translate_graph.transform_point(dontcare, tick_y);
             if (tick_style.length > 0 and tick_style.thickness > 0) {
@@ -174,6 +262,29 @@ void Series::initializePage() {
                 pango_layout->show_in_cairo_context(ctx);
             }
         }
+    }
+
+    if (tick_grid_style.colour.alpha > 0 and not (t_grid.empty() and y_grid.empty())) {
+        double left = graph_left, right = target_.width()-graph_right, top = graph_top, bottom = target_.height()-graph_bottom;
+        ctx->rectangle(left + graph_style.border.thickness, top + graph_style.border.thickness,
+                right - left - 2*graph_style.border.thickness, bottom - top - 2*graph_style.border.thickness);
+        ctx->clip();
+
+        for (const auto &t : t_grid) {
+            double grid_x = t, dontcare;
+            translate_graph.transform_point(grid_x, dontcare);
+            ctx->move_to(grid_x, top);
+            ctx->line_to(grid_x, bottom);
+        }
+        for (const auto &y : y_grid) {
+            double grid_y = y, dontcare = 0;
+            translate_graph.transform_point(dontcare, grid_y);
+            ctx->move_to(left, grid_y);
+            ctx->line_to(right, grid_y);
+        }
+
+        tick_grid_style.applyTo(ctx);
+        ctx->stroke();
     }
 
     // Draw the title

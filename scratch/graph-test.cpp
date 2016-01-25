@@ -44,6 +44,7 @@ int main() {
         {12,{12,INF}},
         {14,{13,15}},
         {16,{16,16}},
+        {17,{12,14}},
         {18,{-2,28}},
         {19,{17,21}},
         {20,{14,30}},
@@ -94,6 +95,8 @@ int main() {
     s.newPage();
     s.autospaceTitle("Title 2");
     s.recalcTicks(10, 8, Series::TickEnds::Replace);
+    s.graph_style.fill_colour = RGBA(0.95, 0.95, 0.95);
+    s.tick_grid_style = LineStyle(White, 1);
 
     FillStyle cistyle(RGBA(0,0,1,1./3.));
     s.addRegion(myci, cistyle);
@@ -104,6 +107,9 @@ int main() {
     s.newPage();
     s.autospaceTitle("");
     s.recalcTicks(10, 8, Series::TickEnds::Add);
+    s.graph_style.fill_colour = White;
+    s.tick_grid_style = LineStyle(RGBA(.95,.95,.95), 1);
+
     FillStyle bigcistyle(RGBA(1,0,0,0.25), LineStyle(RGBA(0,0.5,0,0.5)));
     s.addRegion(myci, cistyle);
     s.addRegion(mybiggerci, bigcistyle);

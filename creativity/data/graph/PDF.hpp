@@ -4,6 +4,7 @@
 
 namespace creativity { namespace data { namespace graph {
 
+/** Graph target that writes to pages of a PDF file. */
 class PDF : public Target {
     public:
         /// Constructs a new PDF target with the given filename and size
