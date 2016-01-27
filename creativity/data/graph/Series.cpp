@@ -5,12 +5,27 @@
 
 namespace creativity { namespace data { namespace graph {
 
-Series::Series(Target &target, std::string title_markup, int tmin, int tmax, double ymin, double ymax)
-    : title_markup{std::move(title_markup)}, target_{target}, tmin_{tmin}, tmax_{tmax}, ymin_{ymin}, ymax_{ymax}
-{
-    if (tmin_ >= tmax_ or ymin_ >= ymax_) throw std::invalid_argument("Series error: invalid graph region: graph must have tmin < tmax and ymin < ymax");
+const FillStyle Series::default_legend_style{LineStyle(Black, 1)};
+const LineStyle Series::default_line_style{Black, 1};
+const FillStyle Series::default_region_style{RGBA(0,0,1,0.25)};
 
+
+Series::Series(Target &target, std::string title_markup, int tmin, int tmax, double ymin, double ymax)
+    : title_markup{std::move(title_markup)}, target_{target}
+{
+    setExtents(tmin, tmax, ymin, ymax);
     recalcTicks();
+}
+
+void Series::setExtents(int tmin, int tmax, double ymin, double ymax, bool retick) {
+    if (tmin >= tmax) throw std::invalid_argument("Invalid graph extents: tmin must be less than tmax");
+    if (ymin >= ymax) throw std::invalid_argument("Invalid graph extents: ymin must be less than ymax");
+    tmin_ = tmin;
+    tmax_ = tmax;
+    ymin_ = ymin;
+    ymax_ = ymax;
+
+    if (retick) recalcTicks();
 }
 
 void Series::recalcTicks(unsigned xmax, unsigned ymax, TickEnds end_mode) {
@@ -266,6 +281,7 @@ void Series::initializePage() {
 
     if (tick_grid_style.colour.alpha > 0 and not (t_grid.empty() and y_grid.empty())) {
         double left = graph_left, right = target_.width()-graph_right, top = graph_top, bottom = target_.height()-graph_bottom;
+        ctx->save();
         ctx->rectangle(left + graph_style.border.thickness, top + graph_style.border.thickness,
                 right - left - 2*graph_style.border.thickness, bottom - top - 2*graph_style.border.thickness);
         ctx->clip();
@@ -285,6 +301,7 @@ void Series::initializePage() {
 
         tick_grid_style.applyTo(ctx);
         ctx->stroke();
+        ctx->restore();
     }
 
     // Draw the title
@@ -403,10 +420,14 @@ void Series::addLine(const std::map<int, double> &points, const LineStyle &style
 
 
 void Series::addLegendItem(std::string markup, Series::LegendPainterCallback_t &&painter, bool preserve) {
-    addLegendItem(markup, painter, false);
+    if (not preserve or page_initialized_) addLegendItem(markup, painter, false);
     if (preserve) legend_.emplace_back(std::move(markup), std::move(painter));
 }
 void Series::addLegendItem(std::string markup, const Series::LegendPainterCallback_t &painter, bool preserve) {
+    if (preserve) {
+        legend_.emplace_back(markup, painter);
+        if (not page_initialized_) return;
+    }
     initializePage();
 
     auto ctx = Cairo::Context::create(target_.surface());
@@ -462,42 +483,38 @@ void Series::addLegendItem(std::string markup, const Series::LegendPainterCallba
     painter(ctx, to_box);
 
     ctx->restore(); // Undo clipping
-
-    if (preserve) legend_.emplace_back(markup, painter);
 }
 
 void Series::addLegendItem(std::string markup, FillStyle lower, bool preserve, FillStyle bg) {
-    initializePage();
+    using namespace std::placeholders;
+    addLegendItem(markup, std::bind(&Series::addSimpleLegendItem, this, _1, _2, lower, bg), preserve);
+}
 
-    addLegendItem(markup, [this,lower,bg](
-                Cairo::RefPtr<Cairo::Context> ctx,
-                const Cairo::Matrix &to_box) -> void {
+void Series::addSimpleLegendItem(Cairo::RefPtr<Cairo::Context> ctx, const Cairo::Matrix &to_box, FillStyle lower, FillStyle bg) {
+    double box_x = 0, box_y = 0, box_width = 1, box_height = 1;
+    to_box.transform_point(box_x, box_y);
+    to_box.transform_distance(box_width, box_height);
+    ctx->save();
+    ctx->move_to(box_x, box_y);
+    // Draw the box and clip it:
+    drawRectangle(ctx, box_width, box_height, bg, true);
 
-        double box_x = 0, box_y = 0, box_width = 1, box_height = 1;
-        to_box.transform_point(box_x, box_y);
-        to_box.transform_distance(box_width, box_height);
-        ctx->save();
-        ctx->move_to(box_x, box_y);
-        // Draw the box and clip it:
-        drawRectangle(ctx, box_width, box_height, bg, true);
-
-        // If there's a lower background, paint it
-        if (lower.fill_colour.alpha > 0) {
-            // The x/width/height are too big, but no matter: it's clipped to the space we want anyway
-            ctx->rectangle(box_x, box_y + 0.5*(box_height + lower.border.thickness),
-                    box_width, 0.5*box_height);
-            lower.fill_colour.applyTo(ctx);
-            ctx->fill();
-        }
-        // Lower border line
-        if (lower.border.thickness > 0 and lower.border.colour.alpha > 0) {
-            ctx->move_to(box_x, box_y + 0.5*box_height);
-            ctx->rel_line_to(box_width, 0);
-            lower.border.colour.applyTo(ctx);
-            ctx->stroke();
-        }
-        ctx->restore(); // Unclip the legend box
-    }, preserve);
+    // If there's a lower background, paint it
+    if (lower.fill_colour.alpha > 0) {
+        // The x/width/height are too big, but no matter: it's clipped to the space we want anyway
+        ctx->rectangle(box_x, box_y + 0.5*(box_height + lower.border.thickness),
+                box_width, 0.5*box_height);
+        lower.fill_colour.applyTo(ctx);
+        ctx->fill();
+    }
+    // Lower border line
+    if (lower.border.thickness > 0 and lower.border.colour.alpha > 0) {
+        ctx->move_to(box_x, box_y + 0.5*box_height);
+        ctx->rel_line_to(box_width, 0);
+        lower.border.colour.applyTo(ctx);
+        ctx->stroke();
+    }
+    ctx->restore(); // Unclip the legend box
 }
 
 void Series::clipToGraph(Cairo::RefPtr<Cairo::Context> ctx, bool border) const {

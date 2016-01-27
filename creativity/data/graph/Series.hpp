@@ -31,6 +31,9 @@ class Series {
          */
         void newPage();
 
+        /// The default line style for addLine(): a 1-unit wide, solid black line.
+        static const LineStyle default_line_style;
+
         /** Plots the pairs of coordinates in the given map to the plot.  Keys should be the `t`
          * values.  If any sequential t values are missing or have non-finite values, the line will
          * be broken around the missing values.
@@ -39,8 +42,12 @@ class Series {
          * \param style the LineStyle; defaults to a 1-unit-wide black line.
          */
         void addLine(const std::map<int, double> &points,
-                const LineStyle &style = LineStyle(RGBA(0,0,0))
-                );
+                const LineStyle &style = default_line_style);
+
+        /** The default fill style for a region added with addRegion(): a 1/4 opacity solid blue
+         * background, with no border.
+         */
+        static const FillStyle default_region_style;
 
         /** Takes a map of time value to double pairs and plots the region between the pair values.
          * If any t values are missing or have one or more non-finite pair values, the region is
@@ -55,34 +62,47 @@ class Series {
          * finite-value neighbour).
          */
         void addRegion(const std::map<int, std::pair<double, double>> &intervals,
-                const FillStyle &style = FillStyle(RGBA(0,0,1,1./3.)),
+                const FillStyle &style = default_region_style,
                 double stray_thickness = 1.
                 );
 
+        /** The default legend item background and/or border style: transparent background with a
+         * 1-unit wide, solid black border.
+         */
+        static const FillStyle default_legend_style;
+
         /** Adds a simple legend item.  The legend box has two main drawing components; each can be
-         * transparent to suppress the element.
+         * transparent to suppress the element.  If the page has not yet been initialized *and* the
+         * `preserve` value is true, the legend item will not be drawn immediately but rather will
+         * wait until the current page is initialized.  Otherwise, the legend item will be drawn
+         * immediately, initializing the page first if required.
          *
          * \param markup the text (with pango markup) to display for the legend item
          * \param lower fill style for the bottom half of the box.  The border component of the fill
-         * style is drawn across the middle of the box.
+         * style is drawn across the middle of the box.  To specify just a line across the middle,
+         * simple provide a LineStyle for this argument (the implicit conversion results in a
+         * transparent fill and the given line style).
          * \param preserve whether this legend item should be automatically added to new pages when
          * newPage() is called.
-         * \param background the fill and border style for the legend box.  Defaults to a
-         * transparent background with a 1-unit-wide black border.  Note that the background fill is
-         * always contained entirely within the border, even if the border is transparent.
+         * \param style the fill and border style for the legend box.  Defaults to a transparent
+         * background with a 1-unit-wide black border.  Note that the background fill is always
+         * contained entirely within the border, even if the border is transparent.
          *
          * The background fill and border is drawn first, followed by the lower area.
          */
         void addLegendItem(std::string markup,
                 FillStyle lower,
                 bool preserve = true,
-                FillStyle background = FillStyle(Transparent, LineStyle(RGBA(0,0,0), 1)));
+                FillStyle style = default_legend_style);
 
         /// Alias for the function callback for custom legend support
         using LegendPainterCallback_t = std::function<void(Cairo::RefPtr<Cairo::Context>, const Cairo::Matrix&)>;
 
         /** Adds a legend item with custom box drawing.  The custom callback function is called with
-         * a Cairo::Context object to allow the caller to draw the box as desired.
+         * a Cairo::Context object to allow the caller to draw the box as desired.  If the current
+         * page is uninitialized *and* `preserve` is true, the legend item drawing will be delayed
+         * until page initialization; otherwise the legend item is drawn immediately, initializing
+         * the page if required.
          *
          * The `legend_painter` callback is called with the Cairo::Context object with an applied
          * clip region that allows drawing only in the legend box and legend text spaces.  Two
@@ -149,7 +169,7 @@ class Series {
         /** The surface units between the right graph border and right surface (image) edge.  Note
          * that this space typically contains any legend items.
          */
-        double graph_right = 80;
+        double graph_right = 120;
 
         /** The graph area background and border.  Note that even if the border is transparent, the
          * width is still taken into account when determining the graph area.
@@ -163,7 +183,9 @@ class Series {
                graph_padding_bottom = 2;
         ///@}
 
-        /// The left edge of the legend boxes relative to the right edge of the graph.
+        /** The left edge of the legend boxes relative to the right edge of the graph.  Can be
+         * negative to move the legend into the graph area.
+         */
         double legend_left = 8;
         /// The top edge of the legend boxes relative to the top edge of the graph.
         double legend_top = 0;
@@ -191,7 +213,7 @@ class Series {
         /// The graph title text, which may contain pango markup.
         std::string title_markup;
         /// The font to use for the title
-        Pango::FontDescription title_font = Pango::FontDescription("serif 13");
+        Pango::FontDescription title_font = Pango::FontDescription("serif 12");
         /// The space between the top of the image and the top of the title, in surface units.
         double title_padding_top = 2;
         /// The space between the bottom of the title and the top of the graph, in surface units.
@@ -315,6 +337,22 @@ class Series {
          */
         Cairo::Matrix translateGraph() const;
 
+        /** Updates the t and y graph extents.  This must be called before the current page is
+         * initialized--that is, either after construction, or after a newPage() call before any
+         * items have been added to the graph.
+         *
+         * \param tmin the new minimum t value
+         * \param tmax the new maximum t value
+         * \param ymin the new minimum y value
+         * \param ymax the new maximum y value
+         * \param retick if true or omitted, call recalcTicks() after updating the extents (with its
+         * default arguments).  Set to false if using custom tick calculations.
+         * \throws std::logic_error if called after the current page has been initialized
+         * \throws std::invalid_argument if called with invalid extents (tmin not less than tmax, or
+         * ymin not less than ymax).
+         */
+        void setExtents(int tmin, int tmax, double ymin, double ymax, bool retick = true);
+
     private:
         Target &target_;
         int tmin_, tmax_;
@@ -335,6 +373,9 @@ class Series {
 
         // Vertical offset of the next legend item, from the top of the legend area.
         double legend_next_ = 0;
+
+        // Implementation method of addLegendItem(markup, lower, preserve, bg).
+        void addSimpleLegendItem(Cairo::RefPtr<Cairo::Context> ctx, const Cairo::Matrix &to_box, FillStyle lower, FillStyle bg);
 
     protected:
         /** Draws the initial layout (graph box, etc.).  Does nothing if called repeatedly (until
