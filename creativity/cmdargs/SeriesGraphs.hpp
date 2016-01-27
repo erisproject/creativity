@@ -47,23 +47,54 @@ class SeriesGraphs : public CmdArgs {
          */
         bool overwrite = false;
 
+        /** The title for the graph, with possible substitutions:
+         *
+         * %F - the full path of the input  as given in `input`
+         * %p - the dirname of the input file (empty if no directory at all)
+         * %f - the basename (i.e. filename) of the input path
+         * %u - the unique portion of the input path
+         * %w - the last word ([0-9A-Za-z_]) of the input file, not counting the extension.
+         * %% - a literal %
+         *
+         * Any other %x string is reserved for future use.
+         */
+        std::string title = "%w (%u)";
+
         /// The width of the resulting graph, in inches.
         double width = 6;
 
         /// The height of the resulting graph, in inches.
         double height = 4;
 
-        /// The `t` value at which to start the graph display
-        unsigned graph_min_t = 0;
-
-        /** The `t` value at which to end the graph display.  If 0, the value graph display end is
-         * determined by the data_stretch value.
+        /** The `t` value at which to start the graph display.  If equal to -1, the graph display
+         * range is determined by the input data.  Note that this only controls the graph range: the
+         * observations can be further limited by setting data_min_t.
          */
-        unsigned graph_max_t = 0;
+        int graph_min_t = -1;
 
-        /** The `t` value at which to start plotting data; has no effect if less than graphmin, or
-         * less than the first observation with data. */
-        unsigned data_min_t = 0;
+        /** The `t` value at which to end the graph display.  If equal to -1, the graph display
+         * range is determined by the input data.  Note that this only controls the graph range:
+         * observations can be further limited by setting data_max_t.
+         */
+        int graph_max_t = -1;
+
+        /** The minimum t value required to actually include an observation in the graph.  -1 means
+         * unlimited.
+         *
+         * The default is 1, since t=0 observations are pre-simulation observations and typically
+         * irrelevant.
+         * 
+         * If this is less than graph_min_t it has no effect; if larger, observations between
+         * graph_min_t and this won't be plotted (even though there is space for them on the graph).
+         */
+        int data_min_t = 1;
+
+        /** The maximum t value to display in the graph.  -1 means unlimited.
+         *
+         * If this is greater than graph_max_t it has no effect; if less, observations between this
+         * and graph_max_t won't be plotted (even though there is space for them on the graph).
+         */
+        int data_max_t = -1;
 
         /** Determines the minimum value to include in the series plot.  The default, NaN,
          * determines the minimum from the data.
@@ -101,6 +132,11 @@ class SeriesGraphs : public CmdArgs {
          */
         bool same_vertical_scale = true;
 
+        /** If true, put the legend items inside the graph area.  It really depends on the data
+         * and/or vertical scale as to whether this will work well.
+         */
+        bool legend_inside = false;
+
         /** The resolution (pixels per inch) for PNG output.  The PNG will have a pixel size of
          * this value times `width` and `height`, but will have the resolution encoded (so that
          * attempting to print it at default sizes should respect the width and height values).
@@ -108,6 +144,9 @@ class SeriesGraphs : public CmdArgs {
          * For PDF and SVG output, this value is ignored.
          */
         double resolution = 96;
+
+        /// Overridden to handle t-min/t-max options
+        virtual void postParse(boost::program_options::variables_map &vars) override;
 
         /// Overridden to add " FILE [FILE ...]"
         virtual std::string usage() const override;
