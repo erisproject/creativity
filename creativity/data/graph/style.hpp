@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include <ostream>
 #include <cairomm/context.h>
 namespace creativity { namespace data { namespace graph {
 
@@ -79,6 +80,14 @@ class RGBA final {
                      green, ///< The green channel value
                      blue, ///< The blue channel value
                      alpha; ///< The alpha channel value (1 == opaque, 0 == transparent)
+
+        /** Sents this RGBA to an output stream in the form "RGBA(r,g,b,a)" where r, g, b, and a are
+         * replaced with their [0,1] values.
+         */
+        friend std::ostream& operator<<(std::ostream &os, const RGBA &colour) {
+            os << "RGBA(" << colour.red << "," << colour.green << "," << colour.blue << "," << colour.alpha << ")";
+            return os;
+        }
 
     private:
         // Private access to set new values.  Values outside [0,1] are truncated.
