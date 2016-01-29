@@ -78,11 +78,8 @@ int main() {
         }
     }
 
-    std::cout << "min=" << min <<", max=" << max << "\n";
-
 
     Series s(pdf, "<b>Hi there!</b>\n<small><small>This is <u>my</u> <i>title</i>.</small></small>\n<small><small><small>(If you want your own title, ask nicely.)</small></small></small>", myline.begin()->first, myline.rbegin()->first, min, max);
-    s.autospaceTitle();
     s.title_font.set_family("5yearsoldfont");
     s.title_font.set_size(12*Pango::SCALE);
     s.legend_font.set_family("5yearsoldfont");
@@ -90,13 +87,14 @@ int main() {
     LineStyle linestyle(RGBA(1,0,0));
     s.addLine(myline, linestyle);
     std::string linemarkup = "TEST line OMG <span foreground=\"blue\">OMG</span> <span background=\"red\" font_weight=\"bold\">OMG</span> <b>OMG</b> OMG <span font=\"Serif 3\">OMG <big>OMG <big>OMG <big>OMG <big>OMG <big>OMG <big>OMG <big>OMG <big>OMG <big>OMG</big></big></big></big></big></big></big></big></big></span>";
-    s.addLegendItem(linemarkup, FillStyle(Transparent, linestyle), false);
+    s.addLegendItem(linemarkup, FillStyle(Transparent, linestyle), false, FillStyle(White, Black));
 
     s.newPage();
-    s.autospaceTitle("Title 2");
+    s.title_markup = "Title 2";
     s.recalcTicks(10, 8, Series::TickEnds::Replace);
     s.graph_style.fill_colour = RGBA(0.95, 0.95, 0.95);
     s.tick_grid_style = LineStyle(White, 1);
+    s.legend_style = FillStyle(RGBA(.9,.9,1), Black);
 
     FillStyle cistyle(RGBA(0,0,1,1./3.));
     s.addRegion(myci, cistyle);
@@ -104,49 +102,81 @@ int main() {
     s.addLegendItem(linemarkup, FillStyle(Transparent, linestyle), false, FillStyle(cistyle.fill_colour, Black));
     s.addLegendItem("90% confidence boundary", cistyle, false);
 
+    s.legend_graph_space = -1;
+
     s.newPage();
-    s.autospaceTitle("");
-    s.recalcTicks(10, 8, Series::TickEnds::Add);
-    s.graph_style.fill_colour = White;
-    s.tick_grid_style = LineStyle(RGBA(.95,.95,.95), 1);
 
     FillStyle bigcistyle(RGBA(1,0,0,0.25), LineStyle(RGBA(0,0.5,0,0.5)));
-    s.addRegion(myci, cistyle);
-    s.addRegion(mybiggerci, bigcistyle);
-    s.addLine(myline, linestyle);
-
-#define SET_RGBA(X) set_source_rgba(X.red, X.green, X.blue, X.alpha)
     s.addLegendItem(linemarkup, [&](Cairo::RefPtr<Cairo::Context> ctx, const Cairo::Matrix &m) {
             double x = 0, y = 0, w = 1, h = 1;
             m.transform_point(x, y);
             m.transform_distance(w, h);
+            std::cout << "x,y,w,h: " << x<<","<<y<<","<<w<<","<<h<<"\n";
             ctx->save();
             ctx->move_to(x, y);
             Series::drawRectangle(ctx, w, h, FillStyle(cistyle.fill_colour, Black), true);
-            ctx->SET_RGBA(bigcistyle.fill_colour);
+            bigcistyle.fill_colour.applyTo(ctx);
             ctx->paint();
-            ctx->SET_RGBA(linestyle.colour);
+            linestyle.colour.applyTo(ctx);
             ctx->set_line_width(linestyle.thickness);
             ctx->move_to(x, y+0.5*h);
             ctx->rel_line_to(x+w, 0);
             ctx->stroke();
     });
 
+    // FIXME: this isn't working; transofmr_point/distance isn't right, I don't think.  Is there a
+    // transformation already applied?
     s.addLegendItem("90% confidence boundary", [&](Cairo::RefPtr<Cairo::Context> ctx, const Cairo::Matrix &m) {
             double x = 0, y = 0, w = 1, h = 1;
             m.transform_point(x, y);
             m.transform_distance(w, h);
+            std::cout << "x,y,w,h: " << x<<","<<y<<","<<w<<","<<h<<"\n";
             ctx->save();
             ctx->move_to(x, y);
             Series::drawRectangle(ctx, w, h, FillStyle(Transparent, Black), true);
             ctx->rectangle(x, y+0.5*h, w, 0.5*h);
-            ctx->SET_RGBA(cistyle.fill_colour);
+            cistyle.fill_colour.applyTo(ctx);
             ctx->fill();
-            ctx->SET_RGBA(bigcistyle.fill_colour);
+            bigcistyle.fill_colour.applyTo(ctx);
             ctx->paint();
     });
 
-    s.addLegendItem("68% confidence level", bigcistyle, false);
+    s.addLegendItem("68% confidence level", bigcistyle);
+
+    for (double xoff : {0, 5, -10}) {
+        s.legend_graph_space = -1;
+        s.legend_x_offset = xoff;
+        for (auto position : {
+                Series::LegendPosition::OutsideTop,
+                Series::LegendPosition::OutsideMiddle,
+                Series::LegendPosition::OutsideBottom,
+                Series::LegendPosition::TopRight,
+                Series::LegendPosition::MiddleRight,
+                Series::LegendPosition::BottomRight,
+                Series::LegendPosition::TopCenter,
+                Series::LegendPosition::MiddleCenter,
+                Series::LegendPosition::BottomCenter,
+                Series::LegendPosition::TopLeft,
+                Series::LegendPosition::MiddleLeft,
+                Series::LegendPosition::BottomLeft
+                }) {
+            if (xoff != 0 or position != Series::LegendPosition::OutsideTop) s.newPage();
+
+            s.legend_position = position;
+            s.title_markup = "";
+            s.recalcTicks(10, 8, Series::TickEnds::Add);
+            s.graph_style.fill_colour = White;
+            s.tick_grid_style = LineStyle(RGBA(.95,.95,.95), 1);
+
+            s.addRegion(myci, cistyle);
+            s.addRegion(mybiggerci, bigcistyle);
+            s.addLine(myline, linestyle);
+
+            s.legend_graph_space += 2;
+            s.finishPage();
+        }
+    }
+    //s.legend_top = -100;
 
 //    s.addLegendItem("transition1", nested_ci, false, std::list<FillStyle>(1, FillStyle(bigcistyle.fill_colour, Black)));
 

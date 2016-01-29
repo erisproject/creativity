@@ -7,6 +7,36 @@
 #include <map>
 #include <set>
 
+#ifndef DOXYGEN_SHOULD_SEE_THIS
+#if CAIROMM_MAJOR_VERSION < 1 || (CAIROMM_MAJOR_VERSION == 1 && CAIROMM_MINOR_VERSION <= 12)
+namespace Cairo {
+
+/** RAII-style context save/restore class.  context->save() is called
+ * automatically when the object is created, and context->restore() is called
+ * when the object is destroyed.  This allows you to write code such as:
+ *
+ *     // context initial state
+ *     {
+ *         Cairo::SaveGuard saver(context);
+ *         ... // manipulate context
+ *     }
+ *     // context is restored to initial state
+ */
+class SaveGuard final {
+  public:
+    /// Constructor: the context is saved
+    explicit SaveGuard(RefPtr<Context> context) : ctx_{context} { ctx_->save(); }
+    /// Copy constructor deleted
+    SaveGuard(const SaveGuard &) = delete;
+    /// Destructor; the context is restored
+    ~SaveGuard() { ctx_->restore(); }
+  private:
+    RefPtr<Context> ctx_;
+};
+}
+#endif
+#endif
+
 namespace creativity { namespace data { namespace graph {
 
 /** Class to plot graphs of time series values and/or regions. */
@@ -26,8 +56,20 @@ class Series {
          */
         Series(Target &target, std::string title_markup, int tmin, int tmax, double ymin, double ymax);
 
-        /** Writes the current graph to disk and begins a new graph.  If a multi-page surface
-         * format, this will be a new page in the output file; otherwise it will be a new file.
+        /// Destructor; calls finishPage()
+        virtual ~Series();
+
+        /** Writes everything added to the graph to the current page.  Once this method is called,
+         * no more graph elements may be added until newPage() is called to begin a new graph.
+         *
+         * This method is called implicitly by `newPage()` and by the destructor; as such it is
+         * rarely required to call it directly.
+         */
+        void finishPage();
+
+        /** Writes the current graph to disk by calling finishPage(), if necessary, and begins a new
+         * graph.  If a multi-page surface format, this will be a new page in the output file;
+         * otherwise it will be a new file.
          */
         void newPage();
 
@@ -58,18 +100,15 @@ class Series {
          * \param style FillStyle the fill style of the region.  The border of the fill style will
          * be used only for the top and bottom border of the region (i.e. the sides will have no
          * border).  Defaults to a 1/3 opacity blue fill with no (i.e. fully transparent) border.
-         * \param stray_thickness the thickness of stray data points (data points without a
-         * finite-value neighbour).
          */
         void addRegion(const std::map<int, std::pair<double, double>> &intervals,
-                const FillStyle &style = default_region_style,
-                double stray_thickness = 1.
+                const FillStyle &style = default_region_style
                 );
 
-        /** The default legend item background and/or border style: transparent background with a
-         * 1-unit wide, solid black border.
+        /** The default legend box background and/or border style: white background with a 1-unit
+         * wide, solid black border.
          */
-        static const FillStyle default_legend_style;
+        static const RectangleStyle default_legend_box_style;
 
         /** Adds a simple legend item.  The legend box has two main drawing components; each can be
          * transparent to suppress the element.  If the page has not yet been initialized *and* the
@@ -93,7 +132,7 @@ class Series {
         void addLegendItem(std::string markup,
                 FillStyle lower,
                 bool preserve = true,
-                FillStyle style = default_legend_style);
+                RectangleStyle style = default_legend_box_style);
 
         /// Alias for the function callback for custom legend support
         using LegendPainterCallback_t = std::function<void(Cairo::RefPtr<Cairo::Context>, const Cairo::Matrix&)>;
@@ -130,10 +169,10 @@ class Series {
          * \param ctx a Cairo::Context positioned at the top-left corner of the desired rectangle
          * \param width the desired width (including the border) of the rectangle
          * \param height the desired height (including the border) of the rectangle
-         * \param style a FillStyle from which to read the border style and background fill colour
+         * \param style a RectangleStyle from which to read the border style and background fill colour
          * \param clip if true, clip the context to the interior of the rectangle before returning
          */
-        static void drawRectangle(Cairo::RefPtr<Cairo::Context> ctx, double width, double height, const FillStyle &style, bool clip = false);
+        static void drawRectangle(Cairo::RefPtr<Cairo::Context> ctx, double width, double height, const RectangleStyle &style, bool clip = false);
 
         /// The background colour of the page
         RGBA background_colour = White;
@@ -142,6 +181,12 @@ class Series {
          * 3-length line.  The `length` parameter of the style controls the length of tick marks; if
          * 0, tick marks are suppressed. */
         LineStyle tick_style = LineStyle(Black, 0.5, 3);
+
+        /** The space between the tick line and the corresponding tick value text.  Only applies
+         * when both are visible (i.e. non-zero `tick_style` width and length, and non-transparent
+         * `tick_font_colour`).
+         */
+        double tick_label_space = 2;
 
         /** The line style to draw for ticks grid lines on the graph itself (*not* the tick marks
          * themselves, which show up outside the graph area). Defaults to transparent (i.e. no grid
@@ -154,27 +199,10 @@ class Series {
         /** The font for tick values */
         Pango::FontDescription tick_font = Pango::FontDescription("serif 6");
 
-        /** The surface units between the top graph border and top surface (image) edge.  Note that
-         * this space contains the graph title, but see the autospaceTitle() method, which can set
-         * this value to exactly fit a desired title.
-         */
-        double graph_top = 40;
-
-        /// The surface units between the left graph border and left surface (image) edge
-        double graph_left = 40;
-
-        /// The surface units between the bottom graph border and bottom surface (image) edge
-        double graph_bottom = 40;
-
-        /** The surface units between the right graph border and right surface (image) edge.  Note
-         * that this space typically contains any legend items.
-         */
-        double graph_right = 120;
-
         /** The graph area background and border.  Note that even if the border is transparent, the
          * width is still taken into account when determining the graph area.
          */
-        FillStyle graph_style{White, LineStyle(Black, 1)};
+        RectangleStyle graph_style{White, LineStyle(Black, 1)};
         ///@{
         /// The graph padding inside the border, in surface units.
         double graph_padding_left = 0,
@@ -183,20 +211,85 @@ class Series {
                graph_padding_bottom = 2;
         ///@}
 
-        /** The left edge of the legend boxes relative to the right edge of the graph.  Can be
-         * negative to move the legend into the graph area.
+        ///@{
+        /// The minimum margin between components of the page and the edge of the page on each side.
+        double margin_top = 5,
+               margin_right = 5,
+               margin_bottom = 5,
+               margin_left = 5;
+        ///@}
+
+        /** The possible positions of the legend area (before adjustment by legend_graph_space,
+         * legend_x_offset and legend_y_offset).  Note that the pre-offset position is such that the
+         * legend border lies exactly adjacent to graph border (you can set `legend_graph_space` to
+         * `-graph_style.border.thickness` to make the borders overlap).
          */
-        double legend_left = 8;
-        /// The top edge of the legend boxes relative to the top edge of the graph.
-        double legend_top = 0;
-        /// The distance between the right edge of the legend text area and the right edge of the graph.
-        double legend_right = 4;
+        enum class LegendPosition {
+            None, ///< The legend is suppressed entirely
+            OutsideTop, ///< To the right of the graph, aligned relative to the graph top
+            OutsideMiddle, ///< To the right of the graph, centered relative to the graph
+            OutsideBottom, ///< To the right of the graph, aligned relative to the graph bottom
+            TopRight, ///< Inside the graph, in the top-right corner
+            MiddleRight, ///< Inside the graph, in the middle of the right side
+            BottomRight, ///< Inside the graph, in the bottom-right corner
+            TopCenter, ///< Inside the graph, in the middle of the top edge
+            MiddleCenter, ///< Inside the graph, in the middle of the graph
+            BottomCenter, ///< Inside the graph, in the middle of the bottom edge
+            TopLeft, ///< Inside the graph, in the top-left corner
+            MiddleLeft, ///< Inside the graph, in the middle of the left-hand side
+            BottomLeft ///< Inside the graph, in the bottom-left corner
+        };
+
+        /// The position in which to draw the legend.
+        LegendPosition legend_position = LegendPosition::OutsideTop;
+
+        /** The size of the gap between the legend area and the graph side(s) with which the legend
+         * is aligned.  The precise adjustment depends on the LegendPosition:
+         *
+         * - OutsideTop, OutsideMiddle, OutsideBottom -- larger values move the legend right
+         * - TopRight -- larger values move the legend left and down
+         * - MiddleRight -- larger values move the legend left
+         * - BottomRight -- larger values move the legend left and up
+         * - TopCenter -- larger values move the legend down
+         * - MiddleCenter -- no effect
+         * - BottomCenter -- larger values move the legend up
+         * - TopLeft -- larger values move the legend down and right
+         * - MiddleLeft -- larger values move the legend right
+         * - BottomLeft -- larger values move the legend right and up
+         */
+        double legend_graph_space = 5.0;
+        ///@{
+        /** After adjusting the position according to the `legend_graph_space` value, the x and y
+         * coordinates are also adjusted by these values.  Larger values are further right (x) or
+         * down (y).  Note that any offset specified here is not taken into account when calculating
+         * the page layout: large positive or negative values can move the legend into the page
+         * margin or off the page entirely.
+         */
+        double legend_x_offset = 0;
+        double legend_y_offset = 0;
+        ///@}
         /// The width of the legend image box, in surface units.
         double legend_box_width = 15;
         /// The height of the legend box, in surface units.
         double legend_box_height = 15;
         /// The gap between the legend box and legend text region, in surface units.
         double legend_box_text_gap = 5;
+        ///@{
+        /// The legend box area padding inside the border, in surface units.
+        double legend_padding_left = 3,
+               legend_padding_right = 3,
+               legend_padding_top = 3,
+               legend_padding_bottom = 3;
+        ///@}
+        /// The style for a box encompassing the entire legend area.  Default is a white background
+        /// and 1-unit wide black border.
+        RectangleStyle legend_style{White, Black};
+        /** The maximum width of legend text, in surface units.  The actual width can be less than
+         * this, depending on the size of the text and taking into account any wrapping.  If text is
+         * too wide (for example, one unwrappable line exceeds this value) it will be cut off; if
+         * the text is too long overall, it will be ellipsized.
+         */
+        double legend_text_max_width = 60;
         /** The maximum height of the box that legend text may occupy (beyond which text is
          * ellipsized), in surface units.  The text will be aligned with the middle of the legend
          * box, and the total legend item height will be the larger of the legend box or text
@@ -205,23 +298,31 @@ class Series {
          * height for a line of text.
          */
         double legend_text_max_height = 40;
-        /** The font to use for legend text. */
-        Pango::FontDescription legend_font = Pango::FontDescription("serif 8");
         /// The vertical space to put between legend items.
         double legend_spacing = 3;
+        /** The font to use for legend text. */
+        Pango::FontDescription legend_font = Pango::FontDescription("serif 6");
 
-        /// The graph title text, which may contain pango markup.
+        /** The graph title text, which may contain pango markup.  Will be drawn in opaque black,
+         * but markup in the string can be used to change this.
+         */
         std::string title_markup;
         /// The font to use for the title
         Pango::FontDescription title_font = Pango::FontDescription("serif 12");
-        /// The space between the top of the image and the top of the title, in surface units.
-        double title_padding_top = 2;
-        /// The space between the bottom of the title and the top of the graph, in surface units.
+        /** The space between the bottom of the title and the top of the graph, in surface units.
+         * Only applies when title_markup is not an empty string.  To adjust the space between the
+         * title and the top of the page, adjust `margin_top`.
+         */
         double title_padding_bottom = 2;
-        /// The space between the left of the surface and the title, in surface units.
+        /// The minimum space between the left of the surface and the title, in surface units.
         double title_padding_left = 20;
-        /// The space between the right of the surface and the title, in surface units.
+        /// The minimum space between the right of the surface and the title, in surface units.
         double title_padding_right = 20;
+
+        /** The thickness of the region drawn for "stray" region observations, that is, observations
+         * that are neither preceeded nor followed by another finite region observation.
+         */
+        double stray_thickness = 1;
 
         /** X-axis (t) tick mark locations, calculated during construction.  Can be recalculated by
          * calling recalcTicks().  If cleared, no horizontal axis ticks are displayed.
@@ -248,28 +349,6 @@ class Series {
          * for the other end modes, the grid end points can differ.
          */
         std::set<int> y_grid;
-
-        /** Makes graph_top as small as possible while still being able to fit the current title.
-         *
-         * If the current title is an empty string, graph_top will simply be set to
-         * title_padding_top + title_padding_bottom.
-         *
-         * This method must be called before the page is initialized, i.e. before any of
-         * addLine/addRegion/addLegend have been called for the initial or a new page.
-         *
-         * If you *don't* call this method after changing the title, the title area may be larger or
-         * smaller than the text contained within it, but the graph position will be the same across
-         * images regardless of the title size.
-         *
-         * \throws std::logic_error if the current page has already been initialized.
-         */
-        void autospaceTitle();
-
-        /** Sets a new title, then calls autospaceTitle() to adjust graph_top to exactly fit the new title.
-         *
-         * \sa autospaceTitle()
-         */
-        void autospaceTitle(std::string title_markup);
 
         /** Different modes for what to do with the tmin/tmax/ymin/ymax graph end points given
          * during construction. */
@@ -326,17 +405,6 @@ class Series {
          */
         void recalcTicksY(unsigned max = 8, TickEnds end_mode = TickEnds::None);
 
-        /** Returns a Cairo::Matrix that transforms coordinates to be graphed into the interior
-         * graph area of the image, based on the tmin/tmax/ymin/ymax values given when constructing
-         * the Series object.  The returned object will be correct as long as the object's graph_*
-         * variables remain unchanged.
-         *
-         * In the translate space, (tmin,ymin) corresponds to the lower-left corner of the graph
-         * space, and (tmax,ymax) corresponds to the top-right corner of the graph space.  (Both
-         * "corners" are inside both the border and padding).
-         */
-        Cairo::Matrix translateGraph() const;
-
         /** Updates the t and y graph extents.  This must be called before the current page is
          * initialized--that is, either after construction, or after a newPage() call before any
          * items have been added to the graph.
@@ -358,42 +426,29 @@ class Series {
         int tmin_, tmax_;
         double ymin_, ymax_;
 
+        // If this is true, the current page is done.
+        bool page_finished_ = false;
 
-        // The buffer to add on the top/bottom edge of the graph (so that lines/points don't run
-        // onto the graph outline).  In absolute surface units.
-        double graph_buffer_tb_ = 2;
-        // The buffer to add to the left/right edges.  Defaults to 0.
-        double graph_buffer_lr_ = 0;
+        using LegendItem_t = std::tuple<bool, std::string, LegendPainterCallback_t>;
+        // Legend items to add to the page; <preserve, title, callback> tuples.
+        std::list<LegendItem_t> legend_items_;
+        // Draw callbacks for the graph items; each will be called with the ctx already clipped to
+        // the graph region, and surrounded with a save/restore pair.
+        std::list<std::function<void(Cairo::RefPtr<Cairo::Context> ctx, const Cairo::Matrix&)>> draw_;
 
-        // Whether initializePage() has been called for the current page yet
-        bool page_initialized_ = false;
+        // Implementation callback for addLegendItem(markup, lower, preserve, bg).
+        void drawSimpleLegendItem(Cairo::RefPtr<Cairo::Context> ctx, const Cairo::Matrix &to_box, FillStyle lower, RectangleStyle bg) const;
 
-        // Legend items to be re-added when newPage is called
-        std::list<std::pair<std::string, LegendPainterCallback_t>> legend_;
+        // Draws a legend item at the current position of the context, returning its size (width and height).  If dry_run is true, just returns the size.
+        std::pair<double, double> drawLegendItem(Cairo::RefPtr<Cairo::Context> ctx, const LegendItem_t &item, bool dry_run = false) const;
 
-        // Vertical offset of the next legend item, from the top of the legend area.
-        double legend_next_ = 0;
+        // Implementation method of addLine() that does the actual drawing
+        void drawLine(Cairo::RefPtr<Cairo::Context> ctx, const Cairo::Matrix &translate_graph, const std::map<int, double> &points, const LineStyle &style) const;
 
-        // Implementation method of addLegendItem(markup, lower, preserve, bg).
-        void addSimpleLegendItem(Cairo::RefPtr<Cairo::Context> ctx, const Cairo::Matrix &to_box, FillStyle lower, FillStyle bg);
+        // Implementation method of addRegion() that does the actual drawing
+        void drawRegion(Cairo::RefPtr<Cairo::Context> ctx, const Cairo::Matrix &translate_graph, const std::map<int, std::pair<double,double>> &points, const FillStyle &style) const;
 
     protected:
-        /** Draws the initial layout (graph box, etc.).  Does nothing if called repeatedly (until
-         * the next newPage() call).
-         */
-        void initializePage();
-
-        /** Clips the given Cairo::Context to the graph space, including the padding and,
-         * optionally, the border.  This should be called without a transformation having been
-         * applied to the provided context.
-         *
-         * \param ctx the Cairo::Context for the surface *without* a transformation matrix applied.
-         * \param border whether or not the border should be part of the clipped region; if false
-         * (the default), the border cannot be drawn on top of; if true, the border can be
-         * overwritten.
-         */
-        void clipToGraph(Cairo::RefPtr<Cairo::Context> ctx, bool border = false) const;
-
         /** Helper method called by addRegion: takes an iterator to the first and final elements of
          * a contiguous set, draws a region empassing the min/max values, and closes it so that a
          * subsequent fill will fill it in.  If the region consists of only a single point (that is,

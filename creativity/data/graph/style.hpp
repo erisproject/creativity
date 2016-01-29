@@ -114,19 +114,68 @@ struct LineStyle {
 };
 
 /** Style class for a filled region. */
-struct FillStyle {
-    /** Constructs a FillStyle using just a fill colour: the borders will be omitted (i.e.
-     * transparent and 0 width). */
-    FillStyle(RGBA fill) : FillStyle(std::move(fill), LineStyle(Transparent, 0)) {};
-    /** Constructs a FillStyle using a fill colour and line style for the borders. */
-    FillStyle(RGBA fill, LineStyle border) : fill_colour{std::move(fill)}, border{std::move(border)} {}
-    /// Constructs a FillStyle using just a LineStyle; the fill will be omitted (i.e. transparent).
-    FillStyle(LineStyle border) : FillStyle(Transparent, border) {}
-    /// The fill colour for the region
-    RGBA fill_colour;
+class FillStyle {
+    public:
+        /** Constructs a FillStyle using just a fill colour: the borders will be omitted (i.e.
+         * transparent and 0 width). */
+        FillStyle(RGBA fill) : FillStyle(std::move(fill), LineStyle(Transparent, 0)) {};
+        /** Constructs a FillStyle using a fill colour and line style for the borders. */
+        FillStyle(RGBA fill, LineStyle border) : fill_colour{std::move(fill)}, border{std::move(border)} {}
+        /// Constructs a FillStyle using just a LineStyle; the fill will be omitted (i.e. transparent).
+        FillStyle(LineStyle border) : FillStyle(Transparent, border) {}
+        /// Move constructor
+        FillStyle(FillStyle&&) = default;
+        /// Copy constructor
+        FillStyle(const FillStyle&) = default;
+        /// Default move assignment
+        FillStyle& operator=(FillStyle&&) = default;
+        /// Default copy assignment
+        FillStyle& operator=(const FillStyle&) = default;
 
-    /// The border colour for the region
-    LineStyle border;
+        /// The fill colour for the region
+        RGBA fill_colour;
+
+        /// The border colour for the region
+        LineStyle border;
+};
+
+/** Style class for a filled, rectangular region.  In addition to the fill colour and border of a
+ * FillStyle, this also allows any of the 4 borders to be disabled.
+ */
+class RectangleStyle : public FillStyle {
+    public:
+        /// Inherit constructors from FillStyle
+        using FillStyle::FillStyle;
+
+        /// Default move constructor
+        RectangleStyle(RectangleStyle&&) = default;
+        /// Default copy constructor
+        RectangleStyle(const RectangleStyle&) = default;
+        /// Default move assignment
+        RectangleStyle& operator=(RectangleStyle&&) = default;
+        /// Default copy assignment
+        RectangleStyle& operator=(const RectangleStyle&) = default;
+
+        /// Initialize using a FillStyle
+        RectangleStyle(FillStyle f) : FillStyle(std::move(f)) {}
+
+        ///@{
+        /// True if the named border should be drawn, false if not. Only applies when drawing rectangles.
+        bool border_top = true, border_right = true, border_bottom = true, border_left = true;
+        ///@}
+
+        /// Returns the border width if the top border is to be drawn, 0 otherwise.
+        double borderT() const { return border_top ? border.thickness : 0; }
+        /// Returns the border width if the right border is to be drawn, 0 otherwise.
+        double borderR() const { return border_right ? border.thickness : 0; }
+        /// Returns the border width if the bottom border is to be drawn, 0 otherwise.
+        double borderB() const { return border_bottom ? border.thickness : 0; }
+        /// Returns the border width if the left border is to be drawn, 0 otherwise.
+        double borderL() const { return border_left ? border.thickness : 0; }
+        /// Returns the total drawn horizontal border width, i.e. borderR() + borderL()
+        double borderLR() const { return borderL() + borderR(); }
+        /// Returns the total drawn vertical border width, i.e. borderT() + borderB()
+        double borderTB() const { return borderT() + borderB(); }
 };
 
 }}}

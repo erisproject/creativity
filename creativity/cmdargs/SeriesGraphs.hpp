@@ -1,5 +1,6 @@
 #pragma once
 #include "creativity/cmdargs/CmdArgs.hpp"
+#include "creativity/data/graph/Series.hpp"
 #include <limits>
 #include <string>
 #include <vector>
@@ -132,10 +133,11 @@ class SeriesGraphs : public CmdArgs {
          */
         bool same_vertical_scale = true;
 
-        /** If true, put the legend items inside the graph area.  It really depends on the data
-         * and/or vertical scale as to whether this will work well.
-         */
-        bool legend_inside = false;
+        /** The legend position */
+        creativity::data::graph::Series::LegendPosition legend_position = creativity::data::graph::Series::LegendPosition::OutsideTop;
+
+        /** The input string, such as "top-left", "outside-center", etc. */
+        std::string legend_position_input = "outside-top";
 
         /** The resolution (pixels per inch) for PNG output.  The PNG will have a pixel size of
          * this value times `width` and `height`, but will have the resolution encoded (so that

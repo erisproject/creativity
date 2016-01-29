@@ -232,29 +232,15 @@ int main(int argc, char *argv[]) {
     PDF output(args.output, args.width, args.height);
     Series graph(output, "", tmin, tmax, ymin, ymax);
     graph.tick_grid_style.colour = RGBA(0.9);
-    if (args.legend_inside) {
-        graph.graph_right = 10;
-        graph.legend_right = 6;
-        graph.legend_left = -84;
-        graph.legend_top = 2;
-    }
-    else {
-        graph.graph_right = 100;
-        graph.legend_left = 10;
-        graph.legend_right = 6;
-        graph.legend_top = 0;
-    }
+    graph.legend_position = args.legend_position;
     FillStyle confband_style = Series::default_region_style;
     LineStyle median_style = Series::default_line_style;
     {
         // Figure out the legend by multiplying colours together
-        FillStyle legend_style = Series::default_legend_style;
+        auto legend_style = Series::default_legend_box_style;
         legend_style.fill_colour = graph.graph_style.fill_colour;
         RGBA bottom = legend_style.fill_colour * confband_style.fill_colour;
-        std::cout << "confband_style.fill_colour: rgba("<<confband_style.fill_colour.red<<","<<confband_style.fill_colour.green<<","<<confband_style.fill_colour.blue<<","<<confband_style.fill_colour.alpha<<")\n";
         for (auto it = levels.rbegin(); it != levels.rend(); it++) {
-            std::cout << "bottom: rgba("<<bottom.red<<","<<bottom.green<<","<<bottom.blue<<","<<bottom.alpha<<")\n";
-            std::cout << "legend fill: rgba("<<legend_style.fill_colour.red<<","<<legend_style.fill_colour.green<<","<<legend_style.fill_colour.blue<<","<<legend_style.fill_colour.alpha<<")\n";
             if (*it > 0) {
                 std::ostringstream ci;
                 ci << (*it * 100) << "% conf. boundary";
@@ -284,7 +270,7 @@ int main(int argc, char *argv[]) {
         }
         graph.setExtents(local_tmin, local_tmax, local_ymin, local_ymax, false);
         graph.recalcTicks(10, 8, Series::TickEnds::Add);
-        graph.autospaceTitle(in.title);
+        graph.title_markup = in.title;
 
         for (const auto &conf : in.quantiles)
             graph.addRegion(conf.second, confband_style);

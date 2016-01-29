@@ -4,6 +4,7 @@
 #include <boost/program_options/errors.hpp>
 #include <boost/program_options/positional_options.hpp>
 #include <boost/program_options/value_semantic.hpp>
+#include <unordered_map>
 #include <iostream>
 
 namespace creativity { namespace cmdargs {
@@ -32,7 +33,7 @@ void SeriesGraphs::addOptions() {
         ("t-to", min<-1>(data_max_t), "The t value at which to stop including observations.  If -1, include all observations.  In contrast to --t-max, this controls when data is plotted, not the graph axis limits.")
         ("same-t-scale,T", "If specified, the time period scale for all graphs will be the same.  The default determines each graph's t scale separately.  This option is implied if both --t-min and --t-max are >= 0.")
         ("different-y-scale,Y", "If specified, the value scale (y-axis) will be determined to fit the data in each file separately.  The default uses the same scale for all graphs.  This option cannot be used when both --y-min and --y-max values are given.")
-        ("legend-inside,L", value(legend_inside), "If specified, put the legend items inside the graph (and expand the graph area to take up the full image width).  The default puts the legend items outside the graph.")
+        ("legend-position,L", value(legend_position_input), "The position of the graph legend, which must be either 'none' to suppress the legend entirely, or one of the twelve possible combinations of: {outside,right,middle,left}-{top,middle,bottom}.  'outside' puts the legend to the right of the graph; the other options put the legend inside the graph in the specified corner. 'center' may be used instead of 'middle', and the order of the pair is insignificant.")
         ;
 
     po::options_description input_desc("Input files");
@@ -42,6 +43,47 @@ void SeriesGraphs::addOptions() {
     invisible_.add(input_desc);
     positional_.add("input-files", -1);
 }
+
+using LP = creativity::data::graph::Series::LegendPosition;
+const std::unordered_map<std::string, LP> posmap{
+    {"none", LP::None},
+    {"outside-top", LP::OutsideTop},
+    {"top-outside", LP::OutsideTop},
+    {"outside-middle", LP::OutsideMiddle},
+    {"middle-outside", LP::OutsideMiddle},
+    {"outside-center", LP::OutsideMiddle},
+    {"center-outside", LP::OutsideMiddle},
+    {"outside-bottom", LP::OutsideBottom},
+    {"bottom-outside", LP::OutsideBottom},
+    {"top-left", LP::TopLeft},
+    {"left-top", LP::TopLeft},
+    {"top-middle", LP::TopCenter},
+    {"middle-top", LP::TopCenter},
+    {"top-center", LP::TopCenter},
+    {"center-top", LP::TopCenter},
+    {"top-right", LP::TopRight},
+    {"right-top", LP::TopRight},
+    {"middle-left", LP::MiddleLeft},
+    {"left-middle", LP::MiddleLeft},
+    {"center-left", LP::MiddleLeft},
+    {"left-center", LP::MiddleLeft},
+    {"middle-center", LP::MiddleCenter},
+    {"middle-middle", LP::MiddleCenter},
+    {"center-center", LP::MiddleCenter},
+    {"center-middle", LP::MiddleCenter},
+    {"middle-right", LP::MiddleRight},
+    {"right-middle", LP::MiddleRight},
+    {"center-right", LP::MiddleRight},
+    {"right-center", LP::MiddleRight},
+    {"bottom-left", LP::BottomLeft},
+    {"left-bottom", LP::BottomLeft},
+    {"bottom-center", LP::BottomCenter},
+    {"center-bottom", LP::BottomCenter},
+    {"bottom-middle", LP::BottomCenter},
+    {"middle-bottom", LP::BottomCenter},
+    {"bottom-right", LP::BottomRight},
+    {"right-bottom", LP::BottomRight}
+};
 
 void SeriesGraphs::postParse(boost::program_options::variables_map &vars) {
     if (graph_min_t >= 0 and graph_max_t >= 0 and graph_max_t <= graph_min_t)
@@ -54,6 +96,13 @@ void SeriesGraphs::postParse(boost::program_options::variables_map &vars) {
         if (std::isfinite(graph_min_value) and std::isfinite(graph_max_value))
             throw po::invalid_option_value("Option --different-y-scale cannot be used when both --y-min and --y-max values are given");
         same_vertical_scale = false;
+    }
+    if (vars.count("legend-position")) {
+        try {
+            legend_position = posmap.at(legend_position_input);
+        } catch (const std::out_of_range&) {
+            throw po::invalid_option_value("Invalid value `" + legend_position_input + "' specified for --legend-position");
+        }
     }
 }
 
