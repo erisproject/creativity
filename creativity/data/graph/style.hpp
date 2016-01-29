@@ -9,34 +9,52 @@ class RGBA final {
     public:
         RGBA() = delete;
 
-        /// Creates the struct with a red, green, blue, and (optional) alpha value.
-        RGBA(const double &r, const double &g, const double &b, const double &a = 1.0) : red{r}, green{g}, blue{b}, alpha{a} {
-            if (r<0 or r>1 or g<0 or g>1 or b<0 or b>1 or a<0 or a>1)
-                throw std::invalid_argument("Invalid RGBA value: all values must be >= 0 and <= 1");
-        }
-        /// Creates a gray with the given intensity for each of the colour channels, and an optional
-        /// alpha value.
-        explicit RGBA(const double &i, const double &a = 1.0) : RGBA(i,i,i,a) {}
+        /** Creates a RGBA colour object with a red, green, blue, and (optional) alpha value.
+         *
+         * \param r the red channel value, from 0 to 1.  0 is off, 1 is full intensity.
+         * \param g the red channel value, from 0 to 1.  0 is off, 1 is full intensity.
+         * \param b the red channel value, from 0 to 1.  0 is off, 1 is full intensity.
+         * \param a the alpha channel value, from 0 to 1.  0 is completely transparent, 1 is
+         * completely opaque.  If omitted, defaults to 1 (fully opaque).
+         * \throws std::out_of_range if any of the given values are outside the [0,1] range.
+         */
+        constexpr RGBA(const double &r, const double &g, const double &b, const double &a = 1.0) :
+            red  {r < 0 or r > 1 ? throw std::out_of_range("") : r},
+            green{g < 0 or g > 1 ? throw std::out_of_range("") : g},
+            blue {b < 0 or b > 1 ? throw std::out_of_range("") : b},
+            alpha{a < 0 or a > 1 ? throw std::out_of_range("") : a} {}
+
+        /** Creates a RGBA object with a gray value and optional alpha value.  The gray intensity is
+         * used for the three red, green, and blue values.
+         *
+         * \throws std::out_of_range if any of the given values are outside the [0,1] range.
+         */
+        explicit constexpr RGBA(const double &i, const double &a = 1.0) : RGBA(i,i,i,a) {}
 
         /// Copy assignment operator
         RGBA& operator=(const RGBA &copy) { r_(copy.red); g_(copy.green); b_(copy.blue); a_(copy.alpha); return *this; }
 
         /// Compares two RGBA objects: they are considered equal if all components are equal.
-        bool operator==(const RGBA& other) const { return equalsRGB(other) and alpha == other.alpha; }
+        constexpr bool operator==(const RGBA& other) const { return equalsRGB(other) and alpha == other.alpha; }
 
         /// Negation of ==
-        bool operator!=(const RGBA& other) const { return not (*this == other); }
+        constexpr bool operator!=(const RGBA& other) const { return not (*this == other); }
 
         /** Returns true if the red, green, and blue channels are equal.  The alpha values do not have
          * to match.
          */
-        bool equalsRGB(const RGBA& other) const { return red == other.red and blue == other.blue and green == other.green; }
+        constexpr bool equalsRGB(const RGBA& other) const { return red == other.red and blue == other.blue and green == other.green; }
 
         /** Returns true if the object is opaque, that is, has alpha = 1. */
-        bool opaque() const { return alpha == 1; }
+        constexpr bool opaque() const { return alpha == 1; }
 
         /** Returns true if the object is completely transparent, that is, has alpha = 0. */
-        bool transparent() const { return alpha == 0; }
+        constexpr bool transparent() const { return alpha == 0; }
+
+        /** Using an RGBA object as a bool returns true unless the object is fully transparent.  In
+         * other words, `if (color)` is equivalent to `if (not color.transparent())`.
+         */
+        constexpr operator bool() const { return alpha > 0; }
 
         /** "Multiplies" two RGBA objects together via alpha compositing "over" filter.  The result
          * is the colour that would result if the left hand side argument was painted, then the
@@ -97,10 +115,10 @@ class RGBA final {
         void a_(double a) { const_cast<double&>(alpha) = a < 0 ? 0 : a > 1 ? 1 : a; }
 };
 
-extern const RGBA
-    Transparent, ///< Pre-declared Transparent colour; the colour is actually black, but with alpha set to 0
-    Black, ///< Pre-declared black colour, with full opacity
-    White; ///< Pre-declared white colour, with full opacity
+constexpr RGBA
+    Transparent{0, 0}, ///< Pre-declared Transparent colour; the colour is actually black, but with alpha set to 0
+    Black{0}, ///< Pre-declared black colour, with full opacity
+    White{1}; ///< Pre-declared white colour, with full opacity
 
 /** Style class for a drawn line. */
 struct LineStyle {
