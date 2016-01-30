@@ -7,13 +7,15 @@ namespace creativity { namespace data { namespace graph {
 
 using namespace std::placeholders;
 
-const RectangleStyle Series::default_legend_box_style{White, Black};
-const LineStyle Series::default_line_style{Black, 1};
-const FillStyle Series::default_region_style{RGBA(0,0,1,0.25)};
+const RectangleStyle Series::default_legend_box_style(White, LineStyle(Black, 0.5));
+const LineStyle Series::default_line_style(Black, 1);
+const FillStyle Series::default_region_style(RGBA(0,0,1,0.25));
 
 
-Series::Series(Target &target, std::string title_markup, int tmin, int tmax, double ymin, double ymax)
-    : title_markup{std::move(title_markup)}, target_{target}
+Series::Series(Target &target, int tmin, int tmax, double ymin, double ymax,
+        std::string title, std::string x_label, std::string y_label)
+    : title{std::move(title)}, x_label{std::move(x_label)},
+    y_label{std::move(y_label)}, target_{target}
 {
     setExtents(tmin, tmax, ymin, ymax);
     recalcTicks();
@@ -170,6 +172,18 @@ void Series::recalcTicksY(unsigned max, TickEnds end_mode) {
     }
 }
 
+void Series::updateFonts(const Pango::FontDescription &new_font) {
+    for (auto *fptr : {&title_font, &axis_label_font, &tick_font, &legend_font}) {
+        fptr->merge(new_font, true);
+    }
+}
+
+void Series::updateFontFamily(const std::string &new_font_name) {
+    Pango::FontDescription font;
+    font.set_family(new_font_name);
+    updateFonts(font);
+}
+
 void Series::newPage() {
     finishPage();
     target_.newPage();
@@ -186,6 +200,8 @@ void Series::finishPage() {
     // Paint background:
     background_colour.applyTo(ctx);
     ctx->paint();
+
+    const double &total_width = target_.width(), &total_height = target_.height();
 
     // Distance from the graph border to the surface edge:
     double graph_left = margin_left, graph_right = margin_right, graph_top = margin_top, graph_bottom = margin_bottom;
@@ -204,42 +220,59 @@ void Series::finishPage() {
             legend_outer_height = legend_inner_height + legend_padding_top + legend_padding_bottom + legend_style.borderTB();
         }
 
-        // If the legend is outside the graph, it affects the graph_right edge:
-        if (legend_outer_width > 0 and legend_position >= LegendPosition::OutsideTop and legend_position <= LegendPosition::OutsideBottom) {
-            // There's a legend, and it's going to the right of the graph
-            graph_right += legend_graph_space + legend_outer_width;
+        // If the legend is outside the graph, it affects one of the edges:
+        if (legend_outer_width > 0) {
+            if (legend_position == LegendPosition::Right)
+                graph_right += legend_graph_space + legend_outer_width;
+            if (legend_position == LegendPosition::Left)
+                graph_left += legend_graph_space + legend_outer_width;
+            if (legend_position == LegendPosition::Top)
+                graph_top += legend_graph_space + legend_outer_height;
+            if (legend_position == LegendPosition::Bottom)
+                graph_bottom += legend_graph_space + legend_outer_height;
         }
     }
 
     // If there's a title, draw it, and use its size to determine the graph_top edge:
-    if (not title_markup.empty()) {
+    if (not title.empty()) {
+        Black.applyTo(ctx);
+        ctx->move_to(0, margin_top);
         auto title_layout = Pango::Layout::create(ctx);
         title_layout->set_font_description(title_font);
-        title_layout->set_width((target_.width() - title_padding_left - title_padding_right)*Pango::SCALE);
+        title_layout->set_width(total_width*Pango::SCALE);
         title_layout->set_ellipsize(Pango::EllipsizeMode::ELLIPSIZE_NONE);
         title_layout->set_alignment(Pango::Alignment::ALIGN_CENTER);
-        title_layout->set_markup(title_markup);
+        title_layout->set_markup(title);
         int pw, ph;
         title_layout->get_size(pw, ph);
-        ctx->move_to(title_padding_left, graph_top);
-        Black.applyTo(ctx);
         title_layout->show_in_cairo_context(ctx);
-        graph_top += ph/(double)Pango::SCALE + title_padding_bottom;
+        graph_top += ph/(double)Pango::SCALE + title_padding;
     }
+
+    auto axis_label_layout = Pango::Layout::create(ctx);
+    axis_label_layout->set_font_description(axis_label_font);
 
     auto tick_label_layout = Pango::Layout::create(ctx);
     tick_label_layout->set_font_description(tick_font);
-    // If there are horizontal ticks and/or a label, they determine graph_bottom
-    if (false) {
-        // FIXME: x-axis label support
+
+    // If there are horizontal ticks and/or an x-axis label, they determine graph_bottom
+    if (not x_label.empty()) {
+        axis_label_layout->set_markup(x_label);
+        int lw, lh;
+        axis_label_layout->get_size(lw, lh);
+        // Can't write it yet: it needs to be centered with the graph, and we don't the final graph
+        // location yet.
+        graph_bottom += lh / (double)Pango::SCALE + axis_label_padding;
     }
     // Tracks how far the last t tick text extends to the right of its tick line center
     double last_t_tick_extends = 0;
+    // Track the space immediately below the graph used by the horizontal axis ticks and tick labels
+    double htick_space = 0;
     if (not t_ticks.empty()) {
         if (tick_style.length > 0 and tick_style.thickness > 0)
-            graph_bottom += tick_style.length;
+            htick_space += tick_style.length;
 
-        if (tick_font_colour.alpha > 0) {
+        if (tick_font_colour) {
             double max_height = 0;
             int tvw, tvh;
             // Find the largest tick size; they are *probably* all the same, but just in case:
@@ -249,23 +282,35 @@ void Series::finishPage() {
                 max_height = std::max(max_height, tvh / (double)Pango::SCALE);
             }
             if (max_height > 0)
-                graph_bottom += tick_label_space + max_height;
+                htick_space += tick_label_space + max_height;
 
             // Also check the last t tick to make sure it won't go into the right margin: if it
             // does, we'll need to adjust graph_right so that it doesn't.
             last_t_tick_extends = 0.5 * tvw / (double)Pango::SCALE;
         }
+
+        if (htick_space > 0)
+            graph_bottom += htick_space;
     }
 
-    // If there are vertical ticks and/or a label, they determine graph_left
-    if (false) {
-        // FIXME: y-axis label support
+    // If there are vertical ticks and/or a y-axis label, they determine either graph_left or
+    // graph_right
+    double &y_axis_graph_side = (y_axis_left ? graph_left : graph_right);
+    if (not y_label.empty()) {
+        axis_label_layout->set_markup(y_label);
+        int lw, lh;
+        axis_label_layout->get_size(lw, lh);
+        // Can't write it yet: it needs to be centered with the graph, and we don't have the final
+        // graph location yet.
+        y_axis_graph_side += (y_label_rotated ? lh : lw) / (double)Pango::SCALE + axis_label_padding;
     }
+    // Track the space immediately to the right/left of the graph used by the vertical axis ticks and tick labels
+    double vtick_space = 0;
     if (not y_ticks.empty()) {
         if (tick_style.length > 0 and tick_style.thickness > 0)
-            graph_left += tick_style.length;
+            vtick_space += tick_style.length;
 
-        if (tick_font_colour.alpha > 0) {
+        if (tick_font_colour) {
             double max_width = 0;
             // Find the largest tick size
             for (const auto &y : y_ticks) {
@@ -278,8 +323,11 @@ void Series::finishPage() {
             }
 
             if (max_width > 0)
-                graph_left += tick_label_space + max_width;
+                vtick_space += tick_label_space + max_width;
         }
+
+        if (vtick_space > 0)
+            y_axis_graph_side += vtick_space;
     }
 
     // Figure out the matrix for converting data points into interior graph coordinates:
@@ -287,9 +335,9 @@ void Series::finishPage() {
     bool redo_graph_translation = false;
     do {
         double left = graph_left + graph_style.borderL() + graph_padding_left,
-               right = target_.width() - graph_right - graph_style.borderR() - graph_padding_right,
+               right = total_width - graph_right - graph_style.borderR() - graph_padding_right,
                top = graph_top + graph_style.borderT() + graph_padding_top,
-               bottom = target_.height() - graph_bottom - graph_style.borderB() - graph_padding_bottom;
+               bottom = total_height - graph_bottom - graph_style.borderB() - graph_padding_bottom;
         graph_translation.xx = (right - left) / (tmax_ - tmin_);
         graph_translation.yy = (top - bottom) / (ymax_ - ymin_);
         graph_translation.x0 = left - tmin_*(right - left)/(tmax_ - tmin_);
@@ -304,7 +352,7 @@ void Series::finishPage() {
             // it does, reduce graph_right to compensate.
             double last_tick_x = *t_ticks.rbegin(), dontcare = 0;
             graph_translation.transform_point(last_tick_x, dontcare);
-            double extra = target_.width() - margin_right - last_tick_x - last_t_tick_extends;
+            double extra = total_width - margin_right - last_tick_x - last_t_tick_extends;
             if (extra < 0) {
                 graph_right -= extra;
                 redo_graph_translation = true;
@@ -312,15 +360,17 @@ void Series::finishPage() {
         }
     } while (redo_graph_translation);
 
+    double graph_outer_width = total_width - graph_right - graph_left, graph_outer_height = total_height - graph_bottom - graph_top;
+
     // Draw graph area:
     {
         Cairo::SaveGuard saver(ctx);
         ctx->move_to(graph_left, graph_top);
-        drawRectangle(ctx, target_.width()-graph_right-graph_left, target_.height()-graph_bottom-graph_top, graph_style, true);
+        drawRectangle(ctx, graph_outer_width, graph_outer_height, graph_style, true);
         // We're now clipped inside it
         // If we have tick grid lines, draw them:
-        if (tick_grid_style.colour.alpha > 0 and not (t_grid.empty() and y_grid.empty())) {
-            double left = graph_left, right = target_.width()-graph_right, top = graph_top, bottom = target_.height()-graph_bottom;
+        if (tick_grid_style.colour and not (t_grid.empty() and y_grid.empty())) {
+            double left = graph_left, right = total_width-graph_right, top = graph_top, bottom = total_height-graph_bottom;
             for (const auto &t : t_grid) {
                 double grid_x = t, dontcare = 0;
                 graph_translation.transform_point(grid_x, dontcare);
@@ -348,7 +398,7 @@ void Series::finishPage() {
 
     // Horizontal axis ticks:
     if (not t_ticks.empty()) {
-        double tick_top = target_.height() - graph_bottom;
+        double tick_top = total_height - graph_bottom;
         for (const auto &t : t_ticks) {
             double tick_x = t, dontcare = 0;
             graph_translation.transform_point(tick_x, dontcare);
@@ -358,7 +408,7 @@ void Series::finishPage() {
                 ctx->rel_line_to(0, tick_style.length);
                 ctx->stroke();
             }
-            if (tick_font_colour.alpha > 0) {
+            if (tick_font_colour) {
                 tick_label_layout->set_text(std::to_string(t));
                 int tvw, tvh;
                 tick_label_layout->get_size(tvw, tvh);
@@ -369,9 +419,10 @@ void Series::finishPage() {
             }
         }
     }
+
     // Vertical axis ticks:
     if (not y_ticks.empty()) {
-        double tick_right = graph_left;
+        double tick_right = y_axis_left ? graph_left : total_width - graph_right + tick_style.length;
         for (const auto &y : y_ticks) {
             double dontcare = 0, tick_y = y;
             graph_translation.transform_point(dontcare, tick_y);
@@ -381,77 +432,97 @@ void Series::finishPage() {
                 ctx->rel_line_to(-tick_style.length, 0);
                 ctx->stroke();
             }
-            if (tick_font_colour.alpha > 0) {
+            if (tick_font_colour) {
                 std::ostringstream oss;
                 oss << y;
                 tick_label_layout->set_text(oss.str());
                 int tvw, tvh;
                 tick_label_layout->get_size(tvw, tvh);
                 double width = (double)tvw / Pango::SCALE, height = (double)tvh / Pango::SCALE;
-                ctx->move_to(tick_right - tick_style.length - tick_label_space - width, tick_y - 0.5*height);
+                ctx->move_to(
+                        y_axis_left ? tick_right - tick_style.length - tick_label_space - width : tick_right + tick_label_space,
+                        tick_y - 0.5*height);
                 tick_font_colour.applyTo(ctx);
                 tick_label_layout->show_in_cairo_context(ctx);
             }
         }
     }
 
+    // Axis labels:
+    Black.applyTo(ctx);
+    if (not x_label.empty()) {
+        axis_label_layout->set_markup(x_label);
+        int lw, lh;
+        axis_label_layout->get_size(lw, lh);
+        ctx->move_to(
+                graph_left + 0.5*(graph_outer_width - lw/(double)Pango::SCALE),
+                total_height - graph_bottom + htick_space + axis_label_padding);
+        axis_label_layout->show_in_cairo_context(ctx);
+    }
+    if (not y_label.empty()) {
+        Cairo::SaveGuard saver(ctx);
+        if (not y_label_rotated) axis_label_layout->set_alignment(y_axis_left ? Pango::Alignment::ALIGN_RIGHT : Pango::Alignment::ALIGN_LEFT);
+        axis_label_layout->set_markup(y_label);
+        int lw, lh;
+        axis_label_layout->get_size(lw, lh);
+        if (y_label_rotated) {
+            ctx->rotate_degrees(-90);
+            ctx->move_to(
+                    graph_bottom - total_height + 0.5*(graph_outer_height - lw/(double)Pango::SCALE),
+                    y_axis_left
+                        ? graph_left - vtick_space - axis_label_padding - lh/(double)Pango::SCALE
+                        : total_width - graph_right + vtick_space + axis_label_padding);
+        }
+        else {
+            ctx->move_to(
+                    y_axis_left
+                        ? graph_left - vtick_space - axis_label_padding - lw/(double)Pango::SCALE
+                        : total_width - graph_right + vtick_space + axis_label_padding,
+                    graph_top + 0.5*(graph_outer_height - lh/(double)Pango::SCALE));
+        }
+        axis_label_layout->show_in_cairo_context(ctx);
+    }
+
 
     // Draw legend area (this has to be down here, after the graph drawing, because it is
     // potentially drawn on top of the graph):
-    if (legend_outer_width > 0) {
+    if (legend_outer_width > 0 and legend_position != LegendPosition::None) {
         Cairo::SaveGuard saver(ctx);
         double legend_x0 = 0, legend_y0 = 0;
         switch (legend_position) {
-            case LegendPosition::OutsideTop:
-            case LegendPosition::OutsideMiddle:
-            case LegendPosition::OutsideBottom:
-                legend_x0 = target_.width() - graph_right + legend_graph_space;
+            case LegendPosition::Inside:
+                legend_x0 = (graph_left + graph_style.borderL() + legend_graph_space)
+                    + legend_rel_x * (graph_outer_width - 2*legend_graph_space - legend_outer_width - graph_style.borderLR());
                 break;
-            case LegendPosition::TopRight:
-            case LegendPosition::MiddleRight:
-            case LegendPosition::BottomRight:
-                legend_x0 = target_.width() - graph_right - graph_style.borderR() - legend_graph_space - legend_outer_width;
+            case LegendPosition::Right:
+                legend_x0 = total_width - margin_right - legend_outer_width;
                 break;
-            case LegendPosition::TopCenter:
-            case LegendPosition::MiddleCenter:
-            case LegendPosition::BottomCenter:
-                legend_x0 = graph_left + 0.5*(target_.width() - graph_right - graph_left - legend_outer_width);
+            case LegendPosition::Left:
+                legend_x0 = margin_left;
                 break;
-            case LegendPosition::TopLeft:
-            case LegendPosition::MiddleLeft:
-            case LegendPosition::BottomLeft:
-                legend_x0 = graph_left + graph_style.borderL() + legend_graph_space;
+            case LegendPosition::Top:
+            case LegendPosition::Bottom:
+                legend_x0 = graph_left + legend_rel_x * (graph_outer_width - legend_outer_width);
                 break;
             case LegendPosition::None:;
         }
         switch (legend_position) {
-            case LegendPosition::OutsideTop:
-                legend_y0 = graph_top;
+            case LegendPosition::Inside:
+                legend_y0 = (graph_top + graph_style.borderT() + legend_graph_space)
+                    + legend_rel_y * (graph_outer_height - 2*legend_graph_space - legend_outer_height - graph_style.borderTB());
                 break;
-            case LegendPosition::OutsideBottom:
-                legend_y0 = target_.height() - graph_bottom - legend_outer_height;
+            case LegendPosition::Right:
+            case LegendPosition::Left:
+                legend_y0 = graph_top + legend_rel_y * (graph_outer_height - legend_outer_height);
                 break;
-            case LegendPosition::TopRight:
-            case LegendPosition::TopCenter:
-            case LegendPosition::TopLeft:
-                legend_y0 = graph_top + graph_style.borderT() + legend_graph_space;
+            case LegendPosition::Top:
+                legend_y0 = graph_top - legend_graph_space - legend_outer_height;
                 break;
-            case LegendPosition::MiddleRight:
-            case LegendPosition::MiddleCenter:
-            case LegendPosition::MiddleLeft:
-            case LegendPosition::OutsideMiddle:
-                legend_y0 = graph_top + 0.5*(target_.height() - graph_bottom - graph_top - legend_outer_height);
-                break;
-            case LegendPosition::BottomRight:
-            case LegendPosition::BottomCenter:
-            case LegendPosition::BottomLeft:
-                legend_y0 = target_.height() - graph_bottom - graph_style.borderB() - legend_graph_space - legend_outer_height;
+            case LegendPosition::Bottom:
+                legend_y0 = total_height - margin_bottom - legend_outer_height;
                 break;
             case LegendPosition::None:;
         }
-
-        legend_x0 += legend_x_offset;
-        legend_y0 += legend_y_offset;
 
         ctx->move_to(legend_x0, legend_y0);
 
@@ -481,7 +552,8 @@ void Series::finishPage() {
 void Series::drawRectangle(Cairo::RefPtr<Cairo::Context> ctx, double width, double height, const RectangleStyle &style, bool clip) {
     double top, left;
     ctx->get_current_point(left, top);
-    if (style.border.thickness > 0 and style.border.colour.alpha > 0) {
+    if (style.border.thickness > 0 and style.border.colour) {
+        style.border.applyTo(ctx);
         if (style.border_top) {
             ctx->move_to(left, top + 0.5*style.border.thickness);
             ctx->rel_line_to(width, 0);
@@ -498,7 +570,6 @@ void Series::drawRectangle(Cairo::RefPtr<Cairo::Context> ctx, double width, doub
             ctx->move_to(left + width - 0.5*style.border.thickness, top);
             ctx->rel_line_to(0, height);
         }
-        style.border.applyTo(ctx);
         ctx->stroke();
     }
     ctx->rectangle(left + style.borderL(), top + style.borderT(),
@@ -639,11 +710,11 @@ std::pair<double, double> Series::drawLegendItem(Cairo::RefPtr<Cairo::Context> c
     return size;
 }
 
-void Series::addLegendItem(std::string markup, FillStyle lower, bool preserve, RectangleStyle bg) {
-    addLegendItem(markup, std::bind(&Series::drawSimpleLegendItem, this, _1, _2, lower, bg), preserve);
+void Series::addLegendItem(std::string markup, const FillStyle &lower, bool preserve, const RectangleStyle &bg) {
+    addLegendItem(markup, std::bind(&Series::drawSimpleLegendItem, this, _1, _2, std::move(lower), std::move(bg)), preserve);
 }
 
-void Series::drawSimpleLegendItem(Cairo::RefPtr<Cairo::Context> ctx, const Cairo::Matrix &to_box, FillStyle lower, RectangleStyle bg) const {
+void Series::drawSimpleLegendItem(Cairo::RefPtr<Cairo::Context> ctx, const Cairo::Matrix &to_box, const FillStyle &lower, const RectangleStyle &bg) const {
     double box_x = 0, box_y = 0, box_width = 1, box_height = 1;
     to_box.transform_point(box_x, box_y);
     to_box.transform_distance(box_width, box_height);
@@ -653,18 +724,17 @@ void Series::drawSimpleLegendItem(Cairo::RefPtr<Cairo::Context> ctx, const Cairo
     drawRectangle(ctx, box_width, box_height, bg, true);
 
     // If there's a lower background, paint it
-    if (lower.fill_colour.alpha > 0) {
+    if (lower.fill_colour) {
         // The x/width/height are too big, but no matter: it's clipped to the space we want anyway
-        ctx->rectangle(box_x, box_y + 0.5*(box_height + lower.border.thickness),
-                box_width, 0.5*box_height);
+        ctx->rectangle(box_x, box_y + 0.5*box_height, box_width, 0.5*box_height);
         lower.fill_colour.applyTo(ctx);
         ctx->fill();
     }
     // Lower border line
-    if (lower.border.thickness > 0 and lower.border.colour.alpha > 0) {
+    if (lower.border.thickness > 0 and lower.border.colour) {
         ctx->move_to(box_x, box_y + 0.5*box_height);
         ctx->rel_line_to(box_width, 0);
-        lower.border.colour.applyTo(ctx);
+        lower.border.applyTo(ctx);
         ctx->stroke();
     }
 }
@@ -703,7 +773,7 @@ void Series::drawRegion(Cairo::RefPtr<Cairo::Context> ctx, const Cairo::Matrix &
     auto end = intervals.upper_bound(tmax_);
     auto group_start = intervals.end(), prev_it = intervals.end();
 
-    if (style.fill_colour.alpha > 0) {
+    if (style.fill_colour) {
         {
             Cairo::SaveGuard saver(ctx);
             ctx->set_matrix(translate_graph);
@@ -745,7 +815,7 @@ void Series::drawRegion(Cairo::RefPtr<Cairo::Context> ctx, const Cairo::Matrix &
     }
 
     // Now draw the border lines (if any)
-    if (not style.border.colour.transparent() and style.border.thickness > 0) {
+    if (style.border.colour and style.border.thickness > 0) {
         std::map<int, double> max_line, min_line;
         for (auto it = intervals.lower_bound(tmin_); it != end; it++) {
             const auto &a = it->second.first, &b = it->second.second;

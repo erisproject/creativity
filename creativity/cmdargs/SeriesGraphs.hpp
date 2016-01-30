@@ -134,10 +134,21 @@ class SeriesGraphs : public CmdArgs {
         bool same_vertical_scale = true;
 
         /** The legend position */
-        creativity::data::graph::Series::LegendPosition legend_position = creativity::data::graph::Series::LegendPosition::OutsideTop;
+        creativity::data::graph::Series::LegendPosition legend_position = creativity::data::graph::Series::LegendPosition::Right;
 
-        /** The input string, such as "top-left", "outside-center", etc. */
-        std::string legend_position_input = "outside-top";
+        /** The legend relative x value.
+         * \sa creativity::data::graph::Series::legend_rel_x
+         */
+        double legend_rel_x = 1;
+
+        /** The legend relative y value.
+         * \sa creativity::data::graph::Series::legend_rel_y
+         */
+        double legend_rel_y = 0;
+
+        /** The input string, such as "top-left", "outside-center", etc.  If blank, we just leave
+         * legend_position/legend_rel_x/legend_rel_y alone. */
+        std::string legend_position_input;
 
         /** The resolution (pixels per inch) for PNG output.  The PNG will have a pixel size of
          * this value times `width` and `height`, but will have the resolution encoded (so that

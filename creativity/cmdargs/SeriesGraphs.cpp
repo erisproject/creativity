@@ -33,7 +33,9 @@ void SeriesGraphs::addOptions() {
         ("t-to", min<-1>(data_max_t), "The t value at which to stop including observations.  If -1, include all observations.  In contrast to --t-max, this controls when data is plotted, not the graph axis limits.")
         ("same-t-scale,T", "If specified, the time period scale for all graphs will be the same.  The default determines each graph's t scale separately.  This option is implied if both --t-min and --t-max are >= 0.")
         ("different-y-scale,Y", "If specified, the value scale (y-axis) will be determined to fit the data in each file separately.  The default uses the same scale for all graphs.  This option cannot be used when both --y-min and --y-max values are given.")
-        ("legend-position,L", value(legend_position_input), "The position of the graph legend, which must be either 'none' to suppress the legend entirely, or one of the twelve possible combinations of: {outside,right,middle,left}-{top,middle,bottom}.  'outside' puts the legend to the right of the graph; the other options put the legend inside the graph in the specified corner. 'center' may be used instead of 'middle', and the order of the pair is insignificant.")
+        ("legend-position,L", value(legend_position_input), "The general position of the graph legend, one of 'none', 'inside', 'right', 'left', 'top', 'bottom' where 'none' suppresses the legend, 'inside' puts it inside the graph, and the rest put it outside on the indicated side of the graph.")
+        ("legend-x", range<0,1>(legend_rel_x), "Relative x position (for --legend-position={inside,top,bottom}): 0 is left-most, 1 is right-most.")
+        ("legend-y", range<0,1>(legend_rel_y), "Relative y position (for --legend-position={inside,left,right}): 0 is top-most, 1 is bottom-most.")
         ;
 
     po::options_description input_desc("Input files");
@@ -47,42 +49,11 @@ void SeriesGraphs::addOptions() {
 using LP = creativity::data::graph::Series::LegendPosition;
 const std::unordered_map<std::string, LP> posmap{
     {"none", LP::None},
-    {"outside-top", LP::OutsideTop},
-    {"top-outside", LP::OutsideTop},
-    {"outside-middle", LP::OutsideMiddle},
-    {"middle-outside", LP::OutsideMiddle},
-    {"outside-center", LP::OutsideMiddle},
-    {"center-outside", LP::OutsideMiddle},
-    {"outside-bottom", LP::OutsideBottom},
-    {"bottom-outside", LP::OutsideBottom},
-    {"top-left", LP::TopLeft},
-    {"left-top", LP::TopLeft},
-    {"top-middle", LP::TopCenter},
-    {"middle-top", LP::TopCenter},
-    {"top-center", LP::TopCenter},
-    {"center-top", LP::TopCenter},
-    {"top-right", LP::TopRight},
-    {"right-top", LP::TopRight},
-    {"middle-left", LP::MiddleLeft},
-    {"left-middle", LP::MiddleLeft},
-    {"center-left", LP::MiddleLeft},
-    {"left-center", LP::MiddleLeft},
-    {"middle-center", LP::MiddleCenter},
-    {"middle-middle", LP::MiddleCenter},
-    {"center-center", LP::MiddleCenter},
-    {"center-middle", LP::MiddleCenter},
-    {"middle-right", LP::MiddleRight},
-    {"right-middle", LP::MiddleRight},
-    {"center-right", LP::MiddleRight},
-    {"right-center", LP::MiddleRight},
-    {"bottom-left", LP::BottomLeft},
-    {"left-bottom", LP::BottomLeft},
-    {"bottom-center", LP::BottomCenter},
-    {"center-bottom", LP::BottomCenter},
-    {"bottom-middle", LP::BottomCenter},
-    {"middle-bottom", LP::BottomCenter},
-    {"bottom-right", LP::BottomRight},
-    {"right-bottom", LP::BottomRight}
+    {"right", LP::Right},
+    {"left", LP::Left},
+    {"bottom", LP::Bottom},
+    {"top", LP::Top},
+    {"inside", LP::Inside}
 };
 
 void SeriesGraphs::postParse(boost::program_options::variables_map &vars) {
@@ -97,7 +68,7 @@ void SeriesGraphs::postParse(boost::program_options::variables_map &vars) {
             throw po::invalid_option_value("Option --different-y-scale cannot be used when both --y-min and --y-max values are given");
         same_vertical_scale = false;
     }
-    if (vars.count("legend-position")) {
+    if (not legend_position_input.empty()) {
         try {
             legend_position = posmap.at(legend_position_input);
         } catch (const std::out_of_range&) {

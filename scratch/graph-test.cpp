@@ -2,6 +2,7 @@
 #include "creativity/data/graph/PDF.hpp"
 #include <map>
 #include <limits>
+#include <unordered_map>
 #include <iostream>
 
 using namespace creativity::data::graph;
@@ -79,18 +80,15 @@ int main() {
     }
 
 
-    Series s(pdf, "<b>Hi there!</b>\n<small><small>This is <u>my</u> <i>title</i>.</small></small>\n<small><small><small>(If you want your own title, ask nicely.)</small></small></small>", myline.begin()->first, myline.rbegin()->first, min, max);
-    s.title_font.set_family("5yearsoldfont");
-    s.title_font.set_size(12*Pango::SCALE);
-    s.legend_font.set_family("5yearsoldfont");
-    s.legend_font.set_size(5 * Pango::SCALE);
+    Series s(pdf, myline.begin()->first, myline.rbegin()->first, min, max, "<b>Hi there!</b>\n<span weight=\"normal\"><small><small>This is <u>my</u> <i>title</i>.</small></small>\n<small><small><small>(If you want your own title, ask nicely.)</small></small></small></span>");
+//    s.updateFontFamily("EB Garamond");
     LineStyle linestyle(RGBA(1,0,0));
     s.addLine(myline, linestyle);
     std::string linemarkup = "TEST line OMG <span foreground=\"blue\">OMG</span> <span background=\"red\" font_weight=\"bold\">OMG</span> <b>OMG</b> OMG <span font=\"Serif 3\">OMG <big>OMG <big>OMG <big>OMG <big>OMG <big>OMG <big>OMG <big>OMG <big>OMG <big>OMG</big></big></big></big></big></big></big></big></big></span>";
-    s.addLegendItem(linemarkup, FillStyle(Transparent, linestyle), false, FillStyle(White, Black));
+    s.addLegendItem(linemarkup, FillStyle(Transparent, linestyle), false, Series::default_legend_box_style); //, FillStyle(White, Black));
 
     s.newPage();
-    s.title_markup = "Title 2";
+    s.title = "Title 2";
     s.recalcTicks(10, 8, Series::TickEnds::Replace);
     s.graph_style.fill_colour = RGBA(0.95, 0.95, 0.95);
     s.tick_grid_style = LineStyle(White, 1);
@@ -111,10 +109,9 @@ int main() {
             double x = 0, y = 0, w = 1, h = 1;
             m.transform_point(x, y);
             m.transform_distance(w, h);
-            std::cout << "x,y,w,h: " << x<<","<<y<<","<<w<<","<<h<<"\n";
             ctx->save();
             ctx->move_to(x, y);
-            Series::drawRectangle(ctx, w, h, FillStyle(cistyle.fill_colour, Black), true);
+            Series::drawRectangle(ctx, w, h, FillStyle(cistyle.fill_colour, Series::default_legend_box_style.border), true);
             bigcistyle.fill_colour.applyTo(ctx);
             ctx->paint();
             linestyle.colour.applyTo(ctx);
@@ -124,16 +121,13 @@ int main() {
             ctx->stroke();
     });
 
-    // FIXME: this isn't working; transofmr_point/distance isn't right, I don't think.  Is there a
-    // transformation already applied?
     s.addLegendItem("90% confidence boundary", [&](Cairo::RefPtr<Cairo::Context> ctx, const Cairo::Matrix &m) {
             double x = 0, y = 0, w = 1, h = 1;
             m.transform_point(x, y);
             m.transform_distance(w, h);
-            std::cout << "x,y,w,h: " << x<<","<<y<<","<<w<<","<<h<<"\n";
             ctx->save();
             ctx->move_to(x, y);
-            Series::drawRectangle(ctx, w, h, FillStyle(Transparent, Black), true);
+            Series::drawRectangle(ctx, w, h, Series::default_legend_box_style, true);
             ctx->rectangle(x, y+0.5*h, w, 0.5*h);
             cistyle.fill_colour.applyTo(ctx);
             ctx->fill();
@@ -143,36 +137,69 @@ int main() {
 
     s.addLegendItem("68% confidence level", bigcistyle);
 
-    for (double xoff : {0, 5, -10}) {
-        s.legend_graph_space = -1;
-        s.legend_x_offset = xoff;
-        for (auto position : {
-                Series::LegendPosition::OutsideTop,
-                Series::LegendPosition::OutsideMiddle,
-                Series::LegendPosition::OutsideBottom,
-                Series::LegendPosition::TopRight,
-                Series::LegendPosition::MiddleRight,
-                Series::LegendPosition::BottomRight,
-                Series::LegendPosition::TopCenter,
-                Series::LegendPosition::MiddleCenter,
-                Series::LegendPosition::BottomCenter,
-                Series::LegendPosition::TopLeft,
-                Series::LegendPosition::MiddleLeft,
-                Series::LegendPosition::BottomLeft
-                }) {
-            if (xoff != 0 or position != Series::LegendPosition::OutsideTop) s.newPage();
+    s.recalcTicks(10, 8, Series::TickEnds::Add);
+    s.graph_style.fill_colour = White;
+    s.tick_grid_style = LineStyle(RGBA(.95,.95,.95), 1);
 
-            s.legend_position = position;
-            s.title_markup = "";
-            s.recalcTicks(10, 8, Series::TickEnds::Add);
-            s.graph_style.fill_colour = White;
-            s.tick_grid_style = LineStyle(RGBA(.95,.95,.95), 1);
+    s.title = "My title";
+    s.x_label = "t";
+    bool first = true;
+    bool last_was_left = false;
+    for (auto lgs : {-1, 0, 5}) {
+        s.legend_graph_space = lgs;
+        for (auto p : std::list<std::pair<Series::LegendPosition, std::pair<double, double>>>({
+                {Series::LegendPosition::Right, {0.,0.}},
+                {Series::LegendPosition::Right, {0.,0.25}},
+                {Series::LegendPosition::Right, {0.,0.5}},
+                {Series::LegendPosition::Right, {0.,0.75}},
+                {Series::LegendPosition::Right, {0.,1.}},
+                {Series::LegendPosition::Left, {0.,0.}},
+                {Series::LegendPosition::Left, {0.,0.25}},
+                {Series::LegendPosition::Left, {0.,0.5}},
+                {Series::LegendPosition::Left, {0.,0.75}},
+                {Series::LegendPosition::Left, {0.,1.}},
+                {Series::LegendPosition::Top, {0.,0.}},
+                {Series::LegendPosition::Top, {0.25,0.}},
+                {Series::LegendPosition::Top, {0.5,0.}},
+                {Series::LegendPosition::Top, {0.75,0.}},
+                {Series::LegendPosition::Top, {1.,0.}},
+                {Series::LegendPosition::Bottom, {0.,0.}},
+                {Series::LegendPosition::Bottom, {0.25,0.}},
+                {Series::LegendPosition::Bottom, {0.5,0.}},
+                {Series::LegendPosition::Bottom, {0.75,0.}},
+                {Series::LegendPosition::Bottom, {1.,0.}},
+                {Series::LegendPosition::Inside, {1.,0.}}, // TopRight
+                {Series::LegendPosition::Inside, {1.,0.5}}, // MidRight
+                {Series::LegendPosition::Inside, {1.,1.}}, // BottomRight
+                {Series::LegendPosition::Inside, {0.5,0.}}, // TopMid
+                {Series::LegendPosition::Inside, {0.5,0.5}}, // Middle
+                {Series::LegendPosition::Inside, {0.5,1.}}, // BottomMid
+                {Series::LegendPosition::Inside, {0.,0.}}, // TopLeft
+                {Series::LegendPosition::Inside, {0.,0.5}}, // MidLeft
+                {Series::LegendPosition::Inside, {0.,1.}} // BottomLeft
+        })) {
+            if (first) first = false;
+            else s.newPage();
+
+            last_was_left = s.y_axis_left = !last_was_left;
+
+            if (p.first == Series::LegendPosition::Inside) {
+                s.y_label = "net\nutility\n(utility\n- fixed\nincome)";
+                s.y_label_rotated = false;
+            }
+            else {
+                s.y_label = "net utility (utility - fixed income)";
+                s.y_label_rotated = true;
+            }
+
+            s.legend_position = p.first;
+            s.legend_rel_x = p.second.first;
+            s.legend_rel_y = p.second.second;
 
             s.addRegion(myci, cistyle);
             s.addRegion(mybiggerci, bigcistyle);
             s.addLine(myline, linestyle);
 
-            s.legend_graph_space += 2;
             s.finishPage();
         }
     }

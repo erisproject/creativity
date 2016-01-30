@@ -48,13 +48,16 @@ class Series {
         /** Constructs a new series plot that plots to the given Cairo context.
          *
          * \param target the Target object to which the graph should be drawn
-         * \param title_markup the title of the graph (which may contain pango markup)
          * \param tmin the left-hand-side t value
          * \param tmax the right-hand-side t value
          * \param ymin the minimum y value at the bottom of the plot region
          * \param ymax the maximum y value at the top of the plot region
+         * \param title the title of the graph (which may contain pango markup)
+         * \param x_label the x axis label (which may contain pango markup)
+         * \param y_label the y axis label (which may contain pango markup)
          */
-        Series(Target &target, std::string title_markup, int tmin, int tmax, double ymin, double ymax);
+        Series(Target &target, int tmin, int tmax, double ymin, double ymax,
+                std::string title = "", std::string x_label = "", std::string y_label = "");
 
         /// Destructor; calls finishPage()
         virtual ~Series();
@@ -105,7 +108,7 @@ class Series {
                 const FillStyle &style = default_region_style
                 );
 
-        /** The default legend box background and/or border style: white background with a 1-unit
+        /** The default legend box background and/or border style: white background with a 0.5-unit
          * wide, solid black border.
          */
         static const RectangleStyle default_legend_box_style;
@@ -130,9 +133,9 @@ class Series {
          * The background fill and border is drawn first, followed by the lower area.
          */
         void addLegendItem(std::string markup,
-                FillStyle lower,
+                const FillStyle &lower,
                 bool preserve = true,
-                RectangleStyle style = default_legend_box_style);
+                const RectangleStyle &style = default_legend_box_style);
 
         /// Alias for the function callback for custom legend support
         using LegendPainterCallback_t = std::function<void(Cairo::RefPtr<Cairo::Context>, const Cairo::Matrix&)>;
@@ -175,29 +178,29 @@ class Series {
         static void drawRectangle(Cairo::RefPtr<Cairo::Context> ctx, double width, double height, const RectangleStyle &style, bool clip = false);
 
         /// The background colour of the page
-        RGBA background_colour = White;
+        RGBA background_colour{White};
 
         /** The line style (including length) of tick marks.  Defaults to a black, 0.5-width,
          * 3-length line.  The `length` parameter of the style controls the length of tick marks; if
          * 0, tick marks are suppressed. */
-        LineStyle tick_style = LineStyle(Black, 0.5, 3);
+        LineStyle tick_style{Black, 0.5, 3};
 
         /** The space between the tick line and the corresponding tick value text.  Only applies
          * when both are visible (i.e. non-zero `tick_style` width and length, and non-transparent
          * `tick_font_colour`).
          */
-        double tick_label_space = 2;
+        double tick_label_space{2.0};
 
         /** The line style to draw for ticks grid lines on the graph itself (*not* the tick marks
          * themselves, which show up outside the graph area). Defaults to transparent (i.e. no grid
          * lines). */
-        LineStyle tick_grid_style = LineStyle(Transparent, 0.5);
+        LineStyle tick_grid_style{Transparent, 0.5};
 
         /** The font colour for tick values.  If completely transparent, tick values are not drawn. */
-        RGBA tick_font_colour = Black;
+        RGBA tick_font_colour{Black};
 
         /** The font for tick values */
-        Pango::FontDescription tick_font = Pango::FontDescription("serif 6");
+        Pango::FontDescription tick_font{"serif 6"};
 
         /** The graph area background and border.  Note that even if the border is transparent, the
          * width is still taken into account when determining the graph area.
@@ -205,81 +208,98 @@ class Series {
         RectangleStyle graph_style{White, LineStyle(Black, 1)};
         ///@{
         /// The graph padding inside the border, in surface units.
-        double graph_padding_left = 0,
-               graph_padding_right = 0,
-               graph_padding_top = 2,
-               graph_padding_bottom = 2;
+        double graph_padding_left{0.0},
+               graph_padding_right{0.0},
+               graph_padding_top{2.0},
+               graph_padding_bottom{2.0};
         ///@}
 
         ///@{
         /// The minimum margin between components of the page and the edge of the page on each side.
-        double margin_top = 5,
-               margin_right = 5,
-               margin_bottom = 5,
-               margin_left = 5;
+        double margin_top{5.0},
+               margin_right{5.0},
+               margin_bottom{5.0},
+               margin_left{5.0};
         ///@}
 
-        /** The possible positions of the legend area (before adjustment by legend_graph_space,
-         * legend_x_offset and legend_y_offset).  Note that the pre-offset position is such that the
-         * legend border lies exactly adjacent to graph border (you can set `legend_graph_space` to
-         * `-graph_style.border.thickness` to make the borders overlap).
+        /** The possible general positions of the legend.  This value, combined with the
+         * legend_rel_x and legend_rel_y variables, determines the legend position.
+         *
+         * \sa legend_rel_x
+         * \sa legend_rel_y
          */
         enum class LegendPosition {
             None, ///< The legend is suppressed entirely
-            OutsideTop, ///< To the right of the graph, aligned relative to the graph top
-            OutsideMiddle, ///< To the right of the graph, centered relative to the graph
-            OutsideBottom, ///< To the right of the graph, aligned relative to the graph bottom
-            TopRight, ///< Inside the graph, in the top-right corner
-            MiddleRight, ///< Inside the graph, in the middle of the right side
-            BottomRight, ///< Inside the graph, in the bottom-right corner
-            TopCenter, ///< Inside the graph, in the middle of the top edge
-            MiddleCenter, ///< Inside the graph, in the middle of the graph
-            BottomCenter, ///< Inside the graph, in the middle of the bottom edge
-            TopLeft, ///< Inside the graph, in the top-left corner
-            MiddleLeft, ///< Inside the graph, in the middle of the left-hand side
-            BottomLeft ///< Inside the graph, in the bottom-left corner
+            Inside, ///< The legend is placed inside the graph
+            Right, ///< The legend goes to the right of the graph
+            Left, ///< The legend goes to the left of the graph
+            Top, ///< The legend goes above the graph
+            Bottom ///< The legend goes below the graph
         };
 
-        /// The position in which to draw the legend.
-        LegendPosition legend_position = LegendPosition::OutsideTop;
-
-        /** The size of the gap between the legend area and the graph side(s) with which the legend
-         * is aligned.  The precise adjustment depends on the LegendPosition:
+        /** The general position of the legend.
          *
-         * - OutsideTop, OutsideMiddle, OutsideBottom -- larger values move the legend right
-         * - TopRight -- larger values move the legend left and down
-         * - MiddleRight -- larger values move the legend left
-         * - BottomRight -- larger values move the legend left and up
-         * - TopCenter -- larger values move the legend down
-         * - MiddleCenter -- no effect
-         * - BottomCenter -- larger values move the legend up
-         * - TopLeft -- larger values move the legend down and right
-         * - MiddleLeft -- larger values move the legend right
-         * - BottomLeft -- larger values move the legend right and up
+         * \sa legend_rel_x
+         * \sa legend_rel_y
          */
-        double legend_graph_space = 5.0;
-        ///@{
-        /** After adjusting the position according to the `legend_graph_space` value, the x and y
-         * coordinates are also adjusted by these values.  Larger values are further right (x) or
-         * down (y).  Note that any offset specified here is not taken into account when calculating
-         * the page layout: large positive or negative values can move the legend into the page
-         * margin or off the page entirely.
+        LegendPosition legend_position{LegendPosition::Right};
+
+        /** The relative x location of the legend.  The specific meaning depends on the value of
+         * legend_position:
+         *
+         * - LegendPosition::Inside - 0 corresponds to the left edge of legend box being exactly
+         *   `legend_graph_space` units away from the inside edge of the left graph border, and 1
+         *   corresponds to the right edge of the legend box being exactly `legend_graph_space`
+         *   units away from the inside edge of the right graph border.
+         * - LegendPosition::Top, LegendPosition::Bottom - 0 corresponds to the left outer edge of
+         *   the legend box lining up with the outer left edge of the graph box, and 1 corresponds
+         *   to the right outer edge lining up with the right outer edge of the graph box.
+         * - LegendPosition::Right, LegendPosition::Left, LegendPosition::None - this value is not
+         *   used.
+         *
+         * The default value is 0.5 (middle horizontal alignment)--but note that the value is not
+         * used with the default legend_position value.
          */
-        double legend_x_offset = 0;
-        double legend_y_offset = 0;
-        ///@}
+        double legend_rel_x{0.5};
+
+        /** The relative y location of the legend.  The specific meaning depends on the value of
+         * legend_position:
+         *
+         * - LegendPosition::Inside - 0 corresponds to the top edge of legend box being exactly
+         *   `legend_graph_space` units away from the inside edge of the top graph border, and 1
+         *   corresponds to the bottom edge of the legend box being exactly `legend_graph_space`
+         *   units away from the inside edge of the bottom graph border.
+         * - LegendPosition::Right, LegendPosition::Left - 0 corresponds to the top outer edge of
+         *   the legend box lining up with the top outer edge of the graph box, and 1 corresponds
+         *   to the bottom outer edge lining up with the bottom outer edge of the graph box.
+         * - LegendPosition::Top, LegendPosition::Bottom, LegendPosition::None - this value is not
+         *   used.
+         *
+         * The default value is 0.5 (midle vertical alignment).
+         */
+        double legend_rel_y{0.5};
+
+        /** The size of the gap between the legend box and the graph box.  If 0, graph and legend
+         * borders will be adjacent; if negative, the legend will overlap the graph border (and so
+         * specifying the graph/legend border size here results in a border-collapse result).
+         *
+         * \sa legend_position
+         * \sa legend_rel_x
+         * \sa legend_rel_y
+         */
+        double legend_graph_space{5.0};
         /// The width of the legend image box, in surface units.
-        double legend_box_width = 15;
+        double legend_box_width{15.0};
         /// The height of the legend box, in surface units.
-        double legend_box_height = 15;
+        double legend_box_height{15.0};
         /// The gap between the legend box and legend text region, in surface units.
-        double legend_box_text_gap = 5;
+        double legend_box_text_gap{5.0};
         ///@{
         /// The legend box area padding inside the border, in surface units.
-        double legend_padding_left = 3,
-               legend_padding_right = 3,
-               legend_padding_top = 3,
-               legend_padding_bottom = 3;
+        double legend_padding_left{3.0},
+               legend_padding_right{3.0},
+               legend_padding_top{3.0},
+               legend_padding_bottom{3.0};
         ///@}
         /// The style for a box encompassing the entire legend area.  Default is a white background
         /// and 1-unit wide black border.
@@ -289,7 +309,7 @@ class Series {
          * too wide (for example, one unwrappable line exceeds this value) it will be cut off; if
          * the text is too long overall, it will be ellipsized.
          */
-        double legend_text_max_width = 60;
+        double legend_text_max_width{60.0};
         /** The maximum height of the box that legend text may occupy (beyond which text is
          * ellipsized), in surface units.  The text will be aligned with the middle of the legend
          * box, and the total legend item height will be the larger of the legend box or text
@@ -297,32 +317,48 @@ class Series {
          * possible for a legend item to exceed this size if this is set smaller than the required
          * height for a line of text.
          */
-        double legend_text_max_height = 40;
+        double legend_text_max_height{40.0};
         /// The vertical space to put between legend items.
-        double legend_spacing = 3;
+        double legend_spacing{3.0};
         /** The font to use for legend text. */
-        Pango::FontDescription legend_font = Pango::FontDescription("serif 6");
+        Pango::FontDescription legend_font{"Latin Modern, DejaVu Serif, serif oblique 6"};
 
         /** The graph title text, which may contain pango markup.  Will be drawn in opaque black,
          * but markup in the string can be used to change this.
          */
-        std::string title_markup;
+        std::string title;
         /// The font to use for the title
-        Pango::FontDescription title_font = Pango::FontDescription("serif 12");
+        Pango::FontDescription title_font{"Latin Modern, DejaVu Serif, serif bold 12"};
+        /** The x axis label, which may contain pango markup.  Will be drawn in opaque black, but
+         * markup in the string can be used to change this.
+         */
+        std::string x_label;
+        /** The y axis label, which may contain pango markup.  Will be drawn in opaque black, but
+         * markup in the string can be used to change this.
+         */
+        std::string y_label;
+        /** If true (the default) the y label is rotated 90 degrees; if false, the text is drawn
+         * horizontally.
+         */
+        bool y_label_rotated = true;
+
+        /// The font for the axis labels.
+        Pango::FontDescription axis_label_font{"Latin Modern, DejaVu Serif, serif oblique 8"};
         /** The space between the bottom of the title and the top of the graph, in surface units.
-         * Only applies when title_markup is not an empty string.  To adjust the space between the
+         * Only applies when title is not an empty string.  To adjust the space between the
          * title and the top of the page, adjust `margin_top`.
          */
-        double title_padding_bottom = 2;
-        /// The minimum space between the left of the surface and the title, in surface units.
-        double title_padding_left = 20;
-        /// The minimum space between the right of the surface and the title, in surface units.
-        double title_padding_right = 20;
+        double title_padding{2.0};
+
+        /** The space between the axis labels and the axis tick values (or ticks or graph border,
+         * depending on what is displayed).
+         */
+        double axis_label_padding{2.0};
 
         /** The thickness of the region drawn for "stray" region observations, that is, observations
          * that are neither preceeded nor followed by another finite region observation.
          */
-        double stray_thickness = 1;
+        double stray_thickness{1.0};
 
         /** X-axis (t) tick mark locations, calculated during construction.  Can be recalculated by
          * calling recalcTicks().  If cleared, no horizontal axis ticks are displayed.
@@ -330,9 +366,15 @@ class Series {
         std::set<int> t_ticks;
 
         /** Y-axis tick mark locations, calculated during construction.  Can be recalculated by
-         * calling recalcTicks().  If cleared, no vertical axis ticks are displayed.
+         * calling recalcTicks().  If cleared, no vertical axis ticks are displayed.  The tick marks
+         * are displayed on the left-hand-side of the graph.
          */
         std::set<double> y_ticks;
+
+        /** If true (the default), draw ticks and the y-axis label on the left-hand side of the
+         * graph; if false, draws them on the right-hand side.
+         */
+        bool y_axis_left = true;
 
         /** X-axis (t) grid mark locations, calculated during construction.  Can be recalculated by
          * calling recalcTicks().  If cleared, no vertical grid lines are drawn.
@@ -421,6 +463,21 @@ class Series {
          */
         void setExtents(int tmin, int tmax, double ymin, double ymax, bool retick = true);
 
+        /** Changes the font description of all fonts in the graph to any values set in the given
+         * font description.  Values that have not been explicitly set in the given FontDescription
+         * are not copied.  For example, if the FontDescription specifies a font family but no font
+         * size, only the font family will be updated but sizes will be preserved.
+         *
+         * \param new_font the font description to apply to the graph's fonts.
+         */
+        void updateFonts(const Pango::FontDescription &new_font);
+
+        /** Updates the font family of all fonts used in the graph, without changing the other
+         * attributes (such as size or font weight).  The font family may optionally be a
+         * comma-separated list of multiple font families.
+         */
+        void updateFontFamily(const std::string &new_font_family);
+
     private:
         Target &target_;
         int tmin_, tmax_;
@@ -437,7 +494,7 @@ class Series {
         std::list<std::function<void(Cairo::RefPtr<Cairo::Context> ctx, const Cairo::Matrix&)>> draw_;
 
         // Implementation callback for addLegendItem(markup, lower, preserve, bg).
-        void drawSimpleLegendItem(Cairo::RefPtr<Cairo::Context> ctx, const Cairo::Matrix &to_box, FillStyle lower, RectangleStyle bg) const;
+        void drawSimpleLegendItem(Cairo::RefPtr<Cairo::Context> ctx, const Cairo::Matrix &to_box, const FillStyle &lower, const RectangleStyle &bg) const;
 
         // Draws a legend item at the current position of the context, returning its size (width and height).  If dry_run is true, just returns the size.
         std::pair<double, double> drawLegendItem(Cairo::RefPtr<Cairo::Context> ctx, const LegendItem_t &item, bool dry_run = false) const;

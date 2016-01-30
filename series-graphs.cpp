@@ -230,9 +230,12 @@ int main(int argc, char *argv[]) {
     }
 
     PDF output(args.output, args.width, args.height);
-    Series graph(output, "", tmin, tmax, ymin, ymax);
+    Series graph(output, tmin, tmax, ymin, ymax);
     graph.tick_grid_style.colour = RGBA(0.9);
     graph.legend_position = args.legend_position;
+    graph.legend_rel_x = args.legend_rel_x;
+    graph.legend_rel_y = args.legend_rel_y;
+    graph.x_label = "t";
     FillStyle confband_style = Series::default_region_style;
     LineStyle median_style = Series::default_line_style;
     {
@@ -270,7 +273,7 @@ int main(int argc, char *argv[]) {
         }
         graph.setExtents(local_tmin, local_tmax, local_ymin, local_ymax, false);
         graph.recalcTicks(10, 8, Series::TickEnds::Add);
-        graph.title_markup = in.title;
+        graph.title = in.title;
 
         for (const auto &conf : in.quantiles)
             graph.addRegion(conf.second, confband_style);
