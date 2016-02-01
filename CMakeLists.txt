@@ -178,9 +178,12 @@ if (NOT DATA)
     file(GLOB_RECURSE cr_data_headers RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} creativity/data/*.hpp creativity/cmdargs/Data.hpp creativity/cmdargs/Series*.hpp creativity/cmdargs/Results.hpp)
     list(REMOVE_ITEM cr_headers ${cr_data_headers})
 elseif(NOT DATA_GRAPHING)
-    # Remove the data graphic headers
+    # Remove the data graphing headers
     file(GLOB_RECURSE cr_data_graph_headers RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} creativity/data/graph/*.hpp creativity/cmdargs/SeriesGraphs.hpp)
     list(REMOVE_ITEM cr_headers ${cr_data_graph_headers})
+    # Remove the source files from the data src list:
+    file(GLOB_RECURSE cr_data_graph_sources ${CMAKE_CURRENT_SOURCE_DIR} creativity/data/graph/*.cpp creativity/cmdargs/SeriesGraphs.cpp)
+    list(REMOVE_ITEM cr_data_libsrc ${cr_data_graph_sources})
 endif()
 
 foreach(h ${cr_headers})
