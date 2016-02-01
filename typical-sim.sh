@@ -2,20 +2,41 @@
 
 set -e
 
+toexec="./creativity-cli"
+preargs=()
+postargs=()
 for a in "$@"; do
     if [ "$a" == "--help" ]; then
         cat <<EOF
 Usage: $0 [ARGUMENTS]
 
-Invokes ./creativity-cli using a fixed set of parameter values derived from
-the median values of simulations that produce consistent writing.
+Invokes ./creativity-cli (and so is typically run from the build directory)
+using a default set of parameter values derived from the median values of
+simulations that produce semi-consistent writing.  Any added ARGUMENTS (other
+than --help and --dry-run) are added to the end of the ./creativity-cli
+argument list, override the default.
 
 Output is placed in
     ./results/\${TYPICAL}~~\${DATE}~~\${HASH}/creativity-\${SEED}.crstate
 where DATE and HASH are generated from the current git commit date and hash,
-and TYPICAL defaults to "typical" if not externally set.
+and TYPICAL defaults to "typical" if not externally set in the environment.
+
+Example usage:
+
+    TYPICAL=costly-piracy ./typical-sim.sh --piracy-cost 100
+
+To see a list of the options that creativity-cli will be called with without
+actually invoking it, add a --dry-run option.
 EOF
         exit 1;
+    elif [ "$a" == "--dry-run" ]; then
+        preargs=("
+Dry run; would have invoked:
+
+$toexec")
+        toexec="/bin/echo"
+    else
+        postargs+=("$a")
     fi
 done
 
@@ -23,7 +44,7 @@ if [ -z "$TYPICAL" ]; then TYPICAL="typical"; fi
 dir="./results/${TYPICAL}~~$(git show -s --format=%cI~~%h @)"
 mkdir -p "$dir"
 
-exec ./creativity-cli \
+exec $toexec "${preargs[@]}" \
     --readers 150 \
     --density 2.8 \
     --reader-step-mean 0.45 \
@@ -47,4 +68,4 @@ exec ./creativity-cli \
     --public-sharing-tax 50 \
     --threads 0 \
     --output "$dir/creativity-SEED.crstate" \
-    "$@"
+    "${postargs[@]}"
