@@ -17,7 +17,9 @@ than --help and --dry-run) are added to the end of the ./creativity-cli
 argument list, override the default.
 
 Output is placed in
-    ./results/\${TYPICAL}~~\${DATE}~~\${HASH}/creativity-\${SEED}.crstate
+
+    ./results/\$DATE~~\$HASH/\$TYPICAL/creativity-\$SEED.crstate
+
 where DATE and HASH are generated from the current git commit date and hash,
 and TYPICAL defaults to "typical" if not externally set in the environment.
 
@@ -41,7 +43,7 @@ $toexec")
 done
 
 if [ -z "$TYPICAL" ]; then TYPICAL="typical"; fi
-dir="./results/${TYPICAL}~~$(git show -s --format=%cI~~%h @)"
+dir="./results/$(git show -s --date=short --format=%cd~~%h @)/${TYPICAL}"
 mkdir -p "$dir"
 
 exec $toexec "${preargs[@]}" \
