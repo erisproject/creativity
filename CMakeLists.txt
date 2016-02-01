@@ -179,7 +179,7 @@ if (NOT DATA)
     list(REMOVE_ITEM cr_headers ${cr_data_headers})
 elseif(NOT DATA_GRAPHING)
     # Remove the data graphic headers
-    file(GLOB_RECURSE cr_data_graph_headers RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} creativity/data/graphing/*.hpp creativity/cmdargs/SeriesGraphs.hpp)
+    file(GLOB_RECURSE cr_data_graph_headers RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} creativity/data/graph/*.hpp creativity/cmdargs/SeriesGraphs.hpp)
     list(REMOVE_ITEM cr_headers ${cr_data_graph_headers})
 endif()
 
