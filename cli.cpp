@@ -135,43 +135,45 @@ int main(int argc, char *argv[]) {
     while (sim->t() < periods) {
         creativity->run();
 
-        // Calculate and show various status information, such as simulation speed, number of books,
-        // etc.
-        auto now = std::chrono::high_resolution_clock::now();
-        std::ostringstream speed;
-        speed << std::setprecision(6) << std::showpoint;
-        speed << std::setw(7) << 1.0 / std::chrono::duration<double>(now - times.back()).count() << " Hz ";
-        while (times.size() > avg_times) times.pop();
-        if (times.size() > 1)
-            speed << std::setw(7) << times.size() / std::chrono::duration<double>(now - times.front()).count() << " Hz[" << times.size() << "] ";
+        if (not args.quiet) {
+            // Calculate and show various status information, such as simulation speed, number of books,
+            // etc.
+            auto now = std::chrono::high_resolution_clock::now();
+            std::ostringstream speed;
+            speed << std::setprecision(6) << std::showpoint;
+            speed << std::setw(7) << 1.0 / std::chrono::duration<double>(now - times.back()).count() << " Hz ";
+            while (times.size() > avg_times) times.pop();
+            if (times.size() > 1)
+                speed << std::setw(7) << times.size() / std::chrono::duration<double>(now - times.front()).count() << " Hz[" << times.size() << "] ";
 
-        auto bnew = sim->countGoods<Book>(count_bnew);
-        max_bnew_digits = std::max(max_bnew_digits, bnew == 0 ? 1 : 1 + (unsigned) std::lround(std::floor(std::log10(bnew))));
+            auto bnew = sim->countGoods<Book>(count_bnew);
+            max_bnew_digits = std::max(max_bnew_digits, bnew == 0 ? 1 : 1 + (unsigned) std::lround(std::floor(std::log10(bnew))));
 
-        speed << std::setw(7) << sim->t() / std::chrono::duration<double>(now - started).count() << " Hz[A]";
-        times.push(std::move(now));
+            speed << std::setw(7) << sim->t() / std::chrono::duration<double>(now - started).count() << " Hz[A]";
+            times.push(std::move(now));
 
-        if (tty) std::cout << "\r";
-        std::cout << "Running simulation [t=" << sim->t() << "; " <<
-            (creativity->piracy() ? u8"Piracy ✔; " : u8"Piracy ✘; ") <<
-            (creativity->publicSharing() ? u8"Public ✔; " : u8"Public ✘; ") <<
-            "R=" << sim->countAgents<Reader>() << "; B=" << sim->countGoods<Book>() << "; Bnew=" <<
-            std::setw(max_bnew_digits) << bnew << "] " << speed.str();
-        if (tty) std::cout << std::flush;
-        else std::cout << std::endl;
+            if (tty) std::cout << "\r";
+            std::cout << "Running simulation [t=" << sim->t() << "; " <<
+                (creativity->piracy() ? u8"Piracy ✔; " : u8"Piracy ✘; ") <<
+                (creativity->publicSharing() ? u8"Public ✔; " : u8"Public ✘; ") <<
+                "R=" << sim->countAgents<Reader>() << "; B=" << sim->countGoods<Book>() << "; Bnew=" <<
+                std::setw(max_bnew_digits) << bnew << "] " << speed.str();
+            if (tty) std::cout << std::flush;
+            else std::cout << std::endl;
+        }
     }
 
     std::cout << "\nSimulation done.";
     unsigned int pending = creativity->storage().first->backend().pending();
     if (pending > 0) {
         std::string waiting = "Waiting for output data to finish writing... ";
-        std::cout << "\n" << waiting;
+        if (not args.quiet) std::cout << "\n" << waiting;
         while (pending > 0) {
-            std::cout << "\r" << waiting << "(" << pending << " states pending)  " << std::flush;
-            std::this_thread::sleep_for(std::chrono::milliseconds(250));
+            if (not args.quiet) std::cout << "\r" << waiting << "(" << pending << " states pending)  " << std::flush;
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
             pending = creativity->storage().first->backend().pending();
         }
-        std::cout << "\r" << waiting << "done.               " << std::flush;
+        if (not args.quiet) std::cout << "\r" << waiting << "done.               " << std::flush;
     }
 
     std::cout << "\n";

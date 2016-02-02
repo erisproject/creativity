@@ -19,6 +19,7 @@ void CLI::addOptions() {
     Simulator::addOptions();
 
     sim_controls_.add_options()
+        ("quiet,q", value(quiet), "If specified, don't output current simulation status.")
         ("output,o", value(output), "Output file for simulation results.  If this contains the characters 'SEED', they will be replaced with the random seed value used for the simulation.")
         ("tmpdir", value(tmpdir), "Output directory in which to write the output file while running the simulation.  When "
             "the simulation finishes, the temporary file is moved to the output location specified by -o.  If this argument is omitted, the "

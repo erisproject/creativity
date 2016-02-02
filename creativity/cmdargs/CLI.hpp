@@ -13,6 +13,9 @@ class CLI : public Simulator {
         /// Constructor for cli simulation arguments; takes the settings object
         CLI(CreativitySettings &s);
 
+        /// Set to tell cli to shut up (typically when running in batch mode)
+        bool quiet = false;
+
         /// The temporary directory for results
         std::string tmpdir;
 

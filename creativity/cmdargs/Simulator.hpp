@@ -15,11 +15,11 @@ namespace creativity { namespace cmdargs {
  * Single-letter options used in this class:
  *     b B c C d D e E f g G i j k K m M n N p P Q r R s S T u U w W x y z Z
  * Used in [CLI], {GUI}, or both:
- *     o [O]
+ *     o [O] [q]
  * Used in CmdArgs base class:
  *     h
  * Available:
- *     a A F H I J l L q t v V X Y
+ *     a A F H I J l L t v V X Y
  */
 class Simulator : public CmdArgs {
     protected:
