@@ -235,7 +235,7 @@ std::vector<initial_datum> initial_data_fields();
 std::vector<datum> data_fields();
 
 /** Takes a string, manipulates it into our simplified CSV-suitable value by removing any newlines,
- * commas, and quotation marks.
+ * commas, semicolons, colons, tabs, and quotation marks.
  */
 std::string csv_fix(std::string val);
 

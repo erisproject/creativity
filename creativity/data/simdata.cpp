@@ -4,16 +4,13 @@
 #include "creativity/Creativity.hpp"
 #include "creativity/Reader.hpp"
 #include "creativity/state/Storage.hpp"
-#include <boost/algorithm/string/erase.hpp>
-#include <boost/algorithm/string/predicate.hpp>
-#include <boost/algorithm/string/replace.hpp>
-#include <boost/iterator/iterator_traits.hpp>
 #include <limits>
 #include <memory>
 #include <stdexcept>
 #include <map>
 #include <unordered_set>
 #include <utility>
+#include <regex>
 
 using namespace creativity::state;
 using namespace eris;
@@ -517,10 +514,7 @@ std::vector<datum> data_fields() {
 }
 
 std::string csv_fix(std::string val) {
-    boost::erase_all(val, "\n"); // remove newlines
-    boost::erase_all(val, "\""); // remove "s
-    boost::erase_all(val, ","); // remove ,s
-    return val;
+    return std::regex_replace(val, std::regex(R"([\n",;:\t])"), "");
 }
 
 }}
