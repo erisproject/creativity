@@ -18,14 +18,14 @@ void Series::addOptions() {
 
     options_.add_options()
         ("series,s", value(series), "A comma-separated list of data series to calculate.  Run --help-series for a detailed list of possible options.")
-        ("periods,T", value(periods), "Specifies the number of periods for which variable series should be calculated.  The default, 0, uses all periods found in the first simulation file loaded.  All files must contain this number of periods.")
+        ("periods,T", value(periods), "    Specifies the number of periods for which variable series should be calculated.  The default, 0, uses all periods found in the first simulation file loaded.  All files must contain this number of periods.")
         ("allow-unused-periods,U", value(allow_unused_periods), "If specified, allow files to contain more than the number of periods specified with --periods.  If not given, an error occurs if files do not have matching period counts.  Has no effect if --periods is not explicitly specified.")
-        ("piracy-begins,P", value(piracy_begins), "Specifies the required period for piracy beginning.  The default, 0, obtains this from the first simulation file loaded.  All simulations must have the same value.")
+        ("piracy-begins,P", value(piracy_begins), "    Specifies the required period for piracy beginning.  The default, 0, obtains this from the first simulation file loaded.  All simulations must have the same value.")
         ("public-sharing-begins,G", value(public_sharing_begins), "Specifies the required period for public sharing beginning.  The default, 0, obtains this from the first simulation file loaded.  All simulations must have the same value.")
         ("ignore-errors,I", value(ignore_errors), "If specified, just warn about and skip any files that can't be read or are not compatible with the given or implied total, piracy, or public sharing periods.")
         ("precision", range<3,std::numeric_limits<double>::max_digits10>(double_precision), "      Specifies the precision level for floating point values.  The default is the minimum required to exactly represent all possible double values without any loss of precision.")
         ("output-directory,o", value(output_dir), "The directory in which to place series files.  If this directory does not exist, it will be created.  Each series S is written to a file named `series-S.csv' in this directory.  Existing files will be overwritten.")
-        ("threads,j", value(threads), "Maximum number of threads to use for data parsing.  0 (the default) disables data parsing threading entirely.")
+        ("threads,j", value(threads), "    Maximum number of threads to use for data parsing.  0 (the default) disables data parsing threading entirely.")
         ("help-series,S", value(help_series), "Shows the series that can be generated.")
         ;
 
