@@ -19,13 +19,10 @@ namespace creativity {
  *
  * This class is the central code used by both the command line and GUI interfaces.
  */
-class Creativity : private eris::noncopyable, public std::enable_shared_from_this<Creativity> {
+class Creativity : private eris::noncopyable {
     public:
-        /** Creates a new Creativity object and returns a shared_ptr to it. */
-        template<typename... Args>
-        static std::shared_ptr<Creativity> create(Args&&... args) {
-            return std::shared_ptr<Creativity>(new Creativity(std::forward<Args>(args)...));
-        }
+        /** Default constructor. */
+        Creativity() = default;
 
         /** The simulation object.  Will be emtpy until setup() is called. */
         std::shared_ptr<eris::Simulation> sim;
@@ -36,7 +33,7 @@ class Creativity : private eris::noncopyable, public std::enable_shared_from_thi
         /** Simulation parameters that are used to configure the simulation when calling setup().
          * To adjust these parameters, call set().
          */
-        const CreativitySettings &parameters = set_;
+        const CreativitySettings &parameters{set_};
 
         /** Provides writeable access to the parameters used to configure the simulation.  This
          * method may only be called before setup() or fileRead(); attempting to call it afterwards
@@ -174,18 +171,15 @@ class Creativity : private eris::noncopyable, public std::enable_shared_from_thi
         /** Stores the number of on-market books.  This is updated at the beginning of every new
          * simulation stage with the number of on-market books in the just-ended period.
          */
-        unsigned long market_books = 0;
+        unsigned long market_books{0};
 
         /** Stores the lagged number of on-market books, that is, the number of books that were on
          * the market in the period before the period that just ended.  This is updated at the same
          * time as market_books.
          */
-        unsigned long market_books_lagged = 0;
+        unsigned long market_books_lagged{0};
 
     protected:
-        /** Default constructor is protected; construct by calling create(). */
-        Creativity() = default;
-
         /** Sets up the piracy network.  Called automatically by run() just before the
          * `piracy_begins` period.
          */
@@ -193,10 +187,10 @@ class Creativity : private eris::noncopyable, public std::enable_shared_from_thi
 
     private:
         // True if this is a live simulation.  Exclusive of setup_read_.
-        bool setup_sim_;
+        bool setup_sim_{false};
 
         // True if this has loaded a previously simulation data file.  Exclusive of setup_sim_.
-        bool setup_read_;
+        bool setup_read_{false};
 
         // The actual, non-const settings (the public `.parameters` is a const reference to this)
         CreativitySettings set_;

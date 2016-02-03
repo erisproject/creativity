@@ -13,10 +13,12 @@ class Creativity;
  */
 class BookMarket : public eris::Market, public virtual eris::intraopt::Finish {
     public:
+        /// Not default constructible
+        BookMarket() = delete;
         /** Constructs a BookMarket that sells copies of the given Book with an initial price of
          * p times the money good.  Books are created as needed at zero cost.
          */
-        BookMarket(std::shared_ptr<Creativity> creativity, eris::SharedMember<Book> b, double price);
+        BookMarket(const Creativity &creativity, eris::SharedMember<Book> b, double price);
 
         /** Returns price info.  Since price is constant, and `quantity` should always 1, this price info
          * is simple: it's always feasible, and total is just the price.
@@ -85,7 +87,7 @@ class BookMarket : public eris::Market, public virtual eris::intraopt::Finish {
     protected:
 
         /// The creativity object pointer
-        std::shared_ptr<Creativity> creativity_;
+        const Creativity &creativity_;
         /// The book this market object sells
         eris::SharedMember<Book> book_;
         /// The current price of the book

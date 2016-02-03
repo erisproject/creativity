@@ -54,9 +54,11 @@ std::string random_filename(const std::string &basename) {
 int main(int argc, char *argv[]) {
     std::cerr << std::setprecision(16);
     std::cout << std::setprecision(16);
-    auto creativity = Creativity::create();
 
-    cmdargs::CLI args(creativity->set());
+    auto cr_ptr = std::unique_ptr<Creativity>(new Creativity);
+    auto &creativity = *cr_ptr;
+
+    cmdargs::CLI args(creativity.set());
     args.parse(argc, argv);
 
     std::string results_out = args.output;
@@ -106,7 +108,7 @@ int main(int argc, char *argv[]) {
             tmpfile = dirname + "/" + random_filename(basename);
         } while (fs::exists(tmpfile));
 
-        creativity->fileWrite(tmpfile);
+        creativity.fileWrite(tmpfile);
         results_out = tmpfile;
         need_copy = true;
     }
@@ -118,11 +120,11 @@ int main(int argc, char *argv[]) {
     if (need_copy) std::cout << "temp file: ";
     std::cout << results_out << "\n";
 
-    creativity->setup();
-    auto sim = creativity->sim;
+    creativity.setup();
+    auto sim = creativity.sim;
 
     // Copy the initial state into the storage object
-    creativity->storage().first->emplace_back(sim);
+    creativity.storage().first->emplace_back(sim);
 
     if (args.threads > 0) Eigen::initParallel();
     sim->maxThreads(args.threads);
@@ -147,7 +149,7 @@ int main(int argc, char *argv[]) {
             prctl(PR_SET_NAME, name.c_str());
         }
 #endif
-        creativity->run();
+        creativity.run();
 
         if (not args.quiet) {
             // Calculate and show various status information, such as simulation speed, number of books,
@@ -168,8 +170,8 @@ int main(int argc, char *argv[]) {
 
             if (tty) std::cout << "\r";
             std::cout << "Running simulation [t=" << sim->t() << "; " <<
-                (creativity->piracy() ? u8"Piracy ✔; " : u8"Piracy ✘; ") <<
-                (creativity->publicSharing() ? u8"Public ✔; " : u8"Public ✘; ") <<
+                (creativity.piracy() ? u8"Piracy ✔; " : u8"Piracy ✘; ") <<
+                (creativity.publicSharing() ? u8"Public ✔; " : u8"Public ✘; ") <<
                 "R=" << sim->countAgents<Reader>() << "; B=" << sim->countGoods<Book>() << "; Bnew=" <<
                 std::setw(max_bnew_digits) << bnew << "] " << speed.str();
             if (tty) std::cout << std::flush;
@@ -180,21 +182,21 @@ int main(int argc, char *argv[]) {
     if (not args.quiet) {
         if (tty) std::cout << std::endl;
         bool need_endl = false;
-        while (not creativity->storage().first->flush_for(500)) {
+        while (not creativity.storage().first->flush_for(500)) {
             if (tty) std::cout << "\r";
             std::cout << "Waiting for output data to finish writing... (" <<
-                creativity->storage().first->backend().pending() << " states pending)";
+                creativity.storage().first->backend().pending() << " states pending)";
             if (tty) { std::cout << "   " << std::flush; need_endl = true; }
             else std::cout << std::endl;
         }
         if (need_endl) std::cout << std::endl;
     }
     else {
-        creativity->storage().first->flush();
+        creativity.storage().first->flush();
     }
 
     // Destroy the simulation (which also closes the storage)
-    creativity.reset();
+    cr_ptr.reset();
 
     if (need_copy) {
         int error = std::rename(results_out.c_str(), args_out.c_str());

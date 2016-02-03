@@ -28,9 +28,9 @@ constexpr std::initializer_list<double> Reader::default_distance_penalty_polynom
 constexpr std::initializer_list<double> Reader::default_num_books_penalty_polynomial;
 const std::vector<unsigned int> Reader::profit_stream_ages{{1,2,4,8}};
 
-Reader::Reader(std::shared_ptr<Creativity> creativity, const Position &pos) :
-    WrappedPositional<agent::AssetAgent>(pos, creativity->parameters.boundary, -creativity->parameters.boundary),
-    creativity_{std::move(creativity)},
+Reader::Reader(Creativity &creativity, const Position &pos) :
+    WrappedPositional<agent::AssetAgent>(pos, creativity.parameters.boundary, -creativity.parameters.boundary),
+    creativity_{creativity},
     profit_belief_{new Profit()},
     profit_belief_extrap_{profit_belief_}
 {
@@ -190,7 +190,7 @@ double Reader::creationEffort(double shape, double scale, double quality) {
 }
 
 double Reader::piracyCost() const {
-    return creativity_->parameters.cost_piracy;
+    return creativity_.parameters.cost_piracy;
 }
 
 const std::unordered_set<SharedMember<Reader>>& Reader::friends() const {
@@ -215,8 +215,8 @@ bool Reader::removeFriend(const SharedMember<Reader> &old_pal, bool recurse) {
 
 void Reader::interBegin() {
     // Move a random distance in a random direction
-    if (creativity_->parameters.reader_step_mean > 0) {
-        double step_dist = std::chi_squared_distribution<double>()(Random::rng()) * creativity_->parameters.reader_step_mean;
+    if (creativity_.parameters.reader_step_mean > 0) {
+        double step_dist = std::chi_squared_distribution<double>()(Random::rng()) * creativity_.parameters.reader_step_mean;
         if (step_dist != 0)
             moveBy(step_dist * Position::random(position().dimensions));
     }
@@ -229,8 +229,8 @@ void Reader::interOptimize() {
     // Update the various beliefs
     updateBeliefs();
 
-    double income_available = assets()[creativity_->money] + creativity_->parameters.income;
-    if (creativity_->publicSharing()) income_available -= creativity_->parameters.public_sharing_tax;
+    double income_available = assets()[creativity_.money] + creativity_.parameters.income;
+    if (creativity_.publicSharing()) income_available -= creativity_.parameters.public_sharing_tax;
 
     auto sim = simulation();
     const double market_books = sim->countMarkets<BookMarket>();
@@ -241,8 +241,8 @@ void Reader::interOptimize() {
     new_prices_.clear();
 
     auto &rng = Random::rng();
-    const double &cost_market = creativity_->parameters.cost_market,
-          &cost_unit = creativity_->parameters.cost_unit;
+    const double &cost_market = creativity_.parameters.cost_market,
+          &cost_unit = creativity_.parameters.cost_unit;
 
     if (not wrote_market_.empty()) {
         if (usableBelief(demand_belief_)) {
@@ -252,9 +252,9 @@ void Reader::interOptimize() {
                 auto book_mkt = book->market();
 
                 try {
-                    auto max = demand_belief_.argmaxP(creativity_->parameters.prediction_draws, book->qualityMean(), book->lifeSales(), book->lifePirated(), creativity_->parameters.readers,
+                    auto max = demand_belief_.argmaxP(creativity_.parameters.prediction_draws, book->qualityMean(), book->lifeSales(), book->lifePirated(), creativity_.parameters.readers,
                             sim->t() - 1 - book->lastSale(), book->age(), authored_books - 1, market_books, cost_unit,
-                            creativity_->parameters.income / 10);
+                            creativity_.parameters.income / 10);
                     const double &p = max.first;
                     const double &q = max.second;
 
@@ -294,8 +294,8 @@ void Reader::interOptimize() {
         // Otherwise bypass market predictions if our market demand belief isn't usable: use initial
         // model action parameters instead (unless we don't have enough income to support even a
         // single book, in which case we can't keep anything on the market).
-        else if (creativity_->parameters.initial.prob_keep > 0 and income_available >= cost_market) {
-            std::bernoulli_distribution keep(creativity_->parameters.initial.prob_keep);
+        else if (creativity_.parameters.initial.prob_keep > 0 and income_available >= cost_market) {
+            std::bernoulli_distribution keep(creativity_.parameters.initial.prob_keep);
             std::vector<SharedMember<Book>> books(wrote_market_.begin(), wrote_market_.end());
             if (income_available < books.size() * cost_market) {
                 // If we don't have enough income to keep every book on the market (which is the
@@ -306,7 +306,7 @@ void Reader::interOptimize() {
             for (auto &book : books) {
                 if (keep(rng)) {
                     income_available -= cost_market;
-                    double new_price = (book->price() - cost_unit) * creativity_->parameters.initial.keep_price + cost_unit;
+                    double new_price = (book->price() - cost_unit) * creativity_.parameters.initial.keep_price + cost_unit;
                     new_prices_.emplace(book, new_price);
                     // If we don't have enough income for any more books, leave the rest off the
                     // market:
@@ -323,8 +323,8 @@ void Reader::interOptimize() {
         // Make sure we have enough income to create a book, which requires (at 0 effort)
         // creation_fixed; if creation is instantaneous, we also need to have cost_market available
         // so that we can actually bring the book to market.
-        double creation_base_cost = creativity_->parameters.creation_fixed;
-        if (creativity_->parameters.creation_time == 0) creation_base_cost += cost_market;
+        double creation_base_cost = creativity_.parameters.creation_fixed;
+        if (creativity_.parameters.creation_time == 0) creation_base_cost += cost_market;
 
         // Figure out what the minimum and maximum effort we can expend are.
         //
@@ -337,9 +337,9 @@ void Reader::interOptimize() {
         // Marginal cost is the unit cost, but if we have public sharing, we'll use the public
         // sharing cost (which is the minimum of unit cost and piracy cost) if that is lower (since
         // that's what the public sharing marginal cost and price ends up being).
-        double marginal_cost = creativity_->parameters.cost_unit;
-        if (creativity_->publicSharing() and creativity_->parameters.cost_piracy < marginal_cost)
-            marginal_cost = creativity_->parameters.cost_piracy;
+        double marginal_cost = creativity_.parameters.cost_unit;
+        if (creativity_.publicSharing() and creativity_.parameters.cost_piracy < marginal_cost)
+            marginal_cost = creativity_.parameters.cost_piracy;
         double min_effort = creationEffort(distancePenalty(0) + numBooksPenalty(1) + 1.05 * marginal_cost);
         double max_effort = income_available - creation_base_cost;
         // Don't even bother trying unless min_effort is actually obtainable
@@ -359,7 +359,7 @@ void Reader::interOptimize() {
 
                 try {
                     effort_profit = profit_belief_extrap_->argmaxL(
-                            creativity_->parameters.prediction_draws,
+                            creativity_.parameters.prediction_draws,
                             [this] (double l) { return creationQuality(l); },
                             authored_books, market_books,
                             min_effort, // l_min
@@ -373,9 +373,9 @@ void Reader::interOptimize() {
                     // As a safety against absurd prices, we also enforce a price ceiling of 20% of
                     // per-period income.
                     std::pair<double, double> max;
-                    max = demand_belief_.argmaxP(creativity_->parameters.prediction_draws, create_quality_, 0, 0,
-                            creativity_->parameters.readers, 0, 0, authored_books, market_books,
-                            cost_unit, creativity_->parameters.income / 10);
+                    max = demand_belief_.argmaxP(creativity_.parameters.prediction_draws, create_quality_, 0, 0,
+                            creativity_.parameters.readers, 0, 0, authored_books, market_books,
+                            cost_unit, creativity_.parameters.income / 10);
                     // If this is zero, that's okay: that might be a release-directly-to-public book
                     create_price_ = max.first;
                 } catch (const BayesianLinear::draw_failure &e) {
@@ -390,36 +390,36 @@ void Reader::interOptimize() {
                     create_quality_ = quality;
                     create_effort_ = effort_profit.first;
                     create_starting_ = true;
-                    create_countdown_ = creativity_->parameters.creation_time;
+                    create_countdown_ = creativity_.parameters.creation_time;
                     create_position_ = position();
                 }
             }
             else {
                 // If we have no useful profit belief yet, just use the initial values:
-                if (creativity_->parameters.initial.prob_write > 0 and std::bernoulli_distribution(creativity_->parameters.initial.prob_write)(rng)) {
-                    double effort = std::uniform_real_distribution<double>(creativity_->parameters.initial.l_min,
-                            creativity_->parameters.initial.l_min + creativity_->parameters.initial.l_range)(rng);
+                if (creativity_.parameters.initial.prob_write > 0 and std::bernoulli_distribution(creativity_.parameters.initial.prob_write)(rng)) {
+                    double effort = std::uniform_real_distribution<double>(creativity_.parameters.initial.l_min,
+                            creativity_.parameters.initial.l_min + creativity_.parameters.initial.l_range)(rng);
                     // Make sure the required effort doesn't exceed the available funds; if it does,
                     // reduce the effort:
                     if (creation_base_cost + effort > income_available)
                         effort = income_available - creation_base_cost;
 
                     create_starting_ = true;
-                    create_countdown_ = creativity_->parameters.creation_time;
+                    create_countdown_ = creativity_.parameters.creation_time;
                     create_effort_ = effort;
                     create_quality_ = creationQuality(effort);
                     create_position_ = position();
-                    create_price_ = creativity_->parameters.cost_unit +
+                    create_price_ = creativity_.parameters.cost_unit +
                         std::uniform_real_distribution<double>(
-                                creativity_->parameters.initial.p_min,
-                                creativity_->parameters.initial.p_min + creativity_->parameters.initial.p_range)(Random::rng());
+                                creativity_.parameters.initial.p_min,
+                                creativity_.parameters.initial.p_min + creativity_.parameters.initial.p_range)(Random::rng());
                 }
             }
         }
     }
 
     if (create_countdown_ == 0) {
-        if (creativity_->parameters.creation_time > 0) {
+        if (creativity_.parameters.creation_time > 0) {
             // A currently-in-progress book is done (and wasn't created instantaneously), so choose its
             // price based on current demand beliefs.  If the optimal price is 0, we won't release it at
             // all: the creation is a sunk cost: it apparently doesn't seem profitable any more.  If we
@@ -430,9 +430,9 @@ void Reader::interOptimize() {
                 // per-period income.
                 std::pair<double, double> max;
                 try {
-                    max = demand_belief_.argmaxP(creativity_->parameters.prediction_draws, create_quality_, 0, 0,
-                            creativity_->parameters.readers, 0, 0, authored_books, market_books,
-                            cost_unit, creativity_->parameters.income / 10);
+                    max = demand_belief_.argmaxP(creativity_.parameters.prediction_draws, create_quality_, 0, 0,
+                            creativity_.parameters.readers, 0, 0, authored_books, market_books,
+                            cost_unit, creativity_.parameters.income / 10);
                     create_price_ = max.first;
                 } catch (BayesianLinear::draw_failure &e) {
                     // Draw failure: don't change create_price_; we'll fall back to what it got set
@@ -443,10 +443,10 @@ void Reader::interOptimize() {
             }
             else {
                 // No usable beliefs; use initial behaviour parameters draw:
-                create_price_ = creativity_->parameters.cost_unit +
+                create_price_ = creativity_.parameters.cost_unit +
                     std::uniform_real_distribution<double>(
-                            creativity_->parameters.initial.p_min,
-                            creativity_->parameters.initial.p_min + creativity_->parameters.initial.p_range)(Random::rng());
+                            creativity_.parameters.initial.p_min,
+                            creativity_.parameters.initial.p_min + creativity_.parameters.initial.p_range)(Random::rng());
             }
         }
     }
@@ -456,14 +456,14 @@ void Reader::interApply() {
     // Give potential income (this has to be before authorship decision, since authorship requires
     // giving up some potential income: actual income will be this amount minus whatever is given up
     // to author)
-    assets()[creativity_->money] += creativity_->parameters.income;
+    assets()[creativity_.money] += creativity_.parameters.income;
 
-    const Bundle cost_market(creativity_->money, creativity_->parameters.cost_market);
+    const Bundle cost_market(creativity_.money, creativity_.parameters.cost_market);
 
     auto sim = simulation();
     if (create_starting_) {
         // Incur the creation effort cost as soon as we start creating
-        assets().transferApprox({ creativity_->money, create_effort_ + creativity_->parameters.creation_fixed }, 1e-6);
+        assets().transferApprox({ creativity_.money, create_effort_ + creativity_.parameters.creation_fixed }, 1e-6);
         create_starting_ = false;
     }
     if (create_countdown_ > 0) {
@@ -483,8 +483,8 @@ void Reader::interApply() {
                 sim->spawn<BookMarket>(creativity_, newbook, create_price_);
 
                 /// If enabled, add some noise in a random direction to the position
-                if (creativity_->parameters.book_distance_mean > 0) {
-                    double step_dist = creativity_->parameters.book_distance_mean * std::chi_squared_distribution<double>()(Random::rng());
+                if (creativity_.parameters.book_distance_mean > 0) {
+                    double step_dist = creativity_.parameters.book_distance_mean * std::chi_squared_distribution<double>()(Random::rng());
                     newbook->moveBy(step_dist * Position::random(create_position_.dimensions));
                 }
 
@@ -583,7 +583,7 @@ const std::map<unsigned int, belief::ProfitStream>& Reader::profitStreamBeliefs(
 }
 
 bool Reader::usableBelief(const BayesianLinear &model) const {
-    return not model.noninformative() and model.n() - model.K() >= creativity_->parameters.initial.belief_threshold;
+    return not model.noninformative() and model.n() - model.K() >= creativity_.parameters.initial.belief_threshold;
 }
 
 void Reader::updateBeliefs() {
@@ -607,7 +607,7 @@ void Reader::updateDemandBelief() {
     // incorporated books into the belief because we need the lagged market book count
     if (simulation()->t() < 3) return;
 
-    double weaken = creativity_->priorWeight();
+    double weaken = creativity_.priorWeight();
 
     // Figure out which books might yield usable data: i.e. those on the market
     std::list<SharedMember<Book>> mktbooks;
@@ -623,7 +623,7 @@ void Reader::updateDemandBelief() {
         size_t i = 0;
         for (const auto &b : mktbooks) {
             y[i] = b->sales(last_t);
-            X.row(i) = Demand::bookRow(b, b->qualityMean(), creativity_->market_books_lagged);
+            X.row(i) = Demand::bookRow(b, b->qualityMean(), creativity_.market_books_lagged);
             i++;
         }
 
@@ -694,7 +694,7 @@ void Reader::updateProfitStreamBelief() {
         }
     }
 
-    double weaken = creativity_->priorWeight();
+    double weaken = creativity_.priorWeight();
     if (weaken != 1.0) {
         // Weaken existing PS beliefs
         for (auto &psb : profit_stream_beliefs_) {
@@ -763,7 +763,7 @@ void Reader::updateProfitBelief() {
     // count.
     // +3 because nothing happens in 0, then we need a period with some creation, and the t has
     // already been incremented for the upcoming period.
-    if (t < creativity_->parameters.creation_time + 3) return;
+    if (t < creativity_.parameters.creation_time + 3) return;
 
     std::list<SharedMember<Book>> new_prof_books, extrap_books;
 
@@ -774,7 +774,7 @@ void Reader::updateProfitBelief() {
             // beliefs
             extrap_books.push_back(b);
         }
-        else if (creativity_->publicSharing()) {
+        else if (creativity_.publicSharing()) {
             // If public sharing exists, we wait until the book has been off the private market for
             // 5 periods (so that it has most likely earned any public money it's going to get)
             if (t - b->leftPrivateMarket() >= 5)
@@ -787,7 +787,7 @@ void Reader::updateProfitBelief() {
         }
     }
 
-    double weaken = creativity_->priorWeight();
+    double weaken = creativity_.priorWeight();
 
     if (not new_prof_books.empty()) {
         MatrixXd X(new_prof_books.size(), profit_belief_->K());
@@ -797,7 +797,7 @@ void Reader::updateProfitBelief() {
         for (auto &book : new_prof_books) {
             // Calculate the book's total (private) profit and any public prize money
             y[i] = book->lifeProfitPrivate() + book->lifePrize();
-            X.row(i) = Profit::profitRow(book->qualityMean(), book->order(), creativity_->market_books_lagged);
+            X.row(i) = Profit::profitRow(book->qualityMean(), book->order(), creativity_.market_books_lagged);
             i++;
         }
 
@@ -821,7 +821,7 @@ void Reader::updateProfitBelief() {
         for (auto &book : extrap_books) {
             // Calculate the book's total profit (ignoring initial creation cost)
             y[i] = book->lifeProfitPrivate() + book->lifePrize();
-            X.row(i) = Profit::profitRow(book->qualityMean(), book->order(), creativity_->market_books_lagged);
+            X.row(i) = Profit::profitRow(book->qualityMean(), book->order(), creativity_.market_books_lagged);
             i++;
         }
 
@@ -832,7 +832,7 @@ void Reader::updateProfitBelief() {
 
 
 void Reader::intraInitialize() {
-    auto nb = creativity_->newBooks();
+    auto nb = creativity_.newBooks();
     for (auto &bm : nb.first) {
         book_cache_.insert(bm);
         if (bm->hasPrivateMarket()) book_cache_market_.insert(bm);
@@ -898,7 +898,7 @@ void Reader::intraOptimize() {
     for (auto &del : cache_del) book_cache_.erase(del);
 
     std::set<SharedMember<Book>> new_books;
-    double money = assets()[creativity_->money];
+    double money = assets()[creativity_.money];
     double u_curr = u(money, new_books); // the "no-books" utility
     // Keep looking at books as long as the net utility from buying the next best book exceeds the
     // penalty that will be incurred.
@@ -981,7 +981,7 @@ void Reader::intraApply() {
         res.buy();
     }
     // Also remove any cost associated with obtaining pirated copies of books:
-    assets().transferApprox({ creativity_->money, reserved_piracy_cost_ }, 1e-6);
+    assets().transferApprox({ creativity_.money, reserved_piracy_cost_ }, 1e-6);
     reserved_piracy_cost_ = 0.0;
     reservations_.clear();
 
@@ -1009,7 +1009,7 @@ void Reader::intraApply() {
     reserved_books_.clear();
 
     // "Eat" any money leftover
-    double money = assets().remove(creativity_->money);
+    double money = assets().remove(creativity_.money);
     // Store final utility
     u_curr_ = u(money, library_new_);
     u_lifetime_ += u_curr_;

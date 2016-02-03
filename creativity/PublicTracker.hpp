@@ -45,7 +45,7 @@ class PublicTracker : public eris::agent::AssetAgent,
          *
          * \throws std::domain_error if tax is negative.
          */
-        PublicTracker(std::shared_ptr<Creativity> creativity, double tax);
+        PublicTracker(const Creativity &creativity, double tax);
         /** When the period advances, we take the lump sum tax from all agents, and create a public
          * market for any books that don't have a market (i.e. the author isn't marketing them
          * anymore). */
@@ -71,7 +71,7 @@ class PublicTracker : public eris::agent::AssetAgent,
 
     protected:
         /// The Creativity object that owns the simulation this reader belongs to
-        std::shared_ptr<Creativity> creativity_;
+        const Creativity &creativity_;
 
         /// The lump sum tax amount
         double tax_;

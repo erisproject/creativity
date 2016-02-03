@@ -79,7 +79,7 @@ using namespace std::placeholders;
 
 namespace creativity { namespace gui {
 
-GUI::GUI(std::shared_ptr<Creativity> creativity,
+GUI::GUI(Creativity &creativity,
         std::function<void(Parameter)> configure,
         std::function<void()> initialize,
         std::function<void(eris_time_t end)> change_periods,
@@ -88,7 +88,7 @@ GUI::GUI(std::shared_ptr<Creativity> creativity,
         std::function<void()> step,
         std::function<void()> quit)
     :
-        creativity_{std::move(creativity)},
+        creativity_{creativity},
         on_configure_{std::move(configure)},
         on_initialize_{std::move(initialize)},
         on_change_periods_{std::move(change_periods)},
@@ -599,7 +599,7 @@ void GUI::thr_set_state(unsigned long t) {
     {
         size_t storage_size;
         {
-            auto st = creativity_->storage();
+            auto st = creativity_.storage();
             state = (*st.first)[t]; // Will throw if `t` is invalid
             storage_size = st.first->size();
         }
@@ -800,7 +800,7 @@ void GUI::thr_set_state(unsigned long t) {
 void GUI::thr_reset_rtrees() {
     rtrees_.clear();
     if (state_num_ == 0) return; // No states to worry about!
-    auto st = creativity_->storage();
+    auto st = creativity_.storage();
     rtrees_.resize(st.first->size());
     auto state = (*st.first)[state_curr_];
 
@@ -849,7 +849,7 @@ void GUI::thr_info_dialog(eris_id_t member_id) {
         already_open->second->present();
     }
     else {
-        std::shared_ptr<const State> state((*creativity_->storage().first)[state_curr_]);
+        std::shared_ptr<const State> state((*creativity_.storage().first)[state_curr_]);
 
         if (state->readers.count(member_id))
             info_windows_.emplace(
@@ -870,10 +870,10 @@ void GUI::thr_info_dialog(eris_id_t member_id) {
 }
 
 void GUI::thr_update_parameters() {
-#define SET_SB(PARAMETER) widget<Gtk::SpinButton>("set_" #PARAMETER)->set_value(creativity_->parameters.PARAMETER)
+#define SET_SB(PARAMETER) widget<Gtk::SpinButton>("set_" #PARAMETER)->set_value(creativity_.parameters.PARAMETER)
     SET_SB(dimensions);
     SET_SB(readers);
-    widget<Gtk::SpinButton>("set_density")->set_value(creativity_->densityFromBoundary());
+    widget<Gtk::SpinButton>("set_density")->set_value(creativity_.densityFromBoundary());
     SET_SB(reader_step_mean);
     SET_SB(book_distance_mean);
     SET_SB(book_quality_sd);
@@ -883,7 +883,7 @@ void GUI::thr_update_parameters() {
     SET_SB(creation_time);
     SET_SB(creation_fixed);
 
-#define SET_INIT_SB(PARAMETER) widget<Gtk::SpinButton>("set_init_" #PARAMETER)->set_value(creativity_->parameters.initial.PARAMETER)
+#define SET_INIT_SB(PARAMETER) widget<Gtk::SpinButton>("set_init_" #PARAMETER)->set_value(creativity_.parameters.initial.PARAMETER)
     SET_INIT_SB(prob_write);
     SET_INIT_SB(l_min);
     SET_INIT_SB(l_range);
@@ -904,7 +904,7 @@ void GUI::thr_update_parameters() {
     SET_SB(prediction_draws);
 
     SET_SB(piracy_begins);
-    widget<Gtk::SpinButton>("set_piracy_link_proportion")->set_value(creativity_->parameters.piracy_link_proportion * 100.0);
+    widget<Gtk::SpinButton>("set_piracy_link_proportion")->set_value(creativity_.parameters.piracy_link_proportion * 100.0);
     SET_SB(prior_scale_piracy);
 
     SET_SB(public_sharing_begins);
@@ -969,9 +969,9 @@ void GUI::thr_signal() {
         auto l = widget<Gtk::Label>("label_summary_t_desc");
         std::string d = l->get_text();
         auto pos = d.find("###");
-        if (pos != d.npos) l->set_markup(d.replace(pos, 3, std::to_string(creativity_->parameters.piracy_begins)));
+        if (pos != d.npos) l->set_markup(d.replace(pos, 3, std::to_string(creativity_.parameters.piracy_begins)));
 
-        std::ostringstream incstr; incstr << creativity_->parameters.income;
+        std::ostringstream incstr; incstr << creativity_.parameters.income;
         for (auto &w : {"label_summary_u_desc", "label_summary_ulife_desc"}) {
             l = widget<Gtk::Label>(w);
             d = l->get_text();
@@ -1022,12 +1022,12 @@ void GUI::thr_signal() {
         // .doubles has: speed
         auto scale = widget<Gtk::Scale>("scale_state");
         scale->set_range(0, last_progress.uls[1]);
-        if (not piracy_tick_added_ and last_progress.uls[1] >= creativity_->parameters.piracy_begins) {
-            widget<Gtk::Scale>("scale_state")->add_mark(creativity_->parameters.piracy_begins, Gtk::POS_BOTTOM, "");
+        if (not piracy_tick_added_ and last_progress.uls[1] >= creativity_.parameters.piracy_begins) {
+            widget<Gtk::Scale>("scale_state")->add_mark(creativity_.parameters.piracy_begins, Gtk::POS_BOTTOM, "");
             piracy_tick_added_ = true;
         }
-        if (not public_tick_added_ and last_progress.uls[1] >= creativity_->parameters.public_sharing_begins) {
-            widget<Gtk::Scale>("scale_state")->add_mark(creativity_->parameters.public_sharing_begins, Gtk::POS_BOTTOM, "");
+        if (not public_tick_added_ and last_progress.uls[1] >= creativity_.parameters.public_sharing_begins) {
+            widget<Gtk::Scale>("scale_state")->add_mark(creativity_.parameters.public_sharing_begins, Gtk::POS_BOTTOM, "");
             public_tick_added_ = true;
         }
 
@@ -1050,7 +1050,7 @@ void GUI::thr_signal() {
 
     if (last_new_states.type == Signal::Type::new_states) {
         auto old_state_num = state_num_;
-        state_num_ = creativity_->storage().first->size();
+        state_num_ = creativity_.storage().first->size();
 
         if (state_num_ > old_state_num) {
             // - 1 here because we don't really count 0 as a stage
@@ -1145,7 +1145,7 @@ void GUI::saveSim() {
 // Initialize a new simulation:
 void GUI::initializeSim() {
     // Set the parameters directly
-    auto &set = creativity_->set();
+    auto &set = creativity_.set();
 #define COPY_SB_D(PARAMETER) set.PARAMETER = sb("set_"#PARAMETER)
 #define COPY_SB_I(PARAMETER) set.PARAMETER = lround(sb("set_"#PARAMETER))
 

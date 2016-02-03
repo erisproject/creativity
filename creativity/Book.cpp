@@ -17,16 +17,16 @@ using namespace eris;
 namespace creativity {
 
 Book::Book(
-        std::shared_ptr<Creativity> creativity,
+        Creativity &creativity,
         const Position &p,
         SharedMember<Reader> author,
         unsigned int order,
         double quality)
     : WrappedPositional<Good::Discrete>(p, author->wrapLowerBound(), author->wrapUpperBound()),
-        creativity_{std::move(creativity)},
+        creativity_{creativity},
         author_{std::move(author)},
         order_{order},
-        quality_draw_(quality, creativity_->parameters.book_quality_sd)
+        quality_draw_(quality, creativity_.parameters.book_quality_sd)
 {}
 
 void Book::added() {
@@ -43,7 +43,7 @@ void Book::added() {
 
     author_->registerAuthoredBook(sharedSelf());
 
-    creativity_->newBooks().first.push_back(sharedSelf());
+    creativity_.newBooks().first.push_back(sharedSelf());
 }
 
 void Book::setMarket(SharedMember<BookMarket> market) {
@@ -192,8 +192,8 @@ double Book::lifeRevenue() const {
 
 double Book::lifeProfitPrivate() const {
     return lifeRevenuePrivate()
-        - privateMarketPeriods() * creativity_->parameters.cost_market
-        - lifeSalesPrivate() * creativity_->parameters.cost_unit;
+        - privateMarketPeriods() * creativity_.parameters.cost_market
+        - lifeSalesPrivate() * creativity_.parameters.cost_unit;
 }
 
 double Book::currRevenue() const {

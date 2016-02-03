@@ -66,10 +66,10 @@ void thr_parse_file(
 
         std::ostringstream output;
         output.precision(args.double_precision);
-        auto creativity = Creativity::create();
+        Creativity creativity;
         // Filename input
         try {
-            creativity->fileRead(source);
+            creativity.fileRead(source);
         }
         catch (std::ios_base::failure&) {
             std::cerr << "Unable to read `" << source << "': " << std::strerror(errno) << "\n";
@@ -80,13 +80,13 @@ void thr_parse_file(
             continue;
         }
 
-        auto locked_storage = creativity->storage();
+        auto locked_storage = creativity.storage();
         auto &storage = *locked_storage.first;
 
         // Check that the data source has enough data:
 
-        const eris_time_t &piracy_begins = creativity->parameters.piracy_begins,
-              &public_sharing_begins = creativity->parameters.public_sharing_begins;
+        const eris_time_t &piracy_begins = creativity.parameters.piracy_begins,
+              &public_sharing_begins = creativity.parameters.public_sharing_begins;
         eris_time_t post_piracy = 0, post_public = 0, post_pre = 0;
         if (not args.skip.piracy)
             post_piracy = (args.skip.public_sharing ? storage.size() : public_sharing_begins);
@@ -131,8 +131,8 @@ void thr_parse_file(
             if (args.human_readable) output << std::setw(readable_name_width+1) << d.name + ":" << " ";
             else output << ",";
 
-            if (d.calc_double) output << double_str(d.calc_double(creativity->parameters), args.double_precision);
-            else output << d.calc_int(creativity->parameters);
+            if (d.calc_double) output << double_str(d.calc_double(creativity.parameters), args.double_precision);
+            else output << d.calc_int(creativity.parameters);
 
             if (args.human_readable) output << "\n";
         }

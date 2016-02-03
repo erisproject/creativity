@@ -69,13 +69,13 @@ void thr_parse_file(
 
         std::ostringstream output;
         output.precision(args.double_precision);
-        auto creativity = Creativity::create();
+        Creativity creativity;
         // Filename input
-        try { creativity->fileRead(source); }
+        try { creativity.fileRead(source); }
         catch (std::ios_base::failure&) FAIL("I/O error: " << std::strerror(errno))
         catch (std::exception &e) FAIL("An exception occured: " << e.what())
 
-        auto locked_storage = creativity->storage();
+        auto locked_storage = creativity.storage();
         auto &storage = *locked_storage.first;
 
         // If parameters were given, use them; otherwise infer them from the first file read
@@ -90,12 +90,12 @@ void thr_parse_file(
             }
             if (args.piracy_begins != 0) piracy_begins = args.piracy_begins;
             else {
-                piracy_begins = creativity->parameters.piracy_begins;
+                piracy_begins = creativity.parameters.piracy_begins;
                 std::cout << "Inferred --piracy-begins " << piracy_begins << std::endl;
             }
             if (args.public_sharing_begins != 0) public_begins = args.public_sharing_begins;
             else {
-                public_begins = creativity->parameters.public_sharing_begins;
+                public_begins = creativity.parameters.public_sharing_begins;
                 std::cout << "Inferred --public-sharing-begins " << public_begins << std::endl;
             }
             need_parameters = false;
@@ -108,12 +108,12 @@ void thr_parse_file(
         }
         // Piracy begins doesn't have to match if the requested number of periods is less than the
         // piracy begins value, but otherwise does:
-        if (piracy_begins <= periods and piracy_begins != creativity->parameters.piracy_begins) {
-            FAIL("simulation piracy begins at t=" << creativity->parameters.piracy_begins << " but t=" << piracy_begins << " is required");
+        if (piracy_begins <= periods and piracy_begins != creativity.parameters.piracy_begins) {
+            FAIL("simulation piracy begins at t=" << creativity.parameters.piracy_begins << " but t=" << piracy_begins << " is required");
         }
         // Likewise for public sharing
-        if (public_begins <= periods and public_begins != creativity->parameters.public_sharing_begins) {
-            FAIL("simulation public sharing begins at t=" << creativity->parameters.public_sharing_begins << " but t=" << public_begins << " is required");
+        if (public_begins <= periods and public_begins != creativity.parameters.public_sharing_begins) {
+            FAIL("simulation public sharing begins at t=" << creativity.parameters.public_sharing_begins << " but t=" << public_begins << " is required");
         }
 
         // Calculate all the local values, then copy them into the results variable in one shot

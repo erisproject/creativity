@@ -97,7 +97,7 @@ void Creativity::setup() {
         // Draw a uniform value for each dimension
         for (size_t d = 0; d < parameters.dimensions; d++) initpos[d] = unif_pmb(rng);
 
-        auto r = sim->spawn<Reader>(shared_from_this(), initpos);
+        auto r = sim->spawn<Reader>(*this, initpos);
 
         r->creation_shape = parameters.reader_creation_shape;
         r->creation_scale = unif_cr_shape(rng);
@@ -128,7 +128,7 @@ void Creativity::run() {
 
     // If the next period is the first when the PublicTracker becomes available, create it
     if (sim->t() + 1 == parameters.public_sharing_begins)
-        sim->spawn<PublicTracker>(shared_from_this(), parameters.public_sharing_tax);
+        sim->spawn<PublicTracker>(*this, parameters.public_sharing_tax);
 
     sim->run();
 

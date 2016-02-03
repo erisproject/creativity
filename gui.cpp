@@ -27,11 +27,11 @@ using namespace Eigen;
 
 int main(int argc, char *argv[1]) {
     Eigen::initParallel();
-    auto creativity = Creativity::create();
+    Creativity creativity;
 
-    // Handle any command line arguments.  These set things in creativity->set(), which form the
+    // Handle any command line arguments.  These set things in creativity.set(), which form the
     // defaults for the GUI, and have a few extra leftovers that the GUI code handles itself.
-    cmdargs::GUI cmd(creativity->set());
+    cmdargs::GUI cmd(creativity.set());
     cmd.parse(argc, argv);
 
     std::cerr << std::setprecision(16);
@@ -53,24 +53,24 @@ int main(int argc, char *argv[1]) {
             case GUI::ParamType::load:
                 if (setup) throw std::runtime_error("Cannot load after initial setup");
                 if (save_to_file) throw std::runtime_error("Error: cannot load and save at the same time");
-                creativity->fileRead(*reinterpret_cast<std::string*>(p.ptr));
-                if (creativity->storage().first->size() == 0)
+                creativity.fileRead(*reinterpret_cast<std::string*>(p.ptr));
+                if (creativity.storage().first->size() == 0)
                     throw std::runtime_error("Unable to load file: file has no states");
-                if (creativity->parameters.dimensions < 1)
+                if (creativity.parameters.dimensions < 1)
                     throw std::runtime_error("Unable to load file: invalid dimensions < 1");
-                if (creativity->parameters.boundary <= 0)
+                if (creativity.parameters.boundary <= 0)
                     throw std::runtime_error("Unable to load file: file has invalid non-positive boundary value");
                 load_from_file = true;
                 break;
             case GUI::ParamType::save_as:
-                creativity->fileWrite(*reinterpret_cast<std::string*>(p.ptr));
+                creativity.fileWrite(*reinterpret_cast<std::string*>(p.ptr));
                 save_to_file = true;
                 break;
             case GUI::ParamType::threads:
                 // This is the only setting that *can* be changed after the initial setup.  This
                 // will throw if currently running, but that's okay: the GUI isn't allowed to send
                 // it if the simulation is currently running.
-                if (creativity->sim) creativity->sim->maxThreads(p.ul);
+                if (creativity.sim) creativity.sim->maxThreads(p.ul);
                 else max_threads = p.ul;
                 break;
         }
@@ -83,10 +83,10 @@ int main(int argc, char *argv[1]) {
             throw std::logic_error("Cannot initialize a new simulation after loading one from a file");
         if (setup)
             throw std::logic_error("Cannot initialize: initialization already done!");
-        if (creativity->parameters.dimensions < 1) throw std::domain_error(u8"Invalid simulation file: dimensions < 1");
+        if (creativity.parameters.dimensions < 1) throw std::domain_error(u8"Invalid simulation file: dimensions < 1");
         // setup() will check the other parameters for validity
-        creativity->setup();
-        creativity->sim->maxThreads(max_threads);
+        creativity.setup();
+        creativity.sim->maxThreads(max_threads);
         setup = true;
     };
 
@@ -118,7 +118,7 @@ int main(int argc, char *argv[1]) {
     if (load_from_file) {
         // We're in read-only mode, which means we do nothing but wait for the GUI to quit.
         gui.initialized();
-        size_t num_states = creativity->storage().first->size() - 1; // -1 because we don't count the initial, t=0 setup state
+        size_t num_states = creativity.storage().first->size() - 1; // -1 because we don't count the initial, t=0 setup state
         gui.progress(num_states, num_states, 0);
         gui.newStates(0);
         while (not quit) {
@@ -127,10 +127,10 @@ int main(int argc, char *argv[1]) {
         return 0;
     }
 
-    auto sim = creativity->sim;
+    auto sim = creativity.sim;
 
     // Copy the initial state into the storage object
-    creativity->storage().first->emplace_back(sim);
+    creativity.storage().first->emplace_back(sim);
 
     // Tell the GUI we're done with initialization so that it can disable the various setup elements
     gui.initialized();
@@ -155,7 +155,7 @@ int main(int argc, char *argv[1]) {
         while (not quit and (step or (not stopped and sim->t() < run_end))) {
             start = std::chrono::high_resolution_clock::now();
 
-            creativity->run();
+            creativity.run();
 
             if (step) step = false;
 
@@ -198,5 +198,5 @@ int main(int argc, char *argv[1]) {
         last_progress = std::chrono::high_resolution_clock::now();
     }
 
-    creativity->storage().first->flush();
+    creativity.storage().first->flush();
 }

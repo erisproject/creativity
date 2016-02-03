@@ -12,9 +12,9 @@ using namespace eris;
 namespace creativity {
 
 // NB: b might not actually be in the simulation yet (in which case it won't have an eris_id)
-BookMarket::BookMarket(std::shared_ptr<Creativity> creativity, SharedMember<Book> b, double price)
+BookMarket::BookMarket(const Creativity &creativity, SharedMember<Book> b, double price)
     // Our output bundle is empty: book copies aren't Goods, and are handled elsewhere
-    : Market{Bundle{}, {{ creativity->money, 1 }}}, creativity_{std::move(creativity)}, book_{b}, price_{price}
+    : Market{Bundle{}, {{ creativity.money, 1 }}}, creativity_{creativity}, book_{b}, price_{price}
 {}
 
 SharedMember<Book> BookMarket::book() {
@@ -68,7 +68,7 @@ void BookMarket::buy(Reservation &res) {
     Bundle &b = reservationBundle_(res);
 
     // Record the sale in the book status
-    book_->recordSale(res.quantity, b[creativity_->money]);
+    book_->recordSale(res.quantity, b[creativity_.money]);
 
     // Transfer the money into the "proceeds" jar (which will eventually go to the author)
     b.transferApprox(b, proceeds_);
@@ -83,7 +83,7 @@ void BookMarket::intraFinish() {
     auto author = book_->author();
     auto lock = writeLock(book_, author);
     // First subtract off variable costs incurred
-    BundleNegative tvc(creativity_->money, book_->currSales() * -creativity_->parameters.cost_unit);
+    BundleNegative tvc(creativity_.money, book_->currSales() * -creativity_.parameters.cost_unit);
     tvc.transferApprox(tvc, proceeds_, 1e-6);
 
     // Transfer profits to the author

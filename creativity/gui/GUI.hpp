@@ -57,8 +57,10 @@ class GUI : eris::noncopyable {
                 /** The Creativity object containing the simulation storage.  The object does not
                  * need to be initialized (by calling setup()): in particular, if the GUI is
                  * displaying a previously stored simulation run, it typically won't be.
+                 *
+                 * Note that the creativity object must persist as long as the created GUI object.
                  */
-                std::shared_ptr<Creativity> creativity,
+                Creativity &creativity,
 
                 /** A function to call with GUI simulation parameters when the user configures the
                  * simulation via the GUI.  Note that this doesn't include simulation settings (like
@@ -240,7 +242,7 @@ class GUI : eris::noncopyable {
 
     private:
         /// The Creativity object
-        std::shared_ptr<Creativity> creativity_;
+        Creativity &creativity_;
 
         /// The thread the GUI is running in.  Set during construction.
         std::thread gui_thread_{};
@@ -442,7 +444,7 @@ class GUI : eris::noncopyable {
                 const std::vector<std::string> &needs_any);
 
         /** When called, this updates the simulation parameters displayed in the GUI to match the
-         * current creativity_->parameters values.
+         * current creativity_.parameters values.
          */
         void thr_update_parameters();
 

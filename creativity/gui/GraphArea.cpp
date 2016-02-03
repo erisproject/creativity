@@ -31,7 +31,7 @@ Cairo::Matrix GraphArea::graph_to_canvas() const {
     Gtk::Allocation allocation = get_allocation();
 
     const double half_width = 0.5 * allocation.get_width(), half_height = 0.5 * allocation.get_height();
-    const double boundary = gui_.creativity_->parameters.boundary;
+    const double boundary = gui_.creativity_.parameters.boundary;
     // The second of these is negative because higher y canvas values are down the screen, which are
     // *lower* graph values.
     return Cairo::Matrix(half_width / boundary, 0, 0, -half_height / boundary, half_width, half_height);
@@ -41,7 +41,7 @@ Cairo::Matrix GraphArea::canvas_to_graph() const {
     Gtk::Allocation allocation = get_allocation();
 
     const double half_width = 0.5 * allocation.get_width(), half_height = 0.5 * allocation.get_height();
-    const double boundary = gui_.creativity_->parameters.boundary;
+    const double boundary = gui_.creativity_.parameters.boundary;
     // The second value below is negative because higher y canvas values are down the screen, which
     // are *lower* graph values.
     //
@@ -54,8 +54,8 @@ Cairo::Matrix GraphArea::canvas_to_graph() const {
 Position GraphArea::graph_position(const Position &p) {
     if (p.dimensions == 2) return p;
     if (p.dimensions == 1) {
-        const double r = 0.9 * gui_.creativity_->parameters.boundary;
-        const double angle = p[0] / gui_.creativity_->parameters.boundary * boost::math::constants::pi<double>();
+        const double r = 0.9 * gui_.creativity_.parameters.boundary;
+        const double angle = p[0] / gui_.creativity_.parameters.boundary * boost::math::constants::pi<double>();
         double x = r * std::cos(angle);
         double y = r * std::sin(angle);
         return Position({x, y});
@@ -95,7 +95,7 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
         std::shared_ptr<const State> state, prev_state;
 
         {
-            auto st = gui_.creativity_->storage();
+            auto st = gui_.creativity_.storage();
             if (st.first->empty())
                 state = std::make_shared<State>();
             else {
@@ -115,7 +115,7 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
 
         // In 1D mode, draw the circle first (in 2+D, we draw the axes at the end so that they're on
         // top of everything).
-        if (gui_.creativity_->parameters.dimensions == 1 and design.enabled.axes) {
+        if (gui_.creativity_.parameters.dimensions == 1 and design.enabled.axes) {
             drawCircularAxis(cr, trans);
         }
 
@@ -290,7 +290,7 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
         }
 
         // Add axes (last, so that they are on top)
-        if (gui_.creativity_->parameters.dimensions != 1 and design.enabled.axes) {
+        if (gui_.creativity_.parameters.dimensions != 1 and design.enabled.axes) {
             drawAxes(cr, trans);
         }
     }
@@ -307,7 +307,7 @@ void GraphArea::drawLine(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::M
     Position from = graph_position(from_raw), to = graph_position(to_raw);
 
     Position v; // The line vector
-    const double &boundary = gui_.creativity_->parameters.boundary;
+    const double &boundary = gui_.creativity_.parameters.boundary;
     const double bshift = 2*boundary;
 
     // If we're doing a 1D graph, this is much simpler: we don't have to worry about extra lines,
@@ -405,7 +405,7 @@ void GraphArea::drawPoint(
         const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::Matrix &trans, const Position &point,
         const PointType &type, const Colour &colour, const double radius, const double width) {
 
-    const double &boundary = gui_.creativity_->parameters.boundary;
+    const double &boundary = gui_.creativity_.parameters.boundary;
 
     Position graphpos = graph_position(point);
     const double &x = graphpos[0];
@@ -574,7 +574,7 @@ void GraphArea::drawCircularAxis(const Cairo::RefPtr<Cairo::Context> &cr, const 
     double zero_x = 0, zero_y = 0;
     trans.transform_point(zero_x, zero_y);
 
-    const double &boundary = gui_.creativity_->parameters.boundary;
+    const double &boundary = gui_.creativity_.parameters.boundary;
     const double r = 0.9 * boundary;
     drawGraphCircle(cr, trans, 0, 0, r, design.colour.axes, design.stroke_width.axes);
 
@@ -641,7 +641,7 @@ void GraphArea::drawAxes(const Cairo::RefPtr<Cairo::Context> &cr, const Cairo::M
     cr->line_to(drawing_cache_width_, zero_y);
     cr->stroke();
 
-    const double &boundary = gui_.creativity_->parameters.boundary;
+    const double &boundary = gui_.creativity_.parameters.boundary;
 
     // Tick marks
     int tick_num = 0;

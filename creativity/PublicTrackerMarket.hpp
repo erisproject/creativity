@@ -17,7 +17,7 @@ class PublicTrackerMarket : public BookMarket, public virtual eris::interopt::Ad
         /** Constructs a PublicTrackerMarket that sells copies of the given Book at marginal cost of
          * the lower of `unit_cost` or `piracy_cost`.
          */
-        PublicTrackerMarket(std::shared_ptr<Creativity> creativity, eris::SharedMember<Book> b);
+        PublicTrackerMarket(const Creativity &creativity, eris::SharedMember<Book> b);
         /** Sets the initial price and registers this as the book's market when added to the
          * simulation.
          */

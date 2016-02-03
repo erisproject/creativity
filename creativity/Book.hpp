@@ -31,6 +31,8 @@ class Creativity;
  */
 class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
     public:
+        /// Not default constructible
+        Book() = delete;
         /** Constructs a new book at the given position created by the given author.
          *
          * \param creativity the Creativity object that owns the simulation this book belongs to
@@ -45,7 +47,7 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
          * Note that a reference to the author is stored internally: even if the author is removed
          * from the simulation, it will still be kept from destruction by this class.
          */
-        Book(std::shared_ptr<Creativity> creativity, const eris::Position &p, eris::SharedMember<Reader> author,
+        Book(Creativity &creativity, const eris::Position &p, eris::SharedMember<Reader> author,
                 unsigned int order, double quality);
 
         /// Returns the age of the book, in simulation periods.
@@ -263,7 +265,7 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         double qualityDraw();
 
     private:
-        std::shared_ptr<Creativity> creativity_;
+        Creativity &creativity_;
         eris::eris_time_t created_ = 0, left_private_market_ = 0, public_market_created_ = 0;
         unsigned int copies_private_total_ = 0, copies_pirated_total_ = 0, copies_public_total_ = 0;
         double revenue_private_total_ = 0, revenue_public_total_ = 0, prize_total_ = 0;

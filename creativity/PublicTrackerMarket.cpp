@@ -7,7 +7,7 @@ namespace creativity {
 
 using namespace eris;
 
-PublicTrackerMarket::PublicTrackerMarket(std::shared_ptr<Creativity> creativity, SharedMember<Book> b)
+PublicTrackerMarket::PublicTrackerMarket(const Creativity &creativity, SharedMember<Book> b)
     : BookMarket(creativity, b, 0.0) {}
 
 void PublicTrackerMarket::added() {
@@ -16,7 +16,7 @@ void PublicTrackerMarket::added() {
 }
 
 void PublicTrackerMarket::updatePrice() {
-    setPrice(std::min(creativity_->parameters.cost_unit, creativity_->parameters.cost_piracy));
+    setPrice(std::min(creativity_.parameters.cost_unit, creativity_.parameters.cost_piracy));
 }
 
 void PublicTrackerMarket::interAdvance() {

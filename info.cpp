@@ -22,10 +22,10 @@ int main(int argc, char *argv[]) {
     cmdargs::Info args;
     args.parse(argc, argv);
 
-    auto creativity = Creativity::create();
+    Creativity creativity;
     // Filename input
     try {
-        creativity->fileRead(args.input);
+        creativity.fileRead(args.input);
     }
     catch (std::exception &e) {
         std::cerr << "Unable to read `" << args.input << "': " << e.what() << "\n\n";
@@ -34,10 +34,10 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Initial settings:\n=================\n" << std::left << std::setprecision(args.output_precision);
 #define PRINT_FIELD(N, V) do { std::cout << std::setw(30) << N << V << "\n"; } while (0)
-#define PRINT_SETTING(S) PRINT_FIELD(#S, creativity->parameters.S)
+#define PRINT_SETTING(S) PRINT_FIELD(#S, creativity.parameters.S)
     PRINT_SETTING(readers);
     PRINT_SETTING(dimensions);
-    PRINT_FIELD("densityFromBoundary()", creativity->densityFromBoundary());
+    PRINT_FIELD("densityFromBoundary()", creativity.densityFromBoundary());
     PRINT_SETTING(boundary);
     PRINT_SETTING(book_distance_mean);
     PRINT_SETTING(book_quality_sd);
@@ -76,17 +76,17 @@ int main(int argc, char *argv[]) {
         auto saveprec = std::cout.precision();
         std::cout.precision(std::numeric_limits<double>::max_digits10);
         std::cout << "\n\nArguments to re-run: ./creativity-cli";
-#define ADD(ARG, PARAM) if (creativity->parameters.PARAM != defaults.PARAM) { \
+#define ADD(ARG, PARAM) if (creativity.parameters.PARAM != defaults.PARAM) { \
     std::string arg(ARG); \
     std::replace(arg.begin(), arg.end(), '_', '-'); \
     std::replace(arg.begin(), arg.end(), '.', '-'); \
-    std::cout << " " << arg << " " << creativity->parameters.PARAM; \
+    std::cout << " " << arg << " " << creativity.parameters.PARAM; \
 }
 #define ADD_SAME(PARAM) ADD("--" #PARAM, PARAM)
         ADD_SAME(readers);
         ADD_SAME(dimensions);
-        if (creativity->parameters.boundary != defaults.boundary) std::cout << " --density " <<
-            creativity->densityFromBoundary(creativity->parameters.readers, creativity->parameters.dimensions, creativity->parameters.boundary);
+        if (creativity.parameters.boundary != defaults.boundary) std::cout << " --density " <<
+            creativity.densityFromBoundary(creativity.parameters.readers, creativity.parameters.dimensions, creativity.parameters.boundary);
         ADD_SAME(book_distance_mean);
         ADD_SAME(book_quality_sd);
         ADD_SAME(reader_step_mean);
@@ -131,7 +131,7 @@ int main(int argc, char *argv[]) {
     }
 
 
-    auto stpair = creativity->storage();
+    auto stpair = creativity.storage();
     auto &st = *stpair.first; 
     std::cout << "\n\nSimulation details:\n===================\n";
     auto disp_size = st.size();
@@ -155,25 +155,25 @@ int main(int argc, char *argv[]) {
 
         unsigned count = 0;
         // These are 0 for disabled, so pretend we already did them if 0:
-        bool did_piracy = creativity->parameters.piracy_begins == 0,
-             did_public_sharing = creativity->parameters.public_sharing_begins == 0;
-        for (unsigned t = args.thin_periods; t < st.size(); t += args.thin_periods) {
+        bool did_piracy = creativity.parameters.piracy_begins == 0,
+             did_public_sharing = creativity.parameters.public_sharing_begins == 0;
+        for (unsigned t = (args.thin_periods < st.size() ? args.thin_periods : st.size()-1); t < st.size(); t += args.thin_periods) {
             auto s = st[t];
             if (++count % 35 == 1 and count > 1) { std::cout << h4 << h3 << h4; }
-            if (not did_piracy and s->t >= creativity->parameters.piracy_begins) {
-                if (s->t == creativity->parameters.piracy_begins) std::cout <<
+            if (not did_piracy and s->t >= creativity.parameters.piracy_begins) {
+                if (s->t == creativity.parameters.piracy_begins) std::cout <<
                    "  =======================================  PIRACY BEGINS  ========================================\n";
                 else std::cout <<
                    "  ===================================  PIRACY BEGINS " << std::setw(8) << std::left << std::string("(t=" + std::to_string(
-                    creativity->parameters.piracy_begins) + ")") <<            "  ===================================\n";
+                    creativity.parameters.piracy_begins) + ")") <<            "  ===================================\n";
                 did_piracy = true;
             }
-            if (not did_public_sharing and s->t >= creativity->parameters.public_sharing_begins) {
-                if (s->t == creativity->parameters.public_sharing_begins) std::cout <<
+            if (not did_public_sharing and s->t >= creativity.parameters.public_sharing_begins) {
+                if (s->t == creativity.parameters.public_sharing_begins) std::cout <<
                    "  ===================================  PUBLIC SHARING BEGINS  ====================================\n";
                 else std::cout <<
                    "  ===============================  PUBLIC SHARING BEGINS " << std::setw(8) << std::left << std::string("(t=" + std::to_string(
-                    creativity->parameters.public_sharing_begins) + ")") <<         "  ===============================\n";
+                    creativity.parameters.public_sharing_begins) + ")") <<         "  ===============================\n";
                 did_public_sharing = true;
             }
 

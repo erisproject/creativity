@@ -152,7 +152,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
          * \param pos the initial position of the reader
          */
         Reader(
-                std::shared_ptr<Creativity> creativity,
+                Creativity &creativity,
                 const eris::Position &pos
               );
 
@@ -558,7 +558,7 @@ class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
 
     protected:
         /// The Creativity object that owns the simulation this reader belongs to
-        std::shared_ptr<Creativity> creativity_;
+        Creativity &creativity_;
 
         std::shared_ptr<belief::Profit> profit_belief_, ///< Belief about lifetime book profits
             profit_belief_extrap_; ///< Beliefs about lifetime book profits using profit stream expectations
