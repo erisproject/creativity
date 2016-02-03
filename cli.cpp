@@ -163,27 +163,26 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    std::cout << "\nSimulation done.";
-    unsigned int pending = creativity->storage().first->backend().pending();
-    if (pending > 0) {
-        std::string waiting = "Waiting for output data to finish writing... ";
-        if (not args.quiet) std::cout << "\n" << waiting;
-        while (pending > 0) {
-            if (not args.quiet) std::cout << "\r" << waiting << "(" << pending << " states pending)  " << std::flush;
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            pending = creativity->storage().first->backend().pending();
+    if (not args.quiet) {
+        if (tty) std::cout << std::endl;
+        bool need_endl = false;
+        while (not creativity->storage().first->flush_for(500)) {
+            if (tty) std::cout << "\r";
+            std::cout << "Waiting for output data to finish writing... (" <<
+                creativity->storage().first->backend().pending() << " states pending)";
+            if (tty) { std::cout << "   " << std::flush; need_endl = true; }
+            else std::cout << std::endl;
         }
-        if (not args.quiet) std::cout << "\r" << waiting << "done.               " << std::flush;
+        if (need_endl) std::cout << std::endl;
     }
-
-    std::cout << "\n";
-    creativity->storage().first->flush();
+    else {
+        creativity->storage().first->flush();
+    }
 
     // Destroy the simulation (which also closes the storage)
     creativity.reset();
 
     if (need_copy) {
-        std::cout << "Moving tmpfile to " << args_out << "..." << std::flush;
         int error = std::rename(results_out.c_str(), args_out.c_str());
         if (error) { // Rename failed (perhaps across filesystems) so do a copy-and-delete
             if (not overwrite) {
@@ -215,8 +214,6 @@ int main(int argc, char *argv[]) {
                 }
             }
 
-            std::cout << " done.\n" << std::flush;
-
             // Copy succeeded, so delete the tmpfile
             error = std::remove(results_out.c_str());
             if (error) {
@@ -224,11 +221,8 @@ int main(int argc, char *argv[]) {
                 std::cerr << "\nWarning: removing tmpfile `" << results_out << "' failed: " << std::strerror(errno) << "\n";
             }
         }
-        else {
-            std::cout << " done.\n" << std::flush;
-        }
         results_out = args_out;
     }
 
-    std::cout << "\nSimulation complete.  Results saved to " << results_out << "\n\n";
+    std::cout << "Simulation complete.  Results saved to " << results_out << "\n\n";
 }
