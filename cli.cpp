@@ -206,6 +206,7 @@ int main(int argc, char *argv[]) {
                 }
             }
 
+            std::cout << "Copying tmpfile to " << args_out << "..." << std::flush;
             {
                 std::ifstream src; src.exceptions(src.failbit);
                 std::ofstream dst; dst.exceptions(dst.failbit);
@@ -227,12 +228,16 @@ int main(int argc, char *argv[]) {
                     exit(1);
                 }
             }
+            std::cout << " done.\nRemoving tmpfile..." << std::flush;
 
             // Copy succeeded, so delete the tmpfile
             error = std::remove(results_out.c_str());
             if (error) {
                 // If we can't remove it, print a warning (but don't die, because we also copied it to the right place)
                 std::cerr << "\nWarning: removing tmpfile `" << results_out << "' failed: " << std::strerror(errno) << "\n";
+            }
+            else {
+                std::cout << " done." << std::endl;
             }
         }
         results_out = args_out;
