@@ -118,9 +118,10 @@ class FileStorage final : public StorageBackend {
          *
          * Use with caution: frequent file flushing will slow the FileStorage object considerably.
          *
+         * \sa creativity::state::StorageBackend::flush
          * \sa std::basic_ostream::flush
          */
-        virtual void flush() override;
+        virtual void device_flush() override;
 
     private:
 

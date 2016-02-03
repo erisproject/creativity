@@ -206,9 +206,7 @@ std::shared_ptr<const State> FileStorage::load(eris_time_t t) const {
     return readState();
 }
 
-void FileStorage::flush() {
-    // Let StorageBackend worry about finishing the thread:
-    StorageBackend::flush();
+void FileStorage::device_flush() {
     std::unique_lock<std::mutex> lock(f_mutex_);
     // Ensure the filehandle output is flushed to disk
     f_.flush();

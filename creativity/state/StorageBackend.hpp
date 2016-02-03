@@ -64,13 +64,13 @@ class StorageBackend : private eris::noncopyable {
         virtual void readSettings(CreativitySettings &settings) const = 0;
 
         /** Flushes changes.  This method blocks until the current thread has finished writing all
-         * queued states.  If there is no thread currently active, this returns immediately.
+         * queued states and the device has been flushed to storage (if applicable).  If there is no
+         * thread currently active, this returns immediately.
          *
          * If a subclass supports additional flushing capabilities (e.g. syncing a file to disk), it
-         * should override, call the base flush method, then perform the additional flush
-         * operations.
+         * should override device_flush(), which this method calls.
          */
-        virtual void flush();
+        void flush();
 
         /** Attempts to flush changes, waiting at most the given number of milliseconds for the
          * flush to complete.  Returns true if the flush completed, false if the duration expired
@@ -79,7 +79,7 @@ class StorageBackend : private eris::noncopyable {
          * \returns true if the flush completed, false if the duration expired without the flush
          * finishing.
          */
-        virtual bool flush_for(long milliseconds);
+        bool flush_for(long milliseconds);
 
         /** Adds a state to this storage container.  The default implementation spawns a thread then
          * adds it to queue_.  Subclasses not using threaded storage MUST override this method to
@@ -110,8 +110,12 @@ class StorageBackend : private eris::noncopyable {
          */
         virtual void thread_insert(std::shared_ptr<const State> &&s);
 
-    private:
+        /** Flush the current device to storage medium.  The default does nothing; storage backends
+         * with such a concept should override.
+         */
+        virtual void device_flush();
 
+    private:
 
         /** Queued values awaiting storage in the storage medium.  If a state is not found in
          * cache_, this is checked next.
@@ -122,9 +126,14 @@ class StorageBackend : private eris::noncopyable {
          */
         unsigned queue_pending_ = 0;
 
-        /** Mutex guarding access to queue_.  If the storage object uses a thread, it must lock this
-         * mutex before manipulating queue_.  The methods of this base class automatically obtain a
-         * lock before using queue_.
+        /** Set to true in the parent to tell the thread to flush; set to false in the thread once
+         * the flush is completed.
+         */
+        bool flush_pending_ = false;
+
+        /** Mutex guarding access to queue_, queue_pending_, and flush_pending_.  If the storage
+         * object uses a thread, it must lock this mutex before manipulating these variables (the
+         * methods of this base class automatically obtain such a lock as needed).
          */
         mutable std::mutex queue_mutex_;
 
@@ -133,8 +142,8 @@ class StorageBackend : private eris::noncopyable {
          */
         std::condition_variable queue_cv_;
 
-        /** Condition variable for the thread to signal that it has emptied the queue. Used during
-         * flush(). */
+        /** Condition variable for the thread to signal that it has emptied the queue and (possibly)
+         * flushed the device. Used during flush(). */
         std::condition_variable queue_finished_cv_;
 
         /** Thread object (for subclasses that return true for threaded()).  The thread runs perpetually
@@ -142,11 +151,15 @@ class StorageBackend : private eris::noncopyable {
          */
         std::thread thread_;
 
-        /** Set during destruction so that the thread loop ends. */
+        /** Set during destruction so that the thread loop ends.  Note that if flushing on
+         * destruction is desired, flush() on the backend should be called explicitly during the
+         * destruction of the object that owns the StorageBackend (i.e. Storage).  The thread
+         * behaviour is to abort as soon as this is seen, even if other states/flush requests are
+         * pending. */
         bool thread_quit_ = false;
 
         /** Thread loop.  Calls thread_insert() as needed. */
-        void thread_inserter_();
+        void thread_loop_();
 
 };
 
