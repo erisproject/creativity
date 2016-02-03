@@ -112,7 +112,6 @@ class StorageBackend : private eris::noncopyable {
 
     private:
 
-#ifndef CREATIVITY_DISABLE_THREADED_STORAGE
 
         /** Queued values awaiting storage in the storage medium.  If a state is not found in
          * cache_, this is checked next.
@@ -148,7 +147,6 @@ class StorageBackend : private eris::noncopyable {
 
         /** Thread loop.  Calls thread_insert() as needed. */
         void thread_inserter_();
-#endif
 
 };
 

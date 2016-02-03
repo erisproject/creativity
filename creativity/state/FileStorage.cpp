@@ -149,16 +149,12 @@ FileStorage::FileStorage(const std::string &filename, MODE mode) {
 }
 
 size_t FileStorage::size() const {
-#ifndef CREATIVITY_DISABLE_THREADED_STORAGE
     std::unique_lock<std::mutex> lock(f_mutex_);
-#endif
     return state_pos_.size();
 }
 
 void FileStorage::thread_insert(std::shared_ptr<const State> &&state) {
-#ifndef CREATIVITY_DISABLE_THREADED_STORAGE
     std::unique_lock<std::mutex> lock(f_mutex_);
-#endif
     f_.seekp(0, f_.end);
     auto location = f_.tellp();
     if (location < HEADER::size) {
@@ -200,9 +196,7 @@ void FileStorage::thread_insert(std::shared_ptr<const State> &&state) {
 
 
 std::shared_ptr<const State> FileStorage::load(eris_time_t t) const {
-#ifndef CREATIVITY_DISABLE_THREADED_STORAGE
     std::unique_lock<std::mutex> lock(f_mutex_);
-#endif
 
     if (t >= state_pos_.size()) return std::shared_ptr<const State>();
 
@@ -215,9 +209,7 @@ std::shared_ptr<const State> FileStorage::load(eris_time_t t) const {
 void FileStorage::flush() {
     // Let StorageBackend worry about finishing the thread:
     StorageBackend::flush();
-#ifndef CREATIVITY_DISABLE_THREADED_STORAGE
     std::unique_lock<std::mutex> lock(f_mutex_);
-#endif
     // Ensure the filehandle output is flushed to disk
     f_.flush();
 }
@@ -244,9 +236,7 @@ void FileStorage::writeSettings(const CreativitySettings &settings) {
             throw std::logic_error("Cannot overwrite settings with a different boundary");
     }
 
-#ifndef CREATIVITY_DISABLE_THREADED_STORAGE
     std::unique_lock<std::mutex> lock(f_mutex_);
-#endif
 
     f_.seekp(HEADER::pos::num_states);
     write_u32(state_pos_.size()); // Number of states

@@ -104,14 +104,6 @@ else()
     message(STATUS "Data libraries and binaries disabled (-DDATA=on to enable)")
 endif()
 
-option(STORAGE_THREAD "Enable threaded storage system" ON)
-if (STORAGE_THREAD)
-    message(STATUS "Threaded storage enabled (-DSTORAGE_THREAD=off to disable)")
-else()
-    message(STATUS "Threaded storage disabled (-DSTORAGE_THREAD=on to enable)")
-    add_definitions("-DCREATIVITY_DISABLE_THREADED_STORAGE")
-endif()
-
 # Look for include-what-you-use, if requested
 option(IWYU "Enable include-what-you-use header debugging support" OFF)
 if (IWYU)
