@@ -24,8 +24,5 @@ std::string quantile_field(double quantile);
  */
 extern const std::regex quantile_field_regex;
 
-/** A std::regex object that matches ordinal values as produced by creativity-series. */
-extern const std::regex ordinal_regex;
-
 
 }}

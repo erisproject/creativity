@@ -36,6 +36,8 @@ void SeriesGraphs::addOptions() {
         ("legend-position,L", value(legend_position_input), "The general position of the graph legend, one of 'none', 'inside', 'right', 'left', 'top', 'bottom' where 'none' suppresses the legend, 'inside' puts it inside the graph, and the rest put it outside on the indicated side of the graph.")
         ("legend-x", range<0,1>(legend_rel_x), "Relative x position (for --legend-position={inside,top,bottom}): 0 is left-most, 1 is right-most.")
         ("legend-y", range<0,1>(legend_rel_y), "Relative y position (for --legend-position={inside,left,right}): 0 is top-most, 1 is bottom-most.")
+        ("time-confidence", "If given, calculate confidence intervals per-time period.")
+        ("source-confidence", "If given, calculate confidence intervals by excluding the most extreme source files.  See --help for details.")
         ;
 
     po::options_description input_desc("Input files");
@@ -61,6 +63,13 @@ void SeriesGraphs::postParse(boost::program_options::variables_map &vars) {
         throw po::invalid_option_value("--t-max value must be larger than --t-min value");
     if (std::isfinite(graph_min_value) and std::isfinite(graph_max_value) and graph_max_value <= graph_min_value)
         throw po::invalid_option_value("--y-max value must be larger than --y-min value");
+    if (vars.count("time-confidence")) {
+        if (vars.count("source-confidence")) throw po::invalid_option_value("--time-confidence and --source-confidence are mutually exclusive");
+        per_t_confidence = true;
+    }
+    if (vars.count("source-confidence")) {
+        per_t_confidence = false;
+    }
     if (vars.count("same-t-scale") or (graph_min_t >= 0 and graph_max_t >= 0))
         same_horizontal_scale = true;
     if (vars.count("different-y-scale")) {
@@ -82,12 +91,53 @@ std::string SeriesGraphs::usage() const {
 }
 
 std::string SeriesGraphs::help() const {
-    return CmdArgs::help() + "Input files:\n" +
-        "  FILE [FILE ...]                       One or more series input files from which to\n" +
-        "                                        calculate quantiles.  At least one must\n" +
-        "                                        be given.\n\n" +
-        "This program takes files as produced by the creativity-series program as inputs\n" +
-        "and retains the existing sample quantiles for each period in the series files.\n\n";
+    return CmdArgs::help() + u8R"HELP(Input files:
+  FILE [FILE ...]                       One or more series or quantile input
+                                        files from which to graph series.  At
+                                        least one must be given.
+
+This program takes files as produced by the creativity-series or
+creativity-series-quantiles programs as inputs and retains the existing sample
+quantiles for each period in the series files.
+
+The plot behaviour has two modes.  The default mode, --time-confidence, and the
+only mode available when using quantiles input files, plots by calculating the
+request sample quantile as recorded in the quantiles file (which must already
+exist in the file) or calculated from the finite values in the series file.  For
+example, for period t=20, a 95% confidence interval will result in the
+confidence band at t=20 throwing away the top and bottom 2.5% of simulations
+observed period t=20.
+
+The other mode, --source-confidence, available only when using series files,
+applies the requested confidence interval(s) to the source files.  In this mode,
+source file data is included only for the 95% (or whatever level) of source
+files have the "smallest" quantiles.  Specifically, each file is assigned a
+score of:
+
+    ∑ (pₜ - 0.5)²
+    t
+
+where pₜ is the source file's inverse sample quantile at time t (that is, 0 for
+the smallest observation, 1 for the largest, and 0.5 for the median
+observation).  Note that when a period t has NaN and infinite values, these
+values are calculated with pₜ=0, and the smallest and largest finite values for
+period t receive values of pₜ = #/2 and 1-#/2, where # is the number of
+non-finite values in period t.  In the case of duplicate values, the pₜ value is
+the most favourable value (for example, for the data 1 1 2 3 4, both
+observations with value 1 have a pₜ value of 0.25, not 0.).
+
+Once the score has been calculated across all observations for all data files,
+the x% of data files with the highest score are excluded; the minimum and
+maximum of the remaining (finite) values then form the confidence interval end
+points.
+
+Note that this procedure is guaranteed to produce confidence intervals at least
+as wide as the --time-confidence intervals, and almost always wider.  Also note
+that, when drawing a median, the actual line is the path of the series which
+received the lowest aggregate score, *not* the median of each time period's
+values.
+
+)HELP";
 }
 
 std::string SeriesGraphs::versionSuffix() const {

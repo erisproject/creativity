@@ -29,6 +29,9 @@ class SeriesGraphs : public CmdArgs {
          */
         std::string levels = "median,0.5,0.9,0.95";
 
+        /// If true, we're in per-t confidence mode.  If false, we're in per-source file confidence mode.
+        bool per_t_confidence = true;
+
         /** The input files (series or quantiles) to plot.  Plot axes scales will be identical
          * across files, so typically this should be called with series files for the same (or at
          * least directly comparable) variables.

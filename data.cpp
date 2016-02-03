@@ -24,19 +24,21 @@ using namespace eris;
 // When outputting CSV values, we want exact precision, but don't necessarily need the full
 // max_digits10 digits to get there.  For example, 0.1 with max_digits10 becomes 0.10000000000000001
 // but 0.1 also converts to the numerically identical value.  0.10000000000000002, on the other
-// hand, needs every decimal digit of precision.
+// hand, needs every decimal digit of precision, because it isn't equal to the double value 0.1
 //
 // This function produces tries first at the requested precision, then the requested precision less
 // one, then less two; if the subsequent values are numerically identical to the given double value,
 // the shortest is returned.
 std::string double_str(double d, unsigned precision) {
-    double round_trip;
-    for (unsigned prec : {precision-2, precision-1}) {
-        std::stringstream ss;
-        ss.precision(prec);
-        ss << d;
-        ss >> round_trip;
-        if (round_trip == d) { ss << d; return ss.str(); }
+    if (std::isfinite(d)) {
+        double round_trip;
+        for (unsigned prec : {precision-2, precision-1}) {
+            std::stringstream ss;
+            ss.precision(prec);
+            ss << d;
+            ss >> round_trip;
+            if (round_trip == d) { ss << d; return ss.str(); }
+        }
     }
     std::stringstream ss;
     ss.precision(precision);

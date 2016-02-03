@@ -105,30 +105,22 @@ int main(int argc, char *argv[]) {
         std::ostringstream output_data;
         output_data << output_header;
         try {
+            if (parser.fields().size() == 0) throw std::invalid_argument("no data fields found (not even t)");
             if (parser.fields()[0] != "t") throw std::invalid_argument("first field != t");
-            for (size_t i = 1; i < parser.fields().size(); i++) {
-                if (not std::regex_match(parser.fields()[i], ordinal_regex))
-                    throw std::invalid_argument("field " + std::to_string(i) + " (" + parser.fields()[i] + ") is not an ordinal value");
-            }
+            if (parser.fields().size() < 2) throw std::invalid_argument("file contains no data (only a t column was found)");
 
-            // Require the t value, but nothing else is strictly required:
-            parser.allow_missing_values = parser.header().size() - 1;
-            for (auto &row : parser) {
-                if (row.size() == 1) continue; // If we have just the time index but no data at all for that index skip it.
+            for (const auto &row : parser) {
+                // Extract finite values (ignore any NaNs or infinities)
+                std::vector<double> finite_values;
+                std::copy_if(row.begin()+1, row.end(), std::back_inserter(finite_values), [](const double &v) { return std::isfinite(v); });
+                if (finite_values.empty()) continue; // Completely skip time periods with zero finite values (often initial rows, possibly others)
+                std::sort(finite_values.begin(), finite_values.end());
 
-                // Make sure the data is sorted:
-                for (int i = 2; i < row.size(); i++) {
-                    if (row[i] < row[i-1]) throw std::invalid_argument("file contains unsorted data (line "
-                            + std::to_string(parser.lineNumber()) + ", columns " + std::to_string(i-1) + "--" + std::to_string(i) + ")");
-
-                }
-
-                std::ostringstream output_row;
-                output_row << row[0];
+                output_data << row[0];
                 for (auto q : quantiles) {
-                    output_row << "," << double_str(data::quantile(row.tail(row.size()-1), q), args.double_precision);
+                    output_data << "," << double_str(data::quantile(finite_values.begin(), finite_values.end(), q), args.double_precision);
                 }
-                output_data << output_row.str() << "\n";
+                output_data << "\n";
             }
         }
         catch (const std::invalid_argument &e) {

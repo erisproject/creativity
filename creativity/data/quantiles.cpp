@@ -4,8 +4,7 @@
 namespace creativity { namespace data {
 
 const std::regex
-    quantile_field_regex("m(?:in|ax|edian)|q\\d*[1-9]"),
-    ordinal_regex("(?:\\d*[02-9])?(?:1st|2nd|3rd)|\\d*1[123]th|\\d*[04-9]th");
+    quantile_field_regex("m(?:in|ax|edian)|q\\d*[1-9]");
 
 std::string quantile_field(double quantile) {
     if (quantile == 0) return "min";

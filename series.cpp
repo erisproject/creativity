@@ -26,15 +26,20 @@ using namespace creativity;
 using namespace creativity::state;
 using namespace eris;
 
+using Locker = std::lock_guard<std::mutex>;
+
 // The series we want to calculate, as given to --series
 std::unordered_set<std::string> series_wanted;
-// Results: "books_written" -> array of periods -> array of values
-std::unordered_map<std::string, std::vector<std::multiset<double>>> values;
-unsigned int values_count, error_count;
-std::mutex values_mutex; // Guards values, output_count, error_count
-decltype(cmdargs::Series::input.cbegin()) input_it, input_it_end;
-std::mutex input_it_mutex;
 
+// Values container.  values["field_name"][t][fileindex] = value
+std::unordered_map<std::string, std::vector<std::vector<double>>> values;
+// File list, in same order as [fileindex] above:
+std::vector<std::string> files;
+size_t error_count = 0;
+std::mutex values_mutex; // Guards values, files, error_count
+
+std::mutex input_mutex; // Guards all of the below:
+size_t input_index;
 // These have to agree across files:
 eris_time_t periods = 0, piracy_begins = 0, public_begins = 0;
 bool allow_unused_periods = false; // Will only be true if --periods is explicitly given
@@ -47,39 +52,28 @@ void thr_parse_file(
         const cmdargs::Series &args,
         const std::vector<data::datum> &data) {
 
-    input_it_mutex.lock();
-
-    while ((error_count == 0 or args.ignore_errors) and input_it != input_it_end) {
-        std::string  source(*input_it++);
+    std::unique_lock<std::mutex> input_lock(input_mutex);
+    size_t input_i;
+    while ((error_count == 0 or args.ignore_errors) and (input_i = input_index++) < args.input.size()) {
         // Hold the lock if this is the first file and we weren't given all of the needed simulation
         // period values: we have to set periods, piracy_begins, public_begins (the lock also
-        // protects assigning to these variables).
-        if (not need_parameters) input_it_mutex.unlock();
+        // protects assigning to these variables) before unlocking; this essentially means that only
+        // one thread runs until the first thread has determined that initial info.
+        if (not need_parameters) input_lock.unlock();
 
-        values_mutex.lock();
-        std::cout << "Processing " << source << "\n";
-        values_mutex.unlock();
+        const auto &source = args.input[input_i];
 
-#define FAIL(WHY) \
-        values_mutex.lock(); \
-        std::cerr << "Error reading `" << source << "': " << WHY << "\n"; \
-        error_count++; \
-        values_mutex.unlock(); \
-        continue;
+        { Locker l(values_mutex); std::cout << "Processing " << source << "\n"; }
+
+#define FAIL(WHY) { Locker l(values_mutex); std::cerr << "Error reading `" << source << "': " << WHY << "\n"; error_count++; continue; }
 
         std::ostringstream output;
         output.precision(args.double_precision);
         auto creativity = Creativity::create();
         // Filename input
-        try {
-            creativity->fileRead(source);
-        }
-        catch (std::ios_base::failure&) {
-            FAIL("I/O error: " << std::strerror(errno));
-        }
-        catch (std::exception &e) {
-            FAIL("An exception occured: " << e.what());
-        }
+        try { creativity->fileRead(source); }
+        catch (std::ios_base::failure&) FAIL("I/O error: " << std::strerror(errno))
+        catch (std::exception &e) FAIL("An exception occured: " << e.what())
 
         auto locked_storage = creativity->storage();
         auto &storage = *locked_storage.first;
@@ -105,7 +99,7 @@ void thr_parse_file(
                 std::cout << "Inferred --public-sharing-begins " << public_begins << "\n";
             }
             need_parameters = false;
-            input_it_mutex.unlock();
+            input_lock.unlock();
         }
 
         // If we need more than is available, we can't use this file.
@@ -138,23 +132,26 @@ void thr_parse_file(
         }
 
         // Copy values we read into the overall values container
-        values_mutex.lock();
-        for (const auto &v : local_values) {
-            auto &vstore = values[v.first];
-            if (vstore.size() < v.second.size()) vstore.resize(v.second.size());
-            for (unsigned t = 0; t < v.second.size(); t++) {
-                // Only copy finite values (this mainly excluded NaNs as nothing should be capable
-                // of generating infinity).
-                double value = v.second[t];
-                if (std::isfinite(value)) vstore[t].insert(value);
+        {
+            Locker locker(values_mutex);
+            auto fileindex = files.size();
+            files.push_back(source);
+
+            // values["field_name"][t][fileindex] = value
+            for (const auto &v : local_values) {
+                auto &vstore = values[v.first];
+                if (vstore.size() < v.second.size()) vstore.resize(v.second.size());
+                for (unsigned t = 0; t < v.second.size(); t++) {
+                    vstore[t].reserve(args.input.size());
+                    if (vstore[t].size() <= fileindex) vstore[t].resize(fileindex+1, std::numeric_limits<double>::quiet_NaN());
+                    vstore[t][fileindex] = v.second[t];
+                }
             }
         }
-        values_count++;
-        values_mutex.unlock();
 
-        input_it_mutex.lock();
+        input_lock.lock();
     }
-    input_it_mutex.unlock();
+    input_lock.unlock();
 }
 
 int main(int argc, char *argv[]) {
@@ -223,13 +220,24 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    input_it = args.input.cbegin();
-    input_it_end = args.input.cend();
-
-    if (input_it == input_it_end) {
+    if (args.input.empty()) {
         std::cerr << "\nError: no simulation input files specified\n\n";
-        exit(1);
+        exit(50);
     }
+
+    // Check for files specified more than once, and abort if found
+    {
+        std::unordered_set<std::string> seen;
+        for (const auto &source : args.input) {
+            auto ins = seen.insert(source);
+            if (not ins.second) {
+                std::cerr << "\nError: simulation input files contains duplicate entry `" << source << "'; aborting\n\n";
+                exit(51);
+            }
+        }
+    }
+
+    files.reserve(args.input.size());
 
     if (args.threads == 0) {
         thr_parse_file(args, data);
@@ -257,32 +265,40 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (values_count == 0) {
+    if (files.empty()) {
         std::cerr << "Error: no usable data sources!\n";
         exit(1);
     }
 
-    std::cout << "Successfully processed " << values_count << "/" << (values_count+error_count) << " simulation files.\n\n";
+    std::cout << "Successfully processed " << files.size() << "/" << (files.size()+error_count) << " simulation files.\n\n";
+
+    std::string header;
+    {
+        // Maps actual source names into CSV-compatible source names by removing potentially problematic
+        // characters, and appending a unique number to resolve any duplicates.
+        std::unordered_set<std::string> source_used;
+        std::ostringstream headeross;
+        headeross << "t";
+        for (const auto &source : files) {
+            std::string fixed = data::csv_fix(source);
+            std::string try_s = fixed;
+            int append = 2;
+            while (not source_used.insert(try_s).second) {
+                try_s = fixed + "-" + std::to_string(append++);
+            }
+            headeross << "," << try_s;
+        }
+        headeross << "\n";
+        header = headeross.str();
+    }
 
     for (auto &v : values) {
-        // Figure out how many "nth" headers we need for this series:
-        unsigned n = 0;
-        for (auto &time : v.second) {
-            if (time.size() > n) n = time.size();
-        }
-
         // Write an output file
         std::string output_file = args.output_dir + "/series-" + v.first + ".csv";
         std::ofstream out(output_file, std::ios::out | std::ios::trunc);
-        out << "t";
-        for (unsigned i = 1; i <= n; i++) {
-            out << "," << i << (
-                (i % 10 == 1 and not i % 100 == 11) ? "st" :
-                (i % 10 == 2 and not i % 100 == 12) ? "nd" :
-                (i % 10 == 3 and not i % 100 == 13) ? "rd" :
-                "th");
-        }
-        out << "\n";
+        out.exceptions(out.failbit | out.badbit);
+        out << header;
+
         for (eris_time_t t = 0; t < v.second.size(); t++) {
             out << t;
             for (const auto &val : v.second[t]) {
