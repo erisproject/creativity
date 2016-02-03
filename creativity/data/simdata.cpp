@@ -514,7 +514,7 @@ std::vector<datum> data_fields() {
 }
 
 std::string csv_fix(std::string val) {
-    return std::regex_replace(val, std::regex(R"([\n",;:\t])"), "");
+    return std::regex_replace(val, std::regex(R"([^\w.+\[\]~/-]+)"), "_");
 }
 
 }}

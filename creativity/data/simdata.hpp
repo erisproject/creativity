@@ -234,8 +234,8 @@ std::vector<initial_datum> initial_data_fields();
 /** Returns a vector of all supported calculated datum values. */
 std::vector<datum> data_fields();
 
-/** Takes a string, manipulates it into our simplified CSV-suitable value by removing any newlines,
- * commas, semicolons, colons, tabs, and quotation marks.
+/** Takes a string, manipulates it into our simplified CSV-suitable value by replacing any special
+ * characters (such as commas, newline, etc.) with underscores.
  */
 std::string csv_fix(std::string val);
 
