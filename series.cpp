@@ -63,9 +63,9 @@ void thr_parse_file(
 
         const auto &source = args.input[input_i];
 
-        { Locker l(values_mutex); std::cout << "Processing " << source << "\n"; }
+        { Locker l(values_mutex); std::cout << "Processing " << source << std::endl; }
 
-#define FAIL(WHY) { Locker l(values_mutex); std::cerr << "Error reading `" << source << "': " << WHY << "\n"; error_count++; continue; }
+#define FAIL(WHY) { Locker l(values_mutex); std::cerr << "Error reading `" << source << "': " << WHY << std::endl; error_count++; continue; }
 
         std::ostringstream output;
         output.precision(args.double_precision);
@@ -86,17 +86,17 @@ void thr_parse_file(
             }
             else {
                 periods = storage.size()-1;
-                std::cout << "Inferred --periods " << periods << "\n";
+                std::cout << "Inferred --periods " << periods << std::endl;
             }
             if (args.piracy_begins != 0) piracy_begins = args.piracy_begins;
             else {
                 piracy_begins = creativity->parameters.piracy_begins;
-                std::cout << "Inferred --piracy-begins " << piracy_begins << "\n";
+                std::cout << "Inferred --piracy-begins " << piracy_begins << std::endl;
             }
             if (args.public_sharing_begins != 0) public_begins = args.public_sharing_begins;
             else {
                 public_begins = creativity->parameters.public_sharing_begins;
-                std::cout << "Inferred --public-sharing-begins " << public_begins << "\n";
+                std::cout << "Inferred --public-sharing-begins " << public_begins << std::endl;
             }
             need_parameters = false;
             input_lock.unlock();
@@ -270,7 +270,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    std::cout << "Successfully processed " << files.size() << "/" << (files.size()+error_count) << " simulation files.\n\n";
+    std::cout << "Successfully processed " << files.size() << "/" << (files.size()+error_count) << " simulation files.\n" << std::endl;
 
     std::string header;
     {
@@ -308,7 +308,7 @@ int main(int argc, char *argv[]) {
         }
 
         out.close();
-        std::cout << "Wrote '" << v.first << "' series data to " << output_file << "\n";
+        std::cout << "Wrote '" << v.first << "' series data to " << output_file << std::endl;
     }
 }
 
