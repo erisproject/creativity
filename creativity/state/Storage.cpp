@@ -10,6 +10,7 @@ size_t Storage::size() const { return cache_.size(); }
 bool Storage::empty() const { return cache_.empty(); }
 void Storage::reserve(size_t T) { backend_->reserve(T); }
 void Storage::flush() { backend_->flush(); }
+bool Storage::flush_for(long milliseconds) { return backend_->flush_for(milliseconds); }
 
 StorageBackend& Storage::backend() { return *backend_; }
 

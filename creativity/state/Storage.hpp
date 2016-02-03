@@ -96,6 +96,21 @@ class Storage final {
          */
         void flush();
 
+        /** Attempts to flushes changes of the backend storage object, with a timeout after the
+         * given number of milliseconds.
+         *
+         * Example usage:
+         *
+         *     while (!storage.flush_for(250)) {
+         *         std::cout << "Still waiting; " << storage.pending() << " states remaining\n";
+         *     }
+         *
+         * \param milliseconds the maximum number of milliseconds to wait for the flush to complete
+         * \returns true if the flush completed, false if the timeout was reached without the flush
+         * completing.
+         */
+        bool flush_for(long milliseconds);
+
         /// Accesses the underlying backend storage instance
         StorageBackend& backend();
 

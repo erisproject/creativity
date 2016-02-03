@@ -14,7 +14,7 @@ size_t StorageBackend::pending() const {
 #ifndef CREATIVITY_DISABLE_THREADED_STORAGE
     if (not thread_.joinable()) return 0;
     std::unique_lock<std::mutex> lock(queue_mutex_);
-    return queue_.size();
+    return queue_.size() + queue_pending_;
 #else
     return 0;
 #endif
@@ -51,10 +51,12 @@ void StorageBackend::thread_inserter_() {
             // having to wait to write out the entire queue).
             auto st = queue_.front();
             queue_.pop();
+            queue_pending_++;
 
             lock.unlock();
             thread_insert(std::move(st));
             lock.lock();
+            queue_pending_--;
         }
 
         // If the queue is empty now, send a signal in case the main thread is waiting (during
@@ -71,9 +73,19 @@ void StorageBackend::flush() {
 #ifndef CREATIVITY_DISABLE_THREADED_STORAGE
     if (thread_.joinable()) {
         std::unique_lock<std::mutex> lock(queue_mutex_);
-        queue_finished_cv_.wait(lock, [&] { return queue_.empty(); });
+        queue_finished_cv_.wait(lock, [&] { return queue_.empty() and queue_pending_ == 0; });
     }
 #endif
+}
+
+bool StorageBackend::flush_for(long milliseconds) {
+#ifndef CREATIVITY_DISABLE_THREADED_STORAGE
+    if (thread_.joinable()) {
+        std::unique_lock<std::mutex> lock(queue_mutex_);
+        return queue_finished_cv_.wait_for(lock, std::chrono::milliseconds(milliseconds), [&] { return queue_.empty() and queue_pending_ == 0; });
+    }
+#endif
+    return true;
 }
 
 StorageBackend::~StorageBackend() {

@@ -72,6 +72,15 @@ class StorageBackend : private eris::noncopyable {
          */
         virtual void flush();
 
+        /** Attempts to flush changes, waiting at most the given number of milliseconds for the
+         * flush to complete.  Returns true if the flush completed, false if the duration expired
+         * before the flush completed.
+         *
+         * \returns true if the flush completed, false if the duration expired without the flush
+         * finishing.
+         */
+        virtual bool flush_for(long milliseconds);
+
         /** Adds a state to this storage container.  The default implementation spawns a thread then
          * adds it to queue_.  Subclasses not using threaded storage MUST override this method to
          * perform the storage immediately.
@@ -109,6 +118,10 @@ class StorageBackend : private eris::noncopyable {
          * cache_, this is checked next.
          */
         std::queue<std::shared_ptr<const State>> queue_;
+
+        /** Number of states values that have been removed from queue_ but are still being written.
+         */
+        unsigned queue_pending_ = 0;
 
         /** Mutex guarding access to queue_.  If the storage object uses a thread, it must lock this
          * mutex before manipulating queue_.  The methods of this base class automatically obtain a
