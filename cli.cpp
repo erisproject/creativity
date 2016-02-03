@@ -26,6 +26,11 @@
 #include <iomanip>
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem/operations.hpp>
+#ifdef __linux__
+extern "C" {
+#include <sys/prctl.h>
+}
+#endif
 
 using namespace creativity;
 using namespace creativity::state;
@@ -133,6 +138,15 @@ int main(int argc, char *argv[]) {
 
     bool tty = isatty(fileno(stdout));
     while (sim->t() < periods) {
+#ifdef __linux__
+        // Update the process name to something like "crcli [43/300]" (the part before the [ gets
+        // shorted if required--we aren't allowed to set a name longer than 15 characters).
+        {
+            std::string progress = "[" + std::to_string(sim->t()) + "/" + std::to_string(periods) + "]";
+            std::string name = progress.size() <= 9 ? "crcli " + progress : "crcli" + progress;
+            prctl(PR_SET_NAME, name.c_str());
+        }
+#endif
         creativity->run();
 
         if (not args.quiet) {
