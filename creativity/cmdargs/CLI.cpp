@@ -23,7 +23,7 @@ void CLI::addOptions() {
         ("output,o", value(output), "Output file for simulation results.  If this contains the characters 'SEED', they will be replaced with the random seed value used for the simulation.")
         ("tmpdir", value(tmpdir), "Output directory in which to write the output file while running the simulation.  When "
             "the simulation finishes, the temporary file is moved to the output location specified by -o.  If this argument is omitted, the "
-            "file is written directly to its final location.")
+            "file is written to a temporary file in the same directory as the final output file.")
         ("overwrite,O", "Allows output file given to -o to be overwritten.")
         ;
     options_.add(sim_controls_);
