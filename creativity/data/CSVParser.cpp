@@ -1,4 +1,5 @@
 #include "creativity/data/CSVParser.hpp"
+#include <sstream>
 
 namespace creativity { namespace data {
 
@@ -34,9 +35,9 @@ bool CSVParser::readRow() {
         throw std::invalid_argument("Invalid data on line " + std::to_string(lineno_) + ": number of fields (" + std::to_string(fields.size())
                 + ") differs from that of the header (" + std::to_string(header_.size()) + ")");
 
-    if ((size_t) row_.size() != fields.size()) row_.resize(fields.size());
+    row_.clear();
+    if (row_.capacity() < fields.size()) row_.reserve(fields.size());
     row_skipped_.clear();
-    long row_i = 0;
     for (size_t fieldnum = 0; fieldnum < fields.size(); fieldnum++) {
         if (skip_.count(header_[fieldnum])) {
             row_skipped_[header_[fieldnum]] = fields[fieldnum];
@@ -53,11 +54,9 @@ bool CSVParser::readRow() {
                 throw std::invalid_argument("CSVParser::readRow: found non-double value `" + field + "' for " +
                         header_[fieldnum] + ", line " + std::to_string(lineno_) + " (" + e.what() + ")");
             }
-            row_[row_i++] = d;
+            row_.emplace_back(std::move(d));
         }
     }
-
-    if (row_.size() != row_i) row_.conservativeResize(row_i);
 
     return true;
 }

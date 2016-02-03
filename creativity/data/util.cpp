@@ -18,7 +18,7 @@ std::string double_str(double d, unsigned precision) {
 }
 
 double quantile(const std::vector<double> &vals, double prob) {
-    return quantile(Eigen::Map<const Eigen::VectorXd>(vals.data(), vals.size()), prob);
+    return quantile(vals.begin(), vals.end(), prob);
 }
 
 double quantile(const Eigen::Ref<const Eigen::VectorXd> &vals, double prob) {

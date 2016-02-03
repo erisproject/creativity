@@ -5,7 +5,6 @@
 #include <unordered_map>
 #include <vector>
 #include <fstream>
-#include <Eigen/Core>
 
 namespace creativity { namespace data {
 
@@ -17,7 +16,7 @@ namespace creativity { namespace data {
  *
  *     CSVParser csv("filename.csv");
  *     for (auto &row : csv) {
- *         // Do something with row (which is a `const Eigen::RowVectorXd`)
+ *         // Do something with row (which is a `const std::vector<double>`)
  *     }
  *
  *     or, equivalently:
@@ -116,7 +115,7 @@ class CSVParser : private eris::noncopyable {
         /** Accesses the most-recently-read row of the file.  If no row has yet been read, this will
          * be an empty vector.
          */
-        const Eigen::RowVectorXd& row() const { return row_; }
+        const std::vector<double>& row() const { return row_; }
 
         /** Accesses any skipped fields in the most-recently-read row. */
         const std::unordered_map<std::string, std::string>& rowSkipped() const { return row_skipped_; }
@@ -144,13 +143,13 @@ class CSVParser : private eris::noncopyable {
         mutable std::unordered_map<std::string, unsigned> field_pos_; // Map from field name to row position (created from fields_ on-demand)
         std::fstream f_;
         size_t lineno_; // Tracks the current line number
-        Eigen::RowVectorXd row_; // The most-recently-read row (reused)
+        std::vector<double> row_; // The most-recently-read row (reused)
         std::unordered_map<std::string, std::string> row_skipped_; // Any skipped fields on most-recently-read row
 };
 
 /** Iterator class that allows iterating through the file.  The iterator satisfies the requirements
  * of a ForwardIterator. */
-class CSVParser::iterator final : public std::iterator<std::input_iterator_tag, const Eigen::RowVectorXd, long> {
+class CSVParser::iterator final : public std::iterator<std::input_iterator_tag, const std::vector<double>, long> {
     public:
         /// Dereferences the iterator, returning the current CSVParser row.
         reference operator*() { return csv_.row(); }
