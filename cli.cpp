@@ -61,12 +61,10 @@ int main(int argc, char *argv[]) {
     cmdargs::CLI args(creativity.set());
     args.parse(argc, argv);
 
-    std::string results_out = args.output;
-    std::string args_out = results_out;
+    std::string args_out = args.output, tmp_out = args_out;
     bool overwrite = args.overwrite;
 
     // Filename output
-
     try {
         fs::path outpath(args_out);
         // If the user didn't specify --overwrite, make sure the file doesn't exist.  (It might
@@ -108,14 +106,14 @@ int main(int argc, char *argv[]) {
         } while (fs::exists(tmpfile));
 
         creativity.fileWrite(tmpfile);
-        results_out = tmpfile;
+        tmp_out = tmpfile;
     }
     catch (std::exception &e) {
         std::cerr << "Unable to write to file: " << e.what() << "\n";
         exit(1);
     }
     std::cout << "Writing simulation results to temp file: ";
-    std::cout << results_out << "\n";
+    std::cout << tmp_out << "\n";
 
     creativity.setup();
     auto sim = creativity.sim;
@@ -195,7 +193,7 @@ int main(int argc, char *argv[]) {
     // Destroy the simulation (which also closes the storage)
     cr_ptr.reset();
 
-    int error = std::rename(results_out.c_str(), args_out.c_str());
+    int error = std::rename(tmp_out.c_str(), args_out.c_str());
     if (error) { // Rename failed (perhaps across filesystems) so do a copy-and-delete
         if (not overwrite) {
             if (fs::exists(args_out)) {
@@ -208,9 +206,9 @@ int main(int argc, char *argv[]) {
         {
             std::ifstream src; src.exceptions(src.failbit);
             std::ofstream dst; dst.exceptions(dst.failbit);
-            try { src.open(results_out, std::ios::binary); }
+            try { src.open(tmp_out, std::ios::binary); }
             catch (std::ios_base::failure&) {
-                std::cerr << "\nUnable to read " << results_out << ": " << std::strerror(errno) << "\n";
+                std::cerr << "\nUnable to read " << tmp_out << ": " << std::strerror(errno) << "\n";
                 exit(1);
             }
 
@@ -229,16 +227,15 @@ int main(int argc, char *argv[]) {
         std::cout << " done.\nRemoving tmpfile..." << std::flush;
 
         // Copy succeeded, so delete the tmpfile
-        error = std::remove(results_out.c_str());
+        error = std::remove(tmp_out.c_str());
         if (error) {
             // If we can't remove it, print a warning (but don't die, because we also copied it to the right place)
-            std::cerr << "\nWarning: removing tmpfile `" << results_out << "' failed: " << std::strerror(errno) << "\n";
+            std::cerr << "\nWarning: removing tmpfile `" << tmp_out << "' failed: " << std::strerror(errno) << "\n";
         }
         else {
             std::cout << " done." << std::endl;
         }
     }
-    results_out = args_out;
 
-    std::cout << "Simulation complete.  Results saved to " << results_out << "\n\n";
+    std::cout << "Simulation complete.  Results saved to " << args_out << "\n\n";
 }
