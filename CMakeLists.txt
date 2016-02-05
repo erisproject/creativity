@@ -62,12 +62,13 @@ include(CheckIncludeFileCXX)
 find_package(PkgConfig REQUIRED)
 set(creativity_pkgconfig_GTKMM gtkmm-3.0)
 set(creativity_pkgconfig_ERIS liberis)
+set(creativity_pkgconfig_LZMA liblzma)
 set(creativity_pkgconfig_LIBPNG libpng)
 set(creativity_pkgconfig_CAIRO cairomm-1.0 cairomm-svg-1.0 cairomm-pdf-1.0)
 set(creativity_pkgconfig_PANGO pangomm-1.4)
 
 # pkg-config required packages for libcreativity.so:
-set(creativity_pkgconfig ERIS)
+set(creativity_pkgconfig ERIS LZMA)
 
 # pkg-config required packages for libcreativity-data.so:
 set(creativity_data_pkgconfig)
