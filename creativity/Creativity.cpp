@@ -1,6 +1,5 @@
 #include "creativity/Creativity.hpp"
 #include "creativity/state/FileStorage.hpp"
-#include "creativity/state/MemoryStorage.hpp"
 #include "creativity/PublicTracker.hpp"
 #include "creativity/state/Storage.hpp"
 #include "creativity/Reader.hpp"
@@ -28,8 +27,8 @@ void Creativity::fileWrite(const std::string &filename) {
     write<FileStorage>(filename, FileStorage::MODE::OVERWRITE);
 }
 
-void Creativity::fileRead(const std::string &filename) {
-    read<FileStorage>(filename, FileStorage::MODE::READONLY);
+void Creativity::fileRead(const std::string &filename, bool xz_to_ram, bool copy_to_ram) {
+    read<FileStorage>(filename, xz_to_ram, copy_to_ram);
 }
 
 void Creativity::checkParameters() {
@@ -70,7 +69,7 @@ void Creativity::setup() {
 
     {
         auto st = storage();
-        if (not st.first) st.first = Storage::create<MemoryStorage>(set_);
+        if (not st.first) st.first = Storage::create<FileStorage>(set_);
     }
 
     sim = Simulation::create();

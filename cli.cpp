@@ -3,7 +3,6 @@
 #include "creativity/Book.hpp"
 #include "creativity/state/Storage.hpp"
 #include "creativity/state/FileStorage.hpp"
-#include "creativity/state/MemoryStorage.hpp"
 #include "creativity/state/StorageBackend.hpp"
 #include "creativity/cmdargs/CLI.hpp"
 #include <eris/Simulation.hpp>
@@ -64,9 +63,7 @@ int main(int argc, char *argv[]) {
     args.parse(argc, argv);
 
     std::string args_out = args.output, tmp_out = args_out;
-    if (args.xz or args.memory_xz) {
-        args_out = std::regex_replace(args_out, std::regex("(?:\\.[xX][zZ])?$"), ".xz");
-    }
+    if (args.xz) args_out = std::regex_replace(args_out, std::regex("(?:\\.[xX][zZ])?$"), ".xz");
     bool overwrite = args.overwrite;
 
     // Filename output
@@ -103,8 +100,8 @@ int main(int argc, char *argv[]) {
             dirname = tmpdir;
         }
 
-        if (args.memory_xz) {
-            creativity.write<MemoryStorage>();
+        if (args.memory) {
+            creativity.write<FileStorage>();
         }
         else {
             std::string tmpfile;
@@ -210,17 +207,28 @@ int main(int argc, char *argv[]) {
     }
 
     std::string to_delete;
-    if (args.xz or args.memory_xz) {
+    if (args.xz) {
         std::cout << "Compressing..." << std::flush;
         try {
-            dynamic_cast<FileStorage&>(creativity.storage().first->backend()).saveXZ(args_out);
+            dynamic_cast<FileStorage&>(creativity.storage().first->backend()).copyToXZ(args_out);
         }
         catch (const std::runtime_error &e) {
             std::cerr << "\nWriting to compressed file failed: " << e.what() << "\n\n";
             exit(1);
         }
         std::cout << " done." << std::endl;
-        if (not args.memory_xz) to_delete = tmp_out;
+        if (not args.memory) to_delete = tmp_out;
+    }
+    else if (args.memory) {
+        std::cout << "Writing creativity data to " << args_out << "..." << std::flush;
+        try {
+            dynamic_cast<FileStorage&>(creativity.storage().first->backend()).copyTo(args_out);
+        }
+        catch (const std::runtime_error &e) {
+            std::cerr << "\nWriting failed: " << e.what() << "\n\n";
+            exit(1);
+        }
+        std::cout << " done." << std::endl;
     }
     else {
         // Destroy the Creativity object (so that the output file is closed)

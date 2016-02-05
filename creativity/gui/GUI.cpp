@@ -838,6 +838,7 @@ decltype(Gtk::FileFilter::create()) GUI::fileFilter() const {
         ff_ = Gtk::FileFilter::create();
         ff_->set_name("Creativity simulation state files");
         ff_->add_pattern("*.crstate");
+        ff_->add_pattern("*.crstate.xz");
     }
     return ff_;
 }

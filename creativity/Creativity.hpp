@@ -95,8 +95,18 @@ class Creativity : private eris::noncopyable {
          *
          * This method is typically called instead of calling setup() when loading a creativity
          * simulation record from disk.
+         *
+         * \param filename the filename to read
+         * \param xz_to_ram if true, and the file is xz-compressed, decompress in memory; if false
+         * (the default), decompress to a temporary file.
+         * \param copy_to_ram if true, and the file is not xz-compressed, copy the file into memory
+         * anyway.
+         *
+         * This method is equivalent to read<FileStorage>(filename, xz_to_ram, copy_to_ram).
+         *
+         * \sa FileStorage
          */
-        void fileRead(const std::string &filename);
+        void fileRead(const std::string &filename, bool xz_to_ram = false, bool copy_to_ram = false);
 
         /** Checks `.parameters` to make sure that all configured values are valid, throwing an
          * exception if any invalid values are found.

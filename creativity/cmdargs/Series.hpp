@@ -54,6 +54,12 @@ class Series : public CmdArgs {
         /// The input files to load data from
         std::vector<std::string> input;
 
+        /// If true, decompress xz files into memory
+        bool memory_xz = false;
+
+        /// If true, copy all files into memory
+        bool memory = false;
+
         /** The output directory; each variable VAR will be written to a "series-VAR.csv" file in
          * the directory.  The directory will be created if it doesn't yet exist.
          */

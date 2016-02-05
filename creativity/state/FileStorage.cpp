@@ -4,6 +4,7 @@
 #include <limits>
 #include <map>
 #include <fstream>
+#include <sstream>
 #include <algorithm>
 #include <eris/Position.hpp>
 #include "creativity/belief/Demand.hpp"
@@ -106,8 +107,10 @@ void FileStorage::throwParseError(const std::string& message) const {
     throw ParseError("Parsing file failed [pos=" + (pos == -1 ? std::string{"(error)"} : std::to_string(pos)) + "]: " + message);
 }
 
-// Subclasses only (they must set f_):
-FileStorage::FileStorage() {}
+FileStorage::FileStorage() {
+    f_.reset(new std::stringstream(open_readwrite));
+    initialize(true);
+}
 
 FileStorage::FileStorage(const std::string &filename, MODE mode) {
     try {
@@ -148,6 +151,75 @@ FileStorage::FileStorage(const std::string &filename, MODE mode) {
     }
     catch (std::ios_base::failure &c) {
         throw std::ios_base::failure("Unable to open " + filename + ": " + strerror(errno));
+    }
+}
+
+FileStorage::FileStorage(const std::string &filename, bool xz_to_ram, bool cr_to_ram, const std::string &tmpfile) {
+    std::string erroneous_file = filename;
+    try {
+        std::unique_ptr<std::fstream> f(new std::fstream);
+        f->exceptions(f->failbit | f->badbit);
+        f->open(filename, open_readonly);
+        char magic[6];
+        // Make sure we fail to compile if fileid ever changes to something longer than 6 bytes,
+        // this code will break:
+        static_assert(sizeof(HEADER::fileid) == 4, "Internal error: expected .crstate header size != 4");
+
+        // A .crstate starts with CrSt; an xz-compressed file starts with the 6 bytes: 0xFD "7zXZ" 0x0
+        // If we eof here, we'll throw: good.
+        f->read(magic, 6);
+        f->seekg(0);
+        bool is_crst = true;
+        for (size_t i = 0; i < sizeof(HEADER::fileid); i++) {
+            if (magic[i] != HEADER::fileid[i]) {
+                is_crst = false;
+                break;
+            }
+        }
+        if (not is_crst and not (magic[0] == (char) 0xFD and magic[1] == '7' and magic[2] == 'z' and magic[3] == 'X' and magic[4] == 'Z' and magic[5] == 0)) {
+            throw std::runtime_error("Unable to parse " + filename + ": neither .crstate nor .xz file signature found");
+        }
+
+        if (is_crst) {
+            if (cr_to_ram) {
+                f_.reset(new std::stringstream(open_readwrite));
+                f_->exceptions(f_->failbit | f_->badbit);
+                *f_ << f->rdbuf();
+            }
+            else {
+                f_ = std::move(f);
+            }
+        }
+        else {
+            // XZ compressed
+            if (xz_to_ram) {
+                f_.reset(new std::stringstream(open_readwrite));
+                f_->exceptions(f_->failbit | f_->badbit);
+            }
+            else {
+                auto tmpf = new std::fstream;
+                tmpf->exceptions(f_->failbit | f_->badbit);
+                tmpfile_path_ = tmpfile.empty()
+                    ? (fs::temp_directory_path() / fs::unique_path("creativity-%%%%-%%%%-%%%%-%%%%.crstate")).native()
+                    : tmpfile;
+                erroneous_file = tmpfile_path_;
+                tmpf->open(tmpfile_path_, open_overwrite);
+                f_.reset(tmpf);
+            }
+            decompressXZ(*f, *f_);
+        }
+
+        initialize(false);
+    }
+    catch (std::ios_base::failure &c) {
+        throw std::ios_base::failure("Error opening " + erroneous_file + ": " + strerror(errno));
+    }
+}
+
+FileStorage::~FileStorage() {
+    if (f_ and not tmpfile_path_.empty()) {
+        f_.reset();
+        std::remove(tmpfile_path_.c_str());
     }
 }
 
@@ -1009,7 +1081,25 @@ void FileStorage::writePublicTracker(const PublicTrackerState &pt) {
     write_dbl(pt.unspent);
 }
 
-void FileStorage::saveXZ(const std::string filename) {
+void FileStorage::copyTo(const std::string &filename) {
+    std::unique_lock<std::mutex> lock(f_mutex_);
+    std::ofstream out;
+    out.exceptions(out.failbit | out.badbit);
+    out.open(filename, open_overwrite);
+    f_->seekg(0, f_->beg);
+    out << f_->rdbuf();
+}
+
+void FileStorage::copyToXZ(const std::string &filename) {
+    std::unique_lock<std::mutex> lock(f_mutex_);
+    std::ofstream xzout;
+    xzout.exceptions(xzout.failbit | xzout.badbit);
+    xzout.open(filename, open_overwrite);
+    f_->seekg(0, f_->beg);
+    compressXZ(*f_, xzout);
+}
+
+void FileStorage::compressXZ(std::istream &in, std::ostream &out) {
     lzma_stream strm = LZMA_STREAM_INIT;
     // Some testing with .crstate files convinced me that -3 is optimal: it's quite fast (compared
     // to -4 and above), and the higher numbers offer only a couple extra percentage of compression
@@ -1022,66 +1112,85 @@ void FileStorage::saveXZ(const std::string filename) {
                  ret == LZMA_OPTIONS_ERROR ? "Specified preset is not supported" :
                  ret == LZMA_UNSUPPORTED_CHECK ? "Specified integrity check is not supported" :
                  "An unknown error occured"));
-    uint8_t uncompressed[BUFSIZ], compressed[BUFSIZ];
-    strm.next_in = uncompressed;
+
+    processXZ(&strm, &ret, in, out);
+}
+
+void FileStorage::processXZ(void *lzma_stream_ptr, void *lzma_ret_ptr, std::istream &in, std::ostream &out) {
+    // The signature really take these references directly, but that makes liblzma-dev a
+    // compile-time dependency of anything including FileStorage, while this way avoids that.
+    // (Normally a forward declaration would take care of that, but I can't seem to forward-declare
+    // C structs in C++ code).
+    lzma_stream &strm = *static_cast<lzma_stream*>(lzma_stream_ptr);
+    lzma_ret &ret = *static_cast<lzma_ret*>(lzma_ret_ptr);
+    uint8_t inbuf[BUFSIZ], outbuf[BUFSIZ];
+    strm.next_in = nullptr;
     strm.avail_in = 0;
-    strm.next_out = compressed;
-    strm.avail_out = sizeof(compressed);
+    strm.next_out = outbuf;
+    strm.avail_out = sizeof(outbuf);
     lzma_action action = LZMA_RUN;
 
-    std::unique_lock<std::mutex> lock(f_mutex_);
-
-    f_->seekg(0, f_->beg);
-    auto save_excep = f_->exceptions();
-    // We don't want failbit in the exceptions, because we want to be able to hit eof without
+    auto save_in_ex = in.exceptions(), save_out_ex = out.exceptions();
+    // We don't want failbit in the input exceptions, because we want to be able to hit eof without
     // throwing an exception.
-    f_->exceptions(f_->badbit);
+    in.exceptions(in.badbit);
+    out.exceptions(out.badbit | out.failbit);
 
     try {
-        std::ofstream xzout;
-        xzout.exceptions(xzout.failbit | xzout.badbit);
-        xzout.open(filename, open_overwrite);
-
         while (true) {
-            if (strm.avail_in == 0 and not f_->eof()) {
-                f_->read(reinterpret_cast<char*>(uncompressed), sizeof(uncompressed));
-                strm.next_in = uncompressed;
-                if (f_->eof()) {
-                    strm.avail_in = f_->gcount();
+            if (strm.avail_in == 0 and not in.eof()) {
+                in.read(reinterpret_cast<char*>(inbuf), sizeof(inbuf));
+                strm.next_in = inbuf;
+                strm.avail_in = in.gcount();
+                if (in.eof())
                     action = LZMA_FINISH;
-                }
-                else {
-                    strm.avail_in = sizeof(uncompressed);
-                }
             }
 
             ret = lzma_code(&strm, action);
 
             if (strm.avail_out == 0 or ret == LZMA_STREAM_END) {
-                auto write_size = sizeof(compressed) - strm.avail_out;
-                xzout.write(reinterpret_cast<char*>(compressed), write_size);
+                auto write_size = sizeof(outbuf) - strm.avail_out;
+                out.write(reinterpret_cast<char*>(outbuf), write_size);
 
-                strm.next_out = compressed;
-                strm.avail_out = sizeof(compressed);
+                strm.next_out = outbuf;
+                strm.avail_out = sizeof(outbuf);
             }
 
             if (ret != LZMA_OK) {
                 if (ret == LZMA_STREAM_END) break;
 
-                throw std::runtime_error(std::string("liblzma compression failed: ") +
+                throw std::runtime_error(std::string("liblzma compression/decompression failed: ") +
                         (ret == LZMA_MEM_ERROR ? "Memory allocation failed" :
                          ret == LZMA_DATA_ERROR ? "File size limits exceeded" :
+			             ret == LZMA_FORMAT_ERROR ? "Input not in .xz format" :
+			             ret == LZMA_OPTIONS_ERROR ? "Unsupported compression options" :
+			             ret == LZMA_DATA_ERROR ? "Compressed file is corrupt" :
+			             ret == LZMA_BUF_ERROR ? "Compressed file is truncated or otherwise corrupt" :
                          "An unknown error occured"));
             }
         }
     }
     catch (const std::ios_base::failure&) {
-        f_->clear();
-        f_->exceptions(save_excep);
+        if (not in.bad()) in.clear();
+        in.exceptions(save_in_ex);
+        out.exceptions(save_out_ex);
         throw;
     }
-    f_->clear();
-    f_->exceptions(save_excep);
+    in.clear();
+    in.exceptions(save_in_ex);
+    out.exceptions(save_out_ex);
+}
+
+void FileStorage::decompressXZ(std::istream &in, std::ostream &out) {
+    lzma_stream strm = LZMA_STREAM_INIT;
+    lzma_ret ret = lzma_stream_decoder(&strm, UINT64_MAX, LZMA_CONCATENATED);
+
+    if (ret != LZMA_OK)
+        throw std::runtime_error(std::string("liblzma initialization failed: ") +
+                (ret == LZMA_MEM_ERROR ? "Memory allocation failed" :
+                 ret == LZMA_OPTIONS_ERROR ? "Unsupported decompression flags" :
+                 "An unknown error occured"));
+    processXZ(&strm, &ret, in, out);
 }
 
 }}

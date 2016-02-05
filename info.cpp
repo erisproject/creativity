@@ -25,7 +25,7 @@ int main(int argc, char *argv[]) {
     Creativity creativity;
     // Filename input
     try {
-        creativity.fileRead(args.input);
+        creativity.fileRead(args.input, args.memory_xz or args.memory, args.memory);
     }
     catch (std::exception &e) {
         std::cerr << "Unable to read `" << args.input << "': " << e.what() << "\n\n";

@@ -56,6 +56,12 @@ class Data : public CmdArgs {
         /// The input files to load data from
         std::vector<std::string> input;
 
+        /// If true, decompress xz files into memory
+        bool memory_xz = false;
+
+        /// If true, copy all files into memory
+        bool memory = false;
+
         /// Overridden to add " CRSTATE [CRSTATE ...]"
         virtual std::string usage() const override;
 

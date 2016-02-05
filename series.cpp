@@ -71,9 +71,9 @@ void thr_parse_file(
         output.precision(args.double_precision);
         Creativity creativity;
         // Filename input
-        try { creativity.fileRead(source); }
+        try { creativity.fileRead(source, args.memory_xz or args.memory, args.memory); }
         catch (std::ios_base::failure&) FAIL("I/O error: " << std::strerror(errno))
-        catch (std::exception &e) FAIL("An exception occured: " << e.what())
+        catch (std::exception &e) FAIL("An error occured: " << e.what())
 
         auto locked_storage = creativity.storage();
         auto &storage = *locked_storage.first;

@@ -523,7 +523,7 @@ class GUI : eris::noncopyable {
         // The file filter.  Access via fileFilter().
         mutable Glib::RefPtr<Gtk::FileFilter> ff_;
 
-        /** Returns a file filter for *.crstate files. */
+        /** Returns a file filter for *.crstate and *.crstate.xz files. */
         decltype(ff_) fileFilter() const;
 
         // The callbacks for GUI thread events

@@ -29,6 +29,8 @@ void Data::addOptions() {
         ("verify-piracy-begins,P", value(verify.piracy_begins), "If non-zero, only use given simulation files with piracy beginning in the given period.")
         ("verify-public-sharing-begins,G", value(verify.public_sharing_begins), "If non-zero, only use given simulation files with public sharing beginning in the given period.")
         ("threads,j", value(threads), "    Maximum number of threads to use for data parsing.  0 (the default) disables data parsing threading entirely.")
+        ("memory-xz,M", value(memory_xz), "If an input file is an xz-compressed file, using this flag causes it to be decompressed into memory instead of writing it to a temporary file.")
+        ("memory-all", value(memory), "If specified, copy each input file into memory before processing, even when not an xz-compressed file.  Implies --memory-xz")
         ;
 
     po::options_description input_desc("Input files");

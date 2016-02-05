@@ -18,6 +18,12 @@ class Info : public CmdArgs {
         /// The input file to load data from
         std::string input;
 
+        /// If true, decompress xz files into memory
+        bool memory_xz = false;
+
+        /// If true, copy all files into memory
+        bool memory = false;
+
         /// Show every `n`th period (where this value is n).  0 means don't show any.
         unsigned int thin_periods = 10;
 

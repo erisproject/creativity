@@ -19,8 +19,8 @@ class CLI : public Simulator {
         /// Whether to use xz compression
         bool xz = false;
 
-        /// Whether to use in-memory file instead of a temporary file (implies xz)
-        bool memory_xz = false;
+        /// Whether to use in-memory file instead of a temporary file
+        bool memory = false;
 
         /// The temporary directory for results
         std::string tmpdir;

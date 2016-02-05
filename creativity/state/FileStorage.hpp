@@ -66,8 +66,17 @@ class FileStorage : public StorageBackend {
             TYPE_PUBLIC_TRACKER = 3 ///< A PublicTracker state
         };
 
+        /** Constructs a FileStorage that stores file content in an in-memory buffer.  Beware: this
+         * usage requires considerably more memory for running a simulation, and the results are not
+         * automatically stored.
+         */
+        FileStorage();
+
         /** Constructs and returns a FileStorage object that uses the given file for reading and
          * (optionally) writing state data.  The file is read or created immediately.
+         *
+         * This method does not support reading from xz-compressed .crstate.xz files: if you need to
+         * read from a file that might be xz-compressed, see the next constructor.
          *
          * \param filename the filename to open
          * \param mode the open mode to use
@@ -76,6 +85,44 @@ class FileStorage : public StorageBackend {
          * contains invalid data.
          */
         FileStorage(const std::string &filename, MODE mode);
+
+        /** Opens a file in read-only mode.  If the file is a xz-compressed file, it is first read
+         * decompressed to a temporary file (or in-memory buffer), and the creativity data is read
+         * from there.
+         *
+         * The FileStorage object will be opened in read-write mode only if the file contents are
+         * copied into memory or to a temporary file; thus it is guaranteed to be read-write only if
+         * `copy_in_memory` is true.  Note also that even though it is read/write, any changes will
+         * be lost when the FileStorage object is destroyed: either the memory will be deallocated,
+         * or the temporary file will be deleted.
+         *
+         * \param filename the filename to open
+         * \param decompress_in_memory if true, decompress the file in memory, otherwise use a
+         * temporary file (in your system's standard temporary directory locations, respecting
+         * standard environment variables).  Note that in-memory decompression can require a large
+         * amount of memory, depending on the size of the uncompressed data.
+         * \param copy_in_memory if true (defaults to false if omitted), copies the file into memory
+         * when the file is *not* xz-compressed.  This may result in better performance (at the cost
+         * of increased memory use) on high-latency storage devices.
+         * \param tmpfile the filename to write to (overwriting if it exists) when decompressing an
+         * xz file to a temporary file.  If omitted or empty, a file is generated in a
+         * system-dependent temporary location (which can be influenced with TMP and TMPDIR and
+         * similar environment variables).  If the temporary file is used, it will be automatically
+         * deleted when the FileStorage object is destroyed.  Has no effect if decompress_in_memory
+         * is true.
+         */
+        FileStorage(const std::string &filename, bool decompress_in_memory, bool copy_in_memory = false, const std::string &tmpfile = "");
+
+        /** Default move constructor. */
+        FileStorage(FileStorage&&) = default;
+
+        /** Default move assignment operator. */
+        FileStorage& operator=(FileStorage&&) = default;
+
+        /** Default destructor; if the current file is currently open to a temporary file, deletes
+         * the temporary file.
+         */
+        virtual ~FileStorage();
 
         /** Throws a ParseError exception.  The given message is prefixed with `Parsing file failed
          * [pos=123]: `, where `123` is the current file position.
@@ -119,6 +166,11 @@ class FileStorage : public StorageBackend {
          */
         virtual void storage_flush() override;
 
+        /** Copies the current file contents to the given file.  If it exists, it will be
+         * overwritten.
+         */
+        void copyTo(const std::string &filename);
+
         /** Compresses the current file contents to an xz file, written at the given location.  If
          * the file already exists, it will be overwritten.  Note that only the current file
          * contents are copied: any changes made after this call will not be present in the
@@ -127,16 +179,29 @@ class FileStorage : public StorageBackend {
          * \throws std::runtime_error (or a derived object thereof, such as std::ios_base::failure)
          * upon I/O failure or liblzma internal errors.
          */
-        virtual void saveXZ(const std::string filename);
+        void copyToXZ(const std::string &filename);
+
+        /** Reads all available data from the given input stream, compresses it to xz format, and
+         * writes the xz data to the given output stream.
+         *
+         * \throws std::runtime_error (or a derived object thereof, such as std::ios_base::failure)
+         * upon I/O failure or liblzma internal errors.
+         */
+        static void compressXZ(std::istream &in, std::ostream &out);
+
+        /** Reads compressed xz data from the given input stream (which must be already opened for
+         * reading and positioned at the beginning of the xz data) and writes the decompressed data
+         * to the given output stream.
+         *
+         * \throws std::runtime_error (or a derived object thereof, such as std::ios_base::failure)
+         * upon I/O failure or liblzma internal errors.
+         */
+        static void decompressXZ(std::istream &in, std::ostream &out);
 
     protected:
-        /** Default constructor is protected: subclasses may use it, but must properly set f_ in
-         * their own constructors.
+        /** The stream object.  Typically an fstream or sstream (if created by this class), but
+         * subclasses could use something else.
          */
-        FileStorage();
-
-        /** The stream object.  An fstream if created by this class, but subclasses (e.g.
-         * MemoryStorage) may use something else. */
         std::unique_ptr<std::iostream> f_;
 
         /** Mutex guarding f_ and related variables (such as state_pos_).  Some operations (such as
@@ -653,6 +718,12 @@ class FileStorage : public StorageBackend {
 
         /// Writes a public tracker to the current file position.
         void writePublicTracker(const PublicTrackerState &pt);
+
+        /// If non-empty, the indicated file is deleted during destruction
+        std::string tmpfile_path_;
+
+        /// Internal method used by decompressXZ/compressXZ
+        static void processXZ(void *lzma_stream, void *lzma_ret, std::istream &in, std::ostream &out);
 };
 
 }}

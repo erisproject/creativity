@@ -26,6 +26,8 @@ void Series::addOptions() {
         ("precision", range<3,std::numeric_limits<double>::max_digits10>(double_precision), "      Specifies the precision level for floating point values.  The default is the minimum required to exactly represent all possible double values without any loss of precision.")
         ("output-directory,o", value(output_dir), "The directory in which to place series files.  If this directory does not exist, it will be created.  Each series S is written to a file named `series-S.csv' in this directory.  Existing files will be overwritten.")
         ("threads,j", value(threads), "    Maximum number of threads to use for data parsing.  0 (the default) disables data parsing threading entirely.")
+        ("memory-xz,M", value(memory_xz), "If an input file is an xz-compressed file, using this flag causes it to be decompressed into memory instead of writing it to a temporary file.")
+        ("memory-all", value(memory), "If specified, copy each input file into memory before processing, even when not an xz-compressed file.  Implies --memory-xz")
         ("help-series,S", value(help_series), "Shows the series that can be generated.")
         ;
 
