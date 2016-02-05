@@ -69,7 +69,7 @@ void thr_parse_file(
         Creativity creativity;
         // Filename input
         try {
-            creativity.fileRead(source);
+            creativity.fileRead(source, args.memory_xz or args.memory, args.memory);
         }
         catch (std::ios_base::failure&) {
             std::cerr << "Unable to read `" << source << "': " << std::strerror(errno) << "\n";
@@ -92,11 +92,12 @@ void thr_parse_file(
             post_piracy = (args.skip.public_sharing ? storage.size() : public_sharing_begins);
         if (not args.skip.public_sharing)
             post_public = storage.size();
-        post_pre = args.skip.piracy
+        post_pre = std::min(storage.size(),
+                args.skip.piracy
                 ? args.skip.public_sharing
                     ? storage.size()
                     : public_sharing_begins
-                : piracy_begins;
+                : piracy_begins);
 
 #define SKIP_IF(CONDITION, REASON) if (CONDITION) { std::cerr << "Skipping `" << source << "': " << REASON << "\n"; continue; }
 
@@ -116,16 +117,16 @@ void thr_parse_file(
         if (not args.skip.short_run) periods_needed *= 2;
 
         if (not args.skip.piracy) {
-            SKIP_IF(post_piracy - piracy_begins < periods_needed,
+            SKIP_IF(post_piracy < piracy_begins + periods_needed,
                     "simulation doesn't have enough piracy periods (t=" << piracy_begins << " through t=" << post_piracy-1 << ")");
         }
         if (not args.skip.public_sharing) {
-            SKIP_IF(post_public - public_sharing_begins < periods_needed,
+            SKIP_IF(post_public < public_sharing_begins + periods_needed,
                     "simulation doesn't have enough public sharing periods (t=" << public_sharing_begins << " through t=" << post_public-1 << ")");
         }
 #undef SKIP_IF
 
-        if (args.human_readable) output << "\n\n" << source << "\n==========\n";
+        if (args.human_readable) output << "\n\n" << source << "\n==========" << std::endl;
         else output << data::csv_fix(source);
         for (auto &d : initial_data) {
             if (args.human_readable) output << std::setw(readable_name_width+1) << d.name + ":" << " ";
