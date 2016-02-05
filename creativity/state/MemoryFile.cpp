@@ -17,8 +17,4 @@ MemoryFile::MemoryFile(const std::string &data, MODE mode) {
 
 void MemoryFile::storage_flush() {}
 
-std::stringstream& MemoryFile::get_stringstream() {
-    return static_cast<std::stringstream&>(*f_);
-}
-
 }}
