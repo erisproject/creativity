@@ -1,7 +1,7 @@
 #include "creativity/Creativity.hpp"
 #include "creativity/cmdargs/GUI.hpp"
 #include "creativity/state/Storage.hpp"
-#include "creativity/state/MemoryFile.hpp"
+#include "creativity/state/MemoryStorage.hpp"
 #include "creativity/gui/GUI.hpp"
 #include <eris/Simulation.hpp>
 #include <eris/Random.hpp>
@@ -37,7 +37,7 @@ int main(int argc, char *argv[1]) {
 
     // Start out with an in-memory storage "file"--it is much more efficient than actual in-memory
     // storage of all of the states
-    creativity.write<MemoryFile>();
+    creativity.write<MemoryStorage>();
 
     std::cerr << std::setprecision(16);
     std::cout << std::setprecision(16);

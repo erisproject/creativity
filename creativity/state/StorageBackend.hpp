@@ -20,7 +20,7 @@ namespace creativity { namespace state {
  *
  * Subclasses must implement the subscript [] operator, size() method, and push_back(&&) method.
  *
- * \sa creativity::state::MemoryFile
+ * \sa creativity::state::MemoryStorage
  * \sa creativity::state::FileStorage
  */
 class StorageBackend : private eris::noncopyable {

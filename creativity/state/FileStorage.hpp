@@ -136,7 +136,7 @@ class FileStorage : public StorageBackend {
         FileStorage();
 
         /** The stream object.  An fstream if created by this class, but subclasses (e.g.
-         * MemoryFile) may use something else. */
+         * MemoryStorage) may use something else. */
         std::unique_ptr<std::iostream> f_;
 
         /** Mutex guarding f_ and related variables (such as state_pos_).  Some operations (such as

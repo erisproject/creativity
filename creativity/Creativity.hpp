@@ -241,7 +241,7 @@ class Creativity : private eris::noncopyable {
          */
         std::vector<eris::SharedMember<Book>> new_books_;
 
-        /** The storage object.  If not set by the time setup() is called, a MemoryFile object will
+        /** The storage object.  If not set by the time setup() is called, a MemoryStorage object will
          * be created and used.
          */
         std::shared_ptr<state::Storage> storage_;

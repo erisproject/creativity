@@ -3,7 +3,7 @@
 #include "creativity/Book.hpp"
 #include "creativity/state/Storage.hpp"
 #include "creativity/state/FileStorage.hpp"
-#include "creativity/state/MemoryFile.hpp"
+#include "creativity/state/MemoryStorage.hpp"
 #include "creativity/state/StorageBackend.hpp"
 #include "creativity/cmdargs/CLI.hpp"
 #include <eris/Simulation.hpp>
@@ -104,7 +104,7 @@ int main(int argc, char *argv[]) {
         }
 
         if (args.memory_xz) {
-            creativity.write<MemoryFile>();
+            creativity.write<MemoryStorage>();
         }
         else {
             std::string tmpfile;

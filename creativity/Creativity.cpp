@@ -1,6 +1,6 @@
 #include "creativity/Creativity.hpp"
 #include "creativity/state/FileStorage.hpp"
-#include "creativity/state/MemoryFile.hpp"
+#include "creativity/state/MemoryStorage.hpp"
 #include "creativity/PublicTracker.hpp"
 #include "creativity/state/Storage.hpp"
 #include "creativity/Reader.hpp"
@@ -70,7 +70,7 @@ void Creativity::setup() {
 
     {
         auto st = storage();
-        if (not st.first) st.first = Storage::create<MemoryFile>(set_);
+        if (not st.first) st.first = Storage::create<MemoryStorage>(set_);
     }
 
     sim = Simulation::create();

@@ -11,7 +11,7 @@ namespace creativity { namespace state {
  *
  * \sa FileStorage
  */
-class MemoryFile final : public FileStorage {
+class MemoryStorage final : public FileStorage {
     public:
         /** Creates an in-memory file consisting of a copy of the given string.
          *
@@ -22,7 +22,7 @@ class MemoryFile final : public FileStorage {
          * \param mode the "file" mode; defaults to MODE::APPEND
          * \sa FileStorage()
          */
-        explicit MemoryFile(const std::string &data = "", MODE mode = MODE::APPEND);
+        explicit MemoryStorage(const std::string &data = "", MODE mode = MODE::APPEND);
 
         /** Does nothing. */
         virtual void storage_flush() override;

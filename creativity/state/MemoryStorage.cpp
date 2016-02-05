@@ -1,8 +1,8 @@
-#include "creativity/state/MemoryFile.hpp"
+#include "creativity/state/MemoryStorage.hpp"
 
 namespace creativity { namespace state {
 
-MemoryFile::MemoryFile(const std::string &data, MODE mode) {
+MemoryStorage::MemoryStorage(const std::string &data, MODE mode) {
     std::string blank;
     const std::string &initial_data = mode == MODE::OVERWRITE ? blank : data;
     f_.reset(new std::stringstream(initial_data, mode == MODE::READONLY ? open_readonly : open_readwrite));
@@ -15,6 +15,6 @@ MemoryFile::MemoryFile(const std::string &data, MODE mode) {
     initialize(empty);
 }
 
-void MemoryFile::storage_flush() {}
+void MemoryStorage::storage_flush() {}
 
 }}

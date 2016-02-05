@@ -21,7 +21,7 @@ namespace creativity { namespace state {
  * class.
  *
  * \sa creativity::state::StorageBackend
- * \sa creativity::state::MemoryFile
+ * \sa creativity::state::MemoryStorage
  * \sa creativity::state::FileStorage
  */
 class Storage final {
