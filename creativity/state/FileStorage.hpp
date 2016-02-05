@@ -10,7 +10,7 @@
 #include <cstdint>
 #include <functional>
 #include <vector>
-#include <fstream>
+#include <iostream>
 #include <memory>
 #include <mutex>
 #include <set>
@@ -118,6 +118,16 @@ class FileStorage : public StorageBackend {
          * \sa std::basic_ostream::flush
          */
         virtual void storage_flush() override;
+
+        /** Compresses the current file contents to an xz file, written at the given location.  If
+         * the file already exists, it will be overwritten.  Note that only the current file
+         * contents are copied: any changes made after this call will not be present in the
+         * compressed file.
+         *
+         * \throws std::runtime_error (or a derived object thereof, such as std::ios_base::failure)
+         * upon I/O failure or liblzma internal errors.
+         */
+        virtual void saveXZ(const std::string filename);
 
     protected:
         /** Default constructor is protected: subclasses may use it, but must properly set f_ in

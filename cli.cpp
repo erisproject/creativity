@@ -2,6 +2,8 @@
 #include "creativity/Reader.hpp"
 #include "creativity/Book.hpp"
 #include "creativity/state/Storage.hpp"
+#include "creativity/state/FileStorage.hpp"
+#include "creativity/state/MemoryFile.hpp"
 #include "creativity/state/StorageBackend.hpp"
 #include "creativity/cmdargs/CLI.hpp"
 #include <eris/Simulation.hpp>
@@ -62,6 +64,9 @@ int main(int argc, char *argv[]) {
     args.parse(argc, argv);
 
     std::string args_out = args.output, tmp_out = args_out;
+    if (args.xz or args.memory_xz) {
+        args_out = std::regex_replace(args_out, std::regex("(?:\\.[xX][zZ])?$"), ".xz");
+    }
     bool overwrite = args.overwrite;
 
     // Filename output
@@ -98,22 +103,28 @@ int main(int argc, char *argv[]) {
             dirname = tmpdir;
         }
 
-        std::string tmpfile;
-        int tries = 0;
-        do {
-            if (tries++ > 10) { std::cerr << "Error: unable to generate suitable tmpfile name (tried 10 times)\n"; exit(2); }
-            tmpfile = dirname + "/" + random_filename(basename);
-        } while (fs::exists(tmpfile));
+        if (args.memory_xz) {
+            creativity.write<MemoryFile>();
+        }
+        else {
+            std::string tmpfile;
+            int tries = 0;
+            do {
+                if (tries++ > 10) { std::cerr << "Error: unable to generate suitable tmpfile name (tried 10 times)\n"; exit(2); }
+                tmpfile = dirname + "/" + random_filename(basename);
+            } while (fs::exists(tmpfile));
 
-        creativity.fileWrite(tmpfile);
-        tmp_out = tmpfile;
+            creativity.fileWrite(tmpfile);
+            tmp_out = tmpfile;
+
+            std::cout << "Writing simulation results to temp file: ";
+            std::cout << tmp_out << "\n";
+        }
     }
     catch (std::exception &e) {
         std::cerr << "Unable to write to file: " << e.what() << "\n";
         exit(1);
     }
-    std::cout << "Writing simulation results to temp file: ";
-    std::cout << tmp_out << "\n";
 
     creativity.setup();
     auto sim = creativity.sim;
@@ -190,50 +201,68 @@ int main(int argc, char *argv[]) {
         creativity.storage().first->flush();
     }
 
-    // Destroy the simulation (which also closes the storage)
-    cr_ptr.reset();
-
-    int error = std::rename(tmp_out.c_str(), args_out.c_str());
-    if (error) { // Rename failed (perhaps across filesystems) so do a copy-and-delete
-        if (not overwrite) {
-            if (fs::exists(args_out)) {
-                std::cerr << "\nError: `" << args_out << "' already exists; specify a different file or add `--overwrite' option to overwrite\n";
-                exit(1);
-            }
+    // Check again, in case something else created it while we were simulating:
+    if (not overwrite) {
+        if (fs::exists(args_out)) {
+            std::cerr << "\nError: `" << args_out << "' already exists; specify a different file or add `--overwrite' option to overwrite\n";
+            exit(1);
         }
+    }
 
-        std::cout << "Copying tmpfile to " << args_out << "..." << std::flush;
-        {
-            std::ifstream src; src.exceptions(src.failbit);
-            std::ofstream dst; dst.exceptions(dst.failbit);
-            try { src.open(tmp_out, std::ios::binary); }
-            catch (std::ios_base::failure&) {
-                std::cerr << "\nUnable to read " << tmp_out << ": " << std::strerror(errno) << "\n";
-                exit(1);
-            }
-
-            try { dst.open(args_out, std::ios::binary | std::ios::trunc); }
-            catch (std::ios_base::failure&) {
-                std::cerr << "\nUnable to write to " << args_out << ": " << std::strerror(errno) << "\n";
-                exit(1);
-            }
-
-            try { dst << src.rdbuf(); }
-            catch (std::ios_base::failure&) {
-                std::cerr << "\nUnable to copy file contents: " << std::strerror(errno) << "\n";
-                exit(1);
-            }
+    std::string to_delete;
+    if (args.xz or args.memory_xz) {
+        std::cout << "Compressing..." << std::flush;
+        try {
+            dynamic_cast<FileStorage&>(creativity.storage().first->backend()).saveXZ(args_out);
         }
-        std::cout << " done.\nRemoving tmpfile..." << std::flush;
+        catch (const std::runtime_error &e) {
+            std::cerr << "\nWriting to compressed file failed: " << e.what() << "\n\n";
+            exit(1);
+        }
+        std::cout << " done." << std::endl;
+        if (not args.memory_xz) to_delete = tmp_out;
+    }
+    else {
+        // Destroy the Creativity object (so that the output file is closed)
+        cr_ptr.reset();
+        int error = std::rename(tmp_out.c_str(), args_out.c_str());
+        if (error) { // Rename failed (perhaps across filesystems) so try a copy-and-delete
 
-        // Copy succeeded, so delete the tmpfile
-        error = std::remove(tmp_out.c_str());
+            std::cout << "Copying tmpfile to " << args_out << "..." << std::flush;
+            {
+                std::ifstream src; src.exceptions(src.failbit);
+                std::ofstream dst; dst.exceptions(dst.failbit);
+                try { src.open(tmp_out, std::ios::binary); }
+                catch (std::ios_base::failure&) {
+                    std::cerr << "\nUnable to read " << tmp_out << ": " << std::strerror(errno) << "\n";
+                    exit(1);
+                }
+
+                try { dst.open(args_out, std::ios::binary | std::ios::trunc); }
+                catch (std::ios_base::failure&) {
+                    std::cerr << "\nUnable to write to " << args_out << ": " << std::strerror(errno) << "\n";
+                    exit(1);
+                }
+
+                try { dst << src.rdbuf(); }
+                catch (std::ios_base::failure&) {
+                    std::cerr << "\nUnable to copy file contents: " << std::strerror(errno) << "\n";
+                    exit(1);
+                }
+            }
+            std::cout << " done.\nRemoving tmpfile..." << std::flush;
+
+            // Copy succeeded, so delete the tmpfile
+            to_delete = tmp_out;
+        }
+        tmp_out = args_out;
+    }
+
+    if (not to_delete.empty()) {
+        int error = std::remove(to_delete.c_str());
         if (error) {
             // If we can't remove it, print a warning (but don't die, because we also copied it to the right place)
-            std::cerr << "\nWarning: removing tmpfile `" << tmp_out << "' failed: " << std::strerror(errno) << "\n";
-        }
-        else {
-            std::cout << " done." << std::endl;
+            std::cerr << "\nWarning: removing tmpfile `" << to_delete << "' failed: " << std::strerror(errno) << "\n";
         }
     }
 

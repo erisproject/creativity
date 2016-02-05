@@ -3,6 +3,7 @@
 #include <cstring>
 #include <limits>
 #include <map>
+#include <fstream>
 #include <algorithm>
 #include <eris/Position.hpp>
 #include "creativity/belief/Demand.hpp"
@@ -10,6 +11,9 @@
 #include "creativity/belief/ProfitStream.hpp"
 #include <boost/math/constants/constants.hpp>
 #include <boost/filesystem/operations.hpp>
+extern "C" {
+#include "lzma.h"
+}
 
 #ifdef ERIS_DEBUG
 #define FILESTORAGE_DEBUG_WRITE_START \
@@ -1003,6 +1007,81 @@ void FileStorage::writePublicTracker(const PublicTrackerState &pt) {
     write_u32(pt.id);
     write_dbl(pt.tax);
     write_dbl(pt.unspent);
+}
+
+void FileStorage::saveXZ(const std::string filename) {
+    lzma_stream strm = LZMA_STREAM_INIT;
+    // Some testing with .crstate files convinced me that -3 is optimal: it's quite fast (compared
+    // to -4 and above), and the higher numbers offer only a couple extra percentage of compression
+    // (and actually, -4 did worse).
+    lzma_ret ret = lzma_easy_encoder(&strm, 3, LZMA_CHECK_CRC64);
+
+    if (ret != LZMA_OK)
+        throw std::runtime_error(std::string("liblzma initialization failed: ") +
+                (ret == LZMA_MEM_ERROR ? "Memory allocation failed" :
+                 ret == LZMA_OPTIONS_ERROR ? "Specified preset is not supported" :
+                 ret == LZMA_UNSUPPORTED_CHECK ? "Specified integrity check is not supported" :
+                 "An unknown error occured"));
+    uint8_t uncompressed[BUFSIZ], compressed[BUFSIZ];
+    strm.next_in = uncompressed;
+    strm.avail_in = 0;
+    strm.next_out = compressed;
+    strm.avail_out = sizeof(compressed);
+    lzma_action action = LZMA_RUN;
+
+    std::unique_lock<std::mutex> lock(f_mutex_);
+
+    f_->seekg(0, f_->beg);
+    auto save_excep = f_->exceptions();
+    // We don't want failbit in the exceptions, because we want to be able to hit eof without
+    // throwing an exception.
+    f_->exceptions(f_->badbit);
+
+    try {
+        std::ofstream xzout;
+        xzout.exceptions(xzout.failbit | xzout.badbit);
+        xzout.open(filename, open_overwrite);
+
+        while (true) {
+            if (strm.avail_in == 0 and not f_->eof()) {
+                f_->read(reinterpret_cast<char*>(uncompressed), sizeof(uncompressed));
+                strm.next_in = uncompressed;
+                if (f_->eof()) {
+                    strm.avail_in = f_->gcount();
+                    action = LZMA_FINISH;
+                }
+                else {
+                    strm.avail_in = sizeof(uncompressed);
+                }
+            }
+
+            ret = lzma_code(&strm, action);
+
+            if (strm.avail_out == 0 or ret == LZMA_STREAM_END) {
+                auto write_size = sizeof(compressed) - strm.avail_out;
+                xzout.write(reinterpret_cast<char*>(compressed), write_size);
+
+                strm.next_out = compressed;
+                strm.avail_out = sizeof(compressed);
+            }
+
+            if (ret != LZMA_OK) {
+                if (ret == LZMA_STREAM_END) break;
+
+                throw std::runtime_error(std::string("liblzma compression failed: ") +
+                        (ret == LZMA_MEM_ERROR ? "Memory allocation failed" :
+                         ret == LZMA_DATA_ERROR ? "File size limits exceeded" :
+                         "An unknown error occured"));
+            }
+        }
+    }
+    catch (const std::ios_base::failure&) {
+        f_->clear();
+        f_->exceptions(save_excep);
+        throw;
+    }
+    f_->clear();
+    f_->exceptions(save_excep);
 }
 
 }}
