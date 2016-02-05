@@ -9,8 +9,8 @@ namespace creativity { namespace state {
 size_t Storage::size() const { return cache_.size(); }
 bool Storage::empty() const { return cache_.empty(); }
 void Storage::reserve(size_t T) { backend_->reserve(T); }
-void Storage::flush() { backend_->flush(); }
-bool Storage::flush_for(long milliseconds) { return backend_->flush_for(milliseconds); }
+void Storage::flush(bool flush_buffers) { backend_->flush(flush_buffers); }
+bool Storage::flush_for(long milliseconds, bool flush_buffers) { return backend_->flush_for(milliseconds, flush_buffers); }
 
 StorageBackend& Storage::backend() { return *backend_; }
 

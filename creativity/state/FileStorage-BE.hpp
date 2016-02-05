@@ -17,7 +17,7 @@ inline T FileStorage::read_value() const {
     T val;
     char *valbytes = reinterpret_cast<char*>(&val);
     char input[sizeof(T)];
-    f_.read(input, sizeof(T));
+    f_->read(input, sizeof(T));
     for (size_t i = 0; i < sizeof(T); i++) valbytes[i] = input[sizeof(T) - 1 - i];
     return val;
 }
@@ -27,7 +27,7 @@ inline void FileStorage::write_value(const T &val) {
     const char *in = reinterpret_cast<const char*>(&val);
     char out[sizeof(T)];
     for (size_t i = 0; i < sizeof(T); i++) out[i] = in[sizeof(T) - 1 - i];
-    f_.write(out, sizeof(T));
+    f_->write(out, sizeof(T));
 }
 
 template <typename T, typename F>

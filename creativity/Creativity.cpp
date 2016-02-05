@@ -25,21 +25,11 @@ CreativitySettings& Creativity::set() {
 }
 
 void Creativity::fileWrite(const std::string &filename) {
-    auto new_storage = Storage::create<FileStorage>(set_, filename, FileStorage::MODE::OVERWRITE);
-    auto spair = storage();
-    auto &old_storage = spair.first;
-
-    if (old_storage) {
-        for (const auto &state : *old_storage) new_storage->push_back(state);
-    }
-
-    spair.first = new_storage;
+    write<FileStorage>(filename, FileStorage::MODE::OVERWRITE);
 }
 
 void Creativity::fileRead(const std::string &filename) {
-    if (setup_sim_) throw std::logic_error("Cannot call Creativity::fileRead() after setup()");
-    storage().first = Storage::create<FileStorage>(set_, filename, FileStorage::MODE::READONLY);
-    setup_read_ = true;
+    read<FileStorage>(filename, FileStorage::MODE::READONLY);
 }
 
 void Creativity::checkParameters() {

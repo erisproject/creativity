@@ -33,10 +33,8 @@ namespace creativity { namespace state {
  * particular, it stores IDs in the file as 32-bit quantities, and will throw an exception if a
  * value that does not fit in a uint32_t is encountered).
  */
-class FileStorage final : public StorageBackend {
+class FileStorage : public StorageBackend {
     public:
-        FileStorage() = delete;
-
         /** The supported file modes, passed to the constructor. */
         enum class MODE {
             /** Opens the file in read-only mode.  The file must exist and contain valid data,
@@ -111,17 +109,47 @@ class FileStorage final : public StorageBackend {
          */
         virtual void writeSettings(const CreativitySettings &settings) override;
 
-        /** Flushes the file to disc.  This calls `flush()` on the underlying file object.  This is
+        /** Flushes the file stream.  This calls `flush()` on the underlying file object.  This is
          * normally not required: any changes will be automatically flushed when the FileStorage
-         * object is destroyed; calling this manually primarily guards against unflushed data
-         * being unwritten if the process is terminated abnormally (i.e. via a signal or a segfault).
-         *
-         * Use with caution: frequent file flushing will slow the FileStorage object considerably.
+         * object is destroyed; calling this manually primarily guards against unflushed data being
+         * unwritten if the process is terminated abnormally (i.e. via a signal or a segfault).
          *
          * \sa creativity::state::StorageBackend::flush
          * \sa std::basic_ostream::flush
          */
-        virtual void device_flush() override;
+        virtual void storage_flush() override;
+
+    protected:
+        /** Default constructor is protected: subclasses may use it, but must properly set f_ in
+         * their own constructors.
+         */
+        FileStorage();
+
+        /** The stream object.  An fstream if created by this class, but subclasses (e.g.
+         * MemoryFile) may use something else. */
+        std::unique_ptr<std::iostream> f_;
+
+        /** Mutex guarding f_ and related variables (such as state_pos_).  Some operations (such as
+         * load/saving settings) are done by the main thread, which accesses f_.
+         */
+        mutable std::mutex f_mutex_;
+
+        /// Flags for opening in read-only mode
+        static constexpr std::ios_base::openmode open_readonly = std::ios_base::binary | std::ios_base::in;
+        /// Flags for opening in overwrite mode
+        static constexpr std::ios_base::openmode open_overwrite = open_readonly | std::ios_base::out | std::ios_base::trunc;
+        /** Flags for opening for read-write when the file exists (if it doesn't exist,
+         * open_overwrite is used instead because this mode fails when the file doesn't exist).
+         */
+        static constexpr std::ios_base::openmode open_readwrite = open_readonly | std::ios_base::out;
+
+        /** Performs initial reading or writing.
+         *
+         * \param empty if true, the file is empty and open for writing, and so an initial, no-state
+         * file header will be written.  If false, the file is not (or should not be) empty, and
+         * thus an existing header needs to be read.
+         */
+        void initialize(bool empty);
 
     private:
 
@@ -145,14 +173,6 @@ class FileStorage final : public StorageBackend {
 
         /// Called from the queue thread to write the given State to the file.
         virtual void thread_insert(std::shared_ptr<const State> &&s) override;
-
-        /** The file buffer object. Mutable because we need to read from it in const methods. */
-        mutable std::fstream f_;
-
-        /** Mutex guarding f_ and related variables (such as state_pos_).  Some operations (such as
-         * load/saving settings) are done by the main thread, which accesses f_.
-         */
-        mutable std::mutex f_mutex_;
 
         /// Storage for header data parsing when opening the file, and after writing settings.
         CreativitySettings settings_;
@@ -370,15 +390,6 @@ class FileStorage final : public StorageBackend {
             static constexpr unsigned int record_size = sizeof(uint32_t) + sizeof(uint32_t) + sizeof(double) + sizeof(uint8_t);
             static constexpr unsigned int block_records = (BLOCK_SIZE - 8)/record_size; ///< Number of records that will fit in a block
         };
-
-        /// Flags for opening in read-only mode
-        static constexpr std::ios_base::openmode open_readonly = std::ios_base::binary | std::ios_base::in;
-        /// Flags for opening in overwrite mode
-        static constexpr std::ios_base::openmode open_overwrite = open_readonly | std::ios_base::out | std::ios_base::trunc;
-        /** Flags for opening for read-write when the file exists (if it doesn't exist,
-         * open_overwrite is used instead because this mode fails when the file doesn't exist).
-         */
-        static constexpr std::ios_base::openmode open_readwrite = open_readonly | std::ios_base::out;
 
         /** Parses the requested number of std::streampos values from memory beginning at `from` and
          * adds them to `state_pos_`.  Throws an exception if the read fails or values are invalid

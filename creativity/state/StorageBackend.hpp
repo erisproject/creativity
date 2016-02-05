@@ -64,13 +64,13 @@ class StorageBackend : private eris::noncopyable {
         virtual void readSettings(CreativitySettings &settings) const = 0;
 
         /** Flushes changes.  This method blocks until the current thread has finished writing all
-         * queued states and the device has been flushed to storage (if applicable).  If there is no
-         * thread currently active, this returns immediately.
+         * queued states and the device has been flushed to storage (if applicable and the given
+         * argument is true).
          *
          * If a subclass supports additional flushing capabilities (e.g. syncing a file to disk), it
-         * should override device_flush(), which this method calls.
+         * should override storage_flush(), which this method calls.
          */
-        void flush();
+        void flush(bool flush_buffers = true);
 
         /** Attempts to flush changes, waiting at most the given number of milliseconds for the
          * flush to complete.  Returns true if the flush completed, false if the duration expired
@@ -79,7 +79,7 @@ class StorageBackend : private eris::noncopyable {
          * \returns true if the flush completed, false if the duration expired without the flush
          * finishing.
          */
-        bool flush_for(long milliseconds);
+        bool flush_for(long milliseconds, bool flush_buffers = true);
 
         /** Adds a state to this storage container.  The default implementation spawns a thread then
          * adds it to queue_.  Subclasses not using threaded storage MUST override this method to
@@ -110,10 +110,10 @@ class StorageBackend : private eris::noncopyable {
          */
         virtual void thread_insert(std::shared_ptr<const State> &&s);
 
-        /** Flush the current device to storage medium.  The default does nothing; storage backends
-         * with such a concept should override.
+        /** Flush any buffered data to the underlying storage system.  The default does nothing;
+         * storage backends with such a concept should override.
          */
-        virtual void device_flush();
+        virtual void storage_flush();
 
     private:
 

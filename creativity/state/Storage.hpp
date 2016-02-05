@@ -89,12 +89,19 @@ class Storage final {
         void emplace_back(Args&&... args);
 
         /** Flushes changes of the backend storage object.  This typically blocks until all data in
-         * the queue has been written to the underlying storage medium.
+         * the queue has been written to the underlying storage medium.  If the argument is true or
+         * omitted, the storage device is also instructed to flush any pending writes; if false,
+         * this call may return once all states have been sent to the output stream, but without
+         * requiring that the output stream be flushed--this is particularly useful if more data is
+         * about to be written, and so the flush is unnecessary.
          *
          * flush() is called automatically during object destruction, unless flush_on_destroy has
          * been set to false.
+         *
+         * \param flush_buffers whether to flush the output buffer (if the backend supports such a
+         * concept).  Defaults to true if omitted.
          */
-        void flush();
+        void flush(bool flush_buffers = true);
 
         /** Attempts to flushes changes of the backend storage object, with a timeout after the
          * given number of milliseconds.
@@ -106,10 +113,13 @@ class Storage final {
          *     }
          *
          * \param milliseconds the maximum number of milliseconds to wait for the flush to complete
+         * \param flush_buffers whether, in addition to writing out state data, the output stream
+         * buffer should also be flushed (if the backend supports such a concept).  Defauls to true
+         * if omitted.
          * \returns true if the flush completed, false if the timeout was reached without the flush
          * completing.
          */
-        bool flush_for(long milliseconds);
+        bool flush_for(long milliseconds, bool flush_buffers = true);
 
         /// Accesses the underlying backend storage instance
         StorageBackend& backend();

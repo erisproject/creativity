@@ -52,11 +52,11 @@ void StorageBackend::thread_loop_() {
         }
         if (thread_quit_) return;
 
-        // If we were explicitly asked to flush, do a device flush:
+        // If we were explicitly asked to flush, do a storage flush as well:
         bool flushed = false;
         if (flush_pending_) {
             lock.unlock();
-            device_flush();
+            storage_flush();
             lock.lock();
             flush_pending_ = false;
             flushed = true;
@@ -71,28 +71,29 @@ void StorageBackend::thread_loop_() {
     }
 }
 
-void StorageBackend::flush() {
+void StorageBackend::flush(bool flush_buffers) {
     if (thread_.joinable()) {
         std::unique_lock<std::mutex> lock(queue_mutex_);
-        flush_pending_ = true;
+        if (flush_buffers) flush_pending_ = true;
         queue_cv_.notify_all();
-        queue_finished_cv_.wait(lock, [&] { return queue_.empty() and queue_pending_ == 0 and not flush_pending_; });
+        queue_finished_cv_.wait(lock, [this,flush_buffers] {
+                return queue_.empty() and queue_pending_ == 0 and not (flush_buffers and flush_pending_); });
     }
 }
 
-bool StorageBackend::flush_for(long milliseconds) {
+bool StorageBackend::flush_for(long milliseconds, bool flush_buffers) {
     if (thread_.joinable()) {
         std::unique_lock<std::mutex> lock(queue_mutex_);
-        flush_pending_ = true;
+        if (flush_buffers) flush_pending_ = true;
         queue_cv_.notify_all();
-        return queue_finished_cv_.wait_for(lock, std::chrono::milliseconds(milliseconds), [&] {
-                return queue_.empty() and queue_pending_ == 0 and not flush_pending_; });
+        return queue_finished_cv_.wait_for(lock, std::chrono::milliseconds(milliseconds), [this,flush_buffers] {
+                return queue_.empty() and queue_pending_ == 0 and not (flush_buffers and flush_pending_); });
     }
     return true;
 }
 
 // No-op:
-void StorageBackend::device_flush() {}
+void StorageBackend::storage_flush() {}
 
 StorageBackend::~StorageBackend() {
     if (thread_.joinable()) {

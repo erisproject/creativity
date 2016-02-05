@@ -13,9 +13,9 @@
 
 #ifdef ERIS_DEBUG
 #define FILESTORAGE_DEBUG_WRITE_START \
-    int64_t debug_start_location = f_.tellp();
+    int64_t debug_start_location = f_->tellp();
 #define FILESTORAGE_DEBUG_WRITE_CHECK(EXPECT) \
-    int64_t debug_length = f_.tellp() - debug_start_location; \
+    int64_t debug_length = f_->tellp() - debug_start_location; \
     int64_t debug_expect = EXPECT; \
     if (debug_length != debug_expect) \
         throw std::runtime_error("Internal FileStorage error: " + std::string(__func__) + " wrote " + std::to_string(debug_length) + ", expected " + std::to_string(debug_expect));
@@ -96,56 +96,62 @@ constexpr std::ios_base::openmode FileStorage::open_readonly, FileStorage::open_
 FileStorage::ParseError::ParseError(const std::string &message) : std::runtime_error(message) {}
 
 void FileStorage::throwParseError(const std::string& message) const {
-    decltype(f_.tellg()) pos;
-    try { pos = f_.tellg(); }
+    decltype(f_->tellg()) pos;
+    try { pos = f_->tellg(); }
     catch (std::ios_base::failure &f) { pos = -1; } // -1 is also be returned by .tellg() for pre-existing failures
     throw ParseError("Parsing file failed [pos=" + (pos == -1 ? std::string{"(error)"} : std::to_string(pos)) + "]: " + message);
 }
 
+// Subclasses only (they must set f_):
+FileStorage::FileStorage() {}
+
 FileStorage::FileStorage(const std::string &filename, MODE mode) {
     try {
-        f_.exceptions(f_.failbit | f_.badbit);
+        auto *f = new std::fstream;
+        f_.reset(f);
+        f_->exceptions(f_->failbit | f_->badbit);
 
-        bool parse = true;
+        bool empty = true;
         switch (mode) {
             case MODE::READONLY:
-                f_.open(filename, open_readonly);
-                parse = true;
+                f->open(filename, open_readonly);
+                empty = false;
                 break;
             case MODE::READ:
-                f_.open(filename, open_readwrite);
-                parse = true;
+                f->open(filename, open_readwrite);
+                empty = false;
                 break;
             case MODE::OVERWRITE:
-                f_.open(filename, open_overwrite);
-                parse = false;
+                f->open(filename, open_overwrite);
+                empty = true;
                 break;
             case MODE::APPEND:
                 if (fs::exists(filename)) {
-                    f_.open(filename, open_readwrite);
-                    f_.seekg(0, f_.end);
-                    parse = f_.tellp() > 0; // Parse if the file is non-empty, write otherwise
+                    f->open(filename, open_readwrite);
+                    f->seekg(0, f_->end);
+                    empty = f->tellp() == 0;
                 }
                 else {
                     // Open in overwrite mode if the file doesn't exist (open in read-write mode
                     // fails if the file doesn't exist (unless also truncating)).
-                    f_.open(filename, open_overwrite);
-                    parse = false;
+                    f->open(filename, open_overwrite);
+                    empty = true;
                 }
                 break;
         }
 
-        if (parse) {
-            parseMetadata();
-            have_settings = true;
-        }
-        else {
-            writeEmptyHeader();
-        }
+        initialize(empty);
     }
     catch (std::ios_base::failure &c) {
         throw std::ios_base::failure("Unable to open " + filename + ": " + strerror(errno));
     }
+}
+
+void FileStorage::initialize(bool empty) {
+    if (empty)
+        writeEmptyHeader();
+    else
+        parseMetadata();
 }
 
 size_t FileStorage::size() const {
@@ -155,8 +161,8 @@ size_t FileStorage::size() const {
 
 void FileStorage::thread_insert(std::shared_ptr<const State> &&state) {
     std::unique_lock<std::mutex> lock(f_mutex_);
-    f_.seekp(0, f_.end);
-    auto location = f_.tellp();
+    f_->seekp(0, f_->end);
+    auto location = f_->tellp();
     if (location < HEADER::size) {
         throw std::runtime_error("File size is invalid, unable to write new State");
     }
@@ -183,12 +189,12 @@ void FileStorage::thread_insert(std::shared_ptr<const State> &&state) {
 
     // If dimensions and boundary are 0, update them.
     if (settings_.dimensions == 0 and state->dimensions != 0) {
-        f_.seekp(HEADER::pos::dimensions);
+        f_->seekp(HEADER::pos::dimensions);
         write_u32(state->dimensions);
         settings_.dimensions = state->dimensions;
     }
     if (settings_.boundary == 0 and state->boundary != 0) {
-        f_.seekp(HEADER::pos::boundary);
+        f_->seekp(HEADER::pos::boundary);
         write_value(state->boundary);
         settings_.boundary = state->boundary;
     }
@@ -201,25 +207,25 @@ std::shared_ptr<const State> FileStorage::load(eris_time_t t) const {
     if (t >= state_pos_.size()) return std::shared_ptr<const State>();
 
     auto state_pos = state_pos_[t];
-    f_.seekg(state_pos);
+    f_->seekg(state_pos);
 
     return readState();
 }
 
-void FileStorage::device_flush() {
+void FileStorage::storage_flush() {
     std::unique_lock<std::mutex> lock(f_mutex_);
     // Ensure the filehandle output is flushed to disk
-    f_.flush();
+    f_->flush();
 }
 
 void FileStorage::writeEmptyHeader() {
-    f_.seekp(0);
-    f_.write(HEADER::fileid, sizeof HEADER::fileid); // 'CrSt' file signature
+    f_->seekp(0);
+    f_->write(HEADER::fileid, sizeof HEADER::fileid); // 'CrSt' file signature
     write_u32(version_); // file version
-    f_.write(HEADER::test_value, sizeof HEADER::test_value); // All test values squished into one
+    f_->write(HEADER::test_value, sizeof HEADER::test_value); // All test values squished into one
 
     // Write out 0s for everything else:
-    f_.write(ZERO_BLOCK, HEADER::size - HEADER::pos::num_states);
+    f_->write(ZERO_BLOCK, HEADER::size - HEADER::pos::num_states);
 }
 
 void FileStorage::readSettings(CreativitySettings &settings) const {
@@ -236,7 +242,7 @@ void FileStorage::writeSettings(const CreativitySettings &settings) {
 
     std::unique_lock<std::mutex> lock(f_mutex_);
 
-    f_.seekp(HEADER::pos::num_states);
+    f_->seekp(HEADER::pos::num_states);
     write_u32(state_pos_.size()); // Number of states
     write_value(settings.dimensions);
     write_value(settings.readers);
@@ -275,7 +281,7 @@ void FileStorage::writeSettings(const CreativitySettings &settings) {
     //write_u32(0); // Unused padding value
 
     int64_t expect = HEADER::pos::state_first;
-    if (f_.tellp() != expect) {
+    if (f_->tellp() != expect) {
         // If this exception occurs, something in the above sequence is wrong.
         throw std::runtime_error("Header writing failed: header parameter block != " + std::to_string(expect) + " bytes");
     }
@@ -287,7 +293,7 @@ void FileStorage::writeSettings(const CreativitySettings &settings) {
 }
 
 void FileStorage::parseLibraryPointerBlock() {
-    f_.seekg(HEADER::size, f_.beg);
+    f_->seekg(HEADER::size, f_->beg);
     std::vector<std::pair<uint32_t, int64_t>> blocks;
     for (uint32_t i = 0; i < settings_.readers; i++) {
         auto rid = read_u32();
@@ -297,7 +303,7 @@ void FileStorage::parseLibraryPointerBlock() {
 
     for (auto &b : blocks) {
         auto &rid = b.first;
-        f_.seekg(b.second, f_.beg);
+        f_->seekg(b.second, f_->beg);
         lib_data data(0); // Will come back to reset the "0"
         while (true) {
             if (data.records_remaining > 0) {
@@ -321,7 +327,7 @@ void FileStorage::parseLibraryPointerBlock() {
                 else {
                     // The book id is 0, which means there are no more library books, so done.
                     // The next pos is the u32 (=0) we just read
-                    data.pos_next = -4 + f_.tellg();
+                    data.pos_next = -4 + f_->tellg();
                     break;
                 }
             }
@@ -329,13 +335,13 @@ void FileStorage::parseLibraryPointerBlock() {
                 // Nothing left in this block, so the next thing is a pointer to the next block
                 int64_t next_block = read_i64();
                 if (next_block > 0) {
-                    f_.seekg(next_block, f_.beg);
+                    f_->seekg(next_block, f_->beg);
                     data.records_remaining = LIBRARY::block_records;
                 }
                 else {
                     // The pointer is 0, which means there is no next block, so done.
                     // the next pos is the block (=0) we just read
-                    data.pos_next = -8 + f_.tellg();
+                    data.pos_next = -8 + f_->tellg();
                     break;
                 }
             }
@@ -346,19 +352,19 @@ void FileStorage::parseLibraryPointerBlock() {
 }
 
 int64_t FileStorage::newBlock() {
-    f_.seekp(0, f_.end);
-    int64_t location = f_.tellp();
+    f_->seekp(0, f_->end);
+    int64_t location = f_->tellp();
     int padding = location % BLOCK_SIZE;
     if (padding > 0) {
-        f_.write(ZERO_BLOCK, padding);
+        f_->write(ZERO_BLOCK, padding);
         location += padding;
     }
     return location;
 }
 
 void FileStorage::writeLibraryPointerBlock(const std::map<eris_id_t, ReaderState> &readers) {
-    f_.seekp(0, f_.end);
-    if (f_.tellp() != HEADER::size)
+    f_->seekp(0, f_->end);
+    if (f_->tellp() != HEADER::size)
         throwParseError("writing library pointer block failed: file is not just the header");
     // We're going to write out the first library blocks immediately after this section, so figure
     // out where the first one is: it'll be at the end, padding out to the next block.
@@ -377,7 +383,7 @@ void FileStorage::writeLibraryPointerBlock(const std::map<eris_id_t, ReaderState
 
     // Now write out the (empty) library blocks we just promised were there
     for (unsigned int i = 0; i < readers.size(); i++) {
-        f_.write(ZERO_BLOCK, BLOCK_SIZE);
+        f_->write(ZERO_BLOCK, BLOCK_SIZE);
     }
 }
 
@@ -394,12 +400,12 @@ void FileStorage::updateLibrary(const ReaderState &r) {
             if (lib.records_remaining == 0) {
                 // There is no more space in the current block, so create a new one:
                 int64_t next_block = newBlock();
-                f_.write(ZERO_BLOCK, BLOCK_SIZE);
+                f_->write(ZERO_BLOCK, BLOCK_SIZE);
                 // Now seek back to the end of the old record and write the new block location:
-                f_.seekp(lib.pos_next);
+                f_->seekp(lib.pos_next);
                 write_i64(next_block);
                 // Now seek to the first location in the new block, to write the value (below)
-                f_.seekp(next_block);
+                f_->seekp(next_block);
                 lib.records_remaining = LIBRARY::block_records;
                 lib.pos_next = next_block;
                 first = false;
@@ -408,7 +414,7 @@ void FileStorage::updateLibrary(const ReaderState &r) {
                 // If this is the first insertion for this reader, the current file pointer could be
                 // anywhere; seek to the next positions.  (After the first insertion, the file
                 // pointer will be just after the previous insertion, which is where we want it)
-                f_.seekp(lib.pos_next);
+                f_->seekp(lib.pos_next);
                 first = false;
             }
             // Otherwise we're already there from the last write
@@ -436,39 +442,39 @@ void FileStorage::addStateLocation(std::streampos location) {
     }
 
     if (past_header < 0) {
-        f_.seekp(HEADER::pos::state_first + 8 * (int64_t) curr_states);
+        f_->seekp(HEADER::pos::state_first + 8 * (int64_t) curr_states);
     }
     else {
-        f_.seekp(cont_pos_.back() + (std::streampos) 8 * (past_header % CBLOCK::states));
+        f_->seekp(cont_pos_.back() + (std::streampos) 8 * (past_header % CBLOCK::states));
     }
     write_u64(location);
 
-    f_.seekp(HEADER::pos::num_states);
+    f_->seekp(HEADER::pos::num_states);
     state_pos_.push_back(location);
     write_u32(curr_states + 1);
 }
 
 void FileStorage::createContinuationBlock() {
     int64_t location = newBlock();
-    f_.write(ZERO_BLOCK, BLOCK_SIZE);
+    f_->write(ZERO_BLOCK, BLOCK_SIZE);
     // Write the new block location either in the header (if this is the first cblock) or in the
     // previous cblock
-    f_.seekp(cont_pos_.empty() ? HEADER::pos::continuation : (int64_t) cont_pos_.back() + CBLOCK::next_cblock);
+    f_->seekp(cont_pos_.empty() ? HEADER::pos::continuation : (int64_t) cont_pos_.back() + CBLOCK::next_cblock);
     write_i64(location);
     cont_pos_.push_back(location);
 }
 
 void FileStorage::parseMetadata() {
-    f_.seekg(0, f_.end);
-    auto file_size = f_.tellg();
+    f_->seekg(0, f_->end);
+    auto file_size = f_->tellg();
     if (file_size == 0)
         throwParseError("file contains no data");
     else if (file_size < HEADER::size)
         throwParseError("file is too small to contain header data");
 
     char block[HEADER::size];
-    f_.seekg(0);
-    f_.read(block, HEADER::size);
+    f_->seekg(0);
+    f_->read(block, HEADER::size);
 
     // Make sure the CrSt file signature is found:
     for (unsigned int i = 0; i < 4; i++) {
@@ -574,8 +580,8 @@ void FileStorage::parseMetadata() {
         cont_pos_.push_back(cont);
 
         char cblock[BLOCK_SIZE];
-        f_.seekg(cont, f_.beg);
-        f_.read(cblock, sizeof cblock);
+        f_->seekg(cont, f_->beg);
+        f_->read(cblock, sizeof cblock);
 
         uint32_t block_locations = std::min(remaining, CBLOCK::states);
         parseStateLocations(cblock[0], block_locations, file_size);
@@ -587,6 +593,7 @@ void FileStorage::parseMetadata() {
         throwParseError("found " + std::to_string(state_pos_.size()) +
                 " state data locations but expected " + std::to_string(num_states));
 
+    have_settings = true;
     // Done!
 }
 

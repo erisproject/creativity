@@ -2,6 +2,7 @@
 #include <eris/Good.hpp>
 #include <eris/noncopyable.hpp>
 #include "creativity/CreativitySettings.hpp"
+#include "creativity/state/Storage.hpp"
 #include <cstdint>
 #include <mutex>
 #include <string>
@@ -9,7 +10,6 @@
 #include <vector>
 
 namespace creativity { class Book; }
-namespace creativity { namespace state { class Storage; } }
 
 /// Primary namespace for all Creativity library code.
 namespace creativity {
@@ -41,6 +41,31 @@ class Creativity : private eris::noncopyable {
          */
         CreativitySettings& set();
 
+        /** Creates a new Storage object with any type of StorageBackend class.  Writes any existing
+         * and any new data to the new Storage object.
+         *
+         * Any existing simulation states are copied from the current Storage object, then the
+         * existing Storage object is released (and destroyed, unless something else has copied its
+         * shared_ptr).  After calling this method, `.storage` will be set to the new FileStorage
+         * object.
+         */
+        template <class T, typename... Args>
+        void write(Args&&... args) {
+            auto new_storage = state::Storage::create<T>(set_, std::forward<Args>(args)...);
+            auto spair = storage();
+            auto &old_storage = spair.first;
+            if (old_storage) {
+                for (const auto &state : *old_storage) {
+                    new_storage->push_back(state);
+                    // Don't let the old storage get ahead of the new storage (we don't want to
+                    // pointlessly slam a bunch of things into memory).
+                    new_storage->flush(false);
+                }
+            }
+
+            spair.first = new_storage;
+        }
+
         /** Store the creativity simulation results in the given file, overwriting any content the
          * file may already have.  Any existing simulation states are copied from the current
          * Storage object, then the existing Storage object is released (and destroyed, unless
@@ -50,6 +75,20 @@ class Creativity : private eris::noncopyable {
          * The default simulation storage is an in-memory storage.
          */
         void fileWrite(const std::string &filename);
+
+        /** Opens a creativity simulation storage source for reading via storage().  Typically
+         * called instead of setup() when loading an existing creativity simulation record from a
+         * stored location.
+         *
+         * This method cannot be combined with a call to setup(): while that method is used to
+         * create a live simulation, this one reads a prior one.
+         */
+        template <class T, typename... Args>
+        void read(Args&&... args) {
+            if (setup_sim_) throw std::logic_error("Creativity: attempt to read() after calling setup()");
+            storage().first = state::Storage::create<T>(set_, std::forward<Args>(args)...);
+            setup_read_ = true;
+        }
 
         /** Opens a creativity simulation storage file for reading via storage().  The file is
          * opened readonly, and so any attempt to manipulate the simulation will fail.

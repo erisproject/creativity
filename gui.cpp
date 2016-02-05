@@ -1,6 +1,7 @@
 #include "creativity/Creativity.hpp"
 #include "creativity/cmdargs/GUI.hpp"
 #include "creativity/state/Storage.hpp"
+#include "creativity/state/MemoryFile.hpp"
 #include "creativity/gui/GUI.hpp"
 #include <eris/Simulation.hpp>
 #include <eris/Random.hpp>
@@ -33,6 +34,10 @@ int main(int argc, char *argv[1]) {
     // defaults for the GUI, and have a few extra leftovers that the GUI code handles itself.
     cmdargs::GUI cmd(creativity.set());
     cmd.parse(argc, argv);
+
+    // Start out with an in-memory storage "file"--it is much more efficient than actual in-memory
+    // storage of all of the states
+    creativity.write<MemoryFile>();
 
     std::cerr << std::setprecision(16);
     std::cout << std::setprecision(16);

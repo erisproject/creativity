@@ -22,7 +22,7 @@ namespace creativity { namespace state {
 template <typename T>
 inline T FileStorage::read_value() const {
     T val;
-    f_.read(reinterpret_cast<char*>(&val), sizeof val);
+    f_->read(reinterpret_cast<char*>(&val), sizeof val);
     return val;
 }
 
@@ -53,7 +53,7 @@ inline void FileStorage::write_value(const T &val) {
     std::cerr << std::dec << "\n";
 #endif
 
-    f_.write(reinterpret_cast<const char*>(&val), sizeof(T));
+    f_->write(reinterpret_cast<const char*>(&val), sizeof(T));
 }
 
 template <typename T, typename F>
