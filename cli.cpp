@@ -64,7 +64,6 @@ int main(int argc, char *argv[]) {
     std::string results_out = args.output;
     std::string args_out = results_out;
     bool overwrite = args.overwrite;
-    bool need_copy = false; // Whether we need to copy from args_out to results_out (if using --tmpdir)
 
     // Filename output
 
@@ -110,14 +109,12 @@ int main(int argc, char *argv[]) {
 
         creativity.fileWrite(tmpfile);
         results_out = tmpfile;
-        need_copy = true;
     }
     catch (std::exception &e) {
         std::cerr << "Unable to write to file: " << e.what() << "\n";
         exit(1);
     }
-    std::cout << "Writing simulation results to ";
-    if (need_copy) std::cout << "temp file: ";
+    std::cout << "Writing simulation results to temp file: ";
     std::cout << results_out << "\n";
 
     creativity.setup();
@@ -198,52 +195,50 @@ int main(int argc, char *argv[]) {
     // Destroy the simulation (which also closes the storage)
     cr_ptr.reset();
 
-    if (need_copy) {
-        int error = std::rename(results_out.c_str(), args_out.c_str());
-        if (error) { // Rename failed (perhaps across filesystems) so do a copy-and-delete
-            if (not overwrite) {
-                if (fs::exists(args_out)) {
-                    std::cerr << "\nError: `" << args_out << "' already exists; specify a different file or add `--overwrite' option to overwrite\n";
-                    exit(1);
-                }
-            }
-
-            std::cout << "Copying tmpfile to " << args_out << "..." << std::flush;
-            {
-                std::ifstream src; src.exceptions(src.failbit);
-                std::ofstream dst; dst.exceptions(dst.failbit);
-                try { src.open(results_out, std::ios::binary); }
-                catch (std::ios_base::failure&) {
-                    std::cerr << "\nUnable to read " << results_out << ": " << std::strerror(errno) << "\n";
-                    exit(1);
-                }
-
-                try { dst.open(args_out, std::ios::binary | std::ios::trunc); }
-                catch (std::ios_base::failure&) {
-                    std::cerr << "\nUnable to write to " << args_out << ": " << std::strerror(errno) << "\n";
-                    exit(1);
-                }
-
-                try { dst << src.rdbuf(); }
-                catch (std::ios_base::failure&) {
-                    std::cerr << "\nUnable to copy file contents: " << std::strerror(errno) << "\n";
-                    exit(1);
-                }
-            }
-            std::cout << " done.\nRemoving tmpfile..." << std::flush;
-
-            // Copy succeeded, so delete the tmpfile
-            error = std::remove(results_out.c_str());
-            if (error) {
-                // If we can't remove it, print a warning (but don't die, because we also copied it to the right place)
-                std::cerr << "\nWarning: removing tmpfile `" << results_out << "' failed: " << std::strerror(errno) << "\n";
-            }
-            else {
-                std::cout << " done." << std::endl;
+    int error = std::rename(results_out.c_str(), args_out.c_str());
+    if (error) { // Rename failed (perhaps across filesystems) so do a copy-and-delete
+        if (not overwrite) {
+            if (fs::exists(args_out)) {
+                std::cerr << "\nError: `" << args_out << "' already exists; specify a different file or add `--overwrite' option to overwrite\n";
+                exit(1);
             }
         }
-        results_out = args_out;
+
+        std::cout << "Copying tmpfile to " << args_out << "..." << std::flush;
+        {
+            std::ifstream src; src.exceptions(src.failbit);
+            std::ofstream dst; dst.exceptions(dst.failbit);
+            try { src.open(results_out, std::ios::binary); }
+            catch (std::ios_base::failure&) {
+                std::cerr << "\nUnable to read " << results_out << ": " << std::strerror(errno) << "\n";
+                exit(1);
+            }
+
+            try { dst.open(args_out, std::ios::binary | std::ios::trunc); }
+            catch (std::ios_base::failure&) {
+                std::cerr << "\nUnable to write to " << args_out << ": " << std::strerror(errno) << "\n";
+                exit(1);
+            }
+
+            try { dst << src.rdbuf(); }
+            catch (std::ios_base::failure&) {
+                std::cerr << "\nUnable to copy file contents: " << std::strerror(errno) << "\n";
+                exit(1);
+            }
+        }
+        std::cout << " done.\nRemoving tmpfile..." << std::flush;
+
+        // Copy succeeded, so delete the tmpfile
+        error = std::remove(results_out.c_str());
+        if (error) {
+            // If we can't remove it, print a warning (but don't die, because we also copied it to the right place)
+            std::cerr << "\nWarning: removing tmpfile `" << results_out << "' failed: " << std::strerror(errno) << "\n";
+        }
+        else {
+            std::cout << " done." << std::endl;
+        }
     }
+    results_out = args_out;
 
     std::cout << "Simulation complete.  Results saved to " << results_out << "\n\n";
 }
