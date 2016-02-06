@@ -176,18 +176,25 @@ class FileStorage : public StorageBackend {
          * contents are copied: any changes made after this call will not be present in the
          * compressed file.
          *
+         * \param filename the filename to write to
+         * \param level the xz compression level, from 0 to 9.  Defaults to 3, which is very fast
+         * compared to higher levels, and compresses typical .crstate files almost as well as 9.
          * \throws std::runtime_error (or a derived object thereof, such as std::ios_base::failure)
          * upon I/O failure or liblzma internal errors.
          */
-        void copyToXZ(const std::string &filename);
+        void copyToXZ(const std::string &filename, uint32_t level = 3);
 
         /** Reads all available data from the given input stream, compresses it to xz format, and
          * writes the xz data to the given output stream.
          *
+         * \param in the uncompressed source
+         * \param out the ostream to write the compressed data to
+         * \param level the XZ compression level, from 0 to 9.  Defaults to 3, which is much faster
+         * than higher levels, but compresses typical .crstate files nearly as well.
          * \throws std::runtime_error (or a derived object thereof, such as std::ios_base::failure)
          * upon I/O failure or liblzma internal errors.
          */
-        static void compressXZ(std::istream &in, std::ostream &out);
+        static void compressXZ(std::istream &in, std::ostream &out, uint32_t level = 3);
 
         /** Reads compressed xz data from the given input stream (which must be already opened for
          * reading and positioned at the beginning of the xz data) and writes the decompressed data

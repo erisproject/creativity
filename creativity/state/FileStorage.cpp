@@ -1090,26 +1090,26 @@ void FileStorage::copyTo(const std::string &filename) {
     out << f_->rdbuf();
 }
 
-void FileStorage::copyToXZ(const std::string &filename) {
+void FileStorage::copyToXZ(const std::string &filename, uint32_t level) {
     std::unique_lock<std::mutex> lock(f_mutex_);
     std::ofstream xzout;
     xzout.exceptions(xzout.failbit | xzout.badbit);
     xzout.open(filename, open_overwrite);
     f_->seekg(0, f_->beg);
-    compressXZ(*f_, xzout);
+    compressXZ(*f_, xzout, level);
 }
 
-void FileStorage::compressXZ(std::istream &in, std::ostream &out) {
+void FileStorage::compressXZ(std::istream &in, std::ostream &out, uint32_t level) {
     lzma_stream strm = LZMA_STREAM_INIT;
     // Some testing with .crstate files convinced me that -3 is optimal: it's quite fast (compared
     // to -4 and above), and the higher numbers offer only a couple extra percentage of compression
     // (and actually, -4 did worse).
-    lzma_ret ret = lzma_easy_encoder(&strm, 3, LZMA_CHECK_CRC64);
+    lzma_ret ret = lzma_easy_encoder(&strm, level, LZMA_CHECK_CRC64);
 
     if (ret != LZMA_OK)
         throw std::runtime_error(std::string("liblzma initialization failed: ") +
                 (ret == LZMA_MEM_ERROR ? "Memory allocation failed" :
-                 ret == LZMA_OPTIONS_ERROR ? "Specified preset is not supported" :
+                 ret == LZMA_OPTIONS_ERROR ? "Specified compression level is invalid/not supported" :
                  ret == LZMA_UNSUPPORTED_CHECK ? "Specified integrity check is not supported" :
                  "An unknown error occured"));
 
