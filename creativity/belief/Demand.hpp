@@ -158,8 +158,6 @@ class Demand : public eris::belief::BayesianLinearRestricted {
 
         /// Returns "Demand", the name of this model.
         virtual std::string display_name() const override { return "Demand"; }
-
-        ERIS_BELIEF_BAYESIANLINEAR_DERIVED_COMMON_METHODS(Demand)
 };
 
 }}

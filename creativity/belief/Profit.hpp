@@ -127,8 +127,6 @@ class Profit : public eris::belief::BayesianLinearRestricted {
 
         /// Returns "Profit", the name of this model
         virtual std::string display_name() const override { return "Profit"; }
-
-        ERIS_BELIEF_BAYESIANLINEAR_DERIVED_COMMON_METHODS(Profit)
 };
 
 }}

@@ -47,8 +47,6 @@ class ProfitStream : public eris::belief::BayesianLinear {
 
         /// Returns "ProfitStream", the name of this model
         virtual std::string display_name() const override { return "ProfitStream"; }
-
-        ERIS_BELIEF_BAYESIANLINEAR_DERIVED_COMMON_METHODS(ProfitStream)
 };
 
 }}

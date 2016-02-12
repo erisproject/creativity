@@ -627,10 +627,10 @@ void Reader::updateDemandBelief() {
             i++;
         }
 
-        demand_belief_ = std::move(demand_belief_).weaken(weaken).update(y.head(i), X.topRows(i));
+        demand_belief_ = decltype(demand_belief_)(std::move(demand_belief_), y.head(i), X.topRows(i), weaken);
     }
     else if (weaken != 1.0)
-        demand_belief_ = std::move(demand_belief_).weaken(weaken);
+        demand_belief_ = decltype(demand_belief_)(std::move(demand_belief_), weaken);
 }
 void Reader::updateProfitStreamBelief() {
     // FIXME: before re-enabling this, the belief needs to be updated somehow to track public prize
@@ -801,10 +801,10 @@ void Reader::updateProfitBelief() {
             i++;
         }
 
-        *profit_belief_ = std::move(*profit_belief_).weaken(weaken).update(y, X);
+        *profit_belief_ = Profit(std::move(*profit_belief_), y, X, weaken);
     }
     else if (weaken != 1.0) {
-        *profit_belief_ = std::move(*profit_belief_).weaken(weaken);
+        *profit_belief_ = Profit(std::move(*profit_belief_), weaken);
     }
 
     // Also include books still on the market in an extrapolated belief, but we want to throw these
@@ -826,7 +826,7 @@ void Reader::updateProfitBelief() {
         }
 
         // extrapolation uses just-updated non-extrapolation as prior, with no weakening
-        profit_belief_extrap_.reset(new Profit(profit_belief_->update(y, X)));
+        profit_belief_extrap_.reset(new Profit(*profit_belief_, y, X));
     }
 }
 
