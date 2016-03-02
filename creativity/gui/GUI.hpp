@@ -127,7 +127,7 @@ class GUI : eris::noncopyable {
          * state; if omitted, the GUI switches to the last state if the user was already there
          * before the signal, and otherwise doesn't change the state.
          */
-        void newStates(unsigned long switch_to = (unsigned long) -1);
+        void newStates(eris::eris_time_t switch_to = (eris::eris_time_t) -1);
 
         /** Sends a signal to the GUI thread that the simulation setup is complete.  The GUI will
          * disable the various simulation setup options and start/initialize buttons and switch to
@@ -144,7 +144,7 @@ class GUI : eris::noncopyable {
          * \param end the simulation stage at which the current run will stop
          * \param speed the speed (in iterations per second)
          */
-        void progress(unsigned long t, unsigned long end, double speed);
+        void progress(eris::eris_time_t t, eris::eris_time_t end, double speed);
 
         /** Sends a signal to the GUI thread that the simulation has stopped running.
          *
@@ -324,8 +324,8 @@ class GUI : eris::noncopyable {
                 std::string message;
                 /// Possible bool
                 bool boolean;
-                /// Possible unsigned longs associated with the signal.
-                std::vector<unsigned long> uls;
+                /// Possible uint64_t values associated with the signal.
+                std::vector<uint64_t> uls;
                 /// Doubles
                 std::vector<double> doubles;
 
@@ -339,8 +339,10 @@ class GUI : eris::noncopyable {
                 Signal(Type type, bool b) : type{type}, boolean{b} {}
                 /// Signal with a single double value
                 Signal(Type type, double d) : type{type}, doubles(1, d) {}
-                /// Signal with a single unsigned long value
-                Signal(Type type, unsigned long ul) : type{type}, uls(1, ul) {}
+                /// Signal with a single unsigned integer value (value will be stored in uls)
+                template<typename UIntT, typename = typename std::enable_if<std::is_integral<UIntT>::value and std::is_unsigned<UIntT>::value>::type>
+                Signal(Type type, UIntT ul) : type{type}, uls(1, ul) {}
+                /// Signal with a single uint32_t value (will be stored in uls)
         };
 
         /// The queue of signals that have been sent to but not yet processed by the GUI thread
@@ -450,16 +452,16 @@ class GUI : eris::noncopyable {
 
         /** Called to update the GUI tabs to display the state at the given time.
          */
-        void thr_set_state(unsigned long t);
+        void thr_set_state(eris::eris_time_t t);
 
         /** The state currently be displayed. */
-        unsigned long state_curr_ = (unsigned long) -1;
+        eris::eris_time_t state_curr_ = (eris::eris_time_t) -1;
 
         /** The current number of states known to the GUI.  `creativity_.storage.size() >=
          * state_num_` is guaranteeded to be true.  There may be more in the `creativity_.storage`
          * variable if the GUI hasn't received and processed the notification yet.
          */
-        unsigned long state_num_ = 0;
+        eris::eris_time_t state_num_ = 0;
 
         /** Opens a dialog for the given member, which must be either a Reader or a Book.  If the
          * dialog is already open, it is presented again (which is window manager dependent, but
@@ -489,15 +491,11 @@ class GUI : eris::noncopyable {
         /** The custom graph area */
         std::unique_ptr<GraphArea> graph_;
 
-        /** The various objects used for the Agents tab */
+        /** The Agents tab */
         Gtk::ScrolledWindow *rdr_win_;
-        std::vector<Glib::RefPtr<ReaderStore>> rdr_models_;
-        std::vector<std::unique_ptr<Gtk::TreeView>> rdr_trees_;
 
-        /** The various objects used for the Books tab */
+        /** The Books tab */
         Gtk::ScrolledWindow *bk_win_;
-        std::vector<Glib::RefPtr<BookStore>> bk_models_;
-        std::vector<std::unique_ptr<Gtk::TreeView>> bk_trees_;
 
         /** Obtains a widget from the current Gtk::Builder and returns it (as a pointer).
          */
@@ -544,8 +542,6 @@ class GUI : eris::noncopyable {
         using rt_point = boost::geometry::model::point<double, 2, boost::geometry::cs::cartesian>;
         using rt_val = std::pair<rt_point, eris::eris_id_t>;
         using RTree = boost::geometry::index::rtree<rt_val, boost::geometry::index::rstar<16>>;
-        /** rtrees of reader/book points for each state. */
-        std::vector<std::unique_ptr<RTree>> rtrees_;
 
         /** Returns the `n` nearest points/eris_id_t pairs to the given rt_point.  May returns fewer
          * than `n` (including 0) if there are not `n` points within `radius` pixels.
@@ -569,6 +565,23 @@ class GUI : eris::noncopyable {
         std::function<bool(GdkEventMotion* event)> motion_handler_;
         sigc::connection motion_handler_conn_;
         Glib::RefPtr<Gdk::Cursor> hand_;
+
+        /** The various per-period data objects, used for constructing the data elements for a
+         * period */
+        struct temporal_data {
+            Glib::RefPtr<ReaderStore> rdr_model;
+            std::unique_ptr<Gtk::TreeView> rdr_tree;
+            Glib::RefPtr<BookStore> bk_model;
+            std::unique_ptr<Gtk::TreeView> bk_tree;
+            std::unique_ptr<RTree> rtree;
+        };
+
+        /// Cache of most-recently-used temporal data
+        std::list<std::pair<eris::eris_time_t, temporal_data>> temporal_cache_;
+        /// Size of the temporal cache data; also used by GraphArea for the size of its temporal
+        /// image data cache
+        unsigned int temporal_cache_size_ = 10;
+
 };
 
 template <typename... Args>

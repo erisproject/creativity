@@ -1,4 +1,5 @@
 #pragma once
+#include <eris/types.hpp>
 #include <eris/noncopyable.hpp>
 #include <eris/WrappedPositional.hpp>
 #include <gtkmm/drawingarea.h>
@@ -352,8 +353,11 @@ class GraphArea : public Gtk::DrawingArea, eris::noncopyable {
         /// Helper object for doing wrapping calculations
         eris::WrappedPositionalBase wpb_;
 
-        /// Cache of image surfaces; these save redrawing when transitioning between states
-        std::vector<Cairo::RefPtr<Cairo::ImageSurface>> drawing_cache_;
+        /** Cache of the most recently used image surfaces; these save redrawing when
+         * transitioning back and forth between states.  The size of the cache is governed by
+         * GUI::temporal_cache_size_.
+         */
+        std::list<std::pair<eris::eris_time_t, Cairo::RefPtr<Cairo::ImageSurface>>> drawing_cache_;
         /// The width of the elements in drawing_cache_.
         int drawing_cache_width_ = -1;
         /// The height of the elements in drawing_cache_.

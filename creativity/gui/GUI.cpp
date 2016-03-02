@@ -592,123 +592,138 @@ void GUI::thr_connect_vis_setting(
     thr_connect_vis_colour(field, colour, needs_all, needs_any);
 }
 
-void GUI::thr_set_state(unsigned long t) {
+void GUI::thr_set_state(eris_time_t t) {
     if (t == state_curr_ or state_num_ == 0) return;
 
-    std::shared_ptr<const State> state;
-    {
-        size_t storage_size;
-        {
-            auto st = creativity_.storage();
-            state = (*st.first)[t]; // Will throw if `t` is invalid
-            storage_size = st.first->size();
+    // First get and the requested state into memory (if not already loaded)
+    std::shared_ptr<const State> state = (*creativity_.storage().first)[t];
+
+    auto found = temporal_cache_.end();
+    auto last = temporal_cache_.end();
+    if (not temporal_cache_.empty()) {
+        // See if the cache contains the current state.  If it does, we'll use it, and also move it
+        // to the front of the list (if not already there) since it is now the most recently
+        // accessed (and thus should be last of the current cache to be evicted).
+        found = std::find_if(temporal_cache_.begin(), temporal_cache_.end(),
+                [&](const decltype(temporal_cache_)::value_type& p) { return p.first == t; });
+        // We also need the previous state (which *should* be at the front of the cache)
+        if (state_curr_ != (eris_time_t) -1) {
+            last = std::find_if(temporal_cache_.begin(), temporal_cache_.end(),
+                    [&](const decltype(temporal_cache_)::value_type& p) { return p.first == state_curr_; });
         }
 
-        // Enlarge if necessary
-        if (rdr_models_.size() < storage_size) rdr_models_.resize(storage_size);
-        if (rdr_trees_.size() < storage_size) rdr_trees_.resize(storage_size);
-        if (bk_models_.size() < storage_size) bk_models_.resize(storage_size);
-        if (bk_trees_.size() < storage_size) bk_trees_.resize(storage_size);
-        if (rtrees_.size() < storage_size) rtrees_.resize(storage_size);
+        // If we found the new state, move it to the front of the cache (if not already there)
+        if (found != temporal_cache_.end() and found != temporal_cache_.begin()) {
+            temporal_cache_.splice(temporal_cache_.begin(), temporal_cache_, found);
+        }
     }
 
-    // Values may be null pointers--if so, create new model stores
-    if (not rdr_models_[t]) rdr_models_[t] = ReaderStore::create(state);
-    if (not bk_models_[t]) bk_models_[t] = BookStore::create(state);
+    if (found == temporal_cache_.end()) {
+        // Not found in the cache, so create a new temporal_data element:
+        temporal_data tdnew;
+        tdnew.rdr_model = ReaderStore::create(state);
+        tdnew.bk_model = BookStore::create(state);
 
+        temporal_cache_.emplace_front(eris_time_t(t), std::move(tdnew));
+        found = temporal_cache_.begin();
+    }
+
+    temporal_data &td = found->second;
+
+    // Store the current reader/book selection (if any), and attempt to preserve it across the state change
     Gtk::TreeModel::Path rdr_select, bk_select;
 
-    if (state_curr_ == (unsigned long) -1) {
+    if (last == temporal_cache_.end()) {
         // This is the first state, replacing the window initialization fake state.
         //
         // Apply default sort orders (readers go in ID ascending, books go by age ascending).  Do
         // this here rather that {Reader,Book}Store::create because the sort order will be copied to
         // new state transitions; if the user changes the sort order, it's that new order rather
         // than this default order that we want to apply.
-        rdr_models_[t]->set_sort_column(rdr_models_[t]->columns.id, Gtk::SortType::SORT_ASCENDING);
-        bk_models_[t]->set_sort_column(bk_models_[t]->columns->age, Gtk::SortType::SORT_ASCENDING);
+        td.rdr_model->set_sort_column(td.rdr_model->columns.id, Gtk::SortType::SORT_ASCENDING);
+        td.bk_model->set_sort_column(td.bk_model->columns->age, Gtk::SortType::SORT_ASCENDING);
     }
     else {
         // Transitioning from one (actual) state to another: preserve sort order and reader/book
-        // selection from the old treeview&model to the newly selected treeview&model.
+        // selection from the old treeview and model to the newly-selected treeview and model.
+        temporal_data &tdold = last->second;
         int old_sort_col, new_sort_col;
         Gtk::SortType old_sort_order, new_sort_order;
 
         // Readers:
-        rdr_models_[state_curr_]->get_sort_column_id(old_sort_col, old_sort_order);
-        rdr_models_[t]->get_sort_column_id(new_sort_col, new_sort_order);
+        tdold.rdr_model->get_sort_column_id(old_sort_col, old_sort_order);
+        td.rdr_model->get_sort_column_id(new_sort_col, new_sort_order);
         if (old_sort_col != new_sort_col or old_sort_order != new_sort_order)
-            rdr_models_[t]->set_sort_column(old_sort_col, old_sort_order);
+            td.rdr_model->set_sort_column(old_sort_col, old_sort_order);
 
         // Books:
-        bk_models_[state_curr_]->get_sort_column_id(old_sort_col, old_sort_order);
-        bk_models_[t]->get_sort_column_id(new_sort_col, new_sort_order);
+        tdold.bk_model->get_sort_column_id(old_sort_col, old_sort_order);
+        td.bk_model->get_sort_column_id(new_sort_col, new_sort_order);
         if (old_sort_col != new_sort_col or old_sort_order != new_sort_order)
-            bk_models_[t]->set_sort_column(old_sort_col, old_sort_order);
+            td.bk_model->set_sort_column(old_sort_col, old_sort_order);
 
         // Figure out if a reader/book is selected so that we can also select it in the new model
-        auto rdr_sel_iter = rdr_trees_[state_curr_]->get_selection()->get_selected();
+        auto rdr_sel_iter = tdold.rdr_tree->get_selection()->get_selected();
         if (rdr_sel_iter) {
-            auto selected_id = rdr_models_[state_curr_]->member(rdr_sel_iter).id;
-            rdr_select = rdr_models_[t]->find(selected_id, rdr_sel_iter);
+            auto selected_id = tdold.rdr_model->member(rdr_sel_iter).id;
+            rdr_select = td.rdr_model->find(selected_id, rdr_sel_iter);
         }
 
-        auto bk_sel_iter = bk_trees_[state_curr_]->get_selection()->get_selected();
+        auto bk_sel_iter = tdold.bk_tree->get_selection()->get_selected();
         if (bk_sel_iter) {
-            auto selected_id = bk_models_[state_curr_]->member(bk_sel_iter).id;
-            bk_select = bk_models_[t]->find(selected_id, bk_sel_iter);
+            auto selected_id = tdold.bk_model->member(bk_sel_iter).id;
+            bk_select = td.bk_model->find(selected_id, bk_sel_iter);
         }
-
     }
 
     // Make sure we have properly set up Gtk::TreeView references and not null pointers
-    if (not rdr_trees_[t]) {
+    if (not td.rdr_tree) {
         auto *tv = new Gtk::TreeView;
-        rdr_models_[t]->appendColumnsTo(*tv);
+        td.rdr_model->appendColumnsTo(*tv);
         tv->set_fixed_height_mode(true);
-        tv->signal_row_activated().connect([this] (const Gtk::TreeModel::Path &path, Gtk::TreeViewColumn*) -> void {
-            thr_info_dialog(rdr_models_[state_curr_]->member(path).id);
+        tv->signal_row_activated().connect([&] (const Gtk::TreeModel::Path &path, Gtk::TreeViewColumn*) -> void {
+            thr_info_dialog(td.rdr_model->member(path).id);
         });
-        tv->set_model(rdr_models_[t]);
+        tv->set_model(td.rdr_model);
         tv->show();
-        rdr_trees_[t].reset(tv);
+        td.rdr_tree.reset(tv);
     }
-    if (not bk_trees_[t]) {
+    if (not td.bk_tree) {
         auto *tv = new Gtk::TreeView;
-        bk_models_[t]->appendColumnsTo(*tv);
+        td.bk_model->appendColumnsTo(*tv);
         tv->set_fixed_height_mode(true);
-        tv->signal_row_activated().connect([this] (const Gtk::TreeModel::Path &path, Gtk::TreeViewColumn*) -> void {
-            thr_info_dialog(bk_models_[state_curr_]->member(path).id);
+        tv->signal_row_activated().connect([&] (const Gtk::TreeModel::Path &path, Gtk::TreeViewColumn*) -> void {
+            thr_info_dialog(td.bk_model->member(path).id);
         });
-        tv->set_model(bk_models_[t]);
+        tv->set_model(td.bk_model);
         tv->show();
-        bk_trees_[t].reset(tv);
+        td.bk_tree.reset(tv);
     }
 
 
     // Apply the previous selection to the new treeviews
     if (rdr_select.empty())
-        rdr_trees_[t]->get_selection()->unselect_all();
+        td.rdr_tree->get_selection()->unselect_all();
     else {
-        rdr_trees_[t]->get_selection()->select(rdr_select);
-        rdr_trees_[t]->scroll_to_row(rdr_select);
+        td.rdr_tree->get_selection()->select(rdr_select);
+        td.rdr_tree->scroll_to_row(rdr_select);
     }
 
     if (bk_select.empty())
-        bk_trees_[t]->get_selection()->unselect_all();
+        td.bk_tree->get_selection()->unselect_all();
     else {
-        bk_trees_[t]->get_selection()->select(bk_select);
-        bk_trees_[t]->scroll_to_row(bk_select);
+        td.bk_tree->get_selection()->select(bk_select);
+        td.bk_tree->scroll_to_row(bk_select);
     }
 
     // Replace the current treeview in the window with the new one
     rdr_win_->remove();
-    rdr_win_->add(*rdr_trees_[t]);
+    rdr_win_->add(*td.rdr_tree);
 
     bk_win_->remove();
-    bk_win_->add(*bk_trees_[t]);
+    bk_win_->add(*td.bk_tree);
 
-    if (not rtrees_[t]) {
+    if (not td.rtree) {
         // Stick all points into an rtree so that we can quickly find the nearest one (needed, in
         // particular, for fast mouseovers).
         //
@@ -719,8 +734,8 @@ void GUI::thr_set_state(unsigned long t) {
         //
         // Also note that only *visible* points get added here (according to
         // graph_->design.enabled.*)
-        rtrees_[t] = std::unique_ptr<RTree>(new RTree);
-        thr_init_rtree(*rtrees_[t], state);
+        td.rtree = std::unique_ptr<RTree>(new RTree);
+        thr_init_rtree(*td.rtree, state);
     }
 
     // Now go through any open reader/book info dialog windows: delete any that have been closed,
@@ -795,17 +810,22 @@ void GUI::thr_set_state(unsigned long t) {
 #undef GUI_SUMMARY_CALC
 
     if (graph_->get_is_drawable()) graph_->queue_draw();
+
+    // Lastly remove any expired cache elements
+    while (temporal_cache_.size() > temporal_cache_size_) temporal_cache_.pop_back();
 }
 
 void GUI::thr_reset_rtrees() {
-    rtrees_.clear();
-    if (state_num_ == 0) return; // No states to worry about!
-    auto st = creativity_.storage();
-    rtrees_.resize(st.first->size());
-    auto state = (*st.first)[state_curr_];
-
-    rtrees_[state_curr_] = std::unique_ptr<RTree>(new RTree);
-    thr_init_rtree(*rtrees_[state_curr_], state);
+    for (auto &td : temporal_cache_) {
+        if (td.first == state_curr_) {
+            auto state = creativity_.storage().first->operator[](state_curr_);
+            td.second.rtree.reset(new RTree);
+            thr_init_rtree(*td.second.rtree, state);
+        }
+        else {
+            td.second.rtree.reset();
+        }
+    }
 }
 
 void GUI::thr_init_rtree(RTree &rt, const std::shared_ptr<const State> &state) const {
@@ -828,8 +848,8 @@ void GUI::thr_init_rtree(RTree &rt, const std::shared_ptr<const State> &state) c
 
 std::vector<GUI::rt_val> GUI::thr_nearest(const rt_point &point, int n) {
     std::vector<rt_val> nearest;
-    if (state_num_ > 0)
-        rtrees_[state_curr_]->query(boost::geometry::index::nearest(point, n), std::back_inserter(nearest));
+    if (not temporal_cache_.empty() and temporal_cache_.front().first == state_curr_)
+        temporal_cache_.front().second.rtree->query(boost::geometry::index::nearest(point, n), std::back_inserter(nearest));
     return nearest;
 }
 
@@ -1066,7 +1086,7 @@ void GUI::thr_signal() {
         }
 
         if (not last_new_states.uls.empty()) {
-            thr_set_state(std::min(state_num_-1, last_new_states.uls[0]));
+            thr_set_state(std::min(state_num_-1, (eris_time_t) last_new_states.uls[0]));
         }
     }
 }
@@ -1216,9 +1236,9 @@ void GUI::runSim() {
     queueEvent(Event::Type::run);
 }
 
-void GUI::newStates(unsigned long switch_to) {
+void GUI::newStates(eris_time_t switch_to) {
     queueSignal(
-            (switch_to == (unsigned long)-1)
+            (switch_to == (eris_time_t)-1)
             ? Signal::Type::new_states
             : Signal(Signal::Type::new_states, switch_to)
             );
@@ -1231,7 +1251,7 @@ void GUI::initialized() {
 
 void GUI::running() { queueSignal(Signal::Type::running); }
 
-void GUI::progress(unsigned long t, unsigned long end, double speed) {
+void GUI::progress(eris_time_t t, eris_time_t end, double speed) {
     Signal s{Signal::Type::progress};
     s.uls = {t, end};
     s.doubles = {speed};

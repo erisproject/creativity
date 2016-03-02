@@ -83,220 +83,243 @@ bool GraphArea::on_draw(const Cairo::RefPtr<Cairo::Context> &cr_grapharea) {
         drawing_cache_height_ = height;
     }
 
-    if (drawing_cache_.size() < gui_.state_curr_ + 1) {
-        drawing_cache_.resize(gui_.state_num_);
-    }
-    if (not drawing_cache_[gui_.state_curr_]) {
-
-        auto cr = Cairo::Context::create(
-                drawing_cache_[gui_.state_curr_] = Cairo::ImageSurface::create(Cairo::FORMAT_RGB24, width, height)
-        );
-
-        std::shared_ptr<const State> state, prev_state;
-
-        {
-            auto st = gui_.creativity_.storage();
-            if (st.first->empty())
-                state = std::make_shared<State>();
-            else {
-                state = (*st.first)[gui_.state_curr_];
-                if (gui_.state_curr_ > 0) prev_state = (*st.first)[gui_.state_curr_ - 1];
+    const auto &t = gui_.state_curr_;
+    if (not drawing_cache_.empty()) {
+        // See if the cache contains the current state.  If it does, we'll use it, and also move it
+        // to the front of the list (if not already there) since it is now the most recently
+        // accessed (and thus should be last of the current cache to be evicted).
+        auto found = std::find_if(drawing_cache_.begin(), drawing_cache_.end(),
+                [&t](const decltype(drawing_cache_)::value_type& p) { return p.first == t; });
+        if (found != drawing_cache_.end()) {
+            // Move to the front of the cache (if not already there)
+            if (found != drawing_cache_.begin()) {
+                drawing_cache_.splice(drawing_cache_.begin(), drawing_cache_, found);
             }
-        }
 
+            // Draw
+            cr_grapharea->set_source(found->second, 0, 0);
+            cr_grapharea->paint();
+
+            return true;
+        }
+    }
+
+    // The period to draw wasn't in the cache, so we need to draw it
+
+    auto surface = Cairo::ImageSurface::create(Cairo::FORMAT_RGB24, width, height);
+    auto cr = Cairo::Context::create(surface);
+
+    std::shared_ptr<const State> state, prev_state;
+
+    // Get shared pointers to the current and previous state (we only need the latter when drawing
+    // reader movement lines).
+    {
+        auto st = gui_.creativity_.storage();
+        if (st.first->empty())
+            state = std::make_shared<State>();
+        else {
+            state = (*st.first)[t];
+            if (t > 0 and design.enabled.reader and design.enabled.movement)
+                prev_state = (*st.first)[t - 1];
+        }
+    }
+
+    cr->save();
+
+    // Paint the background white
+    cr->set_source(design.colour.background);
+    cr->paint();
+
+    auto trans = graph_to_canvas();
+
+    // In 1D mode, draw the circle first (in 2+D, we draw the axes at the end so that they're on
+    // top of everything).
+    if (gui_.creativity_.parameters.dimensions == 1 and design.enabled.axes) {
+        drawCircularAxis(cr, trans);
+    }
+
+    // Things get drawn here in order from least to most important (since later things are drawn on
+    // top of earlier things).  This means we have to loop over the same vector a few times,
+    // unfortunately.
+
+    // Draw reader movement lines (if the reader existed in the previous period).
+    if (design.enabled.reader and design.enabled.movement and prev_state) {
         cr->save();
+        cr->set_dash(design.dash.movement, 0);
+        cr->set_line_width(design.stroke_width.movement);
+        double r, g, b, a;
+        design.colour.movement->get_rgba(r,g,b,a);
+        a = std::max(0.0, std::min(1.0, a * design.style.movement_alpha_multiplier));
+        auto start_colour = Cairo::SolidPattern::create_rgba(r, g, b, a);
 
-        // Paint the background white
-        cr->set_source(design.colour.background);
-        cr->paint();
-
-        auto trans = graph_to_canvas();
-
-
-        // In 1D mode, draw the circle first (in 2+D, we draw the axes at the end so that they're on
-        // top of everything).
-        if (gui_.creativity_.parameters.dimensions == 1 and design.enabled.axes) {
-            drawCircularAxis(cr, trans);
-        }
-
-        // Things get draw here in order from least to most important (since later things are drawn
-        // on top of earlier things).  This means we have to loop over the same vector a few times,
-        // unfortunately.
-
-        // Draw reader movement lines (if the reader existed in the previous period).
-        if (design.enabled.reader and design.enabled.movement and prev_state) {
-            cr->save();
-            cr->set_dash(design.dash.movement, 0);
-            cr->set_line_width(design.stroke_width.movement);
-            double r, g, b, a;
-            design.colour.movement->get_rgba(r,g,b,a);
-            a = std::max(0.0, std::min(1.0, a * design.style.movement_alpha_multiplier));
-            auto start_colour = Cairo::SolidPattern::create_rgba(r, g, b, a);
-
-            for (auto &rpair : state->readers) {
-                if (prev_state->readers.count(rpair.first) > 0) {
-                    auto &was_at = prev_state->readers.at(rpair.first).position;
-                    drawLine(cr, trans, was_at, rpair.second.position, 5.0, start_colour, design.colour.movement);
-                }
+        for (auto &rpair : state->readers) {
+            if (prev_state->readers.count(rpair.first) > 0) {
+                auto &was_at = prev_state->readers.at(rpair.first).position;
+                drawLine(cr, trans, was_at, rpair.second.position, 5.0, start_colour, design.colour.movement);
             }
-            cr->restore();
         }
+        cr->restore();
+    }
 
-        // Draw lines from readers to newly purchased books (unless we're not showing newly
-        // purchased books)
-        if (design.enabled.reading and design.enabled.reader and
-                (design.enabled.book_live or design.enabled.book_dead or design.enabled.book_public)) {
-            cr->save();
-            cr->set_source(design.colour.reading);
-            cr->set_dash(design.dash.reading, 0);
-            cr->set_line_width(design.stroke_width.reading);
-            for (auto &rpair : state->readers) {
-                auto &r = rpair.second;
+    // Draw lines from readers to newly purchased books (unless we're not showing newly
+    // purchased books)
+    if (design.enabled.reading and design.enabled.reader and
+            (design.enabled.book_live or design.enabled.book_dead or design.enabled.book_public)) {
+        cr->save();
+        cr->set_source(design.colour.reading);
+        cr->set_dash(design.dash.reading, 0);
+        cr->set_line_width(design.stroke_width.reading);
+        for (auto &rpair : state->readers) {
+            auto &r = rpair.second;
 
-                for (auto &book_id : r.new_books) {
-                    auto &b = state->books.at(book_id);
-                    bool show = (b.market_private ? design.enabled.book_live :
-                            b.market_public() ? design.enabled.book_public :
-                            design.enabled.book_dead);
-                    if (show)
-                        drawLine(cr, trans, r.position, b.position);
-                }
+            for (auto &book_id : r.new_books) {
+                auto &b = state->books.at(book_id);
+                bool show = (b.market_private ? design.enabled.book_live :
+                        b.market_public() ? design.enabled.book_public :
+                        design.enabled.book_dead);
+                if (show)
+                    drawLine(cr, trans, r.position, b.position);
             }
-            cr->stroke();
-            cr->restore();
         }
+        cr->stroke();
+        cr->restore();
+    }
 
-        // Draw friendship/sharing links
-        if (design.enabled.friendship and design.enabled.reader) {
-            cr->save();
-            cr->set_source(design.colour.friendship);
-            cr->set_dash(design.dash.friendship, 0);
-            cr->set_line_width(design.stroke_width.friendship);
-            for (auto &rpair : state->readers) {
-                auto &r = rpair.second;
-                for (auto &fid : r.friends) {
-                    if (r.id < fid) { // lines are symmetric: only draw each link once
-                        auto f = state->readers.find(fid);
-                        if (f != state->readers.end())
-                            drawLine(cr, trans, r.position, f->second.position);
-                    }
-                }
-            }
-            cr->stroke();
-            cr->restore();
-        }
-
-
-        // Draw books.  On-market and off-market books have different colours, and newer books are
-        // larger than older books.
-        if (design.enabled.book_live or design.enabled.book_dead or design.enabled.book_public) {
-            for (auto &bpair : state->books) {
-                auto &b = bpair.second;
-                // Give new books a larger cross: a brand new book gets a point scaled larges; this
-                // scaling decreases linearly until reading the regular size.
-                const double size = std::max(1.0, design.size.book_scale_a - design.size.book_scale_b*(state->t - b.created))
-                    * design.size.book;
-
-                if (b.market_private) {
-                    if (design.enabled.book_live) {
-                        drawPoint(cr, trans, b.position, design.style.book_live,
-                                design.colour.book_live, size, design.stroke_width.book_live);
-                    }
-                }
-                else if (b.market_public()) {
-                    if (design.enabled.book_public) {
-                        drawPoint(cr, trans, b.position, design.style.book_public,
-                                design.colour.book_public, size, design.stroke_width.book_public);
-                    }
-                }
-                else {
-                    if (design.enabled.book_dead) {
-                        drawPoint(cr, trans, b.position, design.style.book_dead,
-                                design.colour.book_dead, size, design.stroke_width.book_dead);
-                    }
+    // Draw friendship/sharing links
+    if (design.enabled.friendship and design.enabled.reader) {
+        cr->save();
+        cr->set_source(design.colour.friendship);
+        cr->set_dash(design.dash.friendship, 0);
+        cr->set_line_width(design.stroke_width.friendship);
+        for (auto &rpair : state->readers) {
+            auto &r = rpair.second;
+            for (auto &fid : r.friends) {
+                if (r.id < fid) { // lines are symmetric: only draw each link once
+                    auto f = state->readers.find(fid);
+                    if (f != state->readers.end())
+                        drawLine(cr, trans, r.position, f->second.position);
                 }
             }
         }
+        cr->stroke();
+        cr->restore();
+    }
 
-        // Readers have utility circles, indicating how much about the base 1000 utility the reader
-        // was in the period.  (Don't draw anything in the initialization period, though, since
-        // everyone just has 0 utility then).
-        if ((design.enabled.utility_gain or design.enabled.utility_loss) and design.enabled.reader and state->t > 0) {
-            cr->save();
-            cr->set_dash(design.dash.utility, 0);
-            cr->set_line_width(design.stroke_width.utility);
-            for (auto &rpair : state->readers) {
-                auto &r = rpair.second;
-                double radius = 0.0;
-                Colour colour = design.colour.utility_gain;
-                if (r.u > 1000) { /// 1000 is the starting utility
-                    radius = design.size.utility_gain_scale * std::log(r.u - 999);
-                }
-                else if (r.u < 1000) {
-                    radius = design.size.utility_loss_scale * std::log(1001 - r.u);
-                    colour = design.colour.utility_loss;
-                }
 
-                if (radius > 0.0)
-                    drawCanvasCircle(cr, trans, r.position, radius, colour, design.stroke_width.utility, design.stroke_width.utility_radial);
+    // Draw books.  On-market and off-market books have different colours, and newer books are
+    // larger than older books.
+    if (design.enabled.book_live or design.enabled.book_dead or design.enabled.book_public) {
+        for (auto &bpair : state->books) {
+            auto &b = bpair.second;
+            // Give new books a larger cross: a brand new book gets a point scaled larges; this
+            // scaling decreases linearly until reading the regular size.
+            const double size = std::max(1.0, design.size.book_scale_a - design.size.book_scale_b*(state->t - b.created))
+                * design.size.book;
+
+            if (b.market_private) {
+                if (design.enabled.book_live) {
+                    drawPoint(cr, trans, b.position, design.style.book_live,
+                            design.colour.book_live, size, design.stroke_width.book_live);
+                }
             }
-            cr->restore();
-        }
-
-        // Lines from each book to its author
-        bool show_author_on = design.enabled.reader and design.enabled.author_live and design.enabled.book_live,
-             show_author_off = design.enabled.reader and design.enabled.author_dead and design.enabled.book_dead,
-             show_author_pub = design.enabled.reader and design.enabled.author_public and design.enabled.book_public;
-
-        if (show_author_on or show_author_off or show_author_pub) {
-            cr->save();
-            for (auto &bpair : state->books) {
-                auto &b = bpair.second;
-                if (b.market_private) {
-                    if (not show_author_on) continue;
-
-                    cr->set_source(design.colour.author_live);
-                    cr->set_dash(design.dash.author_live, 0);
-                    cr->set_line_width(design.stroke_width.author_live);
+            else if (b.market_public()) {
+                if (design.enabled.book_public) {
+                    drawPoint(cr, trans, b.position, design.style.book_public,
+                            design.colour.book_public, size, design.stroke_width.book_public);
                 }
-                else if (b.market_public()) {
-                    if (not show_author_pub) continue;
-
-                    cr->set_source(design.colour.author_public);
-                    cr->set_dash(design.dash.author_public, 0);
-                    cr->set_line_width(design.stroke_width.author_public);
-                }
-                else {
-                    if (not show_author_off) continue;
-
-                    cr->set_source(design.colour.author_dead);
-                    cr->set_dash(design.dash.author_dead, 0);
-                    cr->set_line_width(design.stroke_width.author_dead);
-                }
-                drawLine(cr, trans, b.position, state->readers.at(b.author).position);
-                cr->stroke();
             }
-            cr->restore();
-        }
-
-        // Draw readers
-        if (design.enabled.reader) {
-            for (auto &rpair : state->readers) {
-                auto &r = rpair.second;
-                // Draw the reader
-                drawPoint(cr, trans, r.position,
-                        design.style.reader, design.colour.reader, design.size.reader, design.stroke_width.reader);
+            else {
+                if (design.enabled.book_dead) {
+                    drawPoint(cr, trans, b.position, design.style.book_dead,
+                            design.colour.book_dead, size, design.stroke_width.book_dead);
+                }
             }
-        }
-
-        // Add axes (last, so that they are on top)
-        if (gui_.creativity_.parameters.dimensions != 1 and design.enabled.axes) {
-            drawAxes(cr, trans);
         }
     }
 
-    cr_grapharea->set_source(drawing_cache_[gui_.state_curr_], 0, 0);
+    // Readers have utility circles, indicating how much about the base 1000 utility the reader
+    // was in the period.  (Don't draw anything in the initialization period, though, since
+    // everyone just has 0 utility then).
+    if ((design.enabled.utility_gain or design.enabled.utility_loss) and design.enabled.reader and state->t > 0) {
+        cr->save();
+        cr->set_dash(design.dash.utility, 0);
+        cr->set_line_width(design.stroke_width.utility);
+        for (auto &rpair : state->readers) {
+            auto &r = rpair.second;
+            double radius = 0.0;
+            Colour colour = design.colour.utility_gain;
+            if (r.u > 1000) { /// 1000 is the starting utility
+                radius = design.size.utility_gain_scale * std::log(r.u - 999);
+            }
+            else if (r.u < 1000) {
+                radius = design.size.utility_loss_scale * std::log(1001 - r.u);
+                colour = design.colour.utility_loss;
+            }
+
+            if (radius > 0.0)
+                drawCanvasCircle(cr, trans, r.position, radius, colour, design.stroke_width.utility, design.stroke_width.utility_radial);
+        }
+        cr->restore();
+    }
+
+    // Lines from each book to its author
+    bool show_author_on = design.enabled.reader and design.enabled.author_live and design.enabled.book_live,
+         show_author_off = design.enabled.reader and design.enabled.author_dead and design.enabled.book_dead,
+         show_author_pub = design.enabled.reader and design.enabled.author_public and design.enabled.book_public;
+
+    if (show_author_on or show_author_off or show_author_pub) {
+        cr->save();
+        for (auto &bpair : state->books) {
+            auto &b = bpair.second;
+            if (b.market_private) {
+                if (not show_author_on) continue;
+
+                cr->set_source(design.colour.author_live);
+                cr->set_dash(design.dash.author_live, 0);
+                cr->set_line_width(design.stroke_width.author_live);
+            }
+            else if (b.market_public()) {
+                if (not show_author_pub) continue;
+
+                cr->set_source(design.colour.author_public);
+                cr->set_dash(design.dash.author_public, 0);
+                cr->set_line_width(design.stroke_width.author_public);
+            }
+            else {
+                if (not show_author_off) continue;
+
+                cr->set_source(design.colour.author_dead);
+                cr->set_dash(design.dash.author_dead, 0);
+                cr->set_line_width(design.stroke_width.author_dead);
+            }
+            drawLine(cr, trans, b.position, state->readers.at(b.author).position);
+            cr->stroke();
+        }
+        cr->restore();
+    }
+
+    // Draw readers
+    if (design.enabled.reader) {
+        for (auto &rpair : state->readers) {
+            auto &r = rpair.second;
+            // Draw the reader
+            drawPoint(cr, trans, r.position,
+                    design.style.reader, design.colour.reader, design.size.reader, design.stroke_width.reader);
+        }
+    }
+
+    // Add axes (last, so that they are on top)
+    if (gui_.creativity_.parameters.dimensions != 1 and design.enabled.axes) {
+        drawAxes(cr, trans);
+    }
+
+    cr_grapharea->set_source(surface, 0, 0);
     cr_grapharea->paint();
+
+    // Add to the front and clear any expired cache elements:
+    drawing_cache_.emplace_front(t, surface);
+    while (drawing_cache_.size() > gui_.temporal_cache_size_)
+        drawing_cache_.pop_back();
 
     return true;
 }
