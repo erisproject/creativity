@@ -196,7 +196,7 @@ void ReaderInfoWindow::refresh(std::shared_ptr<const State> state) {
 #define UPDATE_LIN(PREFIX, VAR) \
     updateValue(PREFIX + std::string("n"), VAR.n()); \
     updateValue(PREFIX + std::string("s2"), VAR.s2()); \
-    updateMatrix(PREFIX + std::string("s2V"), VAR.s2() * VAR.Vinv().fullPivHouseholderQr().inverse(), true); \
+    updateMatrix(PREFIX + std::string("s2V"), VAR.s2() * VAR.Vinvinv(), true); \
     for (size_t i = 0; i < VAR.K(); i++) \
         updateValue(PREFIX + std::to_string(i), VAR.beta()[i]);
 #define UPDATE_LIN_RB(PREFIX, BELIEF) UPDATE_LIN(PREFIX, r.BELIEF)
