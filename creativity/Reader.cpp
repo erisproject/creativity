@@ -617,7 +617,7 @@ void Reader::updateDemandBelief() {
 
     if (not mktbooks.empty()) {
         VectorXd y(mktbooks.size());
-        MatrixXdR X(mktbooks.size(), demand_belief_.K());
+        MatrixXd X(mktbooks.size(), demand_belief_.K());
         // NB: this runs in the interoptimizer, which means t has already been incremented
         auto last_t = simulation()->t() - 1;
         size_t i = 0;

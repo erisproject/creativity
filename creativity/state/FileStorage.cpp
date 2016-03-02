@@ -983,7 +983,7 @@ void FileStorage::writeBelief(const BayesianLinear &m) {
         write_dbl(m.s2());
         write_dbl(m.n());
 
-        auto &Vinv = m.Vinv();
+        const auto &Vinv = m.Vinv();
         // The last k*(k+1)/2 are the lower triangle of the V matrix, in row major order
         for (unsigned int r = 0; r < k; r++) {
             for (unsigned int c = 0; c <= r; c++) {
