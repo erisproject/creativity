@@ -633,6 +633,10 @@ void Reader::updateDemandBelief() {
     }
     else if (weaken != 1.0)
         demand_belief_ = decltype(demand_belief_)(std::move(demand_belief_), weaken);
+
+    // FIXME: hack until gibbs drawing is fixed
+    demand_belief_.draw_mode = BayesianLinearRestricted::DrawMode::Rejection;
+    demand_belief_.draw_rejection_max_discards = 200;
 }
 void Reader::updateProfitStreamBelief() {
     // FIXME: before re-enabling this, the belief needs to be updated somehow to track public prize
@@ -830,6 +834,12 @@ void Reader::updateProfitBelief() {
         // extrapolation uses just-updated non-extrapolation as prior, with no weakening
         profit_belief_extrap_.reset(new Profit(*profit_belief_, y, X));
     }
+
+    // FIXME: hack until gibbs drawing is fixed
+    profit_belief_->draw_mode = BayesianLinearRestricted::DrawMode::Rejection;
+    profit_belief_->draw_rejection_max_discards = 200;
+    profit_belief_extrap_->draw_mode = BayesianLinearRestricted::DrawMode::Rejection;
+    profit_belief_extrap_->draw_rejection_max_discards = 200;
 }
 
 
