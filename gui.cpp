@@ -4,7 +4,7 @@
 #include "creativity/state/FileStorage.hpp"
 #include "creativity/gui/GUI.hpp"
 #include <eris/Simulation.hpp>
-#include <eris/Random.hpp>
+#include <eris/random/rng.hpp>
 #include <Eigen/Core>
 #include <functional>
 #include <iostream>
@@ -53,7 +53,7 @@ int main(int argc, char *argv[1]) {
         switch (p.param) {
             case GUI::ParamType::seed:
                 if (setup or load_from_file) throw std::runtime_error("Cannot change seed after initial setup");
-                eris::Random::seed(p.ul);
+                eris::random::seed(p.ul);
                 break;
             case GUI::ParamType::load:
                 if (setup) throw std::runtime_error("Cannot load after initial setup");

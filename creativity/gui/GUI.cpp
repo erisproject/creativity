@@ -9,7 +9,7 @@
 #include "creativity/state/Storage.hpp"
 #include "creativity/Creativity.hpp"
 #include "creativity/config.hpp"
-#include <eris/Random.hpp>
+#include <eris/random/rng.hpp>
 #include <boost/filesystem/path.hpp>
 #include <cairomm/matrix.h>
 #include <cairomm/pattern.h>
@@ -72,6 +72,7 @@
 #include <cstdlib>
 #include <cmath>
 #include <iomanip>
+#include <random>
 
 using namespace eris;
 using namespace creativity::state;
@@ -137,7 +138,7 @@ void GUI::start(const cmdargs::GUI &args) {
 
     // Have to set the initial seed value *before* starting the GUI thread, because we want the
     // seed() call to affect the main thread, not the GUI thread.
-    widget<Gtk::Entry>("set_seed")->set_text(std::to_string(eris::Random::seed()));
+    widget<Gtk::Entry>("set_seed")->set_text(std::to_string(eris::random::seed()));
 
     // Update the number of periods now, so that it has the right value when the GUI comes up
     widget<Gtk::SpinButton>("set_periods")->set_value(args.periods);

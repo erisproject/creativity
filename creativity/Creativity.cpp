@@ -4,7 +4,9 @@
 #include "creativity/state/Storage.hpp"
 #include "creativity/Reader.hpp"
 #include "creativity/BookMarket.hpp"
-#include <eris/Random.hpp>
+#include <eris/random/rng.hpp>
+#include <boost/random/uniform_int_distribution.hpp>
+#include <boost/random/uniform_real_distribution.hpp>
 #include <eris/Position.hpp>
 #include <eris/interopt/Callback.hpp>
 #include <eris/intraopt/Callback.hpp>
@@ -76,9 +78,9 @@ void Creativity::setup() {
 
     money = sim->spawn<Good::Continuous>();
 
-    auto &rng = eris::Random::rng();
-    std::uniform_real_distribution<double> unif_pmb(-parameters.boundary, parameters.boundary);
-    std::uniform_real_distribution<double> unif_cr_shape(parameters.reader_creation_scale_min,
+    auto &rng = eris::random::rng();
+    boost::random::uniform_real_distribution<double> unif_pmb(-parameters.boundary, parameters.boundary);
+    boost::random::uniform_real_distribution<double> unif_cr_shape(parameters.reader_creation_scale_min,
             parameters.reader_creation_scale_min + parameters.reader_creation_scale_range);
 
     Position initpos = Position::zero(parameters.dimensions);
@@ -160,8 +162,8 @@ void Creativity::createPiracyNetwork() {
     // Thus, by induction, after all N >= L steps, every element has probability L/N of being in the
     // list, and the list contains exactly L elements.
 
-    auto &rng = eris::Random::rng();
-    std::uniform_int_distribution<size_t> replace_dist(0, num_links-1);
+    auto &rng = eris::random::rng();
+    boost::random::uniform_int_distribution<size_t> replace_dist(0, num_links-1);
 
     std::vector<std::pair<size_t, size_t>> edges;
     edges.reserve(num_links);
@@ -173,7 +175,7 @@ void Creativity::createPiracyNetwork() {
             }
             else {
                 // Replace with probability num_links / index:
-                if (std::uniform_int_distribution<size_t>(0, index)(rng) <= num_links) {
+                if (boost::random::uniform_int_distribution<size_t>(0, index)(rng) <= num_links) {
                     size_t replace = replace_dist(rng);
                     edges[replace].first = i;
                     edges[replace].second = j;

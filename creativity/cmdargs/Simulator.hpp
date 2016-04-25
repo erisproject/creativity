@@ -2,7 +2,7 @@
 #include "creativity/cmdargs/CmdArgs.hpp"
 #include "creativity/Creativity.hpp"
 #include <boost/program_options/options_description.hpp>
-#include <eris/Random.hpp>
+#include <eris/random/rng.hpp>
 #include <string>
 namespace boost { namespace program_options { class variables_map; } }
 
@@ -47,11 +47,11 @@ class Simulator : public CmdArgs {
          */
         unsigned int threads = 0;
 
-        /** The seed.  The default is whatever eris::Random::seed() returns, which is random
+        /** The seed.  The default is whatever eris::random::seed() returns, which is random
          * (unless overridden with ERIS_RNG_SEED).  This value can be ignored: it is handled by
          * parse().
          */
-        typename eris::Random::rng_t::result_type seed = eris::Random::seed();
+        typename eris::random::rng_t::result_type seed = eris::random::seed();
 
     protected:
         /** Adds common options into the options descriptions.  Called by

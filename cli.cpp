@@ -27,6 +27,7 @@
 #include <iomanip>
 #include <boost/filesystem/path.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <boost/random/uniform_int_distribution.hpp>
 #ifdef __linux__
 extern "C" {
 #include <sys/prctl.h>
@@ -41,7 +42,7 @@ namespace fs = boost::filesystem;
 
 std::string random_filename(const std::string &basename) {
     std::random_device rd;
-    std::uniform_int_distribution<unsigned char> rand_index(0, 35);
+    boost::random::uniform_int_distribution<unsigned char> rand_index(0, 35);
     constexpr char map[37] = "0123456789abcdefghijklmnopqrstuvwxyz";
 
     std::ostringstream buf;

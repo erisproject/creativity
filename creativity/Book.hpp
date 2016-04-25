@@ -3,6 +3,7 @@
 #include <eris/Good.hpp>
 #include <map>
 #include <functional>
+#include <eris/random/halfnormal_distribution.hpp>
 
 namespace creativity {
 
@@ -275,7 +276,7 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         const unsigned int order_ = 0;
         bool market_private_ = true;
         eris::eris_id_t market_id_ = 0;
-        std::normal_distribution<double> quality_draw_;
+        eris::random::halfnormal_distribution<double> quality_dist_;
 };
 
 }

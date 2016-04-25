@@ -9,8 +9,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
-#include <eris/Random.hpp>
-
+#include <eris/random/rng.hpp>
 
 using namespace eris;
 
@@ -26,7 +25,7 @@ Book::Book(
         creativity_{creativity},
         author_{std::move(author)},
         order_{order},
-        quality_draw_(quality, creativity_.parameters.book_quality_sd)
+        quality_dist_(quality, creativity_.parameters.book_quality_sd)
 {}
 
 void Book::added() {
@@ -272,22 +271,11 @@ double Book::price() const {
 }
 
 double Book::qualityMean() const {
-    return quality_draw_.mean();
+    return quality_dist_.mu();
 }
 
 double Book::qualityDraw() {
-    // We could call Random::truncDist here, but with its defaults for a normal it's just going to
-    // end up doing a rejection sampling loop anyway, so just do that directly.  This loop shouldn't
-    // run too long; since the lowest possible quality is 0, the worst case is that this draw
-    // produces invalid values half the time.
-    if (quality_draw_.stddev() > 0) {
-        auto &rng = Random::rng();
-        double x;
-        do { x = quality_draw_(rng); } while (x < 0);
-        return x;
-    }
-    // No stddev: just return the exact quality value
-    return quality_draw_.mean();
+    return quality_dist_(random::rng());
 }
 
 }

@@ -3,8 +3,10 @@
 #include "creativity/Book.hpp"
 #include "creativity/BookMarket.hpp"
 #include "creativity/belief/Profit.hpp"
-#include <eris/Random.hpp>
 #include <eris/debug.hpp>
+#include <eris/random/util.hpp>
+#include <boost/random/chi_squared_distribution.hpp>
+#include <boost/random/uniform_real_distribution.hpp>
 #include <Eigen/Core>
 #include <algorithm>
 #include <cstddef>
@@ -216,7 +218,7 @@ bool Reader::removeFriend(const SharedMember<Reader> &old_pal, bool recurse) {
 void Reader::interBegin() {
     // Move a random distance in a random direction
     if (creativity_.parameters.reader_step_mean > 0) {
-        double step_dist = std::chi_squared_distribution<double>()(Random::rng()) * creativity_.parameters.reader_step_mean;
+        double step_dist = boost::random::chi_squared_distribution<double>()(random::rng()) * creativity_.parameters.reader_step_mean;
         if (step_dist != 0)
             moveBy(step_dist * Position::random(position().dimensions));
     }
@@ -240,7 +242,7 @@ void Reader::interOptimize() {
     // market
     new_prices_.clear();
 
-    auto &rng = Random::rng();
+    auto &rng = random::rng();
     const double &cost_market = creativity_.parameters.cost_market,
           &cost_unit = creativity_.parameters.cost_unit;
 
@@ -295,7 +297,7 @@ void Reader::interOptimize() {
         // model action parameters instead (unless we don't have enough income to support even a
         // single book, in which case we can't keep anything on the market).
         else if (creativity_.parameters.initial.prob_keep > 0 and income_available >= cost_market) {
-            std::bernoulli_distribution keep(creativity_.parameters.initial.prob_keep);
+
             std::vector<SharedMember<Book>> books(wrote_market_.begin(), wrote_market_.end());
             if (income_available < books.size() * cost_market) {
                 // If we don't have enough income to keep every book on the market (which is the
@@ -304,7 +306,7 @@ void Reader::interOptimize() {
                 std::shuffle(books.begin(), books.end(), rng);
             }
             for (auto &book : books) {
-                if (keep(rng)) {
+                if (random::rcoin(creativity_.parameters.initial.prob_keep)) {
                     income_available -= cost_market;
                     double new_price = (book->price() - cost_unit) * creativity_.parameters.initial.keep_price + cost_unit;
                     new_prices_.emplace(book, new_price);
@@ -396,9 +398,9 @@ void Reader::interOptimize() {
             }
             else {
                 // If we have no useful profit belief yet, just use the initial values:
-                if (creativity_.parameters.initial.prob_write > 0 and std::bernoulli_distribution(creativity_.parameters.initial.prob_write)(rng)) {
-                    double effort = std::uniform_real_distribution<double>(creativity_.parameters.initial.l_min,
-                            creativity_.parameters.initial.l_min + creativity_.parameters.initial.l_range)(rng);
+                if (creativity_.parameters.initial.prob_write > 0 and random::rcoin(creativity_.parameters.initial.prob_write)) {
+                    double effort = random::runiform(creativity_.parameters.initial.l_min,
+                            creativity_.parameters.initial.l_min + creativity_.parameters.initial.l_range);
                     // Make sure the required effort doesn't exceed the available funds; if it does,
                     // reduce the effort:
                     if (creation_base_cost + effort > income_available)
@@ -410,9 +412,9 @@ void Reader::interOptimize() {
                     create_quality_ = creationQuality(effort);
                     create_position_ = position();
                     create_price_ = creativity_.parameters.cost_unit +
-                        std::uniform_real_distribution<double>(
+                        boost::random::uniform_real_distribution<double>(
                                 creativity_.parameters.initial.p_min,
-                                creativity_.parameters.initial.p_min + creativity_.parameters.initial.p_range)(Random::rng());
+                                creativity_.parameters.initial.p_min + creativity_.parameters.initial.p_range)(rng);
                 }
             }
         }
@@ -444,9 +446,9 @@ void Reader::interOptimize() {
             else {
                 // No usable beliefs; use initial behaviour parameters draw:
                 create_price_ = creativity_.parameters.cost_unit +
-                    std::uniform_real_distribution<double>(
+                    boost::random::uniform_real_distribution<double>(
                             creativity_.parameters.initial.p_min,
-                            creativity_.parameters.initial.p_min + creativity_.parameters.initial.p_range)(Random::rng());
+                            creativity_.parameters.initial.p_min + creativity_.parameters.initial.p_range)(rng);
             }
         }
     }
@@ -484,7 +486,7 @@ void Reader::interApply() {
 
                 /// If enabled, add some noise in a random direction to the position
                 if (creativity_.parameters.book_distance_mean > 0) {
-                    double step_dist = creativity_.parameters.book_distance_mean * std::chi_squared_distribution<double>()(Random::rng());
+                    double step_dist = creativity_.parameters.book_distance_mean * boost::random::chi_squared_distribution<double>()(random::rng());
                     newbook->moveBy(step_dist * Position::random(create_position_.dimensions));
                 }
 
@@ -890,7 +892,7 @@ void Reader::intraOptimize() {
     // from equally-preferred options.
     for (auto &bnu : book_net_u) {
         if (bnu.second.size() > 1)
-            std::shuffle(bnu.second.begin(), bnu.second.end(), Random::rng());
+            std::shuffle(bnu.second.begin(), bnu.second.end(), random::rng());
     }
 
     lock.write(); // Time to get serious.

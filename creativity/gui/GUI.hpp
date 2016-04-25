@@ -161,7 +161,7 @@ class GUI : eris::noncopyable {
         enum class ParamType {
             save_as, ///< The file to save simulation data to (will be overwritten)
             load, ///< The file to load existing simulation data from
-            seed, ///< Sets the seed value for eris::Random::seed in `.ul`
+            seed, ///< Sets the seed value for eris::random::seed in `.ul`
             threads ///< Number of threads to use in `.ul`
         };
         /** The parameter struct for passing a configured value back from the GUI.  The GUI always

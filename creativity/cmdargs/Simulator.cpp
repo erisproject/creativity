@@ -98,12 +98,12 @@ void Simulator::addOptions() {
 void Simulator::postParse(boost::program_options::variables_map &) {
     // If the user didn't give a seed, .seed won't have changed from seed, but we still don't want
     // to set it because explicitly setting a seed resets the RNG.
-    if (eris::Random::seed() != seed) {
-        eris::Random::seed(seed);
+    if (eris::random::seed() != seed) {
+        eris::random::seed(seed);
     }
 
     if (not output.empty()) {
-        output = std::regex_replace(output, std::regex("SEED"), std::to_string(eris::Random::seed()));
+        output = std::regex_replace(output, std::regex("SEED"), std::to_string(eris::random::seed()));
     }
 
     s_.boundary = Creativity::boundaryFromDensity(s_.readers, s_.dimensions, density_);

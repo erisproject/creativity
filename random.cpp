@@ -1,4 +1,9 @@
-#include <eris/Random.hpp>
+#include <eris/random/rng.hpp>
+#include <eris/random/util.hpp>
+#include <boost/random/uniform_int_distribution.hpp>
+#include <boost/random/uniform_real_distribution.hpp>
+#include <boost/random/normal_distribution.hpp>
+#include <eris/random/truncated_normal_distribution.hpp>
 #include <regex>
 #include <functional>
 #include <string>
@@ -17,6 +22,8 @@ extern "C" {
 #include <unistd.h>
 }
 
+using namespace eris;
+
 const std::string help_message = u8R"(
 This script is a wrapper intended for use with creativity-cli or creativity-gui (but usable with any
 executable) that allows argument values to be drawn from distributions.  In particular, it looks for
@@ -25,12 +32,11 @@ any arguments of the following forms:
     U[a,b] - draws a uniformly distributed double from [a, b)
     iU[a,b] - draws a uniformly distributed integer from [a,b]
     N(m,sd) - draws a normally distributed double with mean m and standard deviation sd
-    N(m,sd)[a,b] - draws a normally distributed double, truncated to the range [a, b].  The value is
-                   redrawn until a value in the range is found.  'a' or 'b' can be omitted to not
-                   specify an lower or upper bound, respectively.
+    N(m,sd)[a,b] - draws a normally distributed double, truncated to the range [a, b].
+                   One of 'a' or 'b' can be omitted to specify a one-sided truncation.
     N(m,sd)+ - equivalent to N(m,sd)[0,].
     iN(m,sd) - like N(m,sd), but rounds the drawn value to the nearest integer.
-    iN(m,sd)[a,b] - Like iN(m,sd), but repeats until a (rounded) value in [a,b] is found.
+    iN(m,sd)[a,b] - Truncated version of iN(m,sd).
 
 Any other argument is passed through as is.  At least one argument matching the above must be included.
 
@@ -64,7 +70,7 @@ std::vector<std::pair<std::regex, std::function<std::string(const std::smatch&)>
             if (b <= a) throw std::logic_error("Error in input: `" + m[0].str() + "' is invalid (max <= min)");
             std::ostringstream result;
             result << std::setprecision(std::numeric_limits<double>::max_digits10)
-                << std::uniform_real_distribution<double>(a, b)(eris::Random::rng());
+                << random::runiform(a, b);
             return result.str();
         });
     // iU[a,b]
@@ -73,7 +79,7 @@ std::vector<std::pair<std::regex, std::function<std::string(const std::smatch&)>
             long a = std::stol(m[1]);
             long b = std::stol(m[2]);
             if (b <= a) throw std::logic_error("Error in input: `" + m[0].str() + "' is invalid (max <= min)");
-            return std::to_string(std::uniform_int_distribution<long>(a, b)(eris::Random::rng()));
+            return std::to_string(boost::random::uniform_int_distribution<long>(a, b)(random::rng()));
         });
     // All the normal variants
     callbacks.emplace_back(std::regex("^(i)?N\\((" + re_double + ")\\s*,\\s*(" + re_double + ")\\)" + 
@@ -91,14 +97,20 @@ std::vector<std::pair<std::regex, std::function<std::string(const std::smatch&)>
                 lbound = m[5].matched ? std::stod(m[5]) : -std::numeric_limits<double>::infinity();
                 ubound = m[6].matched ? std::stod(m[6]) : std::numeric_limits<double>::infinity();
             }
-            if (ubound <= lbound) throw std::logic_error("Error in input: `" + m[0].str() + "' has impossible-to-satisfy constraint");
             if (sd < 0) throw std::logic_error("Error in input: `" + m[0].str() + "' has invalid negative standard deviation");
-            std::normal_distribution<double> rnorm(mean, sd);
+            if (ubound < lbound) throw std::logic_error("Error in input: `" + m[0].str() + "' has impossible-to-satisfy constraint");
+            std::function<double()> draw_norm;
+            if (std::isfinite(ubound) or std::isfinite(lbound)) {
+                draw_norm = [&] () -> double { return random::truncated_normal_distribution<double>(mean, sd, lbound, ubound)(random::rng()); };
+            }
+            else {
+                draw_norm = [&] () -> double { return random::normal_distribution<double>(mean, sd)(random::rng()); };
+            }
             double draw;
             int draws = 0;
             do {
                 if (draws++ > 1000) throw std::runtime_error("Draw failure: `" + m[0].str() + "' constraints were not satisfied within 1000 draws");
-                draw = rnorm(eris::Random::rng());
+                draw = draw_norm();
                 if (draw < 0 and mean == 0 and lbound == 0) draw = -draw; // Optimize special case (absolute value of 0-mean normal)
                 if (round) draw = std::round(draw);
             } while (draw < lbound or draw > ubound);
