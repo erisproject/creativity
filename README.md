@@ -1,6 +1,6 @@
 # Eris creativity model
 
-This project uses [Eris](https://github.com/erisproject/eris) to model the
+This project uses [Eris](https://git.imaginary.ca/eris/eris/) to model the
 creative process, including creation, production, and purchases of copies of a
 creative work.
 
@@ -10,7 +10,7 @@ creative output where copies of an original are the marketable good.
 
 ## Requirements
 
-- [Eris](https://github.com/erisproject/eris)
+- [Eris](https://git.imaginary.ca/eris/eris/)
 - [gtkmm-3.0](http://www.gtkmm.org) (optional--required for GUI interface)
 - A C++ compiler supporting the C++11 standard, such as
   [clang](http://clang.llvm.org/) (3.3+) or [g++](https://gcc.gnu.org/) (4.9+)
