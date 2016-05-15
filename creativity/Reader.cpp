@@ -39,13 +39,6 @@ Reader::Reader(Creativity &creativity, const Position &pos) :
     profit_stream_beliefs_.emplace(1, ProfitStream(1));
     distancePenaltyPolynomial(default_distance_penalty_polynomial);
     numBooksPenaltyPolynomial(default_num_books_penalty_polynomial);
-    // FIXME: hack for now: Gibbs sampling seems to be a little broken, producing draw failures when
-    // it really shouldn't be, so force rejection sampling instead; the default requires a 1%
-    // acceptance rate on each draw (i.e. up to 100 failures between draws are permitted).
-    demand_belief_.draw_mode = BayesianLinearRestricted::DrawMode::Rejection;
-    demand_belief_.draw_rejection_max_discards = 200;
-    profit_belief_->draw_mode = BayesianLinearRestricted::DrawMode::Rejection;
-    profit_belief_->draw_rejection_max_discards = 200;
 }
 
 void Reader::distancePenaltyPolynomial(std::vector<double> coef) {
@@ -634,9 +627,6 @@ void Reader::updateDemandBelief() {
     else if (weaken != 1.0)
         demand_belief_ = decltype(demand_belief_)(std::move(demand_belief_), weaken);
 
-    // FIXME: hack until gibbs drawing is fixed
-    demand_belief_.draw_mode = BayesianLinearRestricted::DrawMode::Rejection;
-    demand_belief_.draw_rejection_max_discards = 200;
 }
 void Reader::updateProfitStreamBelief() {
     // FIXME: before re-enabling this, the belief needs to be updated somehow to track public prize
@@ -835,11 +825,6 @@ void Reader::updateProfitBelief() {
         profit_belief_extrap_.reset(new Profit(*profit_belief_, y, X));
     }
 
-    // FIXME: hack until gibbs drawing is fixed
-    profit_belief_->draw_mode = BayesianLinearRestricted::DrawMode::Rejection;
-    profit_belief_->draw_rejection_max_discards = 200;
-    profit_belief_extrap_->draw_mode = BayesianLinearRestricted::DrawMode::Rejection;
-    profit_belief_extrap_->draw_rejection_max_discards = 200;
 }
 
 
