@@ -53,6 +53,30 @@ std::string random_filename(const std::string &basename) {
     return buf.str();
 }
 
+// Simple class used to format a duration on output
+struct duration {
+    unsigned days, hours, minutes, seconds, milliseconds;
+    explicit duration(double s) :
+        days{unsigned(s / 86400)},
+        hours{unsigned((s - days*86400) / 3600)},
+        minutes{unsigned((s - days*86400 - hours*3600) / 60)},
+        seconds{unsigned(s - days*86400 - hours*3600 - minutes*60)},
+        milliseconds{unsigned(std::lround(1000*(s - days*86400 - hours*3600 - minutes*60 - seconds)))}
+    {}
+    friend std::ostream& operator<<(std::ostream &out, const duration &d) {
+        auto save = out.flags();
+        if (d.days > 0)
+            out << d.days << 'd';
+        if (d.days > 0 or d.hours > 0)
+            out << d.hours << 'h' << std::setfill('0') << std::setw(2);
+        if (d.days > 0 or d.hours > 0 or d.minutes > 0)
+            out << d.minutes << 'm' << std::setfill('0') << std::setw(2);
+        out << d.seconds << '.' << std::setfill('0') << std::setw(3) << d.milliseconds << "s" << std::setfill(' ');
+        out.flags(save);
+        return out;
+    }
+};
+
 int main(int argc, char *argv[]) {
     std::cerr << std::setprecision(16);
     std::cout << std::setprecision(16);
@@ -143,6 +167,7 @@ int main(int argc, char *argv[]) {
     unsigned int periods = args.periods;
 
     bool tty = isatty(fileno(stdout));
+    if (args.quiet) std::cout << "Running simulation for " << periods << " periods.\n";
     while (sim->t() < periods) {
 #ifdef __linux__
         // Update the process name to something like "crcli [43/300]" (the part before the [ gets
@@ -183,23 +208,34 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (not args.quiet) {
-        if (tty) std::cout << std::endl;
-        bool need_endl = false;
-        while (not creativity.storage().first->flush_for(500)) {
+    if (tty and not args.quiet) std::cout << std::endl;
+
+    std::chrono::time_point<std::chrono::high_resolution_clock> finished_sim = std::chrono::high_resolution_clock::now();
+    std::cout << "Simulation finished in ";
+    std::cout << duration(std::chrono::duration<double>(finished_sim - started).count());
+    std::cout << std::endl;
+
+    bool need_endl = false;
+    bool flush_waited = false;
+    while (not creativity.storage().first->flush_for(250)) {
+        if (args.quiet) {
+            if (not flush_waited) {
+                std::cout << "Waiting for output data to finish writing... " << std::flush;
+                flush_waited = true;
+            }
+        }
+        else {
             if (tty) std::cout << "\r";
             std::cout << "Waiting for output data to finish writing... (" <<
                 creativity.storage().first->backend().pending() << " states pending)";
             if (tty) { std::cout << "   " << std::flush; need_endl = true; }
             else std::cout << std::endl;
         }
-        if (need_endl) std::cout << std::endl;
     }
-    else {
-        creativity.storage().first->flush();
-    }
+    if (args.quiet and flush_waited) std::cout << "done" << std::endl;
+    else if (need_endl) std::cout << std::endl;
 
-    // Check again, in case something else created it while we were simulating:
+    // Check overwrite again, in case something else created it while we were simulating:
     if (not overwrite) {
         if (fs::exists(args_out)) {
             std::cerr << "\nError: `" << args_out << "' already exists; specify a different file or add `--overwrite' option to overwrite\n";
@@ -275,5 +311,5 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    std::cout << "Simulation complete.  Results saved to " << args_out << "\n\n";
+    std::cout << "Simulation saved to " << args_out << ".\n\n";
 }
