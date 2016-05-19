@@ -10,14 +10,14 @@ Usage: $0 [ARGUMENTS]
 Invokes ./creativity-cli via ./creativity-random, using a suitable set of
 randomized parameters.
 
-Output is placed in ./results/DATE~~HASH/creativity-SEED.crstate where DATE and
-HASH are generated from the current git commit date and hash.
+Output is placed in ./results/DATE~~HASH/randomized/creativity-SEED.crstate.xz
+where DATE and HASH are generated from the current git commit date and hash.
 EOF
         exit 1;
     fi
 done
 
-dir="./results/$(git show -s --format=%cI~~%h @)"
+dir="./results/$(git show -s --format=%cd~~%h @)/randomized"
 mkdir -p "$dir"
 
 exec ./creativity-random ./creativity-cli \

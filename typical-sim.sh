@@ -18,7 +18,7 @@ argument list, override the default.
 
 Output is placed in
 
-    ./results/\$DATE~~\$HASH/\$TYPICAL/creativity-\$SEED.crstate
+    ./results/\$DATE~~\$HASH/\$TYPICAL/creativity-\$SEED.crstate.xz
 
 where DATE and HASH are generated from the current git commit date and hash,
 and TYPICAL defaults to "typical" if not externally set in the environment.
