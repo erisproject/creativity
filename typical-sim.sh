@@ -48,14 +48,14 @@ mkdir -p "$dir"
 
 exec $toexec "${preargs[@]}" \
     --readers 150 \
-    --density 2.8 \
+    --density 2.7 \
     --reader-step-mean 0.45 \
     --book-distance-mean 0 \
     --book-quality-sd 0 \
     --creation-fixed 150 \
-    --creation-time 4 \
+    --creation-time 3 \
     --reader-creation-scale-min 0 \
-    --reader-creation-scale-range 12.6 \
+    --reader-creation-scale-range 12.3 \
     --cost-market 26.4 \
     --cost-unit 5 \
     --cost-piracy 5 \
