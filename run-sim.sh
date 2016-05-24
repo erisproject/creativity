@@ -17,7 +17,7 @@ EOF
     fi
 done
 
-dir="./results/$(git show -s --format=%cd~~%h @)/randomized"
+dir="./results/$(git show -s --date=short --format=%cd~~%h @)/randomized"
 mkdir -p "$dir"
 
 exec ./creativity-random ./creativity-cli \
