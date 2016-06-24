@@ -6,7 +6,7 @@ using namespace eris;
 
 namespace creativity { namespace state {
 
-bool StorageBackend::empty() const { return size() == 0; }
+bool StorageBackend::empty() { return size() == 0; }
 
 void StorageBackend::reserve(size_t) {}
 

@@ -1,6 +1,7 @@
 #include "creativity/Creativity.hpp"
 #include "creativity/state/State.hpp"
 #include "creativity/state/Storage.hpp"
+#include "creativity/state/FileStorage.hpp"
 #include "creativity/cmdargs/Info.hpp"
 #include <cstdio>
 #include <cstdlib>
@@ -25,7 +26,7 @@ int main(int argc, char *argv[]) {
     Creativity creativity;
     // Filename input
     try {
-        creativity.fileRead(args.input, args.memory_xz or args.memory, args.memory);
+        creativity.read<FileStorage>(args.input, FileStorage::Mode::READONLY, args.memory_xz, args.tmpdir);
     }
     catch (std::exception &e) {
         std::cerr << "Unable to read `" << args.input << "': " << e.what() << "\n\n";

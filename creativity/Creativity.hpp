@@ -66,16 +66,6 @@ class Creativity : private eris::noncopyable {
             spair.first = new_storage;
         }
 
-        /** Store the creativity simulation results in the given file, overwriting any content the
-         * file may already have.  Any existing simulation states are copied from the current
-         * Storage object, then the existing Storage object is released (and destroyed, unless
-         * something else has copied its shared_ptr).  After calling this method, `.storage` will be
-         * set to the new FileStorage object.
-         *
-         * The default simulation storage is an in-memory storage.
-         */
-        void fileWrite(const std::string &filename);
-
         /** Opens a creativity simulation storage source for reading via storage().  Typically
          * called instead of setup() when loading an existing creativity simulation record from a
          * stored location.
@@ -89,24 +79,6 @@ class Creativity : private eris::noncopyable {
             storage().first = state::Storage::create<T>(set_, std::forward<Args>(args)...);
             setup_read_ = true;
         }
-
-        /** Opens a creativity simulation storage file for reading via storage().  The file is
-         * opened readonly, and so any attempt to manipulate the simulation will fail.
-         *
-         * This method is typically called instead of calling setup() when loading a creativity
-         * simulation record from disk.
-         *
-         * \param filename the filename to read
-         * \param xz_to_ram if true, and the file is xz-compressed, decompress in memory; if false
-         * (the default), decompress to a temporary file.
-         * \param copy_to_ram if true, and the file is not xz-compressed, copy the file into memory
-         * anyway.
-         *
-         * This method is equivalent to read<FileStorage>(filename, xz_to_ram, copy_to_ram).
-         *
-         * \sa FileStorage
-         */
-        void fileRead(const std::string &filename, bool xz_to_ram = false, bool copy_to_ram = false);
 
         /** Checks `.parameters` to make sure that all configured values are valid, throwing an
          * exception if any invalid values are found.

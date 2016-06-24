@@ -25,14 +25,6 @@ CreativitySettings& Creativity::set() {
     return const_cast<CreativitySettings&>(parameters);
 }
 
-void Creativity::fileWrite(const std::string &filename) {
-    write<FileStorage>(filename, FileStorage::MODE::OVERWRITE);
-}
-
-void Creativity::fileRead(const std::string &filename, bool xz_to_ram, bool copy_to_ram) {
-    read<FileStorage>(filename, xz_to_ram, copy_to_ram);
-}
-
 void Creativity::checkParameters() {
 #define PROHIBIT(FIELD, BAD) \
     if (parameters.FIELD BAD) throw std::domain_error("Invalid Creativity setting: parameters." #FIELD " " #BAD " is invalid")

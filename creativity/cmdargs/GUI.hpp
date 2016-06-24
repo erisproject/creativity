@@ -24,6 +24,9 @@ class GUI : public Simulator {
         /// The input file (for the GUI)
         std::string input;
 
+        /// If true, decompress loaded files and store simulation data in an in-memory buffer
+        bool memory = false;
+
         /// Overridden to add " [FILE-TO-LOAD]"
         virtual std::string usage() const override;
 

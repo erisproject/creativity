@@ -23,8 +23,8 @@ void Info::addOptions() {
         ("all-periods,a", "Equivalent to --thin-periods=1, this shows all periods.")
         ("hide-periods,q", "If specified, hides the display of period summaries entirely.")
         ("show-cli-arguments,c", value(show_cli_args), "If specified, output the command line arguments to recreate the experiment.")
-        ("memory-xz,M", value(memory_xz), "If the input file is an xz-compressed file, using this flag causes it to be decompressed into memory instead of writing it to a temporary file.")
-        ("memory-all", value(memory), "If specified, copy the input file into memory before processing.  Implies --memory-xz")
+        ("memory-xz,M", value(memory_xz), "Decompress input files into memory instead of writing to a temporary file.")
+        ("tmpdir", value(tmpdir), "If --memory-xz is not specified, this specifies a temporary directory in which to place the temporary decompressed file.  If omitted, the file is in the same directory as the input file.")
         ;
 
     po::options_description input_desc("Input file");

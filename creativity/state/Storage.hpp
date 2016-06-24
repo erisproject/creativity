@@ -38,7 +38,7 @@ class Storage final {
         template<class SB, class... Args>
         static typename std::enable_if<std::is_base_of<StorageBackend, SB>::value, std::shared_ptr<Storage>>::type
         create(CreativitySettings &settings, Args&&... args) {
-            return std::shared_ptr<Storage>(new Storage(settings, new SB(std::forward<Args>(args)...)));
+            return std::shared_ptr<Storage>(new Storage(settings, new SB(settings, std::forward<Args>(args)...)));
         }
 
         /** Returns the State for the given simulation time period.
@@ -74,7 +74,8 @@ class Storage final {
 
         /** Writes the settings stored in `.settings` (which is a reference to the
          * CreativitySettings given during construction) to the storage medium (if appropriate).
-         * Existing settings are replaced.
+         * Existing settings are replaced.  This should be called after any changes have been made
+         * to the settings so as to commit them to the storage medium.
          *
          * If not called explicitly, this method will be called by the first push_back() call.
          */
@@ -163,12 +164,12 @@ class Storage final {
          * StorageBackend object.
          *
          * \param settings the CreativitySettings reference associated with the Creativity object
-         * this storage class represents.
+         * this storage class represents.  This should be the same reference given to the
+         * StorageBackend object.
          * \param backend a StorageBackend-derived object
          */
         Storage(CreativitySettings &settings, StorageBackend *sb) : settings(settings), settings_(settings), backend_(sb)
         {
-            if (backend_->have_settings) backend_->readSettings(settings_);
             // Track the number of states using the size of the cache_
             cache_.resize(backend_->size());
         }

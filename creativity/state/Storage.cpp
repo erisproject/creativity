@@ -67,7 +67,7 @@ void Storage::push_back(std::shared_ptr<const State> state) {
 }
 
 void Storage::updateSettings() {
-    backend_->writeSettings(settings_);
+    backend_->writeSettings();
     need_settings_updated_ = false;
 }
 

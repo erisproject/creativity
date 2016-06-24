@@ -42,6 +42,9 @@ class Simulator : public CmdArgs {
          */
         std::string output;
 
+        /// The temporary directory for results.  If empty, use output file dirname.
+        std::string tmpdir;
+
         /** The number of threads to use.  The default is number of hardware threads for the
          * GUI, 0 for the CLI.
          */

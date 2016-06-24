@@ -1,6 +1,7 @@
 #include "creativity/Creativity.hpp"
 #include "creativity/data/simdata.hpp"
 #include "creativity/state/Storage.hpp"
+#include "creativity/state/FileStorage.hpp"
 #include "creativity/cmdargs/Data.hpp"
 #include <eris/types.hpp>
 #include <cerrno>
@@ -69,7 +70,7 @@ void thr_parse_file(
         Creativity creativity;
         // Filename input
         try {
-            creativity.fileRead(source, args.memory_xz or args.memory, args.memory);
+            creativity.read<FileStorage>(source, FileStorage::Mode::READONLY, args.memory_xz, args.tmpdir);
         }
         catch (std::ios_base::failure&) {
             std::cerr << "Unable to read `" << source << "': " << std::strerror(errno) << "\n";

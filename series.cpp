@@ -2,6 +2,7 @@
 #include "creativity/data/simdata.hpp"
 #include "creativity/data/util.hpp"
 #include "creativity/state/Storage.hpp"
+#include "creativity/state/FileStorage.hpp"
 #include "creativity/cmdargs/Series.hpp"
 #include <eris/types.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -71,7 +72,7 @@ void thr_parse_file(
         output.precision(args.double_precision);
         Creativity creativity;
         // Filename input
-        try { creativity.fileRead(source, args.memory_xz or args.memory, args.memory); }
+        try { creativity.read<FileStorage>(source, FileStorage::Mode::READONLY, args.memory_xz, args.tmpdir); }
         catch (std::ios_base::failure&) FAIL("I/O error: " << std::strerror(errno))
         catch (std::exception &e) FAIL("An error occured: " << e.what())
 

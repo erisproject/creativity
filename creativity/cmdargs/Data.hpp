@@ -59,8 +59,10 @@ class Data : public CmdArgs {
         /// If true, decompress xz files into memory
         bool memory_xz = false;
 
-        /// If true, copy all files into memory
-        bool memory = false;
+        /** If memory_xz is false, decompress files into temporary files in this directory instead
+         * of into the same directory as the input file.
+         */
+        std::string tmpdir;
 
         /// Overridden to add " CRSTATE [CRSTATE ...]"
         virtual std::string usage() const override;

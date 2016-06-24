@@ -32,8 +32,8 @@ int main(int argc, char *argv[1]) {
 
     // Handle any command line arguments.  These set things in creativity.set(), which form the
     // defaults for the GUI, and have a few extra leftovers that the GUI code handles itself.
-    cmdargs::GUI cmd(creativity.set());
-    cmd.parse(argc, argv);
+    cmdargs::GUI args(creativity.set());
+    args.parse(argc, argv);
 
     // Start out with an in-memory storage "file"--it is much more efficient than actual in-memory
     // storage of all of the states
@@ -46,7 +46,7 @@ int main(int argc, char *argv[1]) {
     eris_time_t run_end = 0;
     std::chrono::milliseconds sync_speed{50};
     bool save_to_file = false, load_from_file = false;
-    unsigned int max_threads = cmd.threads;
+    unsigned int max_threads = args.threads;
 
     // Set up handlers for user actions in the GUI
     auto on_configure = [&](GUI::Parameter p) { // Parameter
@@ -58,7 +58,7 @@ int main(int argc, char *argv[1]) {
             case GUI::ParamType::load:
                 if (setup) throw std::runtime_error("Cannot load after initial setup");
                 if (save_to_file) throw std::runtime_error("Error: cannot load and save at the same time");
-                creativity.fileRead(*reinterpret_cast<std::string*>(p.ptr));
+                creativity.read<FileStorage>(*reinterpret_cast<std::string*>(p.ptr), FileStorage::Mode::READONLY, args.memory, args.tmpdir);
                 if (creativity.storage().first->size() == 0)
                     throw std::runtime_error("Unable to load file: file has no states");
                 if (creativity.parameters.dimensions < 1)
@@ -68,7 +68,7 @@ int main(int argc, char *argv[1]) {
                 load_from_file = true;
                 break;
             case GUI::ParamType::save_as:
-                creativity.fileWrite(*reinterpret_cast<std::string*>(p.ptr));
+                creativity.write<FileStorage>(*reinterpret_cast<std::string*>(p.ptr), FileStorage::Mode::OVERWRITE, args.memory, args.tmpdir);
                 save_to_file = true;
                 break;
             case GUI::ParamType::threads:
@@ -109,7 +109,7 @@ int main(int argc, char *argv[1]) {
     GUI gui(creativity, on_configure, on_initialize, on_change_periods, on_run, on_stop, on_step, on_quit);
 
     try {
-        gui.start(cmd);
+        gui.start(args);
     }
     catch (Glib::Error &e) {
         std::cerr << "Unable to start gui: " << e.what() << "\n";

@@ -16,14 +16,8 @@ class CLI : public Simulator {
         /// Set to tell cli to shut up (typically when running in batch mode)
         bool quiet = false;
 
-        /// Whether to use xz compression
-        bool xz = false;
-
         /// Whether to use in-memory file instead of a temporary file
         bool memory = false;
-
-        /// The temporary directory for results
-        std::string tmpdir;
 
         /// Whether `output' can be overwritten
         bool overwrite = false;

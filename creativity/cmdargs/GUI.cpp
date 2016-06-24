@@ -20,6 +20,7 @@ void GUI::addOptions() {
 
     sim_controls_.add_options()
         ("output,o", value(output), "Output file for simulation results.  If this contains the characters 'SEED', they will be replaced with the random seed value used for the simulation.  If omitted, the simulation is not written to disk.")
+        ("memory", value(memory), "Keep results in memory when loading or saving.  For loading, this causes input files to be decompressed to an in-memory buffer.  For saving, this keeps all results in-memory until writing the final (compressed) file.  Without this option, an (uncompressed) temporary file is used.")
         ("initialize", "If specified, initialize the simulation using the given settings, but do no start it.  Otherwise the GUI starts uninitialized, but ready-to-run with the given settings.  Ignored if --start is specified.")
         ("start", "If specified, start running immediately using the given settings.  Otherwise the GUI starts uninitialized, but ready-to-run with the given settings.")
         ;

@@ -67,34 +67,34 @@ class BookState final {
         /** The number of sales of copies of this book in the current period.  The sales are private
          * sales if `.market_private` is true and public sales if `.market_public()` is true.
          */
-        unsigned int sales;
+        uint32_t sales;
 
         /// The cumulative lifetime private market sales of this book, up to and including the current period.
-        unsigned int sales_lifetime_private;
+        uint32_t sales_lifetime_private;
 
         /// The cumulative lifetime public market sales of this book, up to and including the current period.
-        unsigned int sales_lifetime_public;
+        uint32_t sales_lifetime_public;
 
         /** Returns the cumulative lifetime sales of this book, up to and including the current
          * period, of both private and public markets.
          */
-        unsigned int sales_lifetime() const { return sales_lifetime_private + sales_lifetime_public; }
+        uint32_t sales_lifetime() const { return sales_lifetime_private + sales_lifetime_public; }
 
         /// The number of pirated copies of this book in the current period.
-        unsigned int pirated;
+        uint32_t pirated;
 
         /// The cumulative lifetime pirated copies of the book, up to and including the current period.
-        unsigned int pirated_lifetime;
+        uint32_t pirated_lifetime;
 
         /** Returns the number of new copies created in the current period.  This is simply
          * `sales + pirated`.
          */
-        unsigned int copies() const { return pirated + sales; }
+        uint32_t copies() const { return pirated + sales; }
 
         /** Returns the cumulative lifetime copies of the book, up to and including the current
          * period.  This is simply `sales_lifetime_private + sales_lifetime_public + pirated_lifetime`.
          */
-        unsigned int copies_lifetime() const { return pirated_lifetime + sales_lifetime_private + sales_lifetime_public; }
+        uint32_t copies_lifetime() const { return pirated_lifetime + sales_lifetime_private + sales_lifetime_public; }
 
         /// The period in which this book ws created.  Directly related to age.
         eris::eris_time_t created;
@@ -103,7 +103,7 @@ class BookState final {
          * is currently on the private market, this is simply the age plus 1; if not on the market,
          * this is the number of periods that the book was on the market.
          */
-        unsigned int lifetime_private;
+        uint32_t lifetime_private;
 };
 
 }}

@@ -57,8 +57,10 @@ class Series : public CmdArgs {
         /// If true, decompress xz files into memory
         bool memory_xz = false;
 
-        /// If true, copy all files into memory
-        bool memory = false;
+        /** If memory_xz is false, decompress files into temporary files in this directory instead
+         * of into the same directory as the input file.
+         */
+        std::string tmpdir;
 
         /** The output directory; each variable VAR will be written to a "series-VAR.csv" file in
          * the directory.  The directory will be created if it doesn't yet exist.

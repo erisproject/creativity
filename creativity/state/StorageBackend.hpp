@@ -25,43 +25,30 @@ namespace creativity { namespace state {
  */
 class StorageBackend : private eris::noncopyable {
     public:
-        StorageBackend() = default;
+        /** Constructor: takes a CreativitySettings reference.  The reference must stay valid for
+         * the duration of the StorageBackend.
+         */
+        StorageBackend(CreativitySettings &settings) : settings_{settings} {}
 
         /** Returns the number of states stored in the storage object, not including queued but
          * not-yet-added states.  This is typically called just once by Storage immediately after
          * constructing the object to determine the number of initial storage states; Storage
          * internally tracks (by the number of enqueue calls) the number of states after that.
          */
-        virtual size_t size() const = 0;
+        virtual size_t size() = 0;
 
-        /// Returns true if the container is empty, i.e. if `size() == 0`
-        bool empty() const;
-
-        /** Subclasses should set this to true if they have some settings to load.  This value is
-         * checked immediately after construction by Storage, and should return true if the backend
-         * has existing settings to load, false if the backend represented a new creativity storage
-         * target without meaningful settings.
-         *
-         * The default value is false.
-         */
-        bool have_settings = false;
+        /// Returns true if the container is empty; exactly equivalent to `size() == 0`
+        bool empty();
 
         /** Optional method that subclasses can override if knowing the number of states that will
          * be stored in advance is useful.  The default implementation does nothing.
          */
         virtual void reserve(size_t T);
 
-        /** Writes the given settings to the storage medium (if appropriate).  Existing settings are
-         * replaced.
+        /** Writes the settings in settings_ to the storage medium (if appropriate).  Existing
+         * stored settings should be replaced with the new values.
          */
-        virtual void writeSettings(const CreativitySettings &settings) = 0;
-
-        /** Reads the currently stored settings from the storage medium, updating the given object.
-         * This is typically called by Storage immediately after backend object construction if
-         * hasSettings() returned true.  If no settings are available, this method should just leave
-         * the given CreativitySettings object untouched.
-         */
-        virtual void readSettings(CreativitySettings &settings) const = 0;
+        virtual void writeSettings() = 0;
 
         /** Flushes changes.  This method blocks until the current thread has finished writing all
          * queued states and the device has been flushed to storage (if applicable and the given
@@ -96,7 +83,7 @@ class StorageBackend : private eris::noncopyable {
          * If the state does not exist in the storage medium, a subclass should return a void
          * shared_ptr.
          */
-        virtual std::shared_ptr<const State> load(eris::eris_time_t t) const = 0;
+        virtual std::shared_ptr<const State> load(eris::eris_time_t t) = 0;
 
         /// Virtual destructor that tells the thread (if created) to quit and waits for it.
         virtual ~StorageBackend();
@@ -114,6 +101,9 @@ class StorageBackend : private eris::noncopyable {
          * storage backends with such a concept should override.
          */
         virtual void storage_flush();
+
+        /** CreativitySettings reference. */
+        CreativitySettings &settings_;
 
     private:
 

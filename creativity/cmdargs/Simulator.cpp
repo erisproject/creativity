@@ -88,6 +88,10 @@ void Simulator::addOptions() {
         ("periods,T", value(periods), "    Number of simulation periods to run.")
         ("seed", value(seed), "    Random seed to use.  If omitted, a random seed is obtained from the operating system's random source.")
         ("threads,j", value(threads), "    Maximum number of threads to use for the simulation.  0 (the default) disables simulation threading entirely.")
+        ("tmpdir", value(tmpdir), "Output directory in which to write the output file while running the simulation.  When "
+            "the simulation finishes, the temporary file is compressed and the compression version written to the final destination "
+            "specified by -o.  If this argument is omitted, the file is written to a temporary file in the same directory as the final "
+            "output file.  Has no effect when --memory is enabled.")
         ;
     // Don't add this here: the caller has to do that (after adding to it, if necessary): boost
     // *copies* the argument to add(), so we can't add and then change it later.

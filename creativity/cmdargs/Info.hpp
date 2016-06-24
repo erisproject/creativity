@@ -21,8 +21,10 @@ class Info : public CmdArgs {
         /// If true, decompress xz files into memory
         bool memory_xz = false;
 
-        /// If true, copy all files into memory
-        bool memory = false;
+        /** If memory_xz is false, decompress files into temporary files in this directory instead
+         * of into the same directory as the input file.
+         */
+        std::string tmpdir;
 
         /// Show every `n`th period (where this value is n).  0 means don't show any.
         unsigned int thin_periods = 10;

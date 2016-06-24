@@ -24,7 +24,7 @@ class ReaderState final {
          * dimensions.  All values will be default initialized.  (The number of dimensions is needed
          * for Position initialization).
          */
-        explicit ReaderState(const unsigned int dimensions);
+        explicit ReaderState(const uint32_t dimensions);
 
         /// Unique simulation ID of the reader
         eris::eris_id_t id;
@@ -40,34 +40,34 @@ class ReaderState final {
         /** The number of market-purchased books in the reader's library.  When loading/modifying a
          * ReaderState object you should call updateLibraryCounts() to recalculate this, or else set
          * it yourself. */
-        unsigned int library_purchased;
+        uint32_t library_purchased;
 
         /** The number of market-purchased books in the reader's library that were acquired in the
          * current period.  When loading/modifying a ReaderState object you should call
          * updateLibraryCounts() to recalculate this, or else set it yourself. */
-        unsigned int library_purchased_new;
+        uint32_t library_purchased_new;
 
         /** The number of public provider-purchased books in the reader's library.  When
          * loading/modifying a ReaderState object you should call updateLibraryCounts() to
          * recalculate this, or else set it yourself.
          */
-        unsigned int library_public;
+        uint32_t library_public;
 
         /** The number of public provider-purchased books in the reader's library that were acquired
          * in the current period.  When loading/modifying a ReaderState object you should call
          * updateLibraryCounts() to recalculate this, or else set it yourself.
          */
-        unsigned int library_public_new;
+        uint32_t library_public_new;
 
         /** The number of pirated books in the reader's library.  When loading/modifying a
          * ReaderState object you should call updateLibraryCounts() to recalculate this, or else set
          * it yourself. */
-        unsigned int library_pirated;
+        uint32_t library_pirated;
 
         /** The number of pirated books in the reader's library that were acquired in the current
          * period.  When loading/modifying a ReaderState object you should call
          * updateLibraryCounts() to recalculate this, or else set it yourself. */
-        unsigned int library_pirated_new;
+        uint32_t library_pirated_new;
 
         std::set<eris::eris_id_t>
             friends, ///< Friends of the reader
@@ -90,7 +90,7 @@ class ReaderState final {
         belief::Profit profit; ///< Profit beliefs
         belief::Profit profit_extrap; ///< Profit beliefs using extrapolation for on-market books (will be default-constructed if there is no extrapolation)
         belief::Demand demand; ///< Single-period demand belief
-        std::map<unsigned int, belief::ProfitStream> profit_stream; ///< Profit stream beliefs
+        std::map<uint32_t, belief::ProfitStream> profit_stream; ///< Profit stream beliefs
 
         /** Returns profit_extrap if it exists (i.e. if there is extrapolated data), otherwise
          * returns profit (i.e. if there was no extrapolated data and so profit_extrap_ is exactly

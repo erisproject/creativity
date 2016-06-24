@@ -4,6 +4,8 @@
 #include "creativity/CreativitySettings.hpp"
 #include <eris/belief/BayesianLinearRestricted.hpp>
 #include <eris/types.hpp>
+#include <eris/serialize/serializer.hpp>
+#include <eris/serialize/Serialization.hpp>
 #include <Eigen/Core>
 #include <boost/detail/endian.hpp>
 #include <cstddef>
@@ -12,7 +14,6 @@
 #include <vector>
 #include <iostream>
 #include <memory>
-#include <mutex>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -28,36 +29,9 @@ namespace creativity { namespace state {
  *
  * Writing new states is done by a background thread which is spawned the first time enqueue() is
  * called with a new state.
- *
- * Note that this object is unable to write simulations with more than 2 billion members (in
- * particular, it stores IDs in the file as 32-bit quantities, and will throw an exception if a
- * value that does not fit in a uint32_t is encountered).
  */
-class FileStorage : public StorageBackend {
+class FileStorage : public StorageBackend, public eris::serialize::Serialization {
     public:
-        /** The supported file modes, passed to the constructor. */
-        enum class MODE {
-            /** Opens the file in read-only mode.  The file must exist and contain valid data,
-             * otherwise an exception will be thrown.  Any operation that requires writing to the
-             * file (such as adding a State) will fail.
-             */
-            READONLY,
-            /** Opens the file in read-write mode.  If the file exists and is non-empty, it will be
-             * parsed (and so must be a valid file).  Otherwise, it will be initialized as a new
-             * data file with no states (and uninitialized dimensions and boundaries parameters).
-             * New states passed to push_back() will be added to the end of the existing states (if
-             * any).
-             */
-            APPEND,
-            /** Just like APPEND, but requires that the file already exist with at least a header.
-             */
-            READ,
-            /** Like APPEND, but truncates any file data first if the file exists (so the file is
-             * always treated as an empty file and reinitialized).
-             */
-            OVERWRITE
-        };
-
         /** The supported record types within a state. */
         enum TYPE : uint8_t {
             TYPE_DONE = 0, ///< Psuedo-type indicating the end of the record list
@@ -69,92 +43,49 @@ class FileStorage : public StorageBackend {
         /** Constructs a FileStorage that stores file content in an in-memory buffer.  Beware: this
          * usage requires considerably more memory for running a simulation, and the results are not
          * automatically stored.
+         *
+         * \param settings the CreativitySettings reference which is read when creating a new file
+         * and updated when reading an existing file.
          */
-        FileStorage();
+        FileStorage(CreativitySettings &settings) : StorageBackend(settings) {
+            memory();
+        }
 
         /** Constructs and returns a FileStorage object that uses the given file for reading and
-         * (optionally) writing state data.  The file is read or created immediately.
+         * (optionally) writing state data.  The file is read or created immediately.  All arguments
+         * (except the first) are forwarded to Serialize::open().
          *
-         * This method does not support reading from xz-compressed .crstate.xz files: if you need to
-         * read from a file that might be xz-compressed, see the next constructor.
+         * \sa Serialize::open()
          *
-         * \param filename the filename to open
-         * \param mode the open mode to use
-         *
-         * Throws various exceptions if the file does not exist, cannot be read, is empty, or
+         * \throws various exceptions if the file does not exist, cannot be read, is empty, or
          * contains invalid data.
          */
-        FileStorage(const std::string &filename, MODE mode);
-
-        /** Opens a file in read-only mode.  If the file is a xz-compressed file, it is first read
-         * decompressed to a temporary file (or in-memory buffer), and the creativity data is read
-         * from there.
-         *
-         * The FileStorage object will be opened in read-write mode only if the file contents are
-         * copied into memory or to a temporary file; thus it is guaranteed to be read-write only if
-         * `copy_in_memory` is true.  Note also that even though it is read/write, any changes will
-         * be lost when the FileStorage object is destroyed: either the memory will be deallocated,
-         * or the temporary file will be deleted.
-         *
-         * \param filename the filename to open
-         * \param decompress_in_memory if true, decompress the file in memory, otherwise use a
-         * temporary file (in your system's standard temporary directory locations, respecting
-         * standard environment variables).  Note that in-memory decompression can require a large
-         * amount of memory, depending on the size of the uncompressed data.
-         * \param copy_in_memory if true (defaults to false if omitted), copies the file into memory
-         * when the file is *not* xz-compressed.  This may result in better performance (at the cost
-         * of increased memory use) on high-latency storage devices.
-         * \param tmpfile the filename to write to (overwriting if it exists) when decompressing an
-         * xz file to a temporary file.  If omitted or empty, a file is generated in a
-         * system-dependent temporary location (which can be influenced with TMP and TMPDIR and
-         * similar environment variables).  If the temporary file is used, it will be automatically
-         * deleted when the FileStorage object is destroyed.  Has no effect if decompress_in_memory
-         * is true.
-         */
-        FileStorage(const std::string &filename, bool decompress_in_memory, bool copy_in_memory = false, const std::string &tmpfile = "");
+        template <typename... Args>
+        FileStorage(CreativitySettings &settings, const std::string &filename, Mode mode, Args&&... args)
+        : StorageBackend(settings)
+        {
+            open(filename, mode, std::forward<Args>(args)...);
+        }
 
         /** Default move constructor. */
-        FileStorage(FileStorage&&) = default;
+        //FileStorage(FileStorage&&) = default;
 
         /** Default move assignment operator. */
-        FileStorage& operator=(FileStorage&&) = default;
+        //FileStorage& operator=(FileStorage&&) = default;
 
-        /** Default destructor; if the current file is currently open to a temporary file, deletes
-         * the temporary file.
-         */
-        virtual ~FileStorage();
-
-        /** Throws a ParseError exception.  The given message is prefixed with `Parsing file failed
-         * [pos=123]: `, where `123` is the current file position.
+        /** Throws a eris::serialize::Serializer::parse_error exception.  The given message is
+         * prefixed with `Parsing file failed [pos=123]: `, where `123` is the current file
+         * position.
          */
         void throwParseError(const std::string& message) const;
-
-        /** Exception class thrown when the opened file contains data that cannot be parsed.
-         */
-        class ParseError : public std::runtime_error {
-            public:
-                /// Exception constructor
-                ParseError(const std::string& message);
-        };
 
         /** Loads the requested state data from the open file into a State object and returns it
          * (wrapped in a shared_ptr).
          */
-        virtual std::shared_ptr<const State> load(eris::eris_time_t t) const override;
+        virtual std::shared_ptr<const State> load(eris::eris_time_t t) override;
 
         /// Returns the number of states currently stored in the file.
-        virtual size_t size() const override;
-
-        /** Reads the settings stored in the file header into the given CreativitySettings object.
-         */
-        virtual void readSettings(CreativitySettings &settings) const override;
-
-        /** Updates the values in the file header to those currently in the CreativitySettings
-         * reference provided.
-         *
-         * Existing values are overwritten.
-         */
-        virtual void writeSettings(const CreativitySettings &settings) override;
+        virtual size_t size() override;
 
         /** Flushes the file stream.  This calls `flush()` on the underlying file object.  This is
          * normally not required: any changes will be automatically flushed when the FileStorage
@@ -166,350 +97,29 @@ class FileStorage : public StorageBackend {
          */
         virtual void storage_flush() override;
 
-        /** Copies the current file contents to the given file.  If it exists, it will be
-         * overwritten.
-         */
-        void copyTo(const std::string &filename);
-
-        /** Compresses the current file contents to an xz file, written at the given location.  If
-         * the file already exists, it will be overwritten.  Note that only the current file
-         * contents are copied: any changes made after this call will not be present in the
-         * compressed file.
-         *
-         * \param filename the filename to write to
-         * \param level the xz compression level, from 0 to 9.  Defaults to 3, which is very fast
-         * compared to higher levels, and compresses typical .crstate files almost as well as 9.
-         * \throws std::runtime_error (or a derived object thereof, such as std::ios_base::failure)
-         * upon I/O failure or liblzma internal errors.
-         */
-        void copyToXZ(const std::string &filename, uint32_t level = 3);
-
-        /** Reads all available data from the given input stream, compresses it to xz format, and
-         * writes the xz data to the given output stream.
-         *
-         * \param in the uncompressed source
-         * \param out the ostream to write the compressed data to
-         * \param level the XZ compression level, from 0 to 9.  Defaults to 3, which is much faster
-         * than higher levels, but compresses typical .crstate files nearly as well.
-         * \throws std::runtime_error (or a derived object thereof, such as std::ios_base::failure)
-         * upon I/O failure or liblzma internal errors.
-         */
-        static void compressXZ(std::istream &in, std::ostream &out, uint32_t level = 3);
-
-        /** Reads compressed xz data from the given input stream (which must be already opened for
-         * reading and positioned at the beginning of the xz data) and writes the decompressed data
-         * to the given output stream.
-         *
-         * \throws std::runtime_error (or a derived object thereof, such as std::ios_base::failure)
-         * upon I/O failure or liblzma internal errors.
-         */
-        static void decompressXZ(std::istream &in, std::ostream &out);
-
     protected:
-        /** The stream object.  Typically an fstream or sstream (if created by this class), but
-         * subclasses could use something else.
-         */
-        std::unique_ptr<std::iostream> f_;
 
-        /** Mutex guarding f_ and related variables (such as state_pos_).  Some operations (such as
-         * load/saving settings) are done by the main thread, which accesses f_.
-         */
-        mutable std::mutex f_mutex_;
+        /// Registers the various creativity parameters as header fields.
+        void configureHeaderFields() override;
 
-        /// Flags for opening in read-only mode
-        static constexpr std::ios_base::openmode open_readonly = std::ios_base::binary | std::ios_base::in;
-        /// Flags for opening in overwrite mode
-        static constexpr std::ios_base::openmode open_overwrite = open_readonly | std::ios_base::out | std::ios_base::trunc;
-        /** Flags for opening for read-write when the file exists (if it doesn't exist,
-         * open_overwrite is used instead because this mode fails when the file doesn't exist).
-         */
-        static constexpr std::ios_base::openmode open_readwrite = open_readonly | std::ios_base::out;
+        /// Calls updateHeaderFields() to rewrite settings
+        void writeSettings() override;
 
-        /** Performs initial reading or writing.
-         *
-         * \param empty if true, the file is empty and open for writing, and so an initial, no-state
-         * file header will be written.  If false, the file is not (or should not be) empty, and
-         * thus an existing header needs to be read.
-         */
-        void initialize(bool empty);
+        /// Adds a state pointer block to the end of the header.
+        void writeExtraHeader() override;
+
+        /// Stores the location of the state pointer block at the end of the head.
+        void readExtraHeader() override;
 
     private:
 
-        /** The file version.  The default is 2; earlier versions are from versions of the program
-         * with fundamentally incompatible features (they can be read with earlier versions of the
-         * program, if necessary).
-         *
-         * In particular:
-         *
-         * - v1 files have per-user costs and income, but those never differed from the creativity
-         *   setting in v1-only simulators; v2 files simply don't include them.
-         *
-         * - book distance and reader step parameters are different: they were the standard
-         *   deviation parameter of a half normal distribution with mean 0 under v1, but are the
-         *   mean of a scaled χ²(1) in v2 files.
-         *
-         * - the initial behaviour distributions are different: in v1, authors choose quality from a
-         *   uniform distribution; in v2 they choose effort from a uniform distribution.
-         */
-        uint32_t version_ = 2;
-
-        /// Called from the queue thread to write the given State to the file.
-        virtual void thread_insert(std::shared_ptr<const State> &&s) override;
-
-        /// Storage for header data parsing when opening the file, and after writing settings.
-        CreativitySettings settings_;
-
-        /** Attempts to parse the metadata (global settings, file locations; essentially everything
-         * except for the actual state data) from the opened file.  Throws an exception if parsing
-         * fails or the file format appears invalid.
-         *
-         * This method is called immediately after the file is opened during construction when
-         * opened in READONLY or READ modes, and when opened in APPEND mode with a non-empty file.
-         */
-        void parseMetadata();
-
-        /** Writes a header for an empty FileStorage: that is, a header for a file with 0 states,
-         * and with all settings initialized to 0.  After this completes, the file output position
-         * will be at the end of the header, i.e. at `FileStorage::HEADER::size`.
-         *
-         * This method is called during construction when opening a file in OVERWRITE mode or when
-         * opening a non-existant or empty file in APPEND mode.
-         */
-        void writeEmptyHeader();
-
-        /** Reads the given type T from the file at its current location, advancing the file's
-         * current location by the size of the given type.
-         */
-        template <typename T>
-        T read_value() const;
-
-        /** Reads a value from the file at its current location into the given variable, advancing
-         * the file's current location by the size of the given type.
-         */
-        template <typename T>
-        void read_value(T &val) const { val = read_value<T>(); }
-
-        /** Alias for `read_value<uint64_t>()` */
-        uint64_t read_u64() const { return read_value<uint64_t>(); }
-
-        /** Alias for `read_value<uint32_t>()` */
-        uint32_t read_u32() const { return read_value<uint32_t>(); }
-
-        /** Alias for `read_value<uint8_t>()` */
-        uint8_t read_u8() const { return read_value<uint8_t>(); }
-
-        /** Alias for `read_value<int64_t>()` */
-        int64_t read_i64() const { return read_value<int64_t>(); }
-
-        /** Alias for `read_value<int32_t>()` */
-        int32_t read_i32() const { return read_value<int32_t>(); }
-
-        /** Alias for `read_value<int8_t>()` */
-        int8_t read_i8() const { return read_value<int8_t>(); }
-
-        /** Alias for `read_value<double>()` */
-        double read_dbl() const { return read_value<double>(); }
-
-        /** Writes the given value to the file at its current location. */
-        template <typename T>
-        void write_value(const T &val);
-
-        /** Alias for `write_value((uint64_t) value)` */
-        void write_u64(uint64_t value) { write_value(value); }
-
-        /** Alias for `write_value((uint32_t) value)` */
-        void write_u32(uint32_t value) { write_value(value); }
-
-        /** Alias for `write_value((uint8_t) value)` */
-        void write_u8(uint8_t value) { write_value(value); }
-
-        /** Alias for `write_value((int64_t) value)` */
-        void write_i64(int64_t value) { write_value(value); }
-
-        /** Alias for `write_value((int32_t) value)` */
-        void write_i32(int32_t value) { write_value(value); }
-
-        /** Alias for `write_value((int8_t) value)` */
-        void write_i8(int8_t value) { write_value(value); }
-
-        /** Alias for `write_value((double) value)` */
-        void write_dbl(double value) { write_value(value); }
-
-        /** Seeks to the end of the file, where a new block can be written.  If required, padding is
-         * added to the end of the file so that the new block is on a block alignment boundary.  The
-         * file output position will be at the end of the file after this call; the location is also
-         * returned for convenience.
-         */
-        int64_t newBlock();
-
-        /** Copies the appropriate number of bytes from memory from the location of `from` into a
-         * variable of type T and returns it.  This is safer than a reinterpret_cast as it avoids
-         * alignment issues (i.e. where `from` has a memory alignment that is invalid for T
-         * variables).
-         *
-         * The number of bytes copied is `sizeof(T)`; `from` may be a smaller type (such as a
-         * `char`) as long as `sizeof(T)` bytes of valid data exists at its location.
-         */
-        template <typename T, typename F>
-        static T parse_value(const F &from);
-
-        /// Like parse_value(from), but copies into the given variable instead of returning it.
-        template <typename T, typename F>
-        static void parse_value(const F &from, T &to) { to = parse_value<T>(from); }
-
-        /** Copies the appropriate number of bytes from memory from the location of `from` into the
-         * location of `to`, reordered (if necessary) to be in the file's little-endian order.
-         *
-         * The number of bytes copied is `sizeof(F)`; `to` may be a smaller type (such as a `char`)
-         * as long as `sizeof(F)` bytes of valid space exists at its location.
-         */
-        template <typename F, typename T>
-        static void store_value(const F &from, T &to);
-
-        /// Store the locations of the state data for each state;
-        std::vector<std::streampos> state_pos_;
-
-        /** The header contains the first 485 state locations (bytes 208 through 4887); if the file
-         * has more states, the location at 4088 points to a "continuation block": 511 state
-         * locations and a further continuation block location.  This variable stores the file
-         * locations of continuation blocks, read when the file is first opened and updated as
-         * updates require additional blocks.
-         */
-        std::vector<std::streampos> cont_pos_;
-
-        /** Everything (header, library blocks, continuation blocks, states) gets aligned to this size,
-         * with padding added as required before beginning a new block.
-         */
-        static constexpr unsigned int BLOCK_SIZE = 4096;
-
-        /// Constants for header attributes
-        struct HEADER {
-            static constexpr unsigned int size = BLOCK_SIZE; ///< Size of the header, in bytes
-            /// The magic value 'CrSt' that identifies the file as created by this class
-            static constexpr char fileid[4] = {'C', 'r', 'S', 't'};
-            /// The test value bytes, which should be interpreted as the various test values below
-            static constexpr char test_value[8] = {20,106,10,-50,0,24,69,-64};
-            static constexpr uint32_t u32_test = 3456789012; ///< unsigned 32-bit integer test value
-            static constexpr int32_t  i32_test = -838178284; ///< signed 32-bit integer test value
-            static constexpr uint64_t u64_test = 13854506220411054612ul; ///< unsigned 64-bit integer test value
-            static constexpr int64_t  i64_test = -4592237853298497004; ///< signed 64-bit integer test value
-            // The following constant is exactly representable in a 64-bit double (in fact it is the
-            // exact value of the test_value characters above, interpreted as a little-endian stored
-            // IEEE754 double).
-            static constexpr double dbl_test = -42.187524561963215319337905384600162506103515625; ///< double test value
-            /// Header positions of various fields
-            struct pos {
-                static constexpr int64_t
-                    fileid = 0, ///< First 4 bytes are File ID such as "CrSt" ("Cr"eative "St"ate file)
-                    filever = 4, ///< Second 4 bytes are u32 file format version
-                    test_value = 8, ///< the 8-byte test value (which is interpreted as various types)
-                    num_states = 16, ///< the number of states stored in this file (u32)
-                    dimensions = 20, ///< the number of dimensions of the simulation these states belong to (u32)
-                    readers = 24, ///< the number of readers in the simulation
-                    boundary = 28, ///< the simulation boundary (positive double)
-                    book_distance_mean = 36, ///< mean of distance of new books from authors (non-negative double)
-                    book_quality_sd = 44, ///< standard deviation of perceived book quality draw (draw is normal, with mean = true quality) (dbl)
-                    reader_step_mean = 52, ///< mean of reader step distance (non-negative dbl)
-                    reader_creation_shape = 60, ///< reader q(l) shape parameter (dbl)
-                    reader_creation_scale_min = 68, ///< reader q(l) scale parameter ~ U[a,b]; this is 'a' (dbl)
-                    reader_creation_scale_range = 76, ///< reader q(l) scale parameter ~ U[a,b]; this is 'b-a' (dbl)
-                    creation_time = 84, ///< Time to create a book
-                    cost_market = 88, ///< Fixed cost of keeping a book on the market (dbl)
-                    cost_unit = 96, ///< Unit cost of an author creating a copy of a book (dbl)
-                    cost_piracy = 104, ///< Unit cost of getting a copy of a book via piracy (dbl)
-                    income = 112, ///< Per-period reader external income (before incurring authorship costs or receiving book profits) (dbl)
-                    piracy_begins = 120, ///< the sharing start period (u32)
-                    piracy_link_proportion = 124, ///< The proportion of potential friendship links that exist
-                    prior_scale = 132, ///< The prior 'n' multiplier (usually 0-1)
-                    prior_scale_piracy = 140, ///< The prior 'n' multiplier in the first piracy period
-                    prior_scale_burnin = 148, ///< The prior 'n' multiplier (usually 0-1)
-                    burnin_periods = 156, ///< The burnin-periods during which beliefs are more heavily discounted (u32)
-                    init_prob_write = 160, ///< The probability of writing (while beliefs noninformative)
-                    init_l_min = 168, ///< `a` in U[a,b], the noninformative belief authorship effort level
-                    init_l_range = 176, ///< `b-a` in U[a,b], the noninformative belief authorship effort level
-                    init_p_min = 184, ///< `a` in U[a,b], the noninformative belief book price (net of cost)
-                    init_p_range = 192, ///< `b-a` in U[a,b], the noninformative belief book price (net of cost)
-                    init_prob_keep = 200, ///< The probability of keeping a book on the market (uninformed beliefs)
-                    init_keep_price = 208, ///< If keeping a book on the market, the new price is (p-c)*s+c, where this is s
-                    init_belief_threshold = 216, ///< The required n-k value for readers to use beliefs instead of initial behaviour (i32)
-                    public_sharing_begins = 220, ///< The period in which the PublicTracker is created (u32)
-                    public_sharing_tax = 224, ///< The lump sum tax the PublicTracker collects (dbl)
-                    prior_scale_public_sharing = 232, ///< The prior scale for the period the PublicTracker first becomes available (dbl)
-                    creation_fixed = 240, ///< Fixed cost of creation (dbl)
-                    // NB: this next one should be an integer multiple of 8 (so that states+cont
-                    // location go to the end, and so the `states` division below has no remainder)
-                    //
-                    // padding, if needed, here.
-                    state_first = 248, ///< the first state record
-                    state_last = size - 16, ///< the last state record
-                    continuation = size - 8; ///< the header continuation block pointer (used once header state blocks fill up)
-            };
-            /** The number of states that can be stored in the header.  Storing additional states
-             * requires using continuation blocks.
-             */
-            static constexpr unsigned int states = (pos::state_last - pos::state_first) / 8 + 1;
-        };
-
-        /// Constants for continuation blocks
-        struct CBLOCK {
-            static constexpr unsigned int states = (BLOCK_SIZE / 8) - 1; ///< Number of states stored in a continuation block
-            static constexpr unsigned int next_cblock = states * 8; ///< Relative position of the pointer to the next continuation block
-        };
-
-        /// A BLOCK_SIZE block of 0s
-        static constexpr char ZERO_BLOCK[BLOCK_SIZE] = {0};
-
-        /** Constants for library storage.  Libraries are stored in blocks of many packed
-         * (bookid,t,quality,status) tuples followed by a pointer to the next library block.  When
-         * reading a reader state, the first block of the library is pointed to, and is read until
-         * either a 0 id or a `t` value larger than that of the state being read is found.
-         */
-        struct LIBRARY {
-            /** a reader library record size: the book id (u32), the acquisition period (u32), the
-             * reader-specific quality (dbl), and the library book status (u8: 0=wrote, 1=bought,
-             * 2=pirated).
-             */
-            static constexpr unsigned int record_size = sizeof(uint32_t) + sizeof(uint32_t) + sizeof(double) + sizeof(uint8_t);
-            static constexpr unsigned int block_records = (BLOCK_SIZE - 8)/record_size; ///< Number of records that will fit in a block
-        };
-
-        /** Parses the requested number of std::streampos values from memory beginning at `from` and
-         * adds them to `state_pos_`.  Throws an exception if the read fails or values are invalid
-         * (less than `FileStorage::HEADER::size` >= `end`).  Note that this simply reads a
-         * contiguous set of state locations, it does *not* handle continuation block logic (but
-         * rather continuation block reading uses this method).
-         *
-         * \param from reference to the variable located at the first state position value
-         * \param count the number of state locations to read
-         * \param end the maximum+1 state location that will be accepted; typically the current file
-         * size
-         */
-        void parseStateLocations(const char &from, const size_t count, const size_t end);
-
-        /** Adds the given location to the header or last continuation block, as appropriate.
-         * Creates a new continuation block (updating the previous one) if necessary.
-         *
-         * After updating (or creating) the continuation block(s), this also updates the header with
-         * the new number of states, and adds the location to state_pos_.
-         */
-        void addStateLocation(std::streampos location);
-
-        /** Adds a continuation block to the end of the file and updates the last current
-         * continuation block (or, if none, the header) to point to this new continuation block.
-         * This also adds an element to cont_pos_.
-         *
-         * This method should only be called when the current last continuation block (or the states
-         * in the header) is full.
-         *
-         * The file output position is not guaranteed to be at any particular position after this
-         * call.
-         */
-        void createContinuationBlock();
+        /// The location of the state pointer and main reader/libraries list blocks
+        uint64_t state_pointer_block_, readerlib_block_;
 
         // Sorting method that sorts by the library item's acquired date
         class lib_comp_less final {
             public:
-                using ref = const std::pair<const uint32_t, BookCopy>&;
+                using ref = const std::pair<const eris::eris_id_t, BookCopy>&;
                 bool operator()(ref a, ref b) const {
                     return a.second.acquired < b.second.acquired;
                 }
@@ -517,55 +127,40 @@ class FileStorage : public StorageBackend {
 
         // Reader library data
         struct lib_data {
-            int64_t pos_next; // Next library row position
-            unsigned int records_remaining; // How many library rows are remaining (0 = need a new block)
             // book id to BookCopy
-            std::map<uint32_t, BookCopy> library;
+            std::map<uint64_t, BookCopy> library;
             // library, but sorted by acquired date (for fast retrieval)
-            std::multiset<std::reference_wrapper<std::pair<const uint32_t, BookCopy>>, lib_comp_less> library_acq_sorted;
-            lib_data(int64_t pos_next) : pos_next(pos_next), records_remaining(LIBRARY::block_records) {}
+            std::multiset<std::reference_wrapper<std::pair<const uint64_t, BookCopy>>, lib_comp_less> library_acq_sorted;
         };
 
-        /** Reader library data.  Key is the reader id, value is the data. */
-        std::map<unsigned int, lib_data> reader_lib_;
+        /// Cached individual reader library data already stored in the file; the key is the reader
+        //id, the value is the pair of / the block location and the library data content.
+        std::map<eris::eris_id_t, std::pair<uint64_t, lib_data>> reader_lib_;
 
-        /** Read the reader library pointer block, which immediately follows the header.
-         *
-         * The block consists of num_reader (reader id, library block pointer) tuples.
-         *
-         * The pointed at library block consists of (bookid,t,quality,status) tuples for all books
-         * in the reader's library over all stored simulation periods.  t is the period the book was
-         * acquired; quality is the reader's subjective quality; status is 0 for written books, 1
-         * for private market purchased books, 2 for pirated, and 3 for public-provider-puchased.
-         * If the block overflows, additional continued blocks are created and pointed at by a
-         * pointer at the end of the library block.
-         *
-         * Reader blocks are stored in memory when the file is opened and updated (both in memory
-         * and on disk) as states are added.
+        /** The file version (1).  Note that there were earlier FileStorage versions that were not
+         * based on eris::Serializer at all, and have an incompatible file format; this 1 refers to
+         * the first Serializer-compatible version.
          */
-        void parseLibraryPointerBlock();
+        virtual uint32_t appFileVersion() const override { return 1; }
 
-        /** Writes the reader library pointer block.  This is called when the very first state is
-         * added to a new file, and as a result will end up putting the reader pointer block
-         * immediately after the header.  The keys of the given map are used to write the locations.
+        /** The file application name, "creativity". */
+        virtual std::string appName() const override { return "creativity"; }
+
+        /// Called from the queue thread to write the given State to the file.
+        virtual void thread_insert(std::shared_ptr<const State> &&s) override;
+
+            /** a reader library record size: the book id (u32), the acquisition period (u32), the
+             * reader-specific quality (dbl), and the library book status (u8: 0=wrote, 1=bought,
+             * 2=pirated).
+             */
+
+        /** Ensures that the library reader list contains all readers, and that each reader's
+         * library block contains all of the reader's library books, adding anything as needed.
          */
-        void writeLibraryPointerBlock(const std::map<eris::eris_id_t, ReaderState> &readers);
+        void updateLibraries(const std::map<eris::eris_id_t, ReaderState> &r);
 
-        /** Ensures that the library block for reader `r` has all of the reader's library books in
-         * it.  If any are missing, they are added to disk and to reader_lib_.
-         */
-        void updateLibrary(const ReaderState &r);
-
-        /** Creates an empty library block at the end of the file and returns the location of the
-         * beginning of the block.
-         *
-         * The file output position is not guaranteed to be at any particular position after this
-         * call.
-         */
-        int64_t createLibraryBlock();
-
-        /** Reads a state starting at the current file position.  The state data structure is as
-         * follows:
+        /** Reads a simulation state starting at the current file position.  The state data
+         * structure is as follows:
          *
          *     u32      t (simulation time period)
          *
@@ -578,9 +173,9 @@ class FileStorage : public StorageBackend {
          *
          * \see TYPE for the different TYPE values supported.
          */
-        std::shared_ptr<const State> readState() const;
+        std::shared_ptr<const State> readState();
 
-        /// Writes the given state at the current file position.
+        /// Writes the given simulation state at the current file position.
         void writeState(const State &state);
 
         /** Reads a ReaderState record from the current file position and returns it in an
@@ -617,7 +212,7 @@ class FileStorage : public StorageBackend {
          * such objects should simply be omitted when writing the data.  Each profit stream belief K
          * value must also be unique.
          */
-        std::pair<eris::eris_id_t, ReaderState> readReader(eris::eris_time_t t) const;
+        std::pair<eris::eris_id_t, ReaderState> readReader(eris::eris_time_t t);
 
         /// Writes a reader state at the current file position.
         void writeReader(const ReaderState& reader);
@@ -673,7 +268,7 @@ class FileStorage : public StorageBackend {
          *   took place).
          * - other bits are currently unused.
          */
-        belief_data readBelief() const;
+        belief_data readBelief();
 
         /** Writes a belief at the current file location.  The generally consists of a single i64
          * value at the current file location, and, if required, a belief record immediately
@@ -709,7 +304,7 @@ class FileStorage : public StorageBackend {
          *     u32          created
          *     u32          lifetime_private
          */
-        std::pair<eris::eris_id_t, BookState> readBook() const;
+        std::pair<eris::eris_id_t, BookState> readBook();
 
         /** Writes a book at the current file position.  See readBook() for data layout. */
         void writeBook(const BookState &book);
@@ -721,24 +316,10 @@ class FileStorage : public StorageBackend {
          *     dbl          tax (per-user lump sum tax)
          *     dbl          unspent (!= 0 only if the previous period had no publid downloads)
          */
-        std::unique_ptr<PublicTrackerState> readPublicTracker() const;
+        std::unique_ptr<PublicTrackerState> readPublicTracker();
 
         /// Writes a public tracker to the current file position.
         void writePublicTracker(const PublicTrackerState &pt);
-
-        /// If non-empty, the indicated file is deleted during destruction
-        std::string tmpfile_path_;
-
-        /// Internal method used by decompressXZ/compressXZ
-        static void processXZ(void *lzma_stream, void *lzma_ret, std::istream &in, std::ostream &out);
 };
 
 }}
-
-#if defined(BOOST_BIG_ENDIAN)
-#include "creativity/state/FileStorage-BE.hpp" // IWYU pragma: keep
-#elif defined(BOOST_LITTLE_ENDIAN)
-#include "creativity/state/FileStorage-LE.hpp" // IWYU pragma: keep
-#else
-#error System endianness not supported (neither big-byte nor little-byte endianness detected)!
-#endif
