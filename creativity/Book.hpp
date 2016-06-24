@@ -3,7 +3,7 @@
 #include <eris/Good.hpp>
 #include <map>
 #include <functional>
-#include <eris/random/halfnormal_distribution.hpp>
+#include <eris/random/truncated_normal_distribution.hpp>
 
 namespace creativity {
 
@@ -253,7 +253,9 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
 
         /** Returns the mean quality level determined by the author at book creation time.  This
          * value is not intended for use by readers of a book: readers rather receive a subjective
-         * quality from `qualityDraw()`.
+         * quality from `qualityDraw()`.  Note also that this parameter is the untruncated mean: the
+         * actual quality draw will be truncated to always be non-negative, which may affect the
+         * mean.
          */
         double qualityMean() const;
 
@@ -276,7 +278,7 @@ class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
         const unsigned int order_ = 0;
         bool market_private_ = true;
         eris::eris_id_t market_id_ = 0;
-        eris::random::halfnormal_distribution<double> quality_dist_;
+        eris::random::truncated_normal_distribution<double> quality_dist_;
 };
 
 }

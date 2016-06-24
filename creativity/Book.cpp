@@ -25,7 +25,7 @@ Book::Book(
         creativity_{creativity},
         author_{std::move(author)},
         order_{order},
-        quality_dist_(quality, creativity_.parameters.book_quality_sd)
+        quality_dist_(quality, creativity_.parameters.book_quality_sd, 0.0, std::numeric_limits<double>::infinity())
 {}
 
 void Book::added() {
