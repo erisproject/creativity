@@ -28,7 +28,7 @@ class Creativity : private eris::noncopyable {
         std::shared_ptr<eris::Simulation> sim;
 
         /// The money good.  Will be empty until setup() is called.
-        eris::SharedMember<eris::Good::Continuous> money;
+        eris::SharedMember<eris::Good> money;
 
         /** Simulation parameters that are used to configure the simulation when calling setup().
          * To adjust these parameters, call set().

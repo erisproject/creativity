@@ -14,7 +14,7 @@ set(creativity_description "Agent-based model of creativity and piracy")
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/Modules)
 
-set(ERIS_VERSION_REQUIRED "0.4.0")
+set(ERIS_VERSION_REQUIRED "0.5.0")
 
 # library versions (CURRENT.REVISION.AGE), which is totally separate
 # from the above.  See http://www.gnu.org/software/libtool/manual/html_node/Updating-version-info.html

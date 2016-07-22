@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <stdexcept>
 
-using eris::agent::AssetAgent;
 using namespace eris;
 
 namespace creativity {
@@ -50,7 +49,7 @@ BookMarket::quantity_info BookMarket::quantity(double p) const {
 }
 
 Market::Reservation BookMarket::reserve(
-        SharedMember<AssetAgent> agent, double q, double p_max) {
+        SharedMember<Agent> agent, double q, double p_max) {
     if (q != 1) throw std::logic_error("BookMarket price() can only b called with q=1");
 
     if (price_ > p_max) throw std::logic_error("BookMarket::reserve() called with p_max < price");
@@ -87,7 +86,7 @@ void BookMarket::intraFinish() {
     tvc.transferApprox(tvc, proceeds_, 1e-6);
 
     // Transfer profits to the author
-    author->assets() += proceeds_;
+    author->assets += proceeds_;
 
     proceeds_.clear();
 }

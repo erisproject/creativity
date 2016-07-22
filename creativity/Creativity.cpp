@@ -68,7 +68,7 @@ void Creativity::setup() {
 
     sim = Simulation::create();
 
-    money = sim->spawn<Good::Continuous>();
+    money = sim->spawn<Good>("money");
 
     auto &rng = eris::random::rng();
     boost::random::uniform_real_distribution<double> unif_pmb(-parameters.boundary, parameters.boundary);

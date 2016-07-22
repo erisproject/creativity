@@ -1,7 +1,7 @@
 #pragma once
 #include <eris/Optimize.hpp>
 #include <eris/WrappedPositional.hpp>
-#include <eris/agent/AssetAgent.hpp>
+#include <eris/Agent.hpp>
 #include <eris/Market.hpp>
 #include "creativity/Book.hpp"
 #include "creativity/BookCopy.hpp" // IWYU pragma: keep
@@ -135,7 +135,7 @@ namespace belief { class Profit; }
  * - intra-finish (via BookMarket):
  *   - The author receives all of the periods proceeds from the period.
  */
-class Reader : public eris::WrappedPositional<eris::agent::AssetAgent>,
+class Reader : public eris::WrappedPositional<eris::Agent>,
     public virtual eris::interopt::Begin,
     public virtual eris::interopt::OptApply,
     public virtual eris::intraopt::Initialize,

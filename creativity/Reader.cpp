@@ -31,7 +31,7 @@ constexpr std::initializer_list<double> Reader::default_num_books_penalty_polyno
 const std::vector<unsigned int> Reader::profit_stream_ages{{1,2,4,8}};
 
 Reader::Reader(Creativity &creativity, const Position &pos) :
-    WrappedPositional<agent::AssetAgent>(pos, creativity.parameters.boundary, -creativity.parameters.boundary),
+    WrappedPositional<Agent>(pos, creativity.parameters.boundary, -creativity.parameters.boundary),
     creativity_{creativity},
     profit_belief_{new Profit()},
     profit_belief_extrap_{profit_belief_}
@@ -224,7 +224,7 @@ void Reader::interOptimize() {
     // Update the various beliefs
     updateBeliefs();
 
-    double income_available = assets()[creativity_.money] + creativity_.parameters.income;
+    double income_available = assets[creativity_.money] + creativity_.parameters.income;
     if (creativity_.publicSharing()) income_available -= creativity_.parameters.public_sharing_tax;
 
     auto sim = simulation();
@@ -451,14 +451,14 @@ void Reader::interApply() {
     // Give potential income (this has to be before authorship decision, since authorship requires
     // giving up some potential income: actual income will be this amount minus whatever is given up
     // to author)
-    assets()[creativity_.money] += creativity_.parameters.income;
+    assets[creativity_.money] += creativity_.parameters.income;
 
     const Bundle cost_market(creativity_.money, creativity_.parameters.cost_market);
 
     auto sim = simulation();
     if (create_starting_) {
         // Incur the creation effort cost as soon as we start creating
-        assets().transferApprox({ creativity_.money, create_effort_ + creativity_.parameters.creation_fixed }, 1e-6);
+        assets.transferApprox({ creativity_.money, create_effort_ + creativity_.parameters.creation_fixed }, 1e-6);
         create_starting_ = false;
     }
     if (create_countdown_ > 0) {
@@ -470,9 +470,9 @@ void Reader::interApply() {
         if (create_price_ > 0) {
             // Author-selected price is positive, so let's release.
 
-            if (assets().hasApprox(cost_market)) {
+            if (assets.hasApprox(cost_market)) {
                 // Remove the first period fixed cost of bringing the book to market:
-                assets().transferApprox(cost_market, 1e-6);
+                assets.transferApprox(cost_market, 1e-6);
 
                 auto newbook = sim->spawn<Book>(creativity_, create_position_, sharedSelf(), wrote_.size(), create_quality_);
                 sim->spawn<BookMarket>(creativity_, newbook, create_price_);
@@ -507,7 +507,7 @@ void Reader::interApply() {
         // If it's staying on the market, update the price and incur the fixed cost
         if (new_prices_.count(b) > 0) {
             b->market()->setPrice(new_prices_[b]);
-            assets().transferApprox(cost_market, 1e-6);
+            assets.transferApprox(cost_market, 1e-6);
         }
         else {
             // No new price for an old book, which means we're removing the book from the market
@@ -895,7 +895,7 @@ void Reader::intraOptimize() {
     for (auto &del : cache_del) book_cache_.erase(del);
 
     std::set<SharedMember<Book>> new_books;
-    double money = assets()[creativity_.money];
+    double money = assets[creativity_.money];
     double u_curr = u(money, new_books); // the "no-books" utility
     // Keep looking at books as long as the net utility from buying the next best book exceeds the
     // penalty that will be incurred.
@@ -978,7 +978,7 @@ void Reader::intraApply() {
         res.buy();
     }
     // Also remove any cost associated with obtaining pirated copies of books:
-    assets().transferApprox({ creativity_.money, reserved_piracy_cost_ }, 1e-6);
+    assets.transferApprox({ creativity_.money, reserved_piracy_cost_ }, 1e-6);
     reserved_piracy_cost_ = 0.0;
     reservations_.clear();
 
@@ -989,8 +989,8 @@ void Reader::intraApply() {
         auto &book = new_book.first;
         auto &status = new_book.second;
 
-        // Remove the book from assets() -- we track it via library_ instead.
-        assets().remove(book);
+        // Remove the book from assets -- we track it via library_ instead.
+        assets.remove(book);
 
         auto inserted = library_.emplace(
                 SharedMember<Book>(book),
@@ -1006,7 +1006,7 @@ void Reader::intraApply() {
     reserved_books_.clear();
 
     // "Eat" any money leftover
-    double money = assets().remove(creativity_.money);
+    double money = assets.remove(creativity_.money);
     // Store final utility
     u_curr_ = u(money, library_new_);
     u_lifetime_ += u_curr_;

@@ -1,6 +1,6 @@
 #pragma once
 #include <eris/WrappedPositional.hpp>
-#include <eris/Good.hpp>
+#include <eris/good/Discrete.hpp>
 #include <map>
 #include <functional>
 #include <eris/random/truncated_normal_distribution.hpp>
@@ -30,7 +30,7 @@ class Creativity;
  * a primary market and then move to secondary market, or start out directly in the secondary
  * market.  See PublicTracker for details.
  */
-class Book final : public eris::WrappedPositional<eris::Good::Discrete> {
+class Book final : public eris::WrappedPositional<eris::good::Discrete> {
     public:
         /// Not default constructible
         Book() = delete;

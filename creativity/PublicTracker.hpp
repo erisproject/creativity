@@ -1,5 +1,5 @@
 #pragma once
-#include <eris/agent/AssetAgent.hpp>
+#include <eris/Agent.hpp>
 #include <eris/Optimize.hpp>
 
 namespace creativity {
@@ -36,7 +36,7 @@ class Creativity;
  * Authors may also, when this provider is available, choose not to put books on the market at all
  * but to write and release directly to the public tracker.
  */
-class PublicTracker : public eris::agent::AssetAgent,
+class PublicTracker : public eris::Agent,
     public virtual eris::interopt::Apply, public virtual eris::intraopt::Finish {
     public:
         PublicTracker() = delete; ///< Not default constructible

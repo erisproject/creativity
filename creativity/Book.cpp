@@ -21,7 +21,7 @@ Book::Book(
         SharedMember<Reader> author,
         unsigned int order,
         double quality)
-    : WrappedPositional<Good::Discrete>(p, author->wrapLowerBound(), author->wrapUpperBound()),
+    : WrappedPositional<good::Discrete>(p, author->wrapLowerBound(), author->wrapUpperBound()),
         creativity_{creativity},
         author_{std::move(author)},
         order_{order},

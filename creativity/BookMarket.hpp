@@ -60,7 +60,7 @@ class BookMarket : public eris::Market, public virtual eris::intraopt::Finish {
          * can't buy anything other than 1 copy.
          */
         virtual Reservation reserve(
-                eris::SharedMember<eris::agent::AssetAgent> agent,
+                eris::SharedMember<eris::Agent> agent,
                 double q,
                 double p_max = std::numeric_limits<double>::infinity()) override;
 
