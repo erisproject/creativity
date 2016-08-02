@@ -1,6 +1,5 @@
 #pragma once
-#include <eris/belief/BayesianLinear.hpp>
-#include <eris/belief/BayesianLinearRestricted.hpp>
+#include <eris/learning/BayesianLinearRestricted.hpp>
 #include <eris/SharedMember.hpp>
 #include <Eigen/Core>
 #include <string>
@@ -34,12 +33,12 @@ namespace creativity { namespace belief {
  * Additionally, when predicting, readers know that Q can never be larger than the number of readers
  * in the world minus the copies already sold, and incorporate this limitation into predictions.
  */
-class Demand : public eris::belief::BayesianLinearRestricted {
+class Demand : public eris::learning::BayesianLinearRestricted {
     public:
         /** Default constructor: note that unlike a default-constructed BayesianLinear model, this
          * default constructed object is a usable (but noninformative) model.
          *
-         * \sa eris::belief::BayesianLinear::BayesianLinear()
+         * \sa eris::learning::BayesianLinear::BayesianLinear()
          */
         Demand() : Demand(parameters()) {}
 
@@ -48,7 +47,7 @@ class Demand : public eris::belief::BayesianLinearRestricted {
          *
          * \param args prior arguments to forward to the base BayesianLinearRestricted constructor.
          *
-         * \sa eris::belief::BayesianLinear::BayesianLinear
+         * \sa eris::learning::BayesianLinear::BayesianLinear
          */
         template <typename ...Args>
         explicit Demand(Args &&...args) : BayesianLinearRestricted(std::forward<Args>(args)...)

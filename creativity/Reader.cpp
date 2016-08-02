@@ -21,7 +21,7 @@
 
 using namespace eris;
 using namespace Eigen;
-using namespace eris::belief;
+using namespace eris::learning;
 using namespace creativity::belief;
 
 namespace creativity {

@@ -455,7 +455,7 @@ class Reader : public eris::WrappedPositional<eris::Agent>,
          * from, i.e. because it has linear constraints that are too far in the tail to meaningfully
          * satisfy.
          */
-        bool usableBelief(const eris::belief::BayesianLinear &model) const;
+        bool usableBelief(const eris::learning::BayesianLinear &model) const;
 
         /** Returns the map of all current profit stream beliefs.  The keys of the map are the
          * minimum age for which the belief applies and the value is the actual belief with `age`

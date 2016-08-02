@@ -1,6 +1,6 @@
 #pragma once
-#include <eris/belief/BayesianLinear.hpp>
-#include <eris/belief/BayesianLinearRestricted.hpp>
+#include <eris/learning/BayesianLinear.hpp>
+#include <eris/learning/BayesianLinearRestricted.hpp>
 #include <Eigen/Core>
 #include <algorithm>
 #include <functional>
@@ -29,11 +29,11 @@ namespace creativity { namespace belief {
  * The model uses a natural conjugate prior for the purposes of updating the beliefs via Bayesian
  * econometrics.
  */
-class Profit : public eris::belief::BayesianLinearRestricted {
+class Profit : public eris::learning::BayesianLinearRestricted {
     public:
         /** Construct a noninformative profit model.
          *
-         * \sa eris::belief::BayesianLinear::BayesianLinear
+         * \sa eris::learning::BayesianLinear::BayesianLinear
          */
         Profit() : Profit(parameters()) {}
 

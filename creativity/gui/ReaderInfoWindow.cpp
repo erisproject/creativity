@@ -33,7 +33,7 @@
 namespace creativity { namespace gui {
 
 using namespace eris;
-using namespace eris::belief;
+using namespace eris::learning;
 using namespace creativity::state;
 
 ReaderInfoWindow::ReaderInfoWindow(

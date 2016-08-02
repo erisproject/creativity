@@ -2,7 +2,7 @@
 #include "creativity/state/StorageBackend.hpp"
 #include "creativity/BookCopy.hpp"
 #include "creativity/CreativitySettings.hpp"
-#include <eris/belief/BayesianLinearRestricted.hpp>
+#include <eris/learning/BayesianLinearRestricted.hpp>
 #include <eris/types.hpp>
 #include <eris/serialize/serializer.hpp>
 #include <eris/serialize/Serialization.hpp>
@@ -221,11 +221,11 @@ class FileStorage : public StorageBackend, public eris::serialize::Serialization
         typedef struct {
             uint32_t K = 0; ///< Number of parameters; K=0 for a default constructed (invalid) model (the remaining values will be uninitialized)
             bool noninformative = true; ///< True if this is a noninformative model (in which case the following are not set)
-            Eigen::VectorXd beta; ///< eris::belief::BayesianLinear beta vector
-            double s2; ///< eris::belief::BayesianLinear s2 value
-            double n; ///< eris::belief::BayesianLinear n value
-            Eigen::MatrixXd Vinv; ///< eris::belief::BayesianLinear Vinv matrix
-            eris::belief::BayesianLinearRestricted::DrawMode last_draw_mode; ///< The last draw mode from this belief (for restricted models)
+            Eigen::VectorXd beta; ///< eris::learning::BayesianLinear beta vector
+            double s2; ///< eris::learning::BayesianLinear s2 value
+            double n; ///< eris::learning::BayesianLinear n value
+            Eigen::MatrixXd Vinv; ///< eris::learning::BayesianLinear Vinv matrix
+            eris::learning::BayesianLinearRestricted::DrawMode last_draw_mode; ///< The last draw mode from this belief (for restricted models)
             uint32_t draw_success_cumulative, ///< For a restricted belief, the number of successful draws
                      draw_discards_cumulative; ///< For a restricted belief, the number of discarded draws
         } belief_data;
@@ -281,7 +281,7 @@ class FileStorage : public StorageBackend, public eris::serialize::Serialization
          *
          * \sa readBelief() for the structure and values actually written
          */
-        void writeBelief(const eris::belief::BayesianLinear &belief);
+        void writeBelief(const eris::learning::BayesianLinear &belief);
 
         /** Reads a book state data from the current file position and returns it in a <eris_id_t,
          * BookState> pair, where the eris_id_t is the book id.  The book data is:

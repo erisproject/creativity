@@ -29,7 +29,7 @@
 namespace creativity { namespace state {
 
 using namespace eris;
-using namespace eris::belief;
+using namespace eris::learning;
 using namespace creativity::belief;
 using namespace Eigen;
 using DrawMode = BayesianLinearRestricted::DrawMode;

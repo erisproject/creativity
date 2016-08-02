@@ -1,5 +1,5 @@
 #pragma once
-#include <eris/belief/BayesianLinear.hpp>
+#include <eris/learning/BayesianLinear.hpp>
 #include <eris/SharedMember.hpp>
 #include <string>
 
@@ -28,7 +28,7 @@ namespace creativity { namespace belief {
  *
  * \f$\beta\f$ values are not restricted.
  */
-class ProfitStream : public eris::belief::BayesianLinear {
+class ProfitStream : public eris::learning::BayesianLinear {
     public:
         /// Inherit constructors from BayesianLinear
         using BayesianLinear::BayesianLinear;
