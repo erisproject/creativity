@@ -21,16 +21,16 @@ class Data : public CmdArgs {
             eris::eris_time_t piracy_begins = 0;
             /// If non-zero, verify the total number of simulation periods
             eris::eris_time_t periods = 0;
-            /// If non-zero, verify the public_sharing_begins of given simulations
-            eris::eris_time_t public_sharing_begins = 0;
+            /// If non-zero, verify the policy_begins of given simulations
+            eris::eris_time_t policy_begins = 0;
         } verify;
 
         /// Struct for storing --skip-* options
         struct {
             /// Skip piracy data if true
             bool piracy = false;
-            /// Skip public sharing data if true
-            bool public_sharing = false;
+            /// Skip policy phase data if true
+            bool policy = false;
             /// Skip short-run effects
             bool short_run = false;
         } skip;

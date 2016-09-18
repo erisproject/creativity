@@ -96,6 +96,9 @@ void Creativity::setup() {
         market_books = sim->countMarkets<BookMarket>();
     });
 
+    if (parameters.policy & POLICY_CATCH_PIRATES)
+        throw std::runtime_error("'catch' policy is incomplete: " + std::to_string(parameters.policy));
+
     setup_sim_ = true;
     storage().first->updateSettings();
 }
@@ -109,9 +112,23 @@ void Creativity::run() {
     if (sim->t() + 1 == parameters.piracy_begins)
         createPiracyNetwork();
 
-    // If the next period is the first when the PublicTracker becomes available, create it
-    if (sim->t() + 1 == parameters.public_sharing_begins)
-        sim->spawn<PublicTracker>(*this, parameters.public_sharing_tax);
+    // If the next period is the first when the policy response becomes active, initialize it as
+    // needed.
+    if (sim->t() + 1 == parameters.policy_begins) {
+        uint32_t policies = parameters.policy;
+        if (policies & POLICY_PUBLIC_SHARING) {
+            policies &= ~POLICY_PUBLIC_SHARING;
+            // PublicTracker becomes available, create it
+            sim->spawn<PublicTracker>(*this, parameters.policy_public_sharing_tax);
+        }
+        if (policies & POLICY_CATCH_PIRATES) {
+            policies &= ~POLICY_CATCH_PIRATES;
+            // No special initialization needed
+        }
+
+        if (policies)
+            throw std::runtime_error("Creativity simulation has unknown/invalid `policy` value");
+    }
 
     sim->run();
 
@@ -217,16 +234,26 @@ bool Creativity::piracy() const {
     return parameters.piracy_begins > 0 and sim->t() >= parameters.piracy_begins;
 }
 
+bool Creativity::policyActive() const {
+    if (!setup_sim_) throw std::logic_error("Cannot call policyActive() on a non-live or unconfigured simulation");
+    return parameters.policy and parameters.policy_begins > 0 and sim->t() >= parameters.policy_begins;
+}
+
 bool Creativity::publicSharing() const {
     if (!setup_sim_) throw std::logic_error("Cannot call publicSharing() on a non-live or unconfigured simulation");
-    return parameters.public_sharing_begins > 0 and sim->t() >= parameters.public_sharing_begins;
+    return parameters.policy & POLICY_PUBLIC_SHARING and policyActive();
+}
+
+bool Creativity::catchPirates() const {
+    if (!setup_sim_) throw std::logic_error("Cannot call catchPirates() on a non-live or unconfigured simulation");
+    return parameters.policy & POLICY_CATCH_PIRATES and policyActive();
 }
 
 double Creativity::priorWeight() const {
     if (!setup_sim_) throw std::logic_error("Cannot call priorWeight() on a non-live or unconfigured simulation");
     auto t = sim->t();
     return t == parameters.piracy_begins ? parameters.prior_scale_piracy :
-        t == parameters.public_sharing_begins ? parameters.prior_scale_public_sharing :
+        t == parameters.policy_begins ? parameters.prior_scale_policy :
         t <= parameters.burnin_periods ? parameters.prior_scale_burnin :
         parameters.prior_scale;
 }

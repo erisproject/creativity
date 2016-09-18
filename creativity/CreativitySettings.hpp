@@ -1,6 +1,7 @@
 #pragma once
 #include <eris/types.hpp>
 #include <cstdint>
+#include <array>
 
 namespace creativity {
 
@@ -107,19 +108,80 @@ struct CreativitySettings {
      */
     eris::eris_time_t piracy_begins = 101;
 
-    /** The period in which the PublicTracker agent is created.  The public tracker provides
-     * marginal cost access to copies of books but taxes all agents a lump sum amount,
-     * redistributing the collected tax money to authors proportionally to the number of copies
-     * obtained of each author's works.
-     */
-    eris::eris_time_t public_sharing_begins = 201;
-
-    /** The lump size tax extracted by the public tracker from each agent in each period.
+    /** Bitfield specifying the enabled policy response(s) used to address piracy.  Currently
+     * supported bit values are:
+     * 
+     * - 0x1: public tax for public provisioning and sharing; when the policy response begins, a
+     *   PublicTracker agent is created that distributes copies of books to anyone at marginal cost.
+     *   Authors are compensated in proportion to the number of downloads of their works from a
+     *   per-read lump sum tax.
      *
-     * Currently this is fixed, but future versions of this code may interpret this value as a
-     * starting value and attempt to adjust it to maximize long-term utility.
+     * - 0x2: public tax for catching people downloading illegal copies.  A lump sum tax is
+     *   collected and goes towards the policing effort, with a larger tax resulting in a higher
+     *   probability of detection.
+     * 
+     * Other values are reserved for future use.
      */
-    double public_sharing_tax = 10.0;
+    uint32_t policy = 0;
+
+    /** The period in which the policy response to piracy begins.  Which response is used depends on
+     * the `policy` parameter.
+     */
+    eris::eris_time_t policy_begins = 201;
+
+    /** This is the lump-sum tax extracted from each user at the beginning of the period to fund the
+     * public sharing mechanism of author compensation.  Has no effect when public sharing is not
+     * enabled.
+     */
+    double policy_public_sharing_tax = 10.0;
+
+    /** This is the lump-sum tax extracted from each user to fund the policing policy to catch and
+     * fine readers using piracy.  Has no effect when the catching policy is not enabled.
+     */
+    double policy_catch_tax = 10.0;
+
+    /** A person who gets caught pays a fine of \f$c_0 + c_1 I(#P > 0) + c_2 #P + c_3 #P^2\f$,
+     * where \f$#P\f$ is the number of pirated books the person obtained in the caught period, and
+     * I() is a 0/1-valued indicator function.  Thus a caught individual who obtained 3 pirated
+     * copies pays \f$c_0 + c_1 + 3 c_2 + 9 c_3\f$, while someone who did not pirate (but got
+     * caught, erroneously) pays \f$c_0\f$.  (Setting \f$c_0 = 0\f$ is effectively the same as not
+     * catching people who don't pirate).
+     *
+     * The fine amount is removed from income to be received in the following period, and is
+     * redistributed to the income of all other agents.  (Note that the fine can exceed the
+     * agent's income; in such a case, the agent will have 0 income, and will have an additional
+     * utility penalty of the uncovered amount (this can be thought of as coming out of the agent's
+     * wealth, though wealth is not actually modelled in this simulation).
+     *
+     * The default is a fixed fine of 100 for people who actually pirated, and no fine for
+     * people falsely accused.
+     */
+    std::array<double, 4> policy_catch_fine{{0., 100., 0., 0.}};
+
+    /** For `policy_response = 1`, the probability of being caught for obtaining \f$x\f$ copies
+     * over the network equals the CDF of a \f$\mathcal{N}(\mu, \sigma^2)\f$ distribution evaluated
+     * at \f$x\f$; that is, \f$\Phi\(\frac{x - \mu}{\sigma}\)\f$.
+     *
+     * \f$\mu\f$ and \f$\sigma\f$ themselves are quadratic functions of the per-user piracy
+     * detection expenditure, i.e., functions of `policy_response_tax`.
+     *
+     * This array contains the constant, linear, and quadratic coefficients that define \f$\mu = c_0
+     * + c_1 \tau + c_2 \tau^2\f$, where \f$\tau\f$ is the `policy_response_tax` value.  Note that
+     * the probability of detection equals 50% at \f$\mu\f$, 5% at \f$\mu - 1.96 \sigma\f$, 95%
+     * at \f$\mu + 1.96\f$.  The default is \f$\mu = 10 - 0.5 \tau\f$.
+     *
+     * Note that the probability of being caught is never 0, even for an individual who does not
+     * pirate; such false accusations can still incur a cost, or can be ignored, depending on the
+     * `policy_caught_fine` variable.
+     */
+    std::array<double, 3> policy_catch_mu{{10., -0.5, 0.}};
+
+    /** Like `policy_catch_mu`, but for the quadratic coefficients of \f$\sigma = c_0 +
+     * c_1 \tau + c_2 \tau^2\f$.  The default is simply \f$\sigma = 1\f$.
+     *
+     * \see policy_catch_mu
+     */
+    std::array<double, 3> policy_catch_sigma{{1., 0., 0.}};
 
     /** The number of sharing/friendship links as a proportion of the maxinum number of sharing
      * links possible (which is \f$\frac{R(R-1)}{2}\f$, where \f$R\f$ is the number of readers).
@@ -144,10 +206,10 @@ struct CreativitySettings {
      */
     double prior_scale_piracy = 2;
 
-    /** The factor by which to multiply standard deviations in the first public sharing period.
-     * This value overrides `prior_scale` in the `public_sharing_begins` period.
+    /** The factor by which to multiply standard deviations in the first policy response period.
+     * This value overrides `prior_scale` in the `policy_response_begins` period.
      */
-    double prior_scale_public_sharing = 2;
+    double prior_scale_policy = 2;
 
     /** The prior weight to use during the burn-in period; typically much larger than prior_scale
      * so that the simulation results of pre-belief initial parameters have significantly less

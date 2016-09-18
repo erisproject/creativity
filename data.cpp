@@ -87,17 +87,17 @@ void thr_parse_file(
         // Check that the data source has enough data:
 
         const eris_time_t &piracy_begins = creativity.parameters.piracy_begins,
-              &public_sharing_begins = creativity.parameters.public_sharing_begins;
-        eris_time_t post_piracy = 0, post_public = 0, post_pre = 0;
+              &policy_begins = creativity.parameters.policy_begins;
+        eris_time_t post_piracy = 0, post_policy = 0, post_pre = 0;
         if (not args.skip.piracy)
-            post_piracy = (args.skip.public_sharing ? storage.size() : public_sharing_begins);
-        if (not args.skip.public_sharing)
-            post_public = storage.size();
+            post_piracy = (args.skip.policy ? storage.size() : policy_begins);
+        if (not args.skip.policy)
+            post_policy = storage.size();
         post_pre = std::min(storage.size(),
                 args.skip.piracy
-                ? args.skip.public_sharing
+                ? args.skip.policy
                     ? storage.size()
-                    : public_sharing_begins
+                    : policy_begins
                 : piracy_begins);
 
 #define SKIP_IF(CONDITION, REASON) if (CONDITION) { std::cerr << "Skipping `" << source << "': " << REASON << "\n"; continue; }
@@ -106,8 +106,8 @@ void thr_parse_file(
                 "simulation periods " << storage.size()-1 << " != " << args.verify.periods);
         SKIP_IF(args.verify.piracy_begins > 0 and (size_t) args.verify.piracy_begins != piracy_begins,
                 "simulation piracy_begins " << piracy_begins << " != " << args.verify.piracy_begins);
-        SKIP_IF(args.verify.public_sharing_begins > 0 and (size_t) args.verify.public_sharing_begins != public_sharing_begins,
-                "simulation public_sharing_begins " << public_sharing_begins << " != " << args.verify.public_sharing_begins);
+        SKIP_IF(args.verify.policy_begins > 0 and (size_t) args.verify.policy_begins != policy_begins,
+                "simulation policy_begins " << policy_begins << " != " << args.verify.policy_begins);
 
         SKIP_IF(post_pre-1 <= args.data_periods,
                 "simulation \"pre\" periods " << post_pre-2 << " < " << args.data_periods);
@@ -121,9 +121,9 @@ void thr_parse_file(
             SKIP_IF(post_piracy < piracy_begins + periods_needed,
                     "simulation doesn't have enough piracy periods (t=" << piracy_begins << " through t=" << post_piracy-1 << ")");
         }
-        if (not args.skip.public_sharing) {
-            SKIP_IF(post_public < public_sharing_begins + periods_needed,
-                    "simulation doesn't have enough public sharing periods (t=" << public_sharing_begins << " through t=" << post_public-1 << ")");
+        if (not args.skip.policy) {
+            SKIP_IF(post_policy < policy_begins + periods_needed,
+                    "simulation doesn't have enough policy periods (t=" << policy_begins << " through t=" << post_policy-1 << ")");
         }
 #undef SKIP_IF
 
@@ -192,20 +192,20 @@ void thr_parse_file(
             }
         }
 
-        // public.SR.*:
-        // public.*:
-        if (not args.skip.public_sharing) {
+        // policy.SR.*:
+        // policy.*:
+        if (not args.skip.policy) {
             if (not args.skip.short_run) {
 
                 state_cache.clear();
-                for (eris_time_t t = 0; t < args.data_periods; t++) state_cache.push_back(storage[public_sharing_begins + t]);
+                for (eris_time_t t = 0; t < args.data_periods; t++) state_cache.push_back(storage[policy_begins + t]);
 
                 for (auto &d : data) {
-                    if (d.applies_to.public_sharing) {
-                        if (args.human_readable) output << std::setw(readable_name_width+1) << "public.SR." + d.name + ":" << " ";
+                    if (d.applies_to.policy) {
+                        if (args.human_readable) output << std::setw(readable_name_width+1) << "policy.SR." + d.name + ":" << " ";
                         else output << ",";
 
-                        output << double_str(d.calculate(storage, public_sharing_begins, public_sharing_begins + args.data_periods - 1), args.double_precision);
+                        output << double_str(d.calculate(storage, policy_begins, policy_begins + args.data_periods - 1), args.double_precision);
 
                         if (args.human_readable) output << "\n";
                     }
@@ -213,14 +213,14 @@ void thr_parse_file(
             }
 
             state_cache.clear();
-            for (eris_time_t t = post_public - args.data_periods; t < post_public; t++) state_cache.push_back(storage[t]);
+            for (eris_time_t t = post_policy - args.data_periods; t < post_policy; t++) state_cache.push_back(storage[t]);
 
             for (auto &d : data) {
-                if (d.applies_to.public_sharing) {
-                    if (args.human_readable) output << std::setw(readable_name_width+1) << "public." + d.name + ":" << " ";
+                if (d.applies_to.policy) {
+                    if (args.human_readable) output << std::setw(readable_name_width+1) << "policy." + d.name + ":" << " ";
                     else output << ",";
 
-                    output << double_str(d.calculate(storage, post_public - args.data_periods, post_public - 1), args.double_precision);
+                    output << double_str(d.calculate(storage, post_policy - args.data_periods, post_policy - 1), args.double_precision);
 
                     if (args.human_readable) output << "\n";
                 }
@@ -262,9 +262,9 @@ int main(int argc, char *argv[]) {
             if (not args.skip.short_run) for (const auto &d : data) if (d.applies_to.piracy) output << ",piracy.SR." << d.name;
             for (const auto &d : data) if (d.applies_to.piracy) output << ",piracy." << d.name;
         }
-        if (not args.skip.public_sharing) {
-            if (not args.skip.short_run) for (const auto &d : data) if (d.applies_to.public_sharing) output << ",public.SR." << d.name;
-            for (const auto &d : data) if (d.applies_to.public_sharing) output << ",public." << d.name;
+        if (not args.skip.policy) {
+            if (not args.skip.short_run) for (const auto &d : data) if (d.applies_to.policy) output << ",policy.SR." << d.name;
+            for (const auto &d : data) if (d.applies_to.policy) output << ",policy." << d.name;
         }
         output << "\n";
         std::cout << output.str();

@@ -31,10 +31,10 @@ struct initial_datum {
     initial_datum() = delete;
     /// Constructs a simulation parameter datum that returns an integral value.
     template <typename IntType, typename = typename std::enable_if<std::is_integral<IntType>::value>::type>
-    initial_datum(std::string &&name, std::function<IntType(const CreativitySettings&)> &&calc_int)
+    initial_datum(std::string name, std::function<IntType(const CreativitySettings&)> &&calc_int)
         : name(std::move(name)), calc_int(std::move(calc_int)) {}
     /// Constructs a simulation parameter datum that returns a double value.
-    initial_datum(std::string &&name, std::function<double(const CreativitySettings&)> &&calc_double)
+    initial_datum(std::string name, std::function<double(const CreativitySettings&)> &&calc_double)
         : name(std::move(name)), calc_double(std::move(calc_double)) {}
 };
 
@@ -52,7 +52,7 @@ struct datum {
     struct {
         bool pre; ///< True if this field applies to pre-piracy periods
         bool piracy; ///< True if this field applies to piracy periods
-        bool public_sharing; ///< True if this field applies to public sharing periods
+        bool policy; ///< True if this field applies to policy periods
     } applies_to;
 
     /// Default constructor deleted
@@ -65,10 +65,10 @@ struct datum {
      * \param calc the callable object to store in `calculate`.
      * \param pre specifies whether this data field applies to pre-piracy periods (default true)
      * \param piracy specifies whether this data field applies to piracy periods (default true)
-     * \param public_sharing specifies whether this data field applies to public sharing periods (default true)
+     * \param policy specifies whether this data field applies to policy periods (default true)
      */
-    datum(std::string &&name, decltype(calculate) calc, bool pre = true, bool piracy = true, bool public_sharing = true)
-        : name(std::move(name)), calculate(std::move(calc)), applies_to{pre, piracy, public_sharing} {}
+    datum(std::string &&name, decltype(calculate) calc, bool pre = true, bool piracy = true, bool policy = true)
+        : name(std::move(name)), calculate(std::move(calc)), applies_to{pre, piracy, policy} {}
 };
 
 /** Calculates the average market life of books written between `from` and `to`, in simulation

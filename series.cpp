@@ -42,7 +42,7 @@ std::mutex values_mutex; // Guards values, files, error_count
 std::mutex input_mutex; // Guards all of the below:
 size_t input_index;
 // These have to agree across files:
-eris_time_t periods = 0, piracy_begins = 0, public_begins = 0;
+eris_time_t periods = 0, piracy_begins = 0, policy_begins = 0;
 bool allow_unused_periods = false; // Will only be true if --periods is explicitly given
 bool need_parameters = true;
 
@@ -57,7 +57,7 @@ void thr_parse_file(
     size_t input_i;
     while ((error_count == 0 or args.ignore_errors) and (input_i = input_index++) < args.input.size()) {
         // Hold the lock if this is the first file and we weren't given all of the needed simulation
-        // period values: we have to set periods, piracy_begins, public_begins (the lock also
+        // period values: we have to set periods, piracy_begins, policy_begins (the lock also
         // protects assigning to these variables) before unlocking; this essentially means that only
         // one thread runs until the first thread has determined that initial info.
         if (not need_parameters) input_lock.unlock();
@@ -94,10 +94,10 @@ void thr_parse_file(
                 piracy_begins = creativity.parameters.piracy_begins;
                 std::cout << "Inferred --piracy-begins " << piracy_begins << std::endl;
             }
-            if (args.public_sharing_begins != 0) public_begins = args.public_sharing_begins;
+            if (args.policy_begins != 0) policy_begins = args.policy_begins;
             else {
-                public_begins = creativity.parameters.public_sharing_begins;
-                std::cout << "Inferred --public-sharing-begins " << public_begins << std::endl;
+                policy_begins = creativity.parameters.policy_begins;
+                std::cout << "Inferred --policy-begins " << policy_begins << std::endl;
             }
             need_parameters = false;
             input_lock.unlock();
@@ -112,9 +112,9 @@ void thr_parse_file(
         if (piracy_begins <= periods and piracy_begins != creativity.parameters.piracy_begins) {
             FAIL("simulation piracy begins at t=" << creativity.parameters.piracy_begins << " but t=" << piracy_begins << " is required");
         }
-        // Likewise for public sharing
-        if (public_begins <= periods and public_begins != creativity.parameters.public_sharing_begins) {
-            FAIL("simulation public sharing begins at t=" << creativity.parameters.public_sharing_begins << " but t=" << public_begins << " is required");
+        // Likewise for policy
+        if (policy_begins <= periods and policy_begins != creativity.parameters.policy_begins) {
+            FAIL("simulation policy begins at t=" << creativity.parameters.policy_begins << " but t=" << policy_begins << " is required");
         }
 
         // Calculate all the local values, then copy them into the results variable in one shot

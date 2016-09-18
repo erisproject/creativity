@@ -13,13 +13,13 @@ namespace creativity { namespace cmdargs {
  * Current used single-argument parameters:
  *
  * Single-letter options used in this class:
- *     b B c C d D e E f g G i j k K m M n N p P Q r R s S T u U w W x y z Z
+ *     A b B c C d D e E g G i j J k K L m M n N p P Q r R s S T u U w W x y z Z
  * Used in [CLI], {GUI}, or both:
  *     o [O] [q]
  * Used in CmdArgs base class:
  *     h
  * Available:
- *     a A F H I J l L t v V X Y
+ *     a f F H I l t v V X Y
  */
 class Simulator : public CmdArgs {
     protected:
@@ -36,6 +36,9 @@ class Simulator : public CmdArgs {
          * to whatever the user specified.
          */
         unsigned int periods = 300;
+
+        /// Stores the --policy= arguments given
+        std::vector<std::string> policies;
 
         /** The output file for simulation results; default is "creativity-SEED.crstate" for the
          * CLI, unset for the GUI.
@@ -62,7 +65,7 @@ class Simulator : public CmdArgs {
          */
         void addOptions() override;
 
-        /// Overridden to handle output, seed, and and boundary settings
+        /// Overridden to handle options such as output, seed, and boundary
         virtual void postParse(boost::program_options::variables_map &vars) override;
 
         /** The options (which will be added to the end of options_) containing simulator settings,

@@ -452,8 +452,22 @@ std::vector<initial_datum> initial_data_fields() {
     ADD_SETTING(income);
     ADD_SETTING(piracy_begins);
     ADD_SETTING(piracy_link_proportion);
-    ADD_SETTING(public_sharing_begins);
-    ADD_SETTING(public_sharing_tax);
+
+    ADD_SETTING(policy);
+    ADD_SETTING(policy_begins);
+    ADD_SETTING(policy_public_sharing_tax);
+    ADD_SETTING(policy_catch_tax);
+    ADD_SETTING(policy_catch_fine[0]);
+    ADD_SETTING(policy_catch_fine[1]);
+    ADD_SETTING(policy_catch_fine[2]);
+    ADD_SETTING(policy_catch_fine[3]);
+    ADD_SETTING(policy_catch_mu[0]);
+    ADD_SETTING(policy_catch_mu[1]);
+    ADD_SETTING(policy_catch_mu[2]);
+    ADD_SETTING(policy_catch_sigma[0]);
+    ADD_SETTING(policy_catch_sigma[1]);
+    ADD_SETTING(policy_catch_sigma[2]);
+
     ADD_SETTING(prior_scale);
     ADD_SETTING(prior_scale_piracy);
     ADD_SETTING(prior_scale_burnin);

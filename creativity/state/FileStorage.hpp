@@ -137,9 +137,12 @@ class FileStorage : public StorageBackend, public eris::serialize::Serialization
         //id, the value is the pair of / the block location and the library data content.
         std::map<eris::eris_id_t, std::pair<uint64_t, lib_data>> reader_lib_;
 
-        /** The file version (1).  Note that there were earlier FileStorage versions that were not
-         * based on eris::Serializer at all, and have an incompatible file format; this 1 refers to
-         * the first Serializer-compatible version.
+        /** The file version (2).
+         *
+         * Version 2 added a catch-and-fine policy, and generalized the simulation policy settings.
+         *
+         * Version 1 was the first eris::Serializer compatible version; earlier versions were the
+         * precursor for eris::Serializer, but were not eris::Serializer compatible.
          */
         virtual uint32_t appFileVersion() const override { return 1; }
 

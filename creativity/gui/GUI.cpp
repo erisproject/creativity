@@ -893,6 +893,9 @@ void GUI::thr_info_dialog(eris_id_t member_id) {
 
 void GUI::thr_update_parameters() {
 #define SET_SB(PARAMETER) widget<Gtk::SpinButton>("set_" #PARAMETER)->set_value(creativity_.parameters.PARAMETER)
+#define SET_INIT_SB(PARAMETER) widget<Gtk::SpinButton>("set_init_" #PARAMETER)->set_value(creativity_.parameters.initial.PARAMETER)
+#define SET_SB_ARRAY(PARAMETER) for (size_t i = 0; i < creativity_.parameters.PARAMETER.size(); i++) \
+    widget<Gtk::SpinButton>("set_" #PARAMETER "_" + std::to_string(i))->set_value(creativity_.parameters.PARAMETER[i])
     SET_SB(dimensions);
     SET_SB(readers);
     widget<Gtk::SpinButton>("set_density")->set_value(creativity_.densityFromBoundary());
@@ -905,7 +908,6 @@ void GUI::thr_update_parameters() {
     SET_SB(creation_time);
     SET_SB(creation_fixed);
 
-#define SET_INIT_SB(PARAMETER) widget<Gtk::SpinButton>("set_init_" #PARAMETER)->set_value(creativity_.parameters.initial.PARAMETER)
     SET_INIT_SB(prob_write);
     SET_INIT_SB(l_min);
     SET_INIT_SB(l_range);
@@ -913,7 +915,6 @@ void GUI::thr_update_parameters() {
     SET_INIT_SB(p_range);
     SET_INIT_SB(prob_keep);
     SET_INIT_SB(keep_price);
-#undef SET_INIT_SB
 
     SET_SB(income);
     SET_SB(cost_market);
@@ -929,10 +930,28 @@ void GUI::thr_update_parameters() {
     widget<Gtk::SpinButton>("set_piracy_link_proportion")->set_value(creativity_.parameters.piracy_link_proportion * 100.0);
     SET_SB(prior_scale_piracy);
 
-    SET_SB(public_sharing_begins);
-    SET_SB(public_sharing_tax);
-    SET_SB(prior_scale_public_sharing);
+    // Policy:
+    SET_SB(policy_begins);
+    SET_SB(prior_scale_policy);
+
+    // Public sharing policy:
+    SET_SB(policy_public_sharing_tax);
+
+    // Catching policy:
+    SET_SB(policy_catch_tax);
+    SET_SB_ARRAY(policy_catch_fine);
+    SET_SB_ARRAY(policy_catch_mu);
+    SET_SB_ARRAY(policy_catch_sigma);
 #undef SET_SB
+#undef SET_INIT_SB
+#undef SET_SB_ARRAY
+
+    widget<Gtk::CheckButton>("set_policy_public_sharing")->set_active(
+            creativity_.parameters.policy & POLICY_PUBLIC_SHARING);
+    widget<Gtk::CheckButton>("set_policy_catch")->set_active(
+            creativity_.parameters.policy & POLICY_CATCH_PIRATES);
+    if (creativity_.parameters.policy & ~(POLICY_PUBLIC_SHARING | POLICY_CATCH_PIRATES))
+        throw std::logic_error("Internal error: simulation policy value set to an unknown/invalid value");
 }
 
 void GUI::thr_signal() {
@@ -1048,8 +1067,8 @@ void GUI::thr_signal() {
             widget<Gtk::Scale>("scale_state")->add_mark(creativity_.parameters.piracy_begins, Gtk::POS_BOTTOM, "");
             piracy_tick_added_ = true;
         }
-        if (not public_tick_added_ and last_progress.uls[1] >= creativity_.parameters.public_sharing_begins) {
-            widget<Gtk::Scale>("scale_state")->add_mark(creativity_.parameters.public_sharing_begins, Gtk::POS_BOTTOM, "");
+        if (not public_tick_added_ and last_progress.uls[1] >= creativity_.parameters.policy_begins) {
+            widget<Gtk::Scale>("scale_state")->add_mark(creativity_.parameters.policy_begins, Gtk::POS_BOTTOM, "");
             public_tick_added_ = true;
         }
 
@@ -1170,6 +1189,8 @@ void GUI::initializeSim() {
     auto &set = creativity_.set();
 #define COPY_SB_D(PARAMETER) set.PARAMETER = sb("set_"#PARAMETER)
 #define COPY_SB_I(PARAMETER) set.PARAMETER = lround(sb("set_"#PARAMETER))
+#define COPY_SB_INIT_D(PARAMETER) set.initial.PARAMETER = sb("set_init_"#PARAMETER)
+#define COPY_SB_ARRAY(PARAMETER) for (size_t i = 0; i < set.PARAMETER.size(); i++) set.PARAMETER[i] = sb("set_"#PARAMETER "_" + std::to_string(i))
 
     // Structure:
     COPY_SB_I(dimensions);
@@ -1193,7 +1214,6 @@ void GUI::initializeSim() {
     COPY_SB_D(cost_piracy);
 
     // Initial behaviour:
-#define COPY_SB_INIT_D(PARAMETER) set.initial.PARAMETER = sb("set_init_"#PARAMETER)
     COPY_SB_INIT_D(prob_write);
     COPY_SB_INIT_D(l_min);
     COPY_SB_INIT_D(l_range);
@@ -1201,7 +1221,6 @@ void GUI::initializeSim() {
     COPY_SB_INIT_D(p_range);
     COPY_SB_INIT_D(prob_keep);
     COPY_SB_INIT_D(keep_price);
-#undef COPY_SB_INIT_D
 
     // Beliefs structure:
     COPY_SB_D(prior_scale);
@@ -1214,13 +1233,30 @@ void GUI::initializeSim() {
     COPY_SB_D(piracy_link_proportion) * 0.01; // From percentage
     COPY_SB_D(prior_scale_piracy);
 
-    // Public sharing:
-    COPY_SB_I(public_sharing_begins);
-    COPY_SB_D(public_sharing_tax);
-    COPY_SB_D(prior_scale_public_sharing);
+    // Policy:
+    COPY_SB_I(policy_begins);
+    COPY_SB_D(prior_scale_policy);
+
+    // Public sharing policy:
+    COPY_SB_D(policy_public_sharing_tax);
+
+    // Catching policy:
+    COPY_SB_D(policy_catch_tax);
+    COPY_SB_ARRAY(policy_catch_fine);
+    COPY_SB_ARRAY(policy_catch_mu);
+    COPY_SB_ARRAY(policy_catch_sigma);
 
 #undef COPY_SB_D
 #undef COPY_SB_I
+#undef COPY_SB_ARRAY
+#undef COPY_SB_INIT_D
+
+    set.policy = 0;
+    if (widget<Gtk::CheckButton>("set_policy_public_sharing")->get_active())
+        set.policy |= POLICY_PUBLIC_SHARING;
+    if (widget<Gtk::CheckButton>("set_policy_catch")->get_active())
+        set.policy |= POLICY_CATCH_PIRATES;
+
 
     // Other non-simulation options need to be queued via a configure event:
     Parameter p;

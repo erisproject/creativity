@@ -36,6 +36,12 @@ int main(int argc, char *argv[]) {
     std::cout << "Initial settings:\n=================\n" << std::left << std::setprecision(args.output_precision);
 #define PRINT_FIELD(N, V) do { std::cout << std::setw(30) << N << V << "\n"; } while (0)
 #define PRINT_SETTING(S) PRINT_FIELD(#S, creativity.parameters.S)
+#define PRINT_SETTING_ARRAY(S) do { std::cout << std::setw(30) << #S << "["; \
+    for (size_t i = 0; i < creativity.parameters.S.size(); i++) { \
+        if (i > 0) std::cout << ", "; \
+        std::cout << creativity.parameters.S[i]; \
+    } \
+    std::cout << "]\n"; } while (0)
     PRINT_SETTING(readers);
     PRINT_SETTING(dimensions);
     PRINT_FIELD("densityFromBoundary()", creativity.densityFromBoundary());
@@ -54,12 +60,28 @@ int main(int argc, char *argv[]) {
     PRINT_SETTING(income);
     PRINT_SETTING(piracy_begins);
     PRINT_SETTING(piracy_link_proportion);
-    PRINT_SETTING(public_sharing_begins);
-    PRINT_SETTING(public_sharing_tax);
+
+    const auto &policies = creativity.parameters.policy;
+    std::cout << std::setw(30) << "policy";
+    bool comma = false;
+    if (policies & POLICY_PUBLIC_SHARING) { if (comma) std::cout << ", "; comma = true; std::cout << "public sharing"; }
+    if (policies & POLICY_CATCH_PIRATES)  { if (comma) std::cout << ", "; comma = true; std::cout << "catch and fine pirates"; }
+    if (policies & ~(POLICY_PUBLIC_SHARING | POLICY_CATCH_PIRATES)) { if (comma) std::cout << ", "; comma = true; std::cout << "(unknown policy)"; }
+    if (!policies) std::cout << "no policy response";
+    std::cout << "\n";
+    PRINT_SETTING(policy_begins);
+
+    PRINT_SETTING(policy_public_sharing_tax);
+
+    PRINT_SETTING(policy_catch_tax);
+    PRINT_SETTING_ARRAY(policy_catch_fine);
+    PRINT_SETTING_ARRAY(policy_catch_mu);
+    PRINT_SETTING_ARRAY(policy_catch_sigma);
+
     PRINT_SETTING(prior_scale);
     PRINT_SETTING(prior_scale_burnin);
     PRINT_SETTING(prior_scale_piracy);
-    PRINT_SETTING(prior_scale_public_sharing);
+    PRINT_SETTING(prior_scale_policy);
     PRINT_SETTING(burnin_periods);
     PRINT_SETTING(prediction_draws);
     PRINT_SETTING(initial.prob_write);
@@ -102,12 +124,43 @@ int main(int argc, char *argv[]) {
         ADD_SAME(income);
         ADD_SAME(piracy_begins);
         ADD_SAME(piracy_link_proportion);
-        ADD_SAME(public_sharing_begins);
-        ADD_SAME(public_sharing_tax);
+
+        std::list<std::string> policies;
+        bool policy_public = false, policy_catch = false;
+        if (creativity.parameters.policy & POLICY_PUBLIC_SHARING) { policy_public = true; policies.push_back("public-sharing"); }
+        if (creativity.parameters.policy & POLICY_CATCH_PIRATES) { policy_catch = true; policies.push_back("catch-pirates"); }
+        if (creativity.parameters.policy & ~(POLICY_CATCH_PIRATES | POLICY_PUBLIC_SHARING)) policies.push_back("unknown-policy");
+        if (!policies.empty()) {
+            std::cout << "--policies ";
+            bool first = true;
+            for (const auto &p : policies) {
+                if (first) first = false;
+                else std::cout << ",";
+                std::cout << p;
+            }
+
+            ADD_SAME(policy_begins);
+        }
+
+
+        if (policy_public) ADD("--public-sharing-tax", policy_public_sharing_tax);
+        if (policy_catch) {
+            ADD("--catch-tax", policy_catch_tax);
+            ADD("--catch-fine-any", policy_catch_fine[0]);
+            ADD("--catch-fine-const", policy_catch_fine[1]);
+            ADD("--catch-fine-lin", policy_catch_fine[2]);
+            ADD("--catch-fine-sq", policy_catch_fine[3]);
+            ADD("--catch-mu-const", policy_catch_mu[0]);
+            ADD("--catch-mu-lin", policy_catch_mu[1]);
+            ADD("--catch-mu-sq", policy_catch_mu[2]);
+            ADD("--catch-sigma-const", policy_catch_sigma[0]);
+            ADD("--catch-sigma-lin", policy_catch_sigma[1]);
+            ADD("--catch-sigma-sq", policy_catch_sigma[2]);
+        }
         ADD_SAME(prior_scale);
         ADD_SAME(prior_scale_burnin);
         ADD_SAME(prior_scale_piracy);
-        ADD_SAME(prior_scale_public_sharing);
+        if (!policies.empty()) ADD_SAME(prior_scale_policy);
         ADD_SAME(burnin_periods);
         ADD_SAME(prediction_draws);
         ADD_SAME(initial.prob_write);
@@ -157,25 +210,25 @@ int main(int argc, char *argv[]) {
         unsigned count = 0;
         // These are 0 for disabled, so pretend we already did them if 0:
         bool did_piracy = creativity.parameters.piracy_begins == 0,
-             did_public_sharing = creativity.parameters.public_sharing_begins == 0;
+             did_policy = creativity.parameters.policy_begins == 0;
         for (unsigned t = (args.thin_periods < st.size() ? args.thin_periods : st.size()-1); t < st.size(); t += args.thin_periods) {
             auto s = st[t];
             if (++count % 35 == 1 and count > 1) { std::cout << h4 << h3 << h4; }
             if (not did_piracy and s->t >= creativity.parameters.piracy_begins) {
                 if (s->t == creativity.parameters.piracy_begins) std::cout <<
-                   "  =======================================  PIRACY BEGINS  ========================================\n";
+                    "  =======================================  PIRACY BEGINS  ========================================\n";
                 else std::cout <<
-                   "  ===================================  PIRACY BEGINS " << std::setw(8) << std::left << std::string("(t=" + std::to_string(
+                    "  ===================================  PIRACY BEGINS " << std::setw(8) << std::left << std::string("(t=" + std::to_string(
                     creativity.parameters.piracy_begins) + ")") <<            "  ===================================\n";
                 did_piracy = true;
             }
-            if (not did_public_sharing and s->t >= creativity.parameters.public_sharing_begins) {
-                if (s->t == creativity.parameters.public_sharing_begins) std::cout <<
-                   "  ===================================  PUBLIC SHARING BEGINS  ====================================\n";
+            if (not did_policy and s->t >= creativity.parameters.policy_begins) {
+                if (s->t == creativity.parameters.policy_begins) std::cout <<
+                    "  =======================================  POLICY BEGINS  ========================================\n";
                 else std::cout <<
-                   "  ===============================  PUBLIC SHARING BEGINS " << std::setw(8) << std::left << std::string("(t=" + std::to_string(
-                    creativity.parameters.public_sharing_begins) + ")") <<         "  ===============================\n";
-                did_public_sharing = true;
+                    "  ===================================  POLICY BEGINS " << std::setw(8) << std::left << std::string("(t=" + std::to_string(
+                        creativity.parameters.policy_begins) + ")") <<           "  ===================================\n";
+                did_policy = true;
             }
 
             double net_u = 0;

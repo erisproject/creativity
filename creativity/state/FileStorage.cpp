@@ -133,12 +133,20 @@ void FileStorage::configureHeaderFields() {
     addHeaderField(settings_.income);
     addHeaderField(settings_.piracy_begins);
     addHeaderField(settings_.piracy_link_proportion);
-    addHeaderField(settings_.public_sharing_begins);
-    addHeaderField(settings_.public_sharing_tax);
+
+    addHeaderField(settings_.policy);
+    addHeaderField(settings_.policy_begins);
+
+    addHeaderField(settings_.policy_public_sharing_tax);
+
+    addHeaderField(settings_.policy_catch_tax);
+    addHeaderField(settings_.policy_catch_fine);
+    addHeaderField(settings_.policy_catch_mu);
+    addHeaderField(settings_.policy_catch_sigma);
+
     addHeaderField(settings_.prior_scale);
     addHeaderField(settings_.prior_scale_burnin);
     addHeaderField(settings_.prior_scale_piracy);
-    addHeaderField(settings_.prior_scale_public_sharing);
     addHeaderField(settings_.burnin_periods);
     addHeaderField(settings_.initial.prob_write);
     addHeaderField(settings_.initial.l_min);

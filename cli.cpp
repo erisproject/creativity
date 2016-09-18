@@ -174,7 +174,7 @@ int main(int argc, char *argv[]) {
             if (tty) std::cout << "\r";
             std::cout << "Running simulation [t=" << sim->t() << "; " <<
                 (creativity.piracy() ? u8"Piracy ✔; " : u8"Piracy ✘; ") <<
-                (creativity.publicSharing() ? u8"Public ✔; " : u8"Public ✘; ") <<
+                (creativity.policyActive() ? u8"Policy ✔; " : u8"Policy ✘; ") <<
                 "R=" << sim->countAgents<Reader>() << "; B=" << sim->countGoods<Book>() << "; Bnew=" <<
                 std::setw(max_bnew_digits) << bnew << "] " << speed.str();
             if (tty) std::cout << std::flush;

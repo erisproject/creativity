@@ -35,12 +35,12 @@ class Series : public CmdArgs {
          */
         eris::eris_time_t piracy_begins = 0;
 
-        /** The public sharing begins period.  All simulations must have the same value (unless it
+        /** The policy begins period.  All simulations must have the same value (unless it
          * is larger than `periods`).
          *
          * The default (0) reads the value from the first file loaded.
          */
-        eris::eris_time_t public_sharing_begins = 0;
+        eris::eris_time_t policy_begins = 0;
 
         /// If true, just warn instead of aborting for files that can't be read or contain invalid period values.
         bool ignore_errors = false;

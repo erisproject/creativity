@@ -4,10 +4,10 @@
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/errors.hpp>
 #include <boost/program_options/value_semantic.hpp>
+#include <boost/program_options/variables_map.hpp>
 #include <cstdint>
 #include <regex>
 #include <sstream>
-namespace boost { namespace program_options { class variables_map; } }
 
 
 namespace creativity { namespace cmdargs {
@@ -20,7 +20,8 @@ void Simulator::addOptions() {
     CmdArgs::addOptions();
     po::options_description structure("Structure"), initial("Initial Behaviour"),
         authorship("Authorship Settings and Costs"), costs("Costs"), beliefs("Beliefs"),
-        piracy("Piracy"), publicprov("Public Provisioning");
+        piracy("Piracy"), policy("Policy options"), pol_public("Public sharing policy (requires --policy=public-sharing)"),
+        pol_catch("Catch and fine policy (requires --policy=catch-pirates)");
 
     structure.add_options()
         ("dimensions,D", min<1>(s_.dimensions), "    Number of dimensions of the simulation")
@@ -54,12 +55,12 @@ void Simulator::addOptions() {
         ("prediction-draws,p", min<1>(s_.prediction_draws), "The number of draws agents take from beliefs when using for prediction.  Lower values can be used to introduce deliberate randomness into the simulation")
         ("burnin-periods,u", value(s_.burnin_periods), "    The number of initial periods during which `--prior-scale-burnin' should be used instead of `--prior-scale'")
         ("belief-threshold,b", value(s_.initial.belief_threshold), "  The minimum n-k value at which a readers bases decision on beliefs instead of initial parameters")
-        ("prior-scale-burnin,U", min<1>(s_.prior_scale_burnin), "The same as --prior-weight, but applied in the first `--burnin-periods' periods")
+        ("prior-scale-burnin,U", min<1>(s_.prior_scale_burnin), "The same as --prior-scale, but applied in the first `--burnin-periods' periods")
         ;
     options_.add(beliefs);
 
     initial.add_options()
-        ("initial-prob-write,x", range<0, 1>(s_.initial.prob_write), "The probability of writing in initial periods")
+        ("initial-prob-write,J", range<0, 1>(s_.initial.prob_write), "The probability of writing in initial periods")
         ("initial-effort-min,m", min<0>(s_.initial.l_min), "The minimum support of effort l ~ U[a,b] for authored books in initial periods")
         ("initial-effort-range,M", min<0>(s_.initial.l_range), "The range of effort l ~ U[a,b] (in other words, b-a) for authored books in initial periods")
         ("initial-price-min,n", min<0>(s_.initial.p_min), "The minimum support, `a', of the random component of price c + U[a,b] for new books in initial periods")
@@ -71,17 +72,38 @@ void Simulator::addOptions() {
 
     piracy.add_options()
         ("piracy-begins,P", value(s_.piracy_begins), "    The period in which piracy becomes available.  0 means never")
-        ("piracy-link-proportion,f", range<0, 1>(s_.piracy_link_proportion), "Proportion of potential sharing links between readers that are created")
-        ("prior-scale-piracy,W", min<1>(s_.prior_scale_piracy), "The same as --prior-weight, but applied in the first piracy period")
+        ("piracy-link-proportion,L", range<0, 1>(s_.piracy_link_proportion), "Proportion of potential sharing links between readers that are created")
+        ("prior-scale-piracy,W", min<1>(s_.prior_scale_piracy), "The same as --prior-scale, but applied in the first piracy period")
         ;
     options_.add(piracy);
 
-    publicprov.add_options()
-        ("public-sharing-begins,G", value(s_.public_sharing_begins), "The period in which public sharing becomes available. 0 means never")
-        ("public-sharing-tax,g", min<0>(s_.public_sharing_tax), "The per-period, lump sum tax collected from each reader for public sharing")
-        ("prior-scale-public-sharing,S", min<1>(s_.prior_scale_public_sharing), "The same as --prior-weight, but applied in the first public sharing period")
+    policy.add_options()
+        ("policy,g", value(policies), "A list of policies to enable in the policy phase of the simulation.  This option may be specified multiple times, or may be specified with a comma-separated list of policies.  If the option is omitted, defaults to `public-sharing`; specify 'none' to disable all policies.  Currently accepted policy names: 'public-sharing' - enables public sharing with redistribution (can be shorted to 'public'); 'catch-pirates' - enables detection and fines (can be shorted to 'catch')")
+        ("policy-begins,G", value(s_.policy_begins), "When a policy response is enabled, this specifies the period in which it begins.  Has no effect if no policy response is enabled")
+        ("prior-scale-policy,S", min<1>(s_.prior_scale_policy), "The same as --prior-scale, but applied in the first policy response period")
         ;
-    options_.add(publicprov);
+
+    pol_public.add_options()
+        ("public-sharing-tax,A", min<0>(s_.policy_public_sharing_tax), "The per-period, lump sum tax collected from each reader for public sharing")
+        ;
+    policy.add(pol_public);
+
+    pol_catch.add_options()
+        ("catch-tax,x", min<0>(s_.policy_catch_tax), "The lump-sum, per-reader tax that is collected to pay for the catch policy")
+        ("catch-fine-any", min<0>(s_.policy_catch_fine[0]), "A constant fee that is incurred by someone caught for piracy, even if innocent")
+        ("catch-fine-const", value(s_.policy_catch_fine[1]), "A constant fee that is incurred by someone caught for piracy when guilty, in addition to the --caught-fine-d value")
+        ("catch-fine-lin", value(s_.policy_catch_fine[2]), "The linear term coefficient, b, of the fine polynomial, d + c + b*P + a*P²")
+        ("catch-fine-sq", value(s_.policy_catch_fine[3]), "The squared term coefficient, a, of the fine polynomial, d + c + b*P + a*P²")
+        ("catch-mu-const", value(s_.policy_catch_mu[0]), "The constant term, c, that determines μ = c + b*F + a*F², where F is the --catch-tax value")
+        ("catch-mu-lin", value(s_.policy_catch_mu[1]), "The linear term coefficient, b, that determines μ = c + b*F + a*F², where F is the --catch-tax value")
+        ("catch-mu-sq", value(s_.policy_catch_mu[2]), "The squared term coefficient, a, that determines μ = c + b*F + a*F², where F is the --catch-tax value")
+        ("catch-sigma-const", value(s_.policy_catch_sigma[0]), "The constant term, c, that determines σ = c + b*F + a*F², where F is the --catch-tax value")
+        ("catch-sigma-lin", value(s_.policy_catch_sigma[1]), "The linear term coefficient, b, that determines σ = c + b*F + a*F², where F is the --catch-tax value")
+        ("catch-sigma-sq", value(s_.policy_catch_sigma[2]), "The squared term coefficient, a, that determines σ = c + b*F + a*F², where F is the --catch-tax value")
+        ;
+    policy.add(pol_catch);
+
+    options_.add(policy);
 
     // This one is an object variable because the cli/gui need to add to it
     sim_controls_.add_options()
@@ -99,7 +121,7 @@ void Simulator::addOptions() {
 }
 
 
-void Simulator::postParse(boost::program_options::variables_map &) {
+void Simulator::postParse(boost::program_options::variables_map &vars) {
     // If the user didn't give a seed, .seed won't have changed from seed, but we still don't want
     // to set it because explicitly setting a seed resets the RNG.
     if (eris::random::seed() != seed) {
@@ -111,6 +133,30 @@ void Simulator::postParse(boost::program_options::variables_map &) {
     }
 
     s_.boundary = Creativity::boundaryFromDensity(s_.readers, s_.dimensions, density_);
+
+    // Default, but only if the argument isn't specified (so that `--policy=` by itself disables the
+    // policy)
+    if (vars.count("policy") == 0) {
+        policies.push_back("public-sharing");
+    }
+
+    const auto &npos = std::string::npos;
+    for (const auto &p : policies) {
+        size_t at = 0;
+        while (at != npos) {
+            size_t comma = p.find_first_of(',', at);
+            std::string policy = p.substr(at, comma);
+            at = comma;
+            if (policy == "public" or policy == "public-sharing")
+                s_.policy |= POLICY_PUBLIC_SHARING;
+            else if (policy == "catch" or policy == "catch-pirates")
+                s_.policy |= POLICY_CATCH_PIRATES;
+            else if (policy == "none" or policy == "")
+                /* ignore */;
+            else
+                throw po::invalid_option_value("--policy " + policy);
+        }
+    }
 }
 
 }}

@@ -225,7 +225,8 @@ void Reader::interOptimize() {
     updateBeliefs();
 
     double income_available = assets[creativity_.money] + creativity_.parameters.income;
-    if (creativity_.publicSharing()) income_available -= creativity_.parameters.public_sharing_tax;
+    if (creativity_.publicSharing()) income_available -= creativity_.parameters.policy_public_sharing_tax;
+    if (creativity_.catchPirates()) income_available -= creativity_.parameters.policy_catch_tax;
 
     auto sim = simulation();
     const double market_books = sim->countMarkets<BookMarket>();

@@ -14,6 +14,15 @@ namespace creativity { class Book; }
 /// Primary namespace for all Creativity library code.
 namespace creativity {
 
+/** The bit for the public-sharing policy in `settings.policy`.
+ * \internal
+ */
+constexpr uint32_t POLICY_PUBLIC_SHARING = 1 << 0;
+/** The bit for the catch-pirates policy in `settings.policy`.
+ * \internal
+ */
+constexpr uint32_t POLICY_CATCH_PIRATES  = 1 << 1;
+
 /** Central class for a creativity simulation; this class handles setting up the simulation
  * according to configured parameters and running the simulation.
  *
@@ -132,11 +141,27 @@ class Creativity : private eris::noncopyable {
          */
         bool piracy() const;
 
-        /** Returns true if public sharing exists yet in the simulation.  Attempting to call this on
-         * a Creativity object that is not a live simulation, or is a live simulation but has not
-         * been set up yet, will raise an exception.
+        /** Returns true if a policy response exists yet in the simulation.  This must only be
+         * called on a live, setup simulation.
+         *
+         * This returns false if the `policy_begins` period has not yet been reached, or if
+         * there is no policy response configured at all.
+         */
+        bool policyActive() const;
+
+        /** Returns true if public sharing is an enabled policy response *and* it is active in the
+         * simulation (i.e. the simulation has reached the period in which the policy response
+         * begins).  Attempting to call this on a Creativity object that is not a live simulation,
+         * or is a live simulation but has not been set up yet, will raise an exception.
          */
         bool publicSharing() const;
+
+        /** Returns true if getting caught for piracy is a configured policy response *and* it is
+         * active in the simulation (i.e. the simulation has reached the policy response stage).
+         * Attempting to call this on a Creativity object that is not a live simulation, or is a
+         * live simulation but has not been set up yet, will raise an exception.
+         */
+        bool catchPirates() const;
 
         /** Returns the prior multiplier currently in effect.  This is
          * CreativitySettings.prior_scale except in the first piracy period, during which it is
