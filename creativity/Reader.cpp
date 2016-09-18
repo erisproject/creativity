@@ -101,16 +101,6 @@ const std::set<SharedMember<Book>>& Reader::wrote() const {
     return wrote_;
 }
 
-double Reader::evalPolynomial(double x, const std::vector<double> &polynomial) {
-    double p = 0.0;
-    double xi = 1.0;
-    for (auto &c : polynomial) {
-        p += c * xi;
-        xi *= x;
-    }
-    return p;
-}
-
 void Reader::numBooksPenaltyPolynomial(std::vector<double> coef) {
     unsigned xlast = 0;
     double plast = evalPolynomial(xlast, coef);

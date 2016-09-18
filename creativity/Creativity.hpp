@@ -214,6 +214,39 @@ class Creativity : private eris::noncopyable {
          */
         std::pair<std::shared_ptr<state::Storage>&, std::unique_lock<std::mutex>> storage();
 
+        /** Evaluates a polynomial at the value `x`.
+         *
+         * \param x the value at which to evaluate the polynomial.
+         * \param begin an iterator to the first coefficient of the polynomial.  The first value is
+         * the constant, the second is the linear term, the \f$i\f$th term applies to the \f$x^i\f$
+         * term.  The order of the polynomial is implicitly determined by the distance between
+         * `begin` and `end`.  Typically `container.begin()`.
+         * \param the past-the-end iterator at which to stop evaluating the polynomial.  Typically
+         * `container.end()`.
+         */
+        template <typename Iter, typename = typename std::enable_if<std::is_arithmetic<
+            typename std::iterator_traits<Iter>::value_type>::value>::type>
+        static double evalPolynomial(double x, Iter it, Iter end) {
+            double v = 0;
+            double xi = 1;
+            for (; it != end; ++it) {
+                v += *it * xi;
+                xi *= x;
+                if (xi == 0) break;
+            }
+            return v;
+        }
+
+        /** Evaluates a polynomial at the value `x`.  This is simply a shortcut for calling
+         * `evalPolynomial(x, cont.begin(), cont.end())` for containers with an stl-like container
+         * interface.
+         */
+        template <typename Container, typename = typename std::enable_if<std::is_arithmetic<
+            typename Container::value_type>::value>::type>
+        static double evalPolynomial(double x, const Container &cont) {
+            return evalPolynomial(x, cont.begin(), cont.end());
+        }
+
         /** Stores the number of on-market books.  This is updated at the beginning of every new
          * simulation stage with the number of on-market books in the just-ended period.
          */

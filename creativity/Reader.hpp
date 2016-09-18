@@ -253,14 +253,6 @@ class Reader : public eris::WrappedPositional<eris::Agent>,
          */
         virtual double quality(const eris::SharedMember<Book> &b) const;
 
-        /** Evaluates the given polynomial at the value `x`.
-         *
-         * \param x the value at which to evaluate the polynomial.
-         * \param polynomial the coefficients at which to evaluate the polynomial.  `polynomial[0]`
-         * is the constant term, `polynomial[i]` applies to the \f$x^i\f$ term.
-         */
-        static double evalPolynomial(double x, const std::vector<double> &polynomial);
-
         /** Sets the coefficients for the polynomial used in uBook(double) to calculate the penalty
          * for book distance.  Coefficient \f$c_i\f$ is the coefficient multiplying \f$d^i\f$ in the
          * resulting polynomial.  For example, `coefficients(std::vector<double>{{0, 1, 0.5}})` sets
