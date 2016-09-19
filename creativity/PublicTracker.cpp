@@ -1,6 +1,5 @@
 #include "creativity/PublicTracker.hpp"
 #include "creativity/PublicTrackerMarket.hpp"
-#include "creativity/Creativity.hpp"
 #include "creativity/Reader.hpp"
 #include "creativity/Book.hpp"
 #include <stdexcept>
@@ -11,20 +10,18 @@ namespace creativity {
 
 using namespace eris;
 
-PublicTracker::PublicTracker(const Creativity &creativity, double tax)
-    : creativity_{std::move(creativity)}, tax_{tax}
-{
-    if (tax < 0) throw std::domain_error("PublicTracker creation error: lump sum tax cannot be negative");
+PublicTracker::PublicTracker(const Creativity &creativity) : creativity_{std::move(creativity)} {
+    if (tax() < 0) throw std::domain_error("PublicTracker creation error: lump sum tax cannot be negative");
 }
 
 void PublicTracker::interApply() {
     auto lock = writeLock();
     // If the tax is 0, we don't need to do any transfers.
-    if (tax_ > 0) {
-        Bundle tax(creativity_.money, tax_);
+    if (tax() > 0) {
+        Bundle tax_bill(creativity_.money, tax());
         for (auto &r : simulation()->agents<Reader>()) {
             lock.add(r);
-            r->assets.transferApprox(tax, assets, 1e-6);
+            r->assets.transferApprox(tax_bill, assets, 1e-6);
             lock.remove(r);
         }
     }
@@ -64,10 +61,6 @@ void PublicTracker::intraFinish() {
         }
     }
     // Otherwise no copies downloaded: just leave the assets for the next period's pool
-}
-
-const double& PublicTracker::tax() const {
-    return tax_;
 }
 
 const double& PublicTracker::pool() const {

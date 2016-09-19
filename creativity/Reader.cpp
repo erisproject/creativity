@@ -60,9 +60,9 @@ void Reader::distancePenaltyPolynomial(std::vector<double> coef) {
     }
 
     double xlast = 0;
-    double plast = evalPolynomial(0, coef);
+    double plast = Creativity::evalPolynomial(0, coef);
     for (const double &x : {1e-100, 1e-10, .1, 1., 10., 100., 1e10}) {
-        double p = evalPolynomial(x, coef);
+        double p = Creativity::evalPolynomial(x, coef);
         if (p < plast)
             throw std::domain_error("Invalid uPolynomial: polynomial is not increasing: f(" + std::to_string(x) + ") = " + std::to_string(p) +
                     " is less than f(" + std::to_string(xlast) + ") = " + std::to_string(plast));
@@ -78,7 +78,7 @@ const std::vector<double>& Reader::distancePenaltyPolynomial() const {
 }
 
 double Reader::distancePenalty(double distance) const {
-    return evalPolynomial(distance, distancePenaltyPolynomial());
+    return Creativity::evalPolynomial(distance, distancePenaltyPolynomial());
 }
 
 double Reader::u(double money, const std::unordered_map<eris::SharedMember<Book>, std::reference_wrapper<BookCopy>> &books) const {
@@ -103,9 +103,9 @@ const std::set<SharedMember<Book>>& Reader::wrote() const {
 
 void Reader::numBooksPenaltyPolynomial(std::vector<double> coef) {
     unsigned xlast = 0;
-    double plast = evalPolynomial(xlast, coef);
+    double plast = Creativity::evalPolynomial(xlast, coef);
     for (const unsigned &x : {1,2,3,4,5,6,7,8,9,10,20,30,40,50,60,70,80,90,100,1000,1000000}) {
-        double p = evalPolynomial(x, coef);
+        double p = Creativity::evalPolynomial(x, coef);
         if (p < plast)
             throw std::domain_error("Invalid numBooksPenaltyPolynomial: f(" + std::to_string(x) + ") = " + std::to_string(p) +
                     " is less than f(" + std::to_string(xlast) + ") = " + std::to_string(plast));
@@ -119,7 +119,7 @@ const std::vector<double>& Reader::numBooksPenaltyPolynomial() const {
     return nbooks_penalty_poly_;
 }
 double Reader::numBooksPenalty(unsigned long n) const {
-    return evalPolynomial(n, numBooksPenaltyPolynomial());
+    return Creativity::evalPolynomial(n, numBooksPenaltyPolynomial());
 }
 
 double Reader::creationQuality(double effort) const {
@@ -214,9 +214,7 @@ void Reader::interOptimize() {
     // Update the various beliefs
     updateBeliefs();
 
-    double income_available = assets[creativity_.money] + creativity_.parameters.income;
-    if (creativity_.publicSharing()) income_available -= creativity_.parameters.policy_public_sharing_tax;
-    if (creativity_.catchPirates()) income_available -= creativity_.parameters.policy_catch_tax;
+    double income_available = assets[creativity_.money] + creativity_.disposableIncome();
 
     auto sim = simulation();
     const double market_books = sim->countMarkets<BookMarket>();
@@ -442,6 +440,8 @@ void Reader::interApply() {
     // Give potential income (this has to be before authorship decision, since authorship requires
     // giving up some potential income: actual income will be this amount minus whatever is given up
     // to author)
+    // NB: we give total income; any policy tax is removed by another policy agent, e.g.
+    // PublicTracker, in a later-priority interApply().
     assets[creativity_.money] += creativity_.parameters.income;
 
     const Bundle cost_market(creativity_.money, creativity_.parameters.cost_market);
@@ -818,6 +818,16 @@ void Reader::updateProfitBelief() {
 
 }
 
+void Reader::alterUtility(double amount) {
+    auto stage = simulation()->runStage();
+    if (stage == Simulation::RunStage::intra_Finish or (stage == Simulation::RunStage::intra_Apply and simulation()->runStagePriority() > 0)) {
+        u_curr_ -= amount;
+        u_lifetime_ -= amount;
+    }
+    else {
+        throw std::logic_error("Reader::alterUtility can only be called in intra-finish or late-stage intra-apply simulation stages");
+    }
+}
 
 void Reader::intraInitialize() {
     auto nb = creativity_.newBooks();
@@ -829,6 +839,8 @@ void Reader::intraInitialize() {
 
 void Reader::intraOptimize() {
     auto lock = readLock();
+
+    if (creativity_.catchPirates()) throw std::runtime_error("Readers optimization does not yet handle catch-pirates policy!");
 
     std::vector<SharedMember<Book>> cache_del;
     // Map utility-minus-price values to `<buy, book>` pairs, where `buy` is true if the book is to

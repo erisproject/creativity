@@ -154,7 +154,7 @@
     <property name="step_increment">1</property>
     <property name="page_increment">10</property>
   </object>
-  <object class="GtkAdjustment" id="adjust_catch_fine_3">
+  <object class="GtkAdjustment" id="adjust_catch_cost">
     <property name="lower">-1000</property>
     <property name="upper">1000</property>
     <property name="step_increment">1</property>
@@ -2014,10 +2014,29 @@ This value overrides the "Prior discounting" setting in just the "Sharing begins
                                               </packing>
                                             </child>
                                             <child>
+                                              <object class="GtkSpinButton" id="set_policy_catch_cost">
+                                                <property name="visible">True</property>
+                                                <property name="can_focus">True</property>
+                                                <property name="tooltip_markup" translatable="yes">A fixed cost incurred by readers who are accused of pirating, &lt;b&gt;&lt;i&gt;even if they did not actually pirate&lt;/i&gt;&lt;/b&gt;.</property>
+                                                <property name="margin_bottom">1</property>
+                                                <property name="invisible_char">●</property>
+                                                <property name="text" translatable="yes">0.00</property>
+                                                <property name="input_purpose">number</property>
+                                                <property name="adjustment">adjust_catch_cost</property>
+                                                <property name="digits">2</property>
+                                                <property name="numeric">True</property>
+                                                <property name="update_policy">if-valid</property>
+                                              </object>
+                                              <packing>
+                                                <property name="left_attach">7</property>
+                                                <property name="top_attach">7</property>
+                                              </packing>
+                                            </child>
+                                            <child>
                                               <object class="GtkSpinButton" id="set_policy_catch_fine_0">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
-                                                <property name="tooltip_markup" translatable="yes">A fixed cost fine applied to all readers who are detected as pirating, &lt;b&gt;&lt;i&gt;even if they did not actually pirate&lt;/i&gt;&lt;/b&gt;.</property>
+                                                <property name="tooltip_text" translatable="yes">A fixed cost fine applied to all readers who are (correctly) detected as pirating.  This is added to the above and to the following variable fine components.</property>
                                                 <property name="margin_bottom">1</property>
                                                 <property name="invisible_char">●</property>
                                                 <property name="text" translatable="yes">0.00</property>
@@ -2029,14 +2048,14 @@ This value overrides the "Prior discounting" setting in just the "Sharing begins
                                               </object>
                                               <packing>
                                                 <property name="left_attach">7</property>
-                                                <property name="top_attach">7</property>
+                                                <property name="top_attach">8</property>
                                               </packing>
                                             </child>
                                             <child>
                                               <object class="GtkSpinButton" id="set_policy_catch_fine_1">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
-                                                <property name="tooltip_text" translatable="yes">A fixed cost fine applied to all readers who are (correctly) detected as pirating.  This is added to the above and to the following variable fine components.</property>
+                                                <property name="tooltip_text" translatable="yes">The linear coefficient, &lt;b&gt;b&lt;/b&gt;, in the variable component of the fines for readers who are caught pirating: &lt;b&gt;c + b P + a P²&lt;/b&gt;, where &lt;b&gt;P&lt;/b&gt; is the number of books the reader pirated in the period in which he was caught.</property>
                                                 <property name="margin_bottom">1</property>
                                                 <property name="invisible_char">●</property>
                                                 <property name="text" translatable="yes">0.00</property>
@@ -2048,30 +2067,11 @@ This value overrides the "Prior discounting" setting in just the "Sharing begins
                                               </object>
                                               <packing>
                                                 <property name="left_attach">7</property>
-                                                <property name="top_attach">8</property>
-                                              </packing>
-                                            </child>
-                                            <child>
-                                              <object class="GtkSpinButton" id="set_policy_catch_fine_2">
-                                                <property name="visible">True</property>
-                                                <property name="can_focus">True</property>
-                                                <property name="tooltip_text" translatable="yes">The linear coefficient, &lt;b&gt;b&lt;/b&gt;, in the variable component of the fines for readers who are caught pirating: &lt;b&gt;c + b P + a P²&lt;/b&gt;, where &lt;b&gt;P&lt;/b&gt; is the number of books the reader pirated in the period in which he was caught.</property>
-                                                <property name="margin_bottom">1</property>
-                                                <property name="invisible_char">●</property>
-                                                <property name="text" translatable="yes">0.00</property>
-                                                <property name="input_purpose">number</property>
-                                                <property name="adjustment">adjust_catch_fine_2</property>
-                                                <property name="digits">2</property>
-                                                <property name="numeric">True</property>
-                                                <property name="update_policy">if-valid</property>
-                                              </object>
-                                              <packing>
-                                                <property name="left_attach">7</property>
                                                 <property name="top_attach">9</property>
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkSpinButton" id="set_policy_catch_fine_3">
+                                              <object class="GtkSpinButton" id="set_policy_catch_fine_2">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">True</property>
                                                 <property name="tooltip_text" translatable="yes">The squared term coefficient, &lt;b&gt;a&lt;/b&gt;, in the fine equation for readers who are caught pirating: &lt;b&gt;c + b P + a P²&lt;/b&gt;, where &lt;b&gt;P&lt;/b&gt; is the number of books the reader pirated in the period in which he was caught.</property>
@@ -2079,7 +2079,7 @@ This value overrides the "Prior discounting" setting in just the "Sharing begins
                                                 <property name="invisible_char">●</property>
                                                 <property name="text" translatable="yes">0.00</property>
                                                 <property name="input_purpose">number</property>
-                                                <property name="adjustment">adjust_catch_fine_3</property>
+                                                <property name="adjustment">adjust_catch_fine_2</property>
                                                 <property name="digits">2</property>
                                                 <property name="numeric">True</property>
                                                 <property name="update_policy">if-valid</property>
@@ -2228,10 +2228,10 @@ This paramter is &lt;b&gt;s₂&lt;/b&gt;.</property>
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="lbl_policy_catch_fine_0">
+                                              <object class="GtkLabel" id="lbl_policy_catch_cost">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="label" translatable="yes">Penalty fixed (all)</property>
+                                                <property name="label" translatable="yes">Accused cost</property>
                                                 <property name="xalign">0</property>
                                               </object>
                                               <packing>
@@ -2240,10 +2240,10 @@ This paramter is &lt;b&gt;s₂&lt;/b&gt;.</property>
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="lbl_policy_catch_fine_1">
+                                              <object class="GtkLabel" id="lbl_policy_catch_fine_0">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="label" translatable="yes">Penalty fixed (guilty)</property>
+                                                <property name="label" translatable="yes">Fine, constant</property>
                                                 <property name="xalign">0</property>
                                               </object>
                                               <packing>
@@ -2252,10 +2252,10 @@ This paramter is &lt;b&gt;s₂&lt;/b&gt;.</property>
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="lbl_policy_catch_fine_2">
+                                              <object class="GtkLabel" id="lbl_policy_catch_fine_1">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="label" translatable="yes">Penalty linear</property>
+                                                <property name="label" translatable="yes">Fine, linear</property>
                                                 <property name="xalign">0</property>
                                               </object>
                                               <packing>
@@ -2264,10 +2264,10 @@ This paramter is &lt;b&gt;s₂&lt;/b&gt;.</property>
                                               </packing>
                                             </child>
                                             <child>
-                                              <object class="GtkLabel" id="lbl_policy_catch_fine_3">
+                                              <object class="GtkLabel" id="lbl_policy_catch_fine_2">
                                                 <property name="visible">True</property>
                                                 <property name="can_focus">False</property>
-                                                <property name="label" translatable="yes">Penalty quadratic</property>
+                                                <property name="label" translatable="yes">Fine, quadratic</property>
                                                 <property name="xalign">0</property>
                                               </object>
                                               <packing>

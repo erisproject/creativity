@@ -163,6 +163,20 @@ class Creativity : private eris::noncopyable {
          */
         bool catchPirates() const;
 
+        /** Returns the per-user policies taxes currently in effect.  Before the policy comes into
+         * effect, this is 0; afterwards, it is whatever is the sum of the taxes of whichever
+         * policies are enabled.
+         *
+         * \returns the quantity of the money good that must be surrended.
+         */
+        double policyTaxes() const;
+
+        /** Returns the level of exogenous, disposable income, i.e. income minus policy taxes.  This
+         * is simply a shortcut for `creativity.parameters.income - creativity.policyTaxes()`.  Note
+         * that this does not include any income or costs associated with authorship.
+         */
+        double disposableIncome() const;
+
         /** Returns the prior multiplier currently in effect.  This is
          * CreativitySettings.prior_scale except in the first piracy period, during which it is
          * CreativitySettings.prior_scale_piracy, and in the initial burnin periods, during which it
@@ -217,11 +231,11 @@ class Creativity : private eris::noncopyable {
         /** Evaluates a polynomial at the value `x`.
          *
          * \param x the value at which to evaluate the polynomial.
-         * \param begin an iterator to the first coefficient of the polynomial.  The first value is
+         * \param it an iterator to the first coefficient of the polynomial.  The first value is
          * the constant, the second is the linear term, the \f$i\f$th term applies to the \f$x^i\f$
          * term.  The order of the polynomial is implicitly determined by the distance between
          * `begin` and `end`.  Typically `container.begin()`.
-         * \param the past-the-end iterator at which to stop evaluating the polynomial.  Typically
+         * \param end the past-the-end iterator at which to stop evaluating the polynomial.  Typically
          * `container.end()`.
          */
         template <typename Iter, typename = typename std::enable_if<std::is_arithmetic<

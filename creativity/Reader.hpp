@@ -113,7 +113,7 @@ namespace belief { class Profit; }
  *   - for all authored books still on the market, decides whether to remove from the market, or to
  *     keep on the market.  If the latter, also chooses the price for the upcoming period.
  * - inter-apply:
- *   - Receives external (non-book) income
+ *   - Receives external (non-book) income, less any policy taxes.
  *   - If book creation initiated in previous periods is now complete, the book is created.
  *   - If creation was decided upon in inter-optimize, pays the decided-upon effort level and fixed
  *     creation cost from income, and creates a book
@@ -132,8 +132,11 @@ namespace belief { class Profit; }
  * - intra-apply:
  *   - Buys and/or pirates the books decided upon.  Spends all leftover income on the numeraire
  *     good.
- * - intra-finish (via BookMarket):
- *   - The author receives all of the periods proceeds from the period.
+ * - intra-finish:
+ *   - (via CopyrightPolice) If the 'catch-pirates' policy is active, people are randomly caught and
+ *     incur the fine (subtracted from utility).  The opportunity component of the fine disappears;
+ *     the rest of the fine is redistributed to the authors of the pirated works.
+ *   - (via BookMarket) The author receives all of the period's proceeds from the period.
  */
 class Reader : public eris::WrappedPositional<eris::Agent>,
     public virtual eris::interopt::Begin,
@@ -214,7 +217,8 @@ class Reader : public eris::WrappedPositional<eris::Agent>,
          * through sharing.  Books newly authored by this reader are not included.
          *
          * This is updated only during the agent's intraApply() phase; it intra stages before
-         * "apply" it gives the new books in the previous period.
+         * "apply" it gives the new books in the previous period; after intraApply it contains new
+         * books for the current period.
          */
         const std::unordered_map<eris::SharedMember<Book>, std::reference_wrapper<BookCopy>>& newBooks() const;
 
@@ -499,6 +503,16 @@ class Reader : public eris::WrappedPositional<eris::Agent>,
          * \returns true if the friendship was removed, false if the friendship did not exist.
          */
         bool removeFriend(const eris::SharedMember<Reader> &old_pal, bool recurse = true);
+
+        /** Called to alter the reader's utility for the current period.  This may only be called
+         * after the intraApply stage has completed (at default priority), i.e. typically in a
+         * late-priority intraApply or in an intraFinish.
+         *
+         * This is primarily intended at policy mechanisms like CopyrightPolice who need a way to
+         * fine the reader; one can imagine that the utility hit is a removal of wealth, though
+         * wealth isn't actually modelled in this simulation.
+         */
+        void alterUtility(double amount);
 
         /** At the beginning of the period transition, the reader takes a random step. */
         void interBegin() override;

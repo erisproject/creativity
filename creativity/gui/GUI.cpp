@@ -939,6 +939,7 @@ void GUI::thr_update_parameters() {
 
     // Catching policy:
     SET_SB(policy_catch_tax);
+    SET_SB(policy_catch_cost);
     SET_SB_ARRAY(policy_catch_fine);
     SET_SB_ARRAY(policy_catch_mu);
     SET_SB_ARRAY(policy_catch_sigma);
@@ -1242,6 +1243,7 @@ void GUI::initializeSim() {
 
     // Catching policy:
     COPY_SB_D(policy_catch_tax);
+    COPY_SB_D(policy_catch_cost);
     COPY_SB_ARRAY(policy_catch_fine);
     COPY_SB_ARRAY(policy_catch_mu);
     COPY_SB_ARRAY(policy_catch_sigma);

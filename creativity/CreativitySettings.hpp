@@ -140,27 +140,33 @@ struct CreativitySettings {
      */
     double policy_catch_tax = 10.0;
 
-    /** A person who gets caught pays a fine of \f$c_0 + c_1 I(#P > 0) + c_2 #P + c_3 #P^2\f$,
-     * where \f$#P\f$ is the number of pirated books the person obtained in the caught period, and
-     * I() is a 0/1-valued indicator function.  Thus a caught individual who obtained 3 pirated
-     * copies pays \f$c_0 + c_1 + 3 c_2 + 9 c_3\f$, while someone who did not pirate (but got
-     * caught, erroneously) pays \f$c_0\f$.  (Setting \f$c_0 = 0\f$ is effectively the same as not
-     * catching people who don't pirate).
+    /** The utility cost of being accused of piracy.  This is incurred by everyone who is accused of
+     * piracy, regardless of whether or not they are guilty (since the probability of being caught
+     * even with no piracy is > 0).  If guilty, the reader pays an additional fine, determined by
+     * `policy_catch_fine`.  This component of the cost is simply a cost, it is not a fine being
+     * transferred, unlike `policy_catch_fine`.
+     */
+    double policy_catch_cost = 10.0;
+
+    /** A person who gets caught and is guilty of piracy pays a fine of \f$c_0 + c_1 #P + c_2
+     * #P^2\f$, where \f$#P\f$ is the number of pirated books the person obtained in the caught
+     * period.  Thus a caught individual who obtained 3 pirated copies pays \f$c_0 + 3 c_1 + 9
+     * c_2\f$.
      *
-     * The fine amount is removed from income to be received in the following period, and is
-     * redistributed to the income of all other agents.  (Note that the fine can exceed the
-     * agent's income; in such a case, the agent will have 0 income, and will have an additional
-     * utility penalty of the uncovered amount (this can be thought of as coming out of the agent's
-     * wealth, though wealth is not actually modelled in this simulation).
+     * The fine amount is removed from the reader's utility (as a proxy for the reader's wealth,
+     * which is outside this model), and is redistributed to the authors of the pirated works.
+     * Specifically, the fine is divided into \f$#P\f$ equal shares and each share is transferred to
+     * the author of each pirated work.  (It is possible for a single author to receive multiple
+     * shares, if multiple copies of his works were pirated by the fined reader).
      *
      * The default is a fixed fine of 100 for people who actually pirated, and no fine for
      * people falsely accused.
      */
-    std::array<double, 4> policy_catch_fine{{0., 100., 0., 0.}};
+    std::array<double, 3> policy_catch_fine{{100., 0., 0.}};
 
-    /** For `policy_response = 1`, the probability of being caught for obtaining \f$x\f$ copies
-     * over the network equals the CDF of a \f$\mathcal{N}(\mu, \sigma^2)\f$ distribution evaluated
-     * at \f$x\f$; that is, \f$\Phi\(\frac{x - \mu}{\sigma}\)\f$.
+    /** For the "catch pirates" policy, the probability of being accused of piracy for obtaining
+     * \f$x\f$ copies over the network equals the CDF of a \f$\mathcal{N}(\mu, \sigma^2)\f$
+     * distribution evaluated at \f$x\f$; that is, \f$\Phi\(\frac{x - \mu}{\sigma}\)\f$.
      *
      * \f$\mu\f$ and \f$\sigma\f$ themselves are quadratic functions of the per-user piracy
      * detection expenditure, i.e., functions of `policy_response_tax`.
@@ -172,7 +178,7 @@ struct CreativitySettings {
      *
      * Note that the probability of being caught is never 0, even for an individual who does not
      * pirate; such false accusations can still incur a cost, or can be ignored, depending on the
-     * `policy_caught_fine` variable.
+     * `policy_catch_cost` variable.
      */
     std::array<double, 3> policy_catch_mu{{10., -0.5, 0.}};
 

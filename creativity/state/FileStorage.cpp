@@ -140,6 +140,7 @@ void FileStorage::configureHeaderFields() {
     addHeaderField(settings_.policy_public_sharing_tax);
 
     addHeaderField(settings_.policy_catch_tax);
+    addHeaderField(settings_.policy_catch_cost);
     addHeaderField(settings_.policy_catch_fine);
     addHeaderField(settings_.policy_catch_mu);
     addHeaderField(settings_.policy_catch_sigma);

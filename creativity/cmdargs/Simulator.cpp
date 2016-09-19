@@ -90,16 +90,16 @@ void Simulator::addOptions() {
 
     pol_catch.add_options()
         ("catch-tax,x", min<0>(s_.policy_catch_tax), "The lump-sum, per-reader tax that is collected to pay for the catch policy")
-        ("catch-fine-any", min<0>(s_.policy_catch_fine[0]), "A constant fee that is incurred by someone caught for piracy, even if innocent")
-        ("catch-fine-const", value(s_.policy_catch_fine[1]), "A constant fee that is incurred by someone caught for piracy when guilty, in addition to the --caught-fine-d value")
-        ("catch-fine-lin", value(s_.policy_catch_fine[2]), "The linear term coefficient, b, of the fine polynomial, d + c + b*P + a*P²")
-        ("catch-fine-sq", value(s_.policy_catch_fine[3]), "The squared term coefficient, a, of the fine polynomial, d + c + b*P + a*P²")
-        ("catch-mu-const", value(s_.policy_catch_mu[0]), "The constant term, c, that determines μ = c + b*F + a*F², where F is the --catch-tax value")
-        ("catch-mu-lin", value(s_.policy_catch_mu[1]), "The linear term coefficient, b, that determines μ = c + b*F + a*F², where F is the --catch-tax value")
-        ("catch-mu-sq", value(s_.policy_catch_mu[2]), "The squared term coefficient, a, that determines μ = c + b*F + a*F², where F is the --catch-tax value")
-        ("catch-sigma-const", value(s_.policy_catch_sigma[0]), "The constant term, c, that determines σ = c + b*F + a*F², where F is the --catch-tax value")
-        ("catch-sigma-lin", value(s_.policy_catch_sigma[1]), "The linear term coefficient, b, that determines σ = c + b*F + a*F², where F is the --catch-tax value")
-        ("catch-sigma-sq", value(s_.policy_catch_sigma[2]), "The squared term coefficient, a, that determines σ = c + b*F + a*F², where F is the --catch-tax value")
+        ("catch-cost", min<0>(s_.policy_catch_cost), "The cost that is incurred by someone accused of piracy, even if innocent")
+        ("catch-fine-const", value(s_.policy_catch_fine[0]), "The constant term, c, of the fine polynomial, c + bP + aP²")
+        ("catch-fine-lin", value(s_.policy_catch_fine[1]), "The linear term coefficient, b, of the fine polynomial, c + bP + aP²")
+        ("catch-fine-sq", value(s_.policy_catch_fine[2]), "The squared term coefficient, a, of the fine polynomial, c + bP + aP²")
+        ("catch-mu-const", value(s_.policy_catch_mu[0]), "The constant term, c, that determines μ = c + bF + aF², where F is the --catch-tax value")
+        ("catch-mu-lin", value(s_.policy_catch_mu[1]), "The linear term coefficient, b, that determines μ = c + bF + aF², where F is the --catch-tax value")
+        ("catch-mu-sq", value(s_.policy_catch_mu[2]), "The squared term coefficient, a, that determines μ = c + bF + aF², where F is the --catch-tax value")
+        ("catch-sigma-const", value(s_.policy_catch_sigma[0]), "The constant term, c, that determines σ = c + bF + aF², where F is the --catch-tax value")
+        ("catch-sigma-lin", value(s_.policy_catch_sigma[1]), "The linear term coefficient, b, that determines σ = c + bF + aF², where F is the --catch-tax value")
+        ("catch-sigma-sq", value(s_.policy_catch_sigma[2]), "The squared term coefficient, a, that determines σ = c + bF + aF², where F is the --catch-tax value")
         ;
     policy.add(pol_catch);
 

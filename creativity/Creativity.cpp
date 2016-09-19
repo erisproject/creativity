@@ -1,6 +1,7 @@
 #include "creativity/Creativity.hpp"
 #include "creativity/state/FileStorage.hpp"
 #include "creativity/PublicTracker.hpp"
+#include "creativity/CopyrightPolice.hpp"
 #include "creativity/state/Storage.hpp"
 #include "creativity/Reader.hpp"
 #include "creativity/BookMarket.hpp"
@@ -118,12 +119,13 @@ void Creativity::run() {
         uint32_t policies = parameters.policy;
         if (policies & POLICY_PUBLIC_SHARING) {
             policies &= ~POLICY_PUBLIC_SHARING;
-            // PublicTracker becomes available, create it
-            sim->spawn<PublicTracker>(*this, parameters.policy_public_sharing_tax);
+            // Create the PublicTracker to provide and compensate authors:
+            sim->spawn<PublicTracker>(*this);
         }
         if (policies & POLICY_CATCH_PIRATES) {
             policies &= ~POLICY_CATCH_PIRATES;
-            // No special initialization needed
+            // Spawn the agent that detects and handles piracy:
+            sim->spawn<CopyrightPolice>(*this);
         }
 
         if (policies)
@@ -247,6 +249,19 @@ bool Creativity::publicSharing() const {
 bool Creativity::catchPirates() const {
     if (!setup_sim_) throw std::logic_error("Cannot call catchPirates() on a non-live or unconfigured simulation");
     return parameters.policy & POLICY_CATCH_PIRATES and policyActive();
+}
+
+double Creativity::policyTaxes() const {
+    if (!setup_sim_) throw std::logic_error("Cannot call policyTaxes() on a non-live or unconfigured simulation");
+    double tax = 0;
+    if (catchPirates()) tax += parameters.policy_catch_tax;
+    if (publicSharing()) tax += parameters.policy_public_sharing_tax;
+    return tax;
+}
+
+double Creativity::disposableIncome() const {
+    if (!setup_sim_) throw std::logic_error("Cannot call disposableIncome() on a non-live or unconfigured simulation");
+    return parameters.income - policyTaxes();
 }
 
 double Creativity::priorWeight() const {

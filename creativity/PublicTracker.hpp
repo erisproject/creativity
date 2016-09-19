@@ -1,6 +1,7 @@
 #pragma once
 #include <eris/Agent.hpp>
 #include <eris/Optimize.hpp>
+#include "creativity/Creativity.hpp"
 
 namespace creativity {
 
@@ -40,12 +41,13 @@ class PublicTracker : public eris::Agent,
     public virtual eris::interopt::Apply, public virtual eris::intraopt::Finish {
     public:
         PublicTracker() = delete; ///< Not default constructible
-        /** Constructor for a new PublicTracker agent.  Takes a reference to the creativity object
-         * and the lump sum tax amount.
+
+        /** Constructor for a new PublicTracker agent.  Takes a reference to the creativity object.
          *
-         * \throws std::domain_error if tax is negative.
+         * \throws std::domain_error if `creativity.policy_public_sharing_tax` is negative.
          */
-        PublicTracker(const Creativity &creativity, double tax);
+        explicit PublicTracker(const Creativity &creativity);
+
         /** When the period advances, we take the lump sum tax from all agents, and create a public
          * market for any books that don't have a market (i.e. the author isn't marketing them
          * anymore). */
@@ -54,13 +56,13 @@ class PublicTracker : public eris::Agent,
         /** Override priority to run after the Reader's interApply has deposited income, and after
          * readers have created new books and withdrawn old books from the market.
          */
-        virtual double interApplyPriority() const override { return 1.0; }
+        double interApplyPriority() const override { return 1.0; }
 
         /** When the period finishes, we return the lump sum tax proportionally to all authors. */
         void intraFinish() override;
 
         /// Returns the lump sum per-reader tax collected each period
-        const double& tax() const;
+        double tax() const { return creativity_.parameters.policy_public_sharing_tax; }
 
         /** Returns the current total asset pool that will be distributed to authors (proportional
          * to downloads) at the end of the current period.  If called between periods, this will be
@@ -72,9 +74,6 @@ class PublicTracker : public eris::Agent,
     protected:
         /// The Creativity object that owns the simulation this reader belongs to
         const Creativity &creativity_;
-
-        /// The lump sum tax amount
-        double tax_;
 };
 
 }
