@@ -2,6 +2,7 @@
 #include "creativity/Reader.hpp"
 #include "creativity/Book.hpp"
 #include "creativity/BookMarket.hpp"
+#include "creativity/CopyrightPolice.hpp"
 #include "creativity/belief/Profit.hpp"
 #include <eris/debug.hpp>
 #include <eris/random/util.hpp>
@@ -840,20 +841,26 @@ void Reader::intraInitialize() {
 void Reader::intraOptimize() {
     auto lock = readLock();
 
-    if (creativity_.catchPirates()) throw std::runtime_error("Readers optimization does not yet handle catch-pirates policy!");
-
     std::vector<SharedMember<Book>> cache_del;
-    // Map utility-minus-price values to `<buy, book>` pairs, where `buy` is true if the book is to
-    // be purchased and false if the book is to be pirated from a friend (we don't store *which*
-    // friend, but it'll only be true if there is at least one friend with a copy).
-    //
-    // This is sorted by net utility in highest-to-lowest order for the purposes of iterating from
-    // best to worse options.
-    std::map<double, std::vector<std::pair<bool, SharedMember<Book>>>, std::greater<double>> book_net_u;
+
+    // We get the list of all books that are available either from the market, or via piracy, and
+    // calculate the utility we will receive from reading each book (but *not* including the utility
+    // reduction that occurs from reading multiple books).  For purchasable books, we store the net
+    // utility (i.e. reading utility minus market price).  For pirated books, we store the net
+    // utility (utility minus piracy cost).  Note, however, that when the piracy catching policy
+    // comes into effect, we actually have to adjust the latter by the expected increase in expected
+    // piracy catch cost and fines, which makes the calculation trickier.
+
+    // These are sorted by net utility in highest-to-lowest order for the purposes of iterating from
+    // best to worse options.  We also use a multimap rather than a map here because it is
+    // technically possible, if extremely unlikely, that two books have the same net utility value.
+    std::multimap<double, SharedMember<Book>, std::greater<double>> market_books_u,
+        piracy_books_u;
+
     double piracy_cost = piracyCost();
     for (auto &book : book_cache_) {
         if (library_.count(book) > 0) {
-            // Already have the book: remove from cache and continue
+            // Already have the book: remove from cache and skip this book
             cache_del.push_back(book);
             continue;
         }
@@ -862,121 +869,142 @@ void Reader::intraOptimize() {
         // - If it's on the market, can buy at its current price
         // - If piracy has been invented and one of my friends has it, I can get a copy from the friend
 
-        bool for_sale = book->hasAnyMarket();
-        bool shared = false;
-        for (auto &f : friends()) {
-            if (f->library().count(book) > 0) {
-                // My friend owns the book
-                if (book->author() != f or not book->hasPrivateMarket()) {
-                    // ... and either isn't the author, or is (and the book has left the market)
-                    shared = true;
+        if (book->hasAnyMarket()) { // On the market
+            double p = book->market()->price();
+            if (u > p)
+                market_books_u.emplace(u - p, book);
+        }
+
+        if (creativity_.piracy() and u > piracy_cost) {
+            // Look through all my friends to see if any have a copy of the book that I can copy
+            for (auto &f : friends()) {
+                // I can obtain a pirated book if my friend has it and my friend isn't the author
+                // (or is the author, but has removed the book from the market).
+                if (f->library().count(book) > 0 and (f != book->author() or not book->hasPrivateMarket())) {
+                    piracy_books_u.emplace(u - piracy_cost, book);
                     break;
                 }
             }
         }
-
-        double p = for_sale ? book->market()->price() : 0.0;
-
-        if (for_sale and shared and p > piracy_cost)
-            for_sale = false; // It's for sale, but the pirated version is cheaper.
-
-        if (for_sale and u >= p) // We're buying, and the book is worth buying
-            book_net_u[u - p].emplace_back(true, book);
-        else if (shared and u >= piracy_cost) // We're pirating, and the book is worth the cost of pirating
-            book_net_u[u - piracy_cost].emplace_back(false, book);
     }
 
-    // Shuffle the order of any books with the same net utilities so that we'll be choosing randomly
-    // from equally-preferred options.
-    for (auto &bnu : book_net_u) {
-        if (bnu.second.size() > 1)
-            std::shuffle(bnu.second.begin(), bnu.second.end(), random::rng());
-    }
-
-    lock.write(); // Time to get serious.
+    lock.write(); // Lock out other optimizers from accessing this agent until we're done modifying things.
 
     for (auto &del : cache_del) book_cache_.erase(del);
 
+    // Get expected piracy penalty value:
+    SharedMember<CopyrightPolice> police;
+    auto exp_piracy_cost = [this, &police](unsigned pirated) -> double {
+        if (!creativity_.catchPirates())
+            return 0.0;
+
+        double prob = police->prob(pirated);
+        double cost = police->cost() + police->fine(pirated);
+        return prob*cost;
+    };
+
+    unsigned books_pirating = 0;
+    double piracy_penalty = 0, piracy_penalty_next = 0;
+    if (creativity_.catchPirates())
+        police = simulation()->agents<CopyrightPolice>()[0];
+
+    // Baseline expected penalty: even if we don't pirate, there's some probability of being
+    // (falsely) caught for piracy.  (NB, if we don't try catching pirates, this is simply 0).
+    piracy_penalty = exp_piracy_cost(0);
+
+    // The expected cost of piracy if pirating an additional book (also 0 if not catching pirates).
+    piracy_penalty_next = exp_piracy_cost(1);
+
+    // Now we're going to iterate through the market and piracy books, taking one from whichever is
+    // better in each pass of this loop.  For piracy books, we have to consider not only the net
+    // utility value, but also, when the catch policy is active, the increase in the expected cost
+    // and fine of being caught pirating.
+    auto market_it = market_books_u.begin();
+    auto piracy_it = piracy_books_u.begin();
     std::set<SharedMember<Book>> new_books;
     double money = assets[creativity_.money];
-    double u_curr = u(money, new_books); // the "no-books" utility
-    // Keep looking at books as long as the net utility from buying the next best book exceeds the
-    // penalty that will be incurred.
-#   ifdef ERIS_DEBUG
-    try {
-#   endif
-    while (not book_net_u.empty() and money > 0) {
-        // Pull off the best remaining book:
-        auto &s = book_net_u.begin()->second;
-        auto buy_book = std::move(s.back());
-        bool buying = buy_book.first;
-        auto &book = buy_book.second;
-        s.pop_back();
-        // If we just pulled off the last book at the current net utility level, delete the level.
-        if (s.empty()) book_net_u.erase(book_net_u.begin());
+    double u_curr = u(money, new_books) - piracy_penalty; // the "no-books" utility
 
-        if (buying) {
-            auto bm = book->market();
-            lock.add(bm);
-            // Perform some safety checks:
-            // - if we've already added the book to the set of books to buy, don't add it again. (This
-            //   shouldn't be possible)
-            if (new_books.count(book) > 0) throw std::logic_error("Internal Reader error: attempt to buy book that is already obtained!");
-            // - if the BookMarket says the book is no longer feasible, ignore it. (This shouldn't
-            //   happen, but just in case).
-            auto pinfo = bm->price(1);
-            if (not pinfo.feasible) throw std::logic_error("Internal Reader error: book market says book not available!");
-            if (pinfo.total <= money) { // Only buy if we can actually afford it
-                new_books.insert(book);
-                double u_with_book = u(money - pinfo.total, new_books);
-                if (u_with_book < u_curr) {
-                    // The best book *lowered* utility (because of the multiple books penalty), so
-                    // we're done (because all other new books have utility no higher than this
-                    // one), and will incur the same utility penalty.
-                    new_books.erase(book);
-                    lock.remove(bm);
-                    break;
-                }
-                // Otherwise the purchase is a good one, so make a reservation.
-                reservations_.push_front(bm->reserve(sharedSelf(), 1, pinfo.total));
-                reserved_books_.emplace(book, bm->isPublic() ? BookCopy::Status::purchased_public : BookCopy::Status::purchased_market);
-                u_curr = u_with_book;
-                money -= pinfo.total;
-            }
-            lock.remove(bm);
+    while (market_it != market_books_u.end() || piracy_it != piracy_books_u.end()) {
+        double market_u = -std::numeric_limits<double>::infinity(), piracy_u = -std::numeric_limits<double>::infinity();
+
+        // If we've already acquired this book (i.e. because the book is available both via piracy
+        // and the market, and we already obtained one and are now encountering the other), skip.
+        while (market_it != market_books_u.end() and new_books.count(market_it->second))
+            ++market_it;
+        while (piracy_it != piracy_books_u.end() and new_books.count(piracy_it->second))
+            ++piracy_it;
+
+        if (market_it != market_books_u.end())
+            market_u = market_it->first;
+        if (piracy_it != piracy_books_u.end())
+            piracy_u = piracy_it->first - (piracy_penalty_next - piracy_penalty);
+
+        SharedMember<Book> book;
+        double cost; // Direct cost: either the market price, or the piracy cost
+        bool piracy = false;
+        if (market_u > 0 and market_u >= piracy_u) {
+            book = market_it->second;
+            cost = book->market()->price();
+            ++market_it;
+        }
+        else if (piracy_u > 0) {
+            book = piracy_it->second;
+            cost = piracy_cost;
+            piracy = true;
+            ++piracy_it;
         }
         else {
-            // Pirating.
-            if (new_books.count(book) != 0) throw std::logic_error("Internal Reader error: attempt to pirate book that is already obtained!");
+            // The best choice doesn't increase utility, so no point in looking further (later books
+            // have a net utility no higher than this one).
+            break;
+        }
 
-            if (piracy_cost <= money) { // Only pirate if we can actually afford piracy
-                new_books.insert(book);
+        if (cost > money) {
+            // We can't afford the book, so skip it (but don't stop looking: there may be less good
+            // books that we can still afford).
+            continue;
+        }
 
-                double u_with_book = u(money - piracy_cost, new_books);
-                if (u_with_book < u_curr) {
-                    // The best book *lowered* utility (because of the multiple books penalty), so
-                    // we're done (because all other new books have utility no higher than this
-                    // one), and will incur the same utility penalty.
-                    new_books.erase(book);
-                    break;
-                }
-                reserved_books_.emplace(book, BookCopy::Status::pirated);
-                reserved_piracy_cost_ += piracy_cost;
-                u_curr = u_with_book;
-                money -= piracy_cost;
-            }
+        new_books.insert(book);
+
+        // Get expected utility with the new book included (i.e. known utility minus the expected
+        // piracy penalty).
+        double u_with_book = u(money - cost, new_books) - (piracy ? piracy_penalty_next : piracy_penalty);
+
+        if (u_with_book <= u_curr) {
+            // Obtaining this book doesn't increase utility, so skip it.
+            new_books.erase(book);
+        }
+
+        // Otherwise the utility with the book, after giving up the cost of the book, the
+        // opportunity cost of reading an additional book, and the expected cost of getting caught
+        // pirating with an extra book, is higher than without the book, so go ahead with the
+        // purchase/pirating.
+
+        u_curr = u_with_book;
+        money -= cost;
+
+        if (!piracy) { // Buying from the market
+            auto bm = book->market();
+            auto bm_lock = lock.supplement(bm);
+
+            reservations_.push_front(bm->reserve(sharedSelf(), 1, cost));
+            reserved_books_.emplace(book, bm->isPublic() ? BookCopy::Status::purchased_public : BookCopy::Status::purchased_market);
+        }
+        else { // Pirating
+            books_pirating++;
+            piracy_penalty = piracy_penalty_next;
+            piracy_penalty_next = exp_piracy_cost(books_pirating + 1);
+            reserved_books_.emplace(book, BookCopy::Status::pirated);
+            reserved_piracy_cost_ += piracy_cost;
         }
     }
-#   ifdef ERIS_DEBUG
-    } catch (std::exception &e) {
-        std::cerr << "Caught exception in reader intraOptimize buy loop: " << e.what();
-        throw e;
-    }
-#   endif
 }
+
 void Reader::intraApply() {
     auto lock = writeLock();
-    // Apply the reserved transactions (i.e. pay for book copies and receive the book)
+    // Apply the reserved transactions (i.e. pay for market book copies and receive the book)
     for (auto &res : reservations_) {
         res.buy();
     }
@@ -992,7 +1020,7 @@ void Reader::intraApply() {
         auto &book = new_book.first;
         auto &status = new_book.second;
 
-        // Remove the book from assets -- we track it via library_ instead.
+        // Remove the book from assets (where the reservation puts it) -- we track it via library_ instead.
         assets.remove(book);
 
         auto inserted = library_.emplace(
@@ -1003,7 +1031,10 @@ void Reader::intraApply() {
         library_new_.emplace(book, std::ref(inserted.first->second));
 
         // If we obtained a pirated book, record that in the base book metadata:
-        if (status == BookCopy::Status::pirated) book->recordPiracy(1);
+        if (status == BookCopy::Status::pirated) {
+            auto lock_b = lock.supplement(book);
+            book->recordPiracy(1);
+        }
         //else {} -- // book->recordSale() not needed here: it's called during the BookMarket transaction
     }
     reserved_books_.clear();

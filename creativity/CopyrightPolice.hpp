@@ -51,6 +51,22 @@ public:
      */
     double prob(unsigned pirated) const { return cdf(normal_, pirated); }
 
+    /** Returns the cost of being accused of piracy (whether guilty or not).  This is simply a
+     * shortcut for `creativity_.parameters.policy_catch_cost`.
+     *
+     * Unlike fine, this isn't a paid amount, but rather represents the opportunity cost to the user
+     * of being caught (as such it isn't really a CopyrightPolice property, but is provided here
+     * nonetheless for convenience).
+     */
+    double cost() const { return creativity_.parameters.policy_catch_cost; }
+
+    /** Returns the fine for being caught pirating `pirated` books this period.  Will always return
+     * 0 for 0 pirated books, otherwise evaluates the `creativity_.parameters.policy_catch_fine`
+     * polynomial to determine the fine.  Returns 0 if the polynomial evaluates to a negative
+     * number.
+     */
+    double fine(unsigned pirated);
+
 protected:
     /// The Creativity object that owns the simulation this reader belongs to
     const Creativity &creativity_;

@@ -18,6 +18,14 @@ CopyrightPolice::CopyrightPolice(const Creativity &creativity) : creativity_{cre
     normal_ = boost::math::normal(mu, sigma);
 }
 
+double CopyrightPolice::fine(unsigned pirated) {
+    if (pirated == 0) return 0.0;
+
+    double fine = Creativity::evalPolynomial(pirated, creativity_.parameters.policy_catch_fine);
+
+    return fine > 0 ? fine : 0.0;
+}
+
 void CopyrightPolice::interApply() {
     auto lock = writeLock();
     if (tax() > 0) {
@@ -55,11 +63,9 @@ void CopyrightPolice::intraFinish() {
                 double fine = Creativity::evalPolynomial(pirated, creativity_.parameters.policy_catch_fine);
                 if (fine > 0) {
                     r->alterUtility(-fine);
-                    const Bundle share{{creativity_.money, fine / pirated}};
                     for (const auto &a : author_shares) {
-                        lock.add(a.first);
-                        a.first->assets += a.second * share;
-                        lock.remove(a.first);
+                        auto lock_a = lock.supplement(a.first);
+                        a.first->alterUtility(a.second * fine / pirated);
                     }
                 }
             }

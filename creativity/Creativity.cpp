@@ -54,6 +54,28 @@ void Creativity::checkParameters() {
     PROHIBIT(initial.prob_keep, > 1);
     PROHIBIT(initial.keep_price, < 0);
 #undef PROHIBIT
+
+    // Reader optimization depends on the fine being non-decreasing in the number of books (so that
+    // each additional pirated book increases the fine by at least as much as the previous book).
+    // This simplifies the optimization problem greatly: readers can just increase pirated books
+    // until the risk is not worthwhile anymore, then stop.  If this was concave, that might not
+    // work: there could be both a low number of books and a high number of books where piracy is
+    // worthwhile, but not worthwhile in the middle ground.
+    //
+    // This imposes two requirements on the polynomial a + bx + cx²: first, c ≥ 0 (otherwise, for
+    // sufficiently large x, the polynomial would eventually start decreasing).  Second, b + c ≥ 0
+    // (so that f(1) ≥ f(0); combined with c ≥ 0, this also gives f(x+1) ≥ f(x)).
+    //
+    // (Actually, we really care about probability times the fine, and so we could, in theory, allow
+    // a little bit of concavity depending on the detection parameters, but that would be a
+    // difficult calculation involving the CDF of a normal).
+    if (parameters.policy & POLICY_CATCH_PIRATES) {
+        if (parameters.policy_catch_fine[2] < 0)
+            throw std::domain_error("Invalid Creativity setting: parameters.policy_catch_fine must be convex (i.e. element [2] must be >= 0)");
+        if (parameters.policy_catch_fine[1] + parameters.policy_catch_fine[2] < 0)
+            throw std::domain_error("Invalid Creativity setting: parameters.policy_catch_fine must be non-decreasing for all non-negative integers x, which requires [1] + [2] >= 0 and [2] >= 0");
+    }
+
 }
 
 void Creativity::setup() {
@@ -96,9 +118,6 @@ void Creativity::setup() {
         market_books_lagged = market_books;
         market_books = sim->countMarkets<BookMarket>();
     });
-
-    if (parameters.policy & POLICY_CATCH_PIRATES)
-        throw std::runtime_error("'catch' policy is incomplete: " + std::to_string(parameters.policy));
 
     setup_sim_ = true;
     storage().first->updateSettings();
