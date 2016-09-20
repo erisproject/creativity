@@ -37,6 +37,7 @@ any arguments of the following forms:
     N(m,sd)+ - equivalent to N(m,sd)[0,].
     iN(m,sd) - like N(m,sd), but rounds the drawn value to the nearest integer.
     iN(m,sd)[a,b] - Truncated version of iN(m,sd).
+    {a,b,c,...} - selects one of the comma-separated strings "a", "b", "c", etc. with equal probability.
 
 Any other argument is passed through as is.  At least one argument matching the above must be included.
 
@@ -121,7 +122,22 @@ std::vector<std::pair<std::regex, std::function<std::string(const std::smatch&)>
             result << std::setprecision(std::numeric_limits<double>::max_digits10) << draw;
             return result.str();
         });
-    
+
+    // Random string from comma-separated strings
+    callbacks.emplace_back(std::regex("\\{(.*)\\}"), [](const std::smatch &m) -> std::string {
+        std::string result;
+        std::istringstream iss;
+        iss.str(m[1].str());
+        std::string item;
+        uint_fast32_t count = 0;
+        while (std::getline(iss, item, ',')) {
+            if (eris::random::rcoin(1.0 / ++count))
+                result = item;
+        }
+
+        return result;
+    });
+
     return callbacks;
 }
 
