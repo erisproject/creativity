@@ -41,7 +41,19 @@ exec ./creativity-random ./creativity-cli \
     --initial-prob-keep 'U[0.25,0.75]' \
     --initial-keep-price 'U[0.25,0.75]' \
     --piracy-link-proportion 'U[0.05,0.25]' \
+    --policy '{public-sharing,catch-pirates,public-sharing\,catch-pirates}' \
     --public-sharing-tax 'U[1,100]' \
+    --catch-tax 'U[1,100]' \
+    --catch-cost '0' \
+    --catch-fine-const '0' \
+    --catch-fine-lin 'U[0,100]' \
+    --catch-fine-sq '0' \
+    --catch-mu-const '10' \
+    --catch-mu-lin '-0.1' \
+    --catch-mu-sq '0' \
+    --catch-sigma-const '3' \
+    --catch-sigma-lin '0' \
+    --catch-sigma-sq '0' \
     --threads 0 \
     --output "$dir/creativity-SEED.crstate" \
     "$@"
