@@ -140,13 +140,11 @@ void Simulator::postParse(boost::program_options::variables_map &vars) {
         policies.push_back("public-sharing");
     }
 
-    const auto &npos = std::string::npos;
     for (const auto &p : policies) {
-        size_t at = 0;
-        while (at != npos) {
-            size_t comma = p.find_first_of(',', at);
-            std::string policy = p.substr(at, comma);
-            at = comma;
+        std::istringstream iss;
+        iss.str(p);
+        std::string policy;
+        while (std::getline(iss, policy, ',')) {
             if (policy == "public" or policy == "public-sharing")
                 s_.policy |= POLICY_PUBLIC_SHARING;
             else if (policy == "catch" or policy == "catch-pirates")
