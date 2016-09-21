@@ -38,6 +38,7 @@ any arguments of the following forms:
     iN(m,sd) - like N(m,sd), but rounds the drawn value to the nearest integer.
     iN(m,sd)[a,b] - Truncated version of iN(m,sd).
     {a,b,c,...} - selects one of the comma-separated strings "a", "b", "c", etc. with equal probability.
+                  Literal commas may be specified as \, and literal backslashes as \\
 
 Any other argument is passed through as is.  At least one argument matching the above must be included.
 
@@ -126,14 +127,35 @@ std::vector<std::pair<std::regex, std::function<std::string(const std::smatch&)>
     // Random string from comma-separated strings
     callbacks.emplace_back(std::regex("\\{(.*)\\}"), [](const std::smatch &m) -> std::string {
         std::string result;
-        std::istringstream iss;
-        iss.str(m[1].str());
-        std::string item;
+        std::string match;
+        bool escape = false;
         uint_fast32_t count = 0;
-        while (std::getline(iss, item, ',')) {
-            if (eris::random::rcoin(1.0 / ++count))
-                result = item;
+        for (char &c : m[1].str()) {
+            if (escape) {
+                escape = false;
+                if (c != ',' and c != '\\')
+                    match.push_back('\\');
+                match.push_back(c);
+            }
+            else if (c == '\\') {
+                escape = true;
+            }
+            else if (c == ',') {
+                ++count;
+                if (random::rcoin(1.0 / count))
+                    result = match;
+                match.clear();
+            }
+            else {
+                match.push_back(c);
+            }
         }
+
+        if (escape)
+            match.push_back('\\');
+
+        if (random::rcoin(1.0 / ++count))
+            result = match;
 
         return result;
     });
