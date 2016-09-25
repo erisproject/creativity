@@ -978,6 +978,7 @@ void Reader::intraOptimize() {
         if (u_with_book <= u_curr) {
             // Obtaining this book doesn't increase utility, so skip it.
             new_books.erase(book);
+            continue;
         }
 
         // Otherwise the utility with the book, after giving up the cost of the book, the
