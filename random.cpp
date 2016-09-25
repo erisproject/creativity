@@ -205,13 +205,13 @@ int main (int argc, const char* argv[]) {
             std::cout << " " << arg;
         }
         exec_argv[i] = nullptr;
-        std::cout << "\n";
+        std::cout << std::endl;
     }
 
     execvp(exec_argv[0], const_cast<char**>(exec_argv));
 
     // Getting here means exec failed!
-    std::cerr << "Failed to execute `" << exec_argv[0] << "': " << std::strerror(errno) << "\n";
+    std::cerr << "Failed to execute `" << exec_argv[0] << "': " << std::strerror(errno) << std::endl;
 
     std::exit(errno);
 }
