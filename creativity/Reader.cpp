@@ -308,9 +308,8 @@ void Reader::interOptimize() {
         // so that we can actually bring the book to market.
         double creation_base_cost = creativity_.parameters.creation_fixed;
         // Note: creation_time == 1 can (1/3 of the time) also mean the book is completed in the
-        // current period, but if that happens and we don't have enough income left to market it, we
-        // just hold off for a period and release it in the following period.
-        if (creativity_.parameters.creation_time == 0) creation_base_cost += cost_market;
+        // current period, so make sure that we reserve enough income in case that happens
+        if (creativity_.parameters.creation_time <= 1) creation_base_cost += cost_market;
 
         // Figure out what the minimum and maximum effort we can expend are.
         //
@@ -447,7 +446,6 @@ void Reader::interApply() {
     // NB: we give total income; any policy tax is removed by another policy agent, e.g.
     // PublicTracker, in a later-priority interApply().
     assets[creativity_.money] += creativity_.parameters.income;
-    const Bundle taxes_due = Bundle(creativity_.money, creativity_.policyTaxes());
 
     const Bundle cost_market(creativity_.money, creativity_.parameters.cost_market);
 
@@ -469,7 +467,7 @@ void Reader::interApply() {
             // But first make sure we can afford it (keeping in mind that we'll have to pay our
             // taxes as well); if we can't, we'll just leave it here and (hopefully) release it next
             // period.
-            if (assets.hasApprox(taxes_due + cost_market)) {
+            if (assets.hasApprox(cost_market)) {
                 // Remove the first period fixed cost of bringing the book to market:
                 assets.transferApprox(cost_market, 1e-6);
 
