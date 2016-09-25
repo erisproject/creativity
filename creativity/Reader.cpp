@@ -307,6 +307,9 @@ void Reader::interOptimize() {
         // creation_fixed; if creation is instantaneous, we also need to have cost_market available
         // so that we can actually bring the book to market.
         double creation_base_cost = creativity_.parameters.creation_fixed;
+        // Note: creation_time == 1 can (1/3 of the time) also mean the book is completed in the
+        // current period, but if that happens and we don't have enough income left to market it, we
+        // just hold off for a period and release it in the following period.
         if (creativity_.parameters.creation_time == 0) creation_base_cost += cost_market;
 
         // Figure out what the minimum and maximum effort we can expend are.
@@ -444,6 +447,7 @@ void Reader::interApply() {
     // NB: we give total income; any policy tax is removed by another policy agent, e.g.
     // PublicTracker, in a later-priority interApply().
     assets[creativity_.money] += creativity_.parameters.income;
+    const Bundle taxes_due = Bundle(creativity_.money, creativity_.policyTaxes());
 
     const Bundle cost_market(creativity_.money, creativity_.parameters.cost_market);
 
@@ -462,7 +466,10 @@ void Reader::interApply() {
         if (create_price_ > 0) {
             // Author-selected price is positive, so let's release.
 
-            if (assets.hasApprox(cost_market)) {
+            // But first make sure we can afford it (keeping in mind that we'll have to pay our
+            // taxes as well); if we can't, we'll just leave it here and (hopefully) release it next
+            // period.
+            if (assets.hasApprox(taxes_due + cost_market)) {
                 // Remove the first period fixed cost of bringing the book to market:
                 assets.transferApprox(cost_market, 1e-6);
 
@@ -499,6 +506,8 @@ void Reader::interApply() {
         // If it's staying on the market, update the price and incur the fixed cost
         if (new_prices_.count(b) > 0) {
             b->market()->setPrice(new_prices_[b]);
+            // NB: we've already checked that we have enough income (if we didn't, we would not have
+            // put it in new_prices_).
             assets.transferApprox(cost_market, 1e-6);
         }
         else {
