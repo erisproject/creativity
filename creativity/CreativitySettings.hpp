@@ -161,10 +161,10 @@ struct CreativitySettings {
      * the author of each pirated work.  (It is possible for a single author to receive multiple
      * shares, if multiple copies of his works were pirated by the fined reader).
      *
-     * The default is a fixed fine of 100 for people who actually pirated, and no fine for
-     * people falsely accused.
+     * The default is a fine of 50 for the first, +50 for the second, +75 for the third, etc. (so a
+     * total fine of 50, 100, 175, 275, ...).
      */
-    std::array<double, 3> policy_catch_fine{{100., 0., 0.}};
+    std::array<double, 3> policy_catch_fine{{25., 12.5, 12.5}};
 
     /** For the "catch pirates" policy, the probability of being accused of piracy for obtaining
      * \f$x\f$ copies over the network equals the CDF of a \f$\mathcal{N}(\mu, \sigma^2)\f$
@@ -181,15 +181,23 @@ struct CreativitySettings {
      * Note that the probability of being caught is never 0, even for an individual who does not
      * pirate; such false accusations can still incur a cost, or can be ignored, depending on the
      * `policy_catch_cost` variable.
+     *
+     * The default for this an mu are selected with a range of tau of (0, 100] in mind: close to 0,
+     * the probability of catching someone who doesn't pirate is very close to 0, the 50% detection
+     * is at 10 pirated copies in a period, and the 95% is at 16 (i.e. the probability is the CDF of
+     * N(10,3)).  At the upper end, the CDF is N(2, 1), i.e. non-pirates are false accussed just
+     * under 5% of the time, people pirating 2 are caught 50% of the time, and 95% is hit after
+     * pirating 4 copies.
      */
-    std::array<double, 3> policy_catch_mu{{10., -0.5, 0.}};
+    std::array<double, 3> policy_catch_mu{{10., -.08, 0.}};
 
     /** Like `policy_catch_mu`, but for the quadratic coefficients of \f$\sigma = c_0 +
-     * c_1 \tau + c_2 \tau^2\f$.  The default is simply \f$\sigma = 1\f$.
+     * c_1 \tau + c_2 \tau^2\f$.  The default is \f$\sigma = 3 - .02 \tau\f$.  Note that this will
+     * fail (immediately) if tau is >= 150.
      *
      * \see policy_catch_mu
      */
-    std::array<double, 3> policy_catch_sigma{{1., 0., 0.}};
+    std::array<double, 3> policy_catch_sigma{{3., -.02, 0.}};
 
     /** The number of sharing/friendship links as a proportion of the maxinum number of sharing
      * links possible (which is \f$\frac{R(R-1)}{2}\f$, where \f$R\f$ is the number of readers).
