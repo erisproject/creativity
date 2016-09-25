@@ -946,12 +946,15 @@ void Reader::intraOptimize() {
         SharedMember<Book> book;
         double cost; // Direct cost: either the market price, or the piracy cost
         bool piracy = false;
-        if (market_u > 0 and market_u >= piracy_u) {
+        // Now consider the best market book with the best piracy book: we'll consider whichever
+        // gives us the higher utility increase (including the potential increase in expected fine,
+        // for the piracy option).
+        if (market_u > 0 and market_u >= piracy_u) { // The best market option is better than the best piracy option
             book = market_it->second;
             cost = book->market()->price();
             ++market_it;
         }
-        else if (piracy_u > 0) {
+        else if (piracy_u > 0) { // Otherwise the best piracy option gives the highest utility
             book = piracy_it->second;
             cost = piracy_cost;
             piracy = true;
@@ -959,20 +962,34 @@ void Reader::intraOptimize() {
         }
         else {
             // The best choice doesn't increase utility, so no point in looking further (later books
-            // have a net utility no higher than this one).
+            // have a net utility no higher than this one).  Note that we don't typically get here:
+            // this 'else' is only hit if piracy and pirate catching are enabled, and there are
+            // positive utility piracy books, but the increase in penalty exceeds the utility gain
+            // of the book.  (We never add on-market books with negative utility in the first place,
+            // and piracy books are only added when the utility exceeds the direct piracy cost).
             break;
         }
 
         if (cost > money) {
-            // We can't afford the book, so skip it (but don't stop looking: there may be less good
-            // books that we can still afford).
+            // We can't actually afford the direct cost of the book (i.e. the market price, or the
+            // direct piracy cost), so skip it but don't stop looking: there may be less good books
+            // that we can still afford.  For example, imagine a book that gives 1003 utils but
+            // costs 1000, which will be considered before a book that gives 3 utils and costs 1.
+            //
+            // Note also that running out of income is potentially a misoptimization: in the above
+            // example, if the individual has income of 1000, and there are 1000 3 util/1 cost books
+            // available, with this optimization he'll buy the single 1000-cost book and get a net
+            // utility gain of 3, but if he bought the 1000 1-cost books he'd had net utility gain
+            // of 2000.  In practice, this limitation is not particularly relevant as income is
+            // typically made high enough to not often bind.
             continue;
         }
 
         new_books.insert(book);
 
         // Get expected utility with the new book included (i.e. known utility minus the expected
-        // piracy penalty).
+        // piracy penalty).  This isn't quite the same as the above because there may be an
+        // additional opportunity cost for adding another book (i.e. a too-many-books penalty).
         double u_with_book = u(money - cost, new_books) - (piracy ? piracy_penalty_next : piracy_penalty);
 
         if (u_with_book <= u_curr) {
