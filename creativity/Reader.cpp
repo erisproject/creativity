@@ -210,9 +210,6 @@ void Reader::interBegin() {
 }
 
 void Reader::interOptimize() {
-#   ifdef ERIS_DEBUG
-    try {
-#   endif
     // Update the various beliefs
     updateBeliefs();
 
