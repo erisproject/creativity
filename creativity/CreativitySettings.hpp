@@ -70,8 +70,10 @@ struct CreativitySettings {
      */
     double reader_creation_scale_range = 10.0;
 
-    /** The length of time (in simulation periods) it takes to create a book.  If 0, books are
-     * created instantly; if larger, the given number of periods go by before the book is finished.
+    /** The average length of time (in simulation periods) it takes to create a book.  If 0, books
+     * are created instantly; otherwise books take this value -1/+0/+1 with equal probability of
+     * each (so that this is still the mean creation time).  (The randomness helps avoid strongly
+     * cyclical authorship behaviour)
      */
     uint32_t creation_time = 3;
 

@@ -294,7 +294,7 @@ class Creativity : private eris::noncopyable {
          */
         std::vector<eris::SharedMember<Book>> new_books_;
 
-        /** Linked list of number of market books over the last `creation_time + 1` period, i.e. the
+        /** Linked list of number of market books over the last `creation_time + 1` periods, i.e. the
          * average number of books over a creativity cycle.
          */
         std::list<unsigned int> mkt_books_;

@@ -8,6 +8,7 @@
 #include <eris/random/util.hpp>
 #include <boost/random/chi_squared_distribution.hpp>
 #include <boost/random/uniform_real_distribution.hpp>
+#include <boost/random/uniform_int_distribution.hpp>
 #include <Eigen/Core>
 #include <algorithm>
 #include <cstddef>
@@ -400,39 +401,41 @@ void Reader::interOptimize() {
                                 creativity_.parameters.initial.p_min + creativity_.parameters.initial.p_range)(rng);
                 }
             }
+
+            if (create_countdown_ >= 1) {
+                create_countdown_ += boost::random::uniform_int_distribution<int>(-1, 1)(random::rng());
+            }
         }
     }
 
-    if (create_countdown_ == 0) {
-        if (creativity_.parameters.creation_time > 0) {
-            // A currently-in-progress book is done (and wasn't created instantaneously), so choose its
-            // price based on current demand beliefs.  If the optimal price is 0, we won't release it at
-            // all: the creation is a sunk cost: it apparently doesn't seem profitable any more.  If we
-            // can't draw a price at all, we'll just fall back on the initial one decided when the book
-            // was created.
-            if (usableBelief(demand_belief_)) {
-                // As a safety against absurd prices, we also enforce a price ceiling of 20% of
-                // per-period income.
-                std::pair<double, double> max;
-                try {
-                    max = demand_belief_.argmaxP(creativity_.parameters.prediction_draws, create_quality_, 0, 0,
-                            creativity_.parameters.readers, 0, 0, authored_books, market_books_avg,
-                            cost_unit, creativity_.parameters.income / 10);
-                    create_price_ = max.first;
-                } catch (BayesianLinear::draw_failure &e) {
-                    // Draw failure: don't change create_price_; we'll fall back to what it got set
-                    // to initially at creation time.
-                    ERIS_DBG("draw failure in demand argmaxP calculation; reader="<< id() << ", t=" << simulation()->t());
-                    ERIS_DBGVAR(demand_belief_.draw_rejection_success);
-                }
+    if (create_countdown_ == 0 and !create_starting_) {
+        // A currently-in-progress book is done and we didn't create it this period, so choose its
+        // price based on current demand beliefs (which may have changed since the creation was
+        // started).  If the optimal price is 0, we won't release it at all: the creation is a sunk
+        // cost: it apparently doesn't seem profitable any more.  If we can't draw a price at all,
+        // we'll just fall back on the initial one decided when the book was created.
+        if (usableBelief(demand_belief_)) {
+            // As a safety against absurd prices, we also enforce a price ceiling of 20% of
+            // per-period income.
+            std::pair<double, double> max;
+            try {
+                max = demand_belief_.argmaxP(creativity_.parameters.prediction_draws, create_quality_, 0, 0,
+                        creativity_.parameters.readers, 0, 0, authored_books, market_books_avg,
+                        cost_unit, creativity_.parameters.income / 10);
+                create_price_ = max.first;
+            } catch (BayesianLinear::draw_failure &e) {
+                // Draw failure: don't change create_price_; we'll fall back to what it got set
+                // to initially at creation time.
+                ERIS_DBG("draw failure in demand argmaxP calculation; reader="<< id() << ", t=" << simulation()->t());
+                ERIS_DBGVAR(demand_belief_.draw_rejection_success);
             }
-            else {
-                // No usable beliefs; use initial behaviour parameters draw:
-                create_price_ = creativity_.parameters.cost_unit +
-                    boost::random::uniform_real_distribution<double>(
-                            creativity_.parameters.initial.p_min,
-                            creativity_.parameters.initial.p_min + creativity_.parameters.initial.p_range)(rng);
-            }
+        }
+        else {
+            // No usable beliefs; use initial behaviour parameters draw:
+            create_price_ = creativity_.parameters.cost_unit +
+                boost::random::uniform_real_distribution<double>(
+                        creativity_.parameters.initial.p_min,
+                        creativity_.parameters.initial.p_min + creativity_.parameters.initial.p_range)(rng);
         }
     }
 }
