@@ -33,6 +33,11 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+    auto stpair = creativity.storage();
+    auto &st = *stpair.first;
+    auto disp_size = st.size();
+    if (disp_size > 0) disp_size--;
+
     std::cout << "Initial settings:\n=================\n" << std::left << std::setprecision(args.output_precision);
 #define PRINT_FIELD(N, V) do { std::cout << std::setw(30) << N << V << "\n"; } while (0)
 #define PRINT_SETTING(S) PRINT_FIELD(#S, creativity.parameters.S)
@@ -98,7 +103,7 @@ int main(int argc, char *argv[]) {
         CreativitySettings defaults;
         auto saveprec = std::cout.precision();
         std::cout.precision(std::numeric_limits<double>::max_digits10);
-        std::cout << "\n\nArguments to re-run: ./creativity-cli";
+        std::cout << "\n\nArguments to re-run: ./creativity-cli --periods " << disp_size;
 #define ADD(ARG, PARAM) if (creativity.parameters.PARAM != defaults.PARAM) { \
     std::string arg(ARG); \
     std::replace(arg.begin(), arg.end(), '_', '-'); \
@@ -185,11 +190,7 @@ int main(int argc, char *argv[]) {
     }
 
 
-    auto stpair = creativity.storage();
-    auto &st = *stpair.first; 
     std::cout << "\n\nSimulation details:\n===================\n";
-    auto disp_size = st.size();
-    if (disp_size > 0) disp_size--;
     std::cout << "Periods: " << disp_size << "\n";
     if (st.size() > 0 and args.thin_periods > 0) {
         std::cout << "Period summary";
