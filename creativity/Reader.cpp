@@ -218,7 +218,7 @@ void Reader::interOptimize() {
     double income_available = assets[creativity_.money] + creativity_.disposableIncome();
 
     auto sim = simulation();
-    const double market_books = sim->countMarkets<BookMarket>();
+    const double &market_books_avg = creativity_.market_books_avg;
     const double authored_books = wrote().size();
 
     // Any books not in new_prices_ but that were on the market last period will be removed from the
@@ -238,7 +238,7 @@ void Reader::interOptimize() {
 
                 try {
                     auto max = demand_belief_.argmaxP(creativity_.parameters.prediction_draws, book->qualityMean(), book->lifeSales(), book->lifePirated(), creativity_.parameters.readers,
-                            sim->t() - 1 - book->lastSale(), book->age(), authored_books - 1, market_books, cost_unit,
+                            sim->t() - 1 - book->lastSale(), book->age(), authored_books - 1, market_books_avg, cost_unit,
                             creativity_.parameters.income / 10);
                     const double &p = max.first;
                     const double &q = max.second;
@@ -346,7 +346,7 @@ void Reader::interOptimize() {
                     effort_profit = profit_belief_extrap_->argmaxL(
                             creativity_.parameters.prediction_draws,
                             [this] (double l) { return creationQuality(l); },
-                            authored_books, market_books,
+                            authored_books, market_books_avg,
                             min_effort, // l_min
                             income_available - creation_base_cost // l_max
                             );
@@ -359,7 +359,7 @@ void Reader::interOptimize() {
                     // per-period income.
                     std::pair<double, double> max;
                     max = demand_belief_.argmaxP(creativity_.parameters.prediction_draws, create_quality_, 0, 0,
-                            creativity_.parameters.readers, 0, 0, authored_books, market_books,
+                            creativity_.parameters.readers, 0, 0, authored_books, market_books_avg,
                             cost_unit, creativity_.parameters.income / 10);
                     // If this is zero, that's okay: that might be a release-directly-to-public book
                     create_price_ = max.first;
@@ -416,7 +416,7 @@ void Reader::interOptimize() {
                 std::pair<double, double> max;
                 try {
                     max = demand_belief_.argmaxP(creativity_.parameters.prediction_draws, create_quality_, 0, 0,
-                            creativity_.parameters.readers, 0, 0, authored_books, market_books,
+                            creativity_.parameters.readers, 0, 0, authored_books, market_books_avg,
                             cost_unit, creativity_.parameters.income / 10);
                     create_price_ = max.first;
                 } catch (BayesianLinear::draw_failure &e) {
@@ -610,7 +610,7 @@ void Reader::updateDemandBelief() {
         size_t i = 0;
         for (const auto &b : mktbooks) {
             y[i] = b->sales(last_t);
-            X.row(i) = Demand::bookRow(b, b->qualityMean(), creativity_.market_books_lagged);
+            X.row(i) = Demand::bookRow(b, b->qualityMean(), creativity_.market_books_avg);
             i++;
         }
 
@@ -785,7 +785,7 @@ void Reader::updateProfitBelief() {
         for (auto &book : new_prof_books) {
             // Calculate the book's total (private) profit and any public prize money
             y[i] = book->lifeProfitPrivate() + book->lifePrize();
-            X.row(i) = Profit::profitRow(book->qualityMean(), book->order(), creativity_.market_books_lagged);
+            X.row(i) = Profit::profitRow(book->qualityMean(), book->order(), creativity_.market_books_avg);
             i++;
         }
 
@@ -809,7 +809,7 @@ void Reader::updateProfitBelief() {
         for (auto &book : extrap_books) {
             // Calculate the book's total profit (ignoring initial creation cost)
             y[i] = book->lifeProfitPrivate() + book->lifePrize();
-            X.row(i) = Profit::profitRow(book->qualityMean(), book->order(), creativity_.market_books_lagged);
+            X.row(i) = Profit::profitRow(book->qualityMean(), book->order(), creativity_.market_books_avg);
             i++;
         }
 

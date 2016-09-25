@@ -16,9 +16,10 @@ namespace creativity { namespace belief {
  * Specifically, the fields above are:
  * - \f$\pi_b\f$ is the lifetime profits of the book *without* considering the initial creation effort
  * - \f$q_b\f$ is the (non-negative) quality of the book.
- * - \f$marketBooks\f$ is the number of books on the market in the previous period (books in the
+ * - \f$marketBooks\f$ is the average number of books on the market in the past `creation_time`
+ *   periods (so that it includes one full creation cycle).  Ideally we'd want books in the
  *   current period can't be used because it is unknown at the time the reader is making the
- *   decision of whether or not to create).
+ *   decision of whether or not to create.
  *
  * Although a \f$\beta_3 \leq 0\f$ restriction would make some intuitive sense (more competition
  * means lower profit), it isn't imposed because doing so induces volatile creation cycles: readers decide
@@ -118,12 +119,11 @@ class Profit : public eris::learning::BayesianLinearRestricted {
          * \param previous_books the number of previous books written by the same author
          * \param quality the mean quality of the book as determined at creation time by the book's
          * author.  Must be non-negative.
-         * \param lag_market_books the number of books that was in the market in the period just
-         * before the just-ended period.
+         * \param avg_market_books the average number of books on the market over the previous creation time periods
          *
          * \returns a row containing the book's information as used for this model
          */
-        static Eigen::RowVectorXd profitRow(double quality, int previous_books, int lag_market_books);
+        static Eigen::RowVectorXd profitRow(double quality, int previous_books, int avg_market_books);
 
         /// Returns "Profit", the name of this model
         virtual std::string display_name() const override { return "Profit"; }

@@ -262,15 +262,14 @@ class Creativity : private eris::noncopyable {
         }
 
         /** Stores the number of on-market books.  This is updated at the beginning of every new
-         * simulation stage with the number of on-market books in the just-ended period.
+         * simulation stage (in inter-begin) with the number of on-market books in the just-ended period.
          */
         unsigned long market_books{0};
 
-        /** Stores the lagged number of on-market books, that is, the number of books that were on
-         * the market in the period before the period that just ended.  This is updated at the same
-         * time as market_books.
+        /** Stores the average number of on-market books over the past `creation_time + 1` periods.
+         * This is updated at the same time as market_books.
          */
-        unsigned long market_books_lagged{0};
+        double market_books_avg{0.0};
 
     protected:
         /** Sets up the piracy network.  Called automatically by run() just before the
@@ -294,6 +293,11 @@ class Creativity : private eris::noncopyable {
          * Obtain a lock by calling booksLock() before accessing.
          */
         std::vector<eris::SharedMember<Book>> new_books_;
+
+        /** Linked list of number of market books over the last `creation_time + 1` period, i.e. the
+         * average number of books over a creativity cycle.
+         */
+        std::list<unsigned int> mkt_books_;
 
         /** The storage object.  If not set by the time setup() is called, a MemoryStorage object will
          * be created and used.

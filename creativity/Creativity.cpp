@@ -112,11 +112,20 @@ void Creativity::setup() {
 
     sim->spawn<intraopt::FinishCallback>([this] { new_books_.clear(); });
 
-    // Count the number of on-market books, store it, and update the lagged number of on-market
-    // books to the previous number of on-market books.
+    // Count the number of on-market books, store it, and update the average number of on-market
+    // books over the last `creation_time` periods.
     sim->spawn<interopt::BeginCallback>([this] {
-        market_books_lagged = market_books;
         market_books = sim->countMarkets<BookMarket>();
+        if (mkt_books_.size() <= parameters.creation_time) {
+            market_books_avg *= mkt_books_.size(); // Convert to total
+            mkt_books_.push_back(market_books);
+            market_books_avg = (market_books_avg + market_books) / mkt_books_.size(); // Back to average
+        }
+        else {
+            market_books_avg += double(market_books - mkt_books_.front()) / mkt_books_.size(); // Replace front with new
+            mkt_books_.pop_front();
+            mkt_books_.push_back(market_books);
+        }
     });
 
     setup_sim_ = true;
