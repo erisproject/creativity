@@ -213,5 +213,5 @@ int main(int argc, char *argv[]) {
     // Destroy the creativity object, which should cascade through to the storage object, causing it
     // to save its contents.
     cr_ptr.reset();
-    std::cout << " done.\n\nSimulation saved to " << args_out << ".\n\n";
+    std::cout << " done.\n\nSimulation saved to " << args_out << "\n\n";
 }
