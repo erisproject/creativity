@@ -136,7 +136,7 @@ int main(int argc, char *argv[]) {
         if (creativity.parameters.policy & POLICY_CATCH_PIRATES) { policy_catch = true; policies.push_back("catch-pirates"); }
         if (creativity.parameters.policy & ~(POLICY_CATCH_PIRATES | POLICY_PUBLIC_SHARING)) policies.push_back("unknown-policy");
         if (!policies.empty()) {
-            std::cout << "--policies ";
+            std::cout << " --policy ";
             bool first = true;
             for (const auto &p : policies) {
                 if (first) first = false;
