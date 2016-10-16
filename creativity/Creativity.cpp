@@ -44,6 +44,11 @@ void Creativity::checkParameters() {
     PROHIBIT(income, < 0);
     PROHIBIT(piracy_link_proportion, < 0);
     PROHIBIT(piracy_link_proportion, > 1);
+    PROHIBIT(policy_public_sharing_tax, < 0);
+    PROHIBIT(policy_public_sharing_voting_tax, <= 0);
+    PROHIBIT(policy_public_sharing_voting_votes, < 1);
+    PROHIBIT(policy_catch_tax, <= 0);
+    PROHIBIT(policy_catch_cost, < 0);
     PROHIBIT(initial.prob_write, < 0);
     PROHIBIT(initial.prob_write, > 1);
     PROHIBIT(initial.p_min, < 0);
@@ -145,8 +150,9 @@ void Creativity::run() {
     // needed.
     if (sim->t() + 1 == parameters.policy_begins) {
         uint32_t policies = parameters.policy;
-        if (policies & POLICY_PUBLIC_SHARING) {
-            policies &= ~POLICY_PUBLIC_SHARING;
+        auto pub_track_mask = POLICY_PUBLIC_SHARING | POLICY_PUBLIC_SHARING_VOTING;
+        if (policies & pub_track_mask) {
+            policies &= ~pub_track_mask;
             // Create the PublicTracker to provide and compensate authors:
             sim->spawn<PublicTracker>(*this);
         }
@@ -274,6 +280,11 @@ bool Creativity::publicSharing() const {
     return parameters.policy & POLICY_PUBLIC_SHARING and policyActive();
 }
 
+bool Creativity::publicSharingVoting() const {
+    if (!setup_sim_) throw std::logic_error("Cannot call publicSharingVoting() on a non-live or unconfigured simulation");
+    return parameters.policy & POLICY_PUBLIC_SHARING_VOTING and policyActive();
+}
+
 bool Creativity::catchPirates() const {
     if (!setup_sim_) throw std::logic_error("Cannot call catchPirates() on a non-live or unconfigured simulation");
     return parameters.policy & POLICY_CATCH_PIRATES and policyActive();
@@ -284,6 +295,7 @@ double Creativity::policyTaxes() const {
     double tax = 0;
     if (catchPirates()) tax += parameters.policy_catch_tax;
     if (publicSharing()) tax += parameters.policy_public_sharing_tax;
+    if (publicSharingVoting()) tax += parameters.policy_public_sharing_voting_tax;
     return tax;
 }
 

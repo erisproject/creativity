@@ -104,6 +104,12 @@ class BookState final {
          * this is the number of periods that the book was on the market.
          */
         uint32_t lifetime_private;
+
+        /// The number of votes the book received this period.
+        uint32_t votes;
+
+        /// The lifetime number of votes the book has received.
+        uint32_t votes_lifetime;
 };
 
 }}

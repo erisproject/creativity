@@ -22,6 +22,10 @@ constexpr uint32_t POLICY_PUBLIC_SHARING = 1 << 0;
  * \internal
  */
 constexpr uint32_t POLICY_CATCH_PIRATES  = 1 << 1;
+/** The bit for the public-sharing-with-voting policy in `settings.policy`.
+ * \internal
+ */
+constexpr uint32_t POLICY_PUBLIC_SHARING_VOTING = 1 << 2;
 
 /** Central class for a creativity simulation; this class handles setting up the simulation
  * according to configured parameters and running the simulation.
@@ -155,6 +159,13 @@ class Creativity : private eris::noncopyable {
          * or is a live simulation but has not been set up yet, will raise an exception.
          */
         bool publicSharing() const;
+
+        /** Returns true if public sharing with voting is an enabled policy response *and* it is
+         * active in the simulation (i.e. the simulation has reached the period in which the policy
+         * response begins).  Attempting to call this on a Creativity object that is not a live
+         * simulation, or is a live simulation but has not been set up yet, will raise an exception.
+         */
+        bool publicSharingVoting() const;
 
         /** Returns true if getting caught for piracy is a configured policy response *and* it is
          * active in the simulation (i.e. the simulation has reached the policy response stage).

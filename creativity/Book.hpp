@@ -213,6 +213,13 @@ class Book final : public eris::WrappedPositional<eris::good::Discrete> {
         /// Returns the lifetime prize money earned by the author for this book
         double lifePrize() const;
 
+        /// Returns the lifetime number of votes for this book
+        uint32_t lifeVotes() const;
+        /// Returns the number of votes for this book in the current period
+        uint32_t currVotes() const;
+        /// Returns the number of votes for this book in the simulation period `t`
+        uint32_t votes(eris::eris_time_t t) const;
+
         /** Returns `lifeSales() + lifePirated()` (but atomically), reflecting the number of copies
          * of the book that have been made.  This should always be one less than the total in the
          * simulation, as the author also has a copy of the book in his library which is neither a
@@ -251,6 +258,11 @@ class Book final : public eris::WrappedPositional<eris::good::Discrete> {
          */
         void recordPrize(double prize);
 
+        /** Called by a reader to cast one or more votes for this book, when under the public
+         * sharing with votes policy.
+         */
+        void vote(uint32_t count);
+
         /** Returns the mean quality level determined by the author at book creation time.  This
          * value is not intended for use by readers of a book: readers rather receive a subjective
          * quality from `qualityDraw()`.  Note also that this parameter is the untruncated mean: the
@@ -270,9 +282,10 @@ class Book final : public eris::WrappedPositional<eris::good::Discrete> {
     private:
         Creativity &creativity_;
         eris::eris_time_t created_ = 0, left_private_market_ = 0, public_market_created_ = 0;
-        unsigned int copies_private_total_ = 0, copies_pirated_total_ = 0, copies_public_total_ = 0;
+        uint32_t copies_private_total_ = 0, copies_pirated_total_ = 0, copies_public_total_ = 0,
+                 votes_total_ = 0;
         double revenue_private_total_ = 0, revenue_public_total_ = 0, prize_total_ = 0;
-        std::map<eris::eris_time_t, unsigned int> copies_sold_, copies_pirated_;
+        std::map<eris::eris_time_t, uint32_t> copies_sold_, copies_pirated_, votes_;
         std::map<eris::eris_time_t, double> revenue_, prize_;
         eris::SharedMember<Reader> author_;
         const unsigned int order_ = 0;

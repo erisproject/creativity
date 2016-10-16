@@ -1064,6 +1064,67 @@ void Reader::intraApply() {
     }
     reserved_books_.clear();
 
+    if (creativity_.publicSharingVoting()) {
+        // If we are voting, figure out the distribution of votes, by allocating votes in coarse
+        // proportion to the realized book sub-utility (i.e. uBook(), the book utility, minus its
+        // cost (market or piracy), without taking into account the added opportunity cost of
+        // reading additional books).
+        //
+        // To do that, we first order all public-sharing-purchased books by their sub-utility value
+        // (highest first).  Then we assign a vote to the first and reweight its subutility.  We
+        // repeat this until all votes are used up.
+        //
+        // The reweighting follows the pattern 1/2, 2/3, 3/4, ... (compounded, so that the stored
+        // subutility value is 1/2, 1/3, 1/4, ... of the original subutility).  Effectively this
+        // works by ensuring that we don't give a second vote to a book unless its utility is at
+        // least double the next-best-book's utility, and hold back a third vote unless it is at
+        // least three times the next-best-book's utility.
+        //
+        // For example, with book/utility pairs: (A,10), (B,4), (C,3), we would assign votes in this
+        // order (stopping when we run out of votes; this pattern repeats indefinitely):
+        // A, A, B, A, C, A, [AB], A, C, A, B, A, A, [ABC]
+        // (where [XYZ] indicates a sequence with any subordering of X, Y, Z).
+        //
+        // Note that, asymptotically, this tends to award a vote distribution equal to the relative
+        // utility distribution (in this special case of integer utilities, matching exactly after
+        // 17n votes).
+
+        uint32_t total_votes = 0;
+        std::unordered_map<SharedMember<Book>, uint32_t> votes;
+        std::multimap<double, SharedMember<Book>, std::greater<double>> book_subu;
+
+        for (auto &bc : library_new_) {
+            auto &copy = bc.second.get();
+            if (copy.purchased_public()) {
+                auto book = bc.first;
+                double netu = uBook(book, copy.quality) - book->price();
+                if (std::isfinite(netu) and netu > 0)
+                    book_subu.emplace(std::move(netu), std::move(book));
+            }
+        }
+
+        if (not book_subu.empty()) {
+
+            while (total_votes < creativity_.parameters.policy_public_sharing_voting_votes) {
+                // We need to change the key, which means we have to remove and reinsert the element
+                // (so that it gets resorted into the right place in the multimap).
+                auto best = book_subu.begin();
+                auto book = best->second;
+                auto &v = votes[book];
+                v++;
+                total_votes++;
+                double netu_updated = (best->first * v) / (v+1);
+                book_subu.erase(best);
+                book_subu.emplace(std::move(netu_updated), std::move(book));
+            }
+
+            for (auto &bv : votes) {
+                auto lock_b = lock.supplement(bv.first);
+                bv.first->vote(bv.second);
+            }
+        }
+    }
+
     // "Eat" any money leftover
     double money = assets.remove(creativity_.money);
     // Store final utility

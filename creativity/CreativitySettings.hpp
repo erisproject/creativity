@@ -113,15 +113,20 @@ struct CreativitySettings {
     /** Bitfield specifying the enabled policy response(s) used to address piracy.  Currently
      * supported bit values are:
      * 
-     * - 0x1: public tax for public provisioning and sharing; when the policy response begins, a
-     *   PublicTracker agent is created that distributes copies of books to anyone at marginal cost.
-     *   Authors are compensated in proportion to the number of downloads of their works from a
-     *   per-read lump sum tax.
+     * - 0x1: policy_public_sharing: public tax for public provisioning and sharing; when the policy
+     *   response begins, a PublicTracker agent is created that distributes copies of books to
+     *   anyone at marginal cost.  Authors are compensated in proportion to the number of downloads
+     *   of their works from a per-reader lump sum tax.
      *
-     * - 0x2: public tax for catching people downloading illegal copies.  A lump sum tax is
-     *   collected and goes towards the policing effort, with a larger tax resulting in a higher
-     *   probability of detection.
-     * 
+     * - 0x2: policy_catch: public tax for catching people downloading illegal copies.  A lump sum
+     *   tax is collected and goes towards the policing effort, with a larger tax resulting in a
+     *   higher probability of detection.
+     *
+     * - 0x4: policy_public_sharing_voting: public tax for public provisioning and sharing with
+     *   reader votes.  This is like policy_public_sharing, but instead of awarding the collected
+     *   prize in proportion to downloads, readers cast votes for their favourite works in a period
+     *   and the tax is redistributed proportionally to votes received.
+     *
      * Other values are reserved for future use.
      */
     uint32_t policy = 0;
@@ -133,9 +138,24 @@ struct CreativitySettings {
 
     /** This is the lump-sum tax extracted from each user at the beginning of the period to fund the
      * public sharing mechanism of author compensation.  Has no effect when public sharing is not
-     * enabled.
+     * enabled.  Must be >= 0; if 0, no redistribution happens.
      */
     double policy_public_sharing_tax = 10.0;
+
+    /** This is the lump-sum per-reader tax for public sharing with voting.  Has no effect when
+     * public sharing with voting is not enabled.  Must be strictly greater than 0.
+     */
+    double policy_public_sharing_voting_tax = 10.0;
+
+    /** The number of votes each reader receives in the public-sharing-with-voting regime.  Voters
+     * cast votes in (rough) proportion to the net utility they received from reading each public
+     * book obtained in the current period.
+     *
+     * For example, if a reader obtained 4 book copies, and received net utility of 10, 5, 2, 1, if
+     * given 4 votes, he would cast 3 votes for book 1, and 1 vote for book 2; with 18 votes he
+     * would cast 10, 5, 2, 1.
+     */
+    uint32_t policy_public_sharing_voting_votes = 3;
 
     /** This is the lump-sum tax extracted from each user to fund the policing policy to catch and
      * fine readers using piracy.  Has no effect when the catching policy is not enabled.

@@ -4,7 +4,7 @@
 namespace creativity { namespace state {
 
 PublicTrackerState::PublicTrackerState(const PublicTracker &pt)
-    : id{pt.id()}, tax{pt.tax()}, unspent{pt.pool()}
+    : id{pt.id()}, dl_tax{pt.dlTax()}, dl_unspent{pt.dlPool()}, vote_unspent{pt.votePool()}
 {}
 
 }}

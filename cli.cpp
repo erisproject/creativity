@@ -174,7 +174,16 @@ int main(int argc, char *argv[]) {
             if (tty) std::cout << "\r";
             std::cout << "Running simulation [t=" << sim->t() << "; " <<
                 (creativity.piracy() ? u8"Piracy ✔; " : u8"Piracy ✘; ") <<
-                (creativity.policyActive() ? u8"Policy ✔; " : u8"Policy ✘; ") <<
+                "Policy ";
+            if (creativity.policyActive()) {
+                std::cout << u8"✔[";
+                if (creativity.publicSharing()) std::cout << 'P';
+                if (creativity.publicSharingVoting()) std::cout << 'V';
+                if (creativity.catchPirates()) std::cout << 'C';
+                std::cout << "]; ";
+            }
+            else std::cout << u8"✘; ";
+            std::cout <<
                 "R=" << sim->countAgents<Reader>() << "; B=" << sim->countGoods<Book>() << "; Bnew=" <<
                 std::setw(max_bnew_digits) << bnew << "] " << speed.str();
             if (tty) std::cout << std::flush;

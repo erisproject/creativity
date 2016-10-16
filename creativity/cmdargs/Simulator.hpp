@@ -13,13 +13,13 @@ namespace creativity { namespace cmdargs {
  * Current used single-argument parameters:
  *
  * Single-letter options used in this class:
- *     A b B c C d D e E g G i j J k K L m M n N p P Q r R s S T u U w W x y z Z
+ *     A b B c C d D e E g G i j J k K L m M n N p P Q r R s S T u U v V w W x y z Z
  * Used in [CLI], {GUI}, or both:
  *     o [O] [q]
  * Used in CmdArgs base class:
  *     h
  * Available:
- *     a f F H I l t v V X Y
+ *     a f F H I l t X Y
  */
 class Simulator : public CmdArgs {
     protected:

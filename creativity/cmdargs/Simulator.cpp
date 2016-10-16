@@ -78,18 +78,20 @@ void Simulator::addOptions() {
     options_.add(piracy);
 
     policy.add_options()
-        ("policy,g", value(policies), "A list of policies to enable in the policy phase of the simulation.  This option may be specified multiple times, or may be specified with a comma-separated list of policies.  If the option is omitted, defaults to `public-sharing`; specify 'none' to disable all policies.  Currently accepted policy names: 'public-sharing' - enables public sharing with redistribution (can be shorted to 'public'); 'catch-pirates' - enables detection and fines (can be shorted to 'catch')")
+        ("policy,g", value(policies), "A list of policies to enable in the policy phase of the simulation.  This option may be specified multiple times, or may be specified with a comma-separated list of policies.  If the option is omitted, defaults to `public-sharing`; specify 'none' to disable all policies.  Currently accepted policy names: 'public-sharing' - enables public sharing with redistribution (can be shorted to 'public'); 'public-voting' - like public-sharing, but readers cast votes for public works to determine payoffs (can be shorted to 'vote'); 'catch-pirates' - enables detection and fines (can be shorted to 'catch')")
         ("policy-begins,G", value(s_.policy_begins), "When a policy response is enabled, this specifies the period in which it begins.  Has no effect if no policy response is enabled")
         ("prior-scale-policy,S", min<1>(s_.prior_scale_policy), "The same as --prior-scale, but applied in the first policy response period")
         ;
 
     pol_public.add_options()
-        ("public-sharing-tax,A", min<0>(s_.policy_public_sharing_tax), "The per-period, lump sum tax collected from each reader for public sharing")
+        ("public-sharing-tax,A", min<0>(s_.policy_public_sharing_tax), "The per-period, lump sum tax collected from each reader for --policy=public-sharing")
+        ("public-voting-tax,V", above<0>(s_.policy_public_sharing_voting_tax), "The per-period, lump sum tax collected from each reader for --policy=public-voting")
+        ("public-voting-votes,v", min<1>(s_.policy_public_sharing_voting_votes), "The number of votes each readers gets for --policy=public-voting")
         ;
     policy.add(pol_public);
 
     pol_catch.add_options()
-        ("catch-tax,x", min<0>(s_.policy_catch_tax), "The lump-sum, per-reader tax that is collected to pay for the catch policy")
+        ("catch-tax,x", min<0>(s_.policy_catch_tax), "The lump-sum, per-reader tax that is collected to pay for --policy=catch-pirates")
         ("catch-cost", min<0>(s_.policy_catch_cost), "The cost that is incurred by someone accused of piracy, even if innocent")
         ("catch-fine-const", value(s_.policy_catch_fine[0]), "The constant term, c, of the fine polynomial, c + bP + aP²")
         ("catch-fine-lin", value(s_.policy_catch_fine[1]), "The linear term coefficient, b, of the fine polynomial, c + bP + aP²")
@@ -149,6 +151,8 @@ void Simulator::postParse(boost::program_options::variables_map &vars) {
                 s_.policy |= POLICY_PUBLIC_SHARING;
             else if (policy == "catch" or policy == "catch-pirates")
                 s_.policy |= POLICY_CATCH_PIRATES;
+            else if (policy == "vote" or policy == "voting" or policy == "public-voting")
+                s_.policy |= POLICY_PUBLIC_SHARING_VOTING;
             else if (policy == "none" or policy == "")
                 /* ignore */;
             else

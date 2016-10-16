@@ -29,7 +29,9 @@ BookState::BookState(const Book &b) :
     pirated{b.currPirated()},
     pirated_lifetime{b.lifePirated()},
     created{b.created()},
-    lifetime_private{b.privateMarketPeriods()}
+    lifetime_private{b.privateMarketPeriods()},
+    votes{b.currVotes()},
+    votes_lifetime{b.lifeVotes()}
 {}
 
 }}

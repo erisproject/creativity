@@ -937,6 +937,10 @@ void GUI::thr_update_parameters() {
     // Public sharing policy:
     SET_SB(policy_public_sharing_tax);
 
+    // Public voting policy:
+    SET_SB(policy_public_sharing_voting_tax);
+    SET_SB(policy_public_sharing_voting_votes);
+
     // Catching policy:
     SET_SB(policy_catch_tax);
     SET_SB(policy_catch_cost);
@@ -951,7 +955,10 @@ void GUI::thr_update_parameters() {
             creativity_.parameters.policy & POLICY_PUBLIC_SHARING);
     widget<Gtk::CheckButton>("set_policy_catch")->set_active(
             creativity_.parameters.policy & POLICY_CATCH_PIRATES);
-    if (creativity_.parameters.policy & ~(POLICY_PUBLIC_SHARING | POLICY_CATCH_PIRATES))
+    widget<Gtk::CheckButton>("set_policy_public_sharing_voting")->set_active(
+            creativity_.parameters.policy & POLICY_PUBLIC_SHARING_VOTING);
+
+    if (creativity_.parameters.policy & ~(POLICY_PUBLIC_SHARING | POLICY_CATCH_PIRATES | POLICY_PUBLIC_SHARING_VOTING))
         throw std::logic_error("Internal error: simulation policy value set to an unknown/invalid value");
 }
 

@@ -176,6 +176,29 @@ void Book::recordPrize(double prize) {
     prize_total_ += prize;
 }
 
+void Book::vote(uint32_t votes) {
+    auto lock = writeLock();
+
+    votes_[simulation()->t()] += votes;
+    votes_total_ += votes;
+}
+
+uint32_t Book::votes(eris_time_t t) const {
+    if (t < created_) return 0;
+    auto lock = readLock();
+    auto it = votes_.find(t);
+    if (it == votes_.end()) return 0;
+    return it->second;
+}
+
+uint32_t Book::currVotes() const {
+    return votes(simulation()->t());
+}
+
+uint32_t Book::lifeVotes() const {
+    return votes_total_;
+}
+
 double Book::lifeRevenuePrivate() const {
     return revenue_private_total_;
 }

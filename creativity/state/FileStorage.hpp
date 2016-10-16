@@ -139,12 +139,13 @@ class FileStorage : public StorageBackend, public eris::serialize::Serialization
 
         /** The file version (2).
          *
-         * Version 2 added a catch-and-fine policy, and generalized the simulation policy settings.
+         * Version 2 added catch-and-fine and public-sharing-with-voting policies, and generalized
+         * the simulation policy settings.
          *
          * Version 1 was the first eris::Serializer compatible version; earlier versions were the
          * precursor for eris::Serializer, but were not eris::Serializer compatible.
          */
-        virtual uint32_t appFileVersion() const override { return 1; }
+        virtual uint32_t appFileVersion() const override { return 2; }
 
         /** The file application name, "creativity". */
         virtual std::string appName() const override { return "creativity"; }
@@ -306,6 +307,8 @@ class FileStorage : public StorageBackend, public eris::serialize::Serialization
          *     u32          piratedLifetime
          *     u32          created
          *     u32          lifetime_private
+         *     u32          votes
+         *     u32          votes_lifetime
          */
         std::pair<eris::eris_id_t, BookState> readBook();
 
@@ -316,8 +319,10 @@ class FileStorage : public StorageBackend, public eris::serialize::Serialization
          * PublicTrackerState unique pointer.  The data is:
          *
          *     u32          id
-         *     dbl          tax (per-user lump sum tax)
-         *     dbl          unspent (!= 0 only if the previous period had no publid downloads)
+         *     dbl          dl_tax (per-user lump sum tax for download count payouts)
+         *     dbl          vote_tax (per-user lump sum tax for vote-based payouts)
+         *     dbl          dl_unspent (!= 0 only if the previous period had no public downloads)
+         *     dbl          vote_unspent (!= 0 only if the previous period had no votes)
          */
         std::unique_ptr<PublicTrackerState> readPublicTracker();
 

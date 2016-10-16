@@ -139,6 +139,9 @@ void FileStorage::configureHeaderFields() {
 
     addHeaderField(settings_.policy_public_sharing_tax);
 
+    addHeaderField(settings_.policy_public_sharing_voting_tax);
+    addHeaderField(settings_.policy_public_sharing_voting_votes);
+
     addHeaderField(settings_.policy_catch_tax);
     addHeaderField(settings_.policy_catch_cost);
     addHeaderField(settings_.policy_catch_fine);
@@ -535,7 +538,7 @@ std::pair<eris_id_t, BookState> FileStorage::readBook() {
     if (stat != 0) throw std::runtime_error("FileStorage error: found invalid/unknown book status bit");
     *this >> b.price >> b.revenue >> b.revenue_lifetime >> b.prize >> b.prize_lifetime
         >> b.sales >> b.sales_lifetime_private >> b.sales_lifetime_public >> b.pirated >> b.pirated_lifetime
-        >> b.created >> b.lifetime_private;
+        >> b.created >> b.lifetime_private >> b.votes >> b.votes_lifetime;
 
     return pair;
 }
@@ -554,20 +557,20 @@ void FileStorage::writeBook(const BookState &b) {
     *this << status;
     *this << b.price << b.revenue << b.revenue_lifetime << b.prize << b.prize_lifetime
         << b.sales << b.sales_lifetime_private << b.sales_lifetime_public << b.pirated << b.pirated_lifetime
-        << b.created << b.lifetime_private;
+        << b.created << b.lifetime_private << b.votes << b.votes_lifetime;
 
-    FILESTORAGE_DEBUG_WRITE_CHECK(8+8+8*settings_.dimensions+8+1+8*5+4*7);
+    FILESTORAGE_DEBUG_WRITE_CHECK(8+8+8*settings_.dimensions+8+1+8*5+4*9);
 }
 
 std::unique_ptr<PublicTrackerState> FileStorage::readPublicTracker() {
     std::unique_ptr<PublicTrackerState> ptsptr(new PublicTrackerState);
     auto &pts = *ptsptr;
-    *this >> pts.id >> pts.tax >> pts.unspent;
+    *this >> pts.id >> pts.dl_tax >> pts.vote_tax >> pts.dl_unspent >> pts.vote_unspent;
     return ptsptr;
 }
 
 void FileStorage::writePublicTracker(const PublicTrackerState &pts) {
-    *this << pts.id << pts.tax << pts.unspent;
+    *this << pts.id << pts.dl_tax << pts.vote_tax << pts.dl_unspent << pts.vote_unspent;
 }
 
 
