@@ -8,6 +8,7 @@ flags = [
         '-std=c++11',
         '-I', '.',
         '-I', '/usr/include/eigen3',
+        '-isystem', '/usr/include/x86_64-linux-gnu/c++/6',
         '-I', 'build' # The pick up the generated creativity/config.hpp
         ]
 

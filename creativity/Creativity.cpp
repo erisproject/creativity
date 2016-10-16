@@ -127,7 +127,7 @@ void Creativity::setup() {
             market_books_avg = (market_books_avg + market_books) / mkt_books_.size(); // Back to average
         }
         else {
-            market_books_avg += double(market_books - mkt_books_.front()) / mkt_books_.size(); // Replace front with new
+            market_books_avg += ((double)market_books - mkt_books_.front()) / mkt_books_.size(); // Replace front with new
             mkt_books_.pop_front();
             mkt_books_.push_back(market_books);
         }
