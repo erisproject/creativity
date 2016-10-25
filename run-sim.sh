@@ -41,8 +41,10 @@ exec ./creativity-random ./creativity-cli \
     --initial-prob-keep 'U[0.25,0.75]' \
     --initial-keep-price 'U[0.25,0.75]' \
     --piracy-link-proportion 'U[0.05,0.25]' \
-    --policy '{public-sharing,catch-pirates,public-sharing\,catch-pirates}' \
+    --policy '{public-sharing,catch-pirates,public-voting}' \
     --public-sharing-tax 'U[1,100]' \
+    --public-voting-tax 'U[1,100]' \
+    --public-voting-votes 'iU[1,5]' \
     --catch-tax 'U[1,100]' \
     --catch-cost '0' \
     --catch-fine-const '0' \
