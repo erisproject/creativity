@@ -20,7 +20,7 @@ done
 dir="./results/$(git show -s --date=short --format=%cd~~%h @)/randomized"
 mkdir -p "$dir"
 
-exec ./creativity-random ./creativity-cli \
+exec nice ./creativity-random ./creativity-cli \
     --readers 'iU[100,200]' \
     --density 'U[0.25,4]' \
     --reader-step-mean 'U[.1,.9]' \
