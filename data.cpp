@@ -68,7 +68,6 @@ void thr_preload(const cmdargs::Data &args) {
         preload_next_cv.wait(input_lock, [&max_queue]{ return preload_queue.size() < max_queue; });
         while (preload_queue.size() < max_queue && input_it != input_it_end) {
             std::string source(*input_it++);
-            std::cerr << "DEBUG: preloading " << source << "\n";
             input_lock.unlock();
             std::unique_ptr<std::stringstream> s(new std::stringstream(
                         std::ios_base::in | std::ios_base::out | std::ios_base::binary));
@@ -82,9 +81,7 @@ void thr_preload(const cmdargs::Data &args) {
                 success = true;
             }
             catch (std::ios_base::failure &e) {
-                std::cerr << "f failbit=" << f.fail() << ", badbit=" << f.bad() << ", eof=" << f.eof() << ", good=" << f.good() << "\n";
-                std::cerr << "*s failbit=" << s->fail() << ", badbit=" << s->bad() << ", eof=" << s->eof() << ", good=" << s->good() << "\n";
-                std::cerr << "Unable to preload `" << source << "': " << e.what() << ", errstr=" << std::strerror(errno) << "\n";
+                std::cerr << "Unable to preload `" << source << "': " << std::strerror(errno) << "\n";
             }
             catch (std::exception &e) {
                 std::cerr << "Unable to preload `" << source << "': " << e.what() << "\n";
@@ -92,7 +89,6 @@ void thr_preload(const cmdargs::Data &args) {
 
             input_lock.lock();
             if (success) {
-                std::cerr << "DEBUG: done preloading " << source << "\n";
                 preload_queue.emplace(std::move(source), std::move(s));
                 preload_cv.notify_all();
             }
