@@ -71,7 +71,7 @@ class FileStorage : public StorageBackend, public eris::serialize::Serialization
          * and (optionally) writing state data.  Takes the open mode, which defaults to
          * Mode::READONLY.
          */
-        FileStorage(CreativitySettings &settings, std::stringstream &&s, Mode mode = Mode::READONLY);
+        FileStorage(CreativitySettings &settings, std::unique_ptr<std::stringstream> &&s, Mode mode = Mode::READONLY);
 
         /** Default move constructor. */
         //FileStorage(FileStorage&&) = default;

@@ -149,7 +149,7 @@ void thr_parse_file(
         output.precision(args.double_precision);
         try {
             if (preload_mode) // Preloaded input:
-                creativity.read<FileStorage>(std::move(*ss), FileStorage::Mode::READONLY);
+                creativity.read<FileStorage>(std::move(ss), FileStorage::Mode::READONLY);
             else // File input:
                 creativity.read<FileStorage>(source, FileStorage::Mode::READONLY, args.memory_xz, args.tmpdir);
         }
