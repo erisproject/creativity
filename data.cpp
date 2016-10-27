@@ -13,8 +13,12 @@
 #include <cstddef>
 #include <cstring>
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <iomanip>
 #include <list>
+#include <queue>
+#include <mutex>
 
 namespace creativity { namespace state { class State; } }
 
@@ -50,34 +54,111 @@ std::string double_str(double d, unsigned precision) {
 unsigned int output_count;
 std::mutex output_mutex; // Guards std::out, output_count
 decltype(cmdargs::Data::input.cbegin()) input_it, input_it_end;
-std::mutex input_it_mutex;
+std::queue<std::pair<std::string, std::unique_ptr<std::stringstream>>> preload_queue;
+bool preload_done = false;
+std::mutex input_mutex; // Guards both the above iterator and preload_queue
+std::condition_variable preload_cv; // Used to wait for preload data to appear
+std::condition_variable preload_next_cv; // Used to tell the preload thread that something has been removed from the preload queue
+
+void thr_preload(const cmdargs::Data &args) {
+    std::unique_lock<std::mutex> input_lock(input_mutex);
+    const unsigned int max_queue = args.preload;
+    if (max_queue < 1) throw std::logic_error("Internal error: thr_preload called in non-preload mode");
+    while (input_it != input_it_end) {
+        preload_next_cv.wait(input_lock, [&max_queue]{ return preload_queue.size() < max_queue; });
+        while (preload_queue.size() < max_queue && input_it != input_it_end) {
+            std::string source(*input_it++);
+            std::cerr << "DEBUG: preloading " << source << "\n";
+            input_lock.unlock();
+            std::unique_ptr<std::stringstream> s(new std::stringstream(
+                        std::ios_base::in | std::ios_base::out | std::ios_base::binary));
+            s->exceptions(s->failbit | s->badbit);
+            bool success = false;
+            std::ifstream f;
+            try {
+                f.exceptions(f.badbit | f.failbit);
+                f.open(source, std::ios_base::in | std::ios_base::binary);
+                *s << f.rdbuf();
+                success = true;
+            }
+            catch (std::ios_base::failure &e) {
+                std::cerr << "f failbit=" << f.fail() << ", badbit=" << f.bad() << ", eof=" << f.eof() << ", good=" << f.good() << "\n";
+                std::cerr << "*s failbit=" << s->fail() << ", badbit=" << s->bad() << ", eof=" << s->eof() << ", good=" << s->good() << "\n";
+                std::cerr << "Unable to preload `" << source << "': " << e.what() << ", errstr=" << std::strerror(errno) << "\n";
+            }
+            catch (std::exception &e) {
+                std::cerr << "Unable to preload `" << source << "': " << e.what() << "\n";
+            }
+
+            input_lock.lock();
+            if (success) {
+                std::cerr << "DEBUG: done preloading " << source << "\n";
+                preload_queue.emplace(std::move(source), std::move(s));
+                preload_cv.notify_all();
+            }
+        }
+    }
+
+    // Input file preloading is done
+    preload_done = true;
+    preload_cv.notify_all();
+    input_lock.unlock();
+}
 
 void thr_parse_file(
         const cmdargs::Data &args,
         const std::vector<data::initial_datum> &initial_data,
         const std::vector<data::datum> &data,
         unsigned readable_name_width) {
-    input_it_mutex.lock();
-    while (input_it != input_it_end) {
-        std::string source(*input_it++);
-        input_it_mutex.unlock();
+    const bool preload_mode = args.preload > 0;
+    std::unique_lock<std::mutex> input_lock(input_mutex);
+    while (preload_mode || input_it != input_it_end) {
+        std::string source;
+        std::unique_ptr<std::stringstream> ss;
+        Creativity creativity;
+        if (preload_mode) {
+            preload_cv.wait(input_lock, []{ return preload_done || !preload_queue.empty(); });
+            if (!preload_queue.empty()) {
+                {
+                    auto &next = preload_queue.front();
+                    source = std::move(next.first);
+                    ss = std::move(next.second);
+                }
+                preload_queue.pop();
+                preload_next_cv.notify_all();
+                if (!ss) {
+                    std::cerr << "Unable to read preloaded file `" << source << "': stringstream pointer is null\n";
+                    continue;
+                }
+            }
+            else {
+                // Preloading is finished *and* the queue is empty, so we're done.
+                return;
+            }
+        }
+        else {
+            source = *input_it++;
+        }
+        input_lock.unlock();
+
         output_mutex.lock();
         std::cerr << "Processing " << source << "\n";
         output_mutex.unlock();
 
         std::ostringstream output;
         output.precision(args.double_precision);
-        Creativity creativity;
-        // Filename input
         try {
-            creativity.read<FileStorage>(source, FileStorage::Mode::READONLY, args.memory_xz, args.tmpdir);
+            if (preload_mode) // Preloaded input:
+                creativity.read<FileStorage>(std::move(*ss), FileStorage::Mode::READONLY);
+            else // File input:
+                creativity.read<FileStorage>(source, FileStorage::Mode::READONLY, args.memory_xz, args.tmpdir);
         }
         catch (std::ios_base::failure&) {
-            std::cerr << "Unable to read `" << source << "': " << std::strerror(errno) << "\n";
+            std::cerr << "Unable to read/parse `" << source << "': " << std::strerror(errno) << "\n";
             continue;
         }
         catch (std::exception &e) {
-            std::cerr << "Unable to read `" << source << "': " << e.what() << "\n";
+            std::cerr << "Unable to read/parse `" << source << "': " << e.what() << "\n";
             continue;
         }
 
@@ -233,9 +314,9 @@ void thr_parse_file(
         output_mutex.unlock();
         output.str("");
 
-        input_it_mutex.lock();
+        input_lock.lock();
     }
-    input_it_mutex.unlock();
+    input_lock.unlock();
 }
 
 int main(int argc, char *argv[]) {
@@ -272,18 +353,26 @@ int main(int argc, char *argv[]) {
 
     input_it = args.input.cbegin();
     input_it_end = args.input.cend();
+    std::vector<std::thread> threads;
+    if (args.preload > 0) {
+        // Start the preload thread, which loads files into memory:
+        threads.emplace_back(thr_preload, args);
+    }
+
     if (args.threads == 0) {
+        // Not doing threaded loading (aside from, possibly, preloading while parsing):
         thr_parse_file(args, initial_data, data, longest_name);
     }
     else {
         Eigen::initParallel();
-        std::vector<std::thread> threads;
         for (unsigned t = 0; t < args.threads; t++) {
             threads.emplace_back(thr_parse_file, args, initial_data, data, longest_name);
         }
-        for (auto &th : threads) {
-            if (th.joinable()) th.join();
-        }
+    }
+
+    // Wait for preload and/or parse threads to finish:
+    for (auto &th : threads) {
+        if (th.joinable()) th.join();
     }
 
     if (output_count == 0 and not args.only_csv_header) {

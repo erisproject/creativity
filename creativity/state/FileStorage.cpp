@@ -35,6 +35,13 @@ using namespace Eigen;
 using DrawMode = BayesianLinearRestricted::DrawMode;
 namespace fs = boost::filesystem;
 
+FileStorage::FileStorage(CreativitySettings &settings, std::stringstream &&s, Mode mode)
+    : StorageBackend(settings)
+{
+    memory(std::move(s), mode);
+}
+
+
 void FileStorage::throwParseError(const std::string& message) const {
     decltype(f_->tellg()) pos;
     try { pos = f_->tellg(); }

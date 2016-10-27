@@ -53,10 +53,14 @@ class Data : public CmdArgs {
         /// Number of threads to use
         unsigned int threads = 0;
 
+        /// Number of files to preload from disk into memory
+        unsigned int preload = 0;
+
         /// The input files to load data from
         std::vector<std::string> input;
 
-        /// If true, decompress xz files into memory
+        /// If true, decompress xz files into memory (note that decompression into memory happens
+        /// with `preload > 0` regardless of this option).
         bool memory_xz = false;
 
         /** If memory_xz is false, decompress files into temporary files in this directory instead

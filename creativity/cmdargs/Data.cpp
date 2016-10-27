@@ -28,8 +28,9 @@ void Data::addOptions() {
         ("verify-periods,T", value(verify.periods), "    If non-zero, only use given simulation files with the last time period matching the given argument.")
         ("verify-piracy-begins,P", value(verify.piracy_begins), "If non-zero, only use given simulation files with piracy beginning in the given period.")
         ("verify-policy-begins,G", value(verify.policy_begins), "If non-zero, only use given simulation files with policy response beginning in the given period.")
-        ("threads,j", value(threads), "    Maximum number of threads to use for data parsing.  0 (the default) disables data parsing threading entirely.")
+        ("threads,j", value(threads), "    Maximum number of threads to use for simulation data extraction.  0 (the default) disables simulation value extraction threading entirely.")
         ("memory-xz,M", value(memory_xz), "If an input file is an xz-compressed file, using this flag causes it to be decompressed into memory instead of writing it to a temporary file.")
+        ("preload,J", value(preload), "    Maximum number of simulations to copy from disk into memory before being needed, 0 to disable.  If non-zero, preloading happens in a dedicated thread (not included in the -j limit), which preloads the next file from disk whenever fewer than this number are preloaded.  Larger values require more memory, but can help reduce starvation among parsing threads.  This option also implies --memory-xz.")
         ("tmpdir", value(tmpdir), "If --memory-xz is not specified, this specifies a temporary directory in which to place the temporary decompressed file.  If omitted, the file is in the same directory as the input file.")
         ;
 
