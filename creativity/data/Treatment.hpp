@@ -6,8 +6,8 @@
 
 namespace creativity { namespace data {
 
-/** This class converts raw simulation data into multiple data rows, with piracy/public, SR/LR as
- * treatment effects on the base (pre-piracy, pre-public) row.  It additionally supports filtering
+/** This class converts raw simulation data into multiple data rows, with piracy/policy, SR/LR as
+ * treatment effects on the base (pre-piracy, pre-policy) row.  It additionally supports filtering
  * the resulting data--for instance, only using observations that still exhibit some writing during
  * piracy.
  */
@@ -35,18 +35,18 @@ class Treatment {
          */
         void requirePiracy(bool require = true);
 
-        /// Like requirePiracy(), but for public sharing data
-        void requirePublic(bool require = true);
+        /// Like requirePiracy(), but for policy data
+        void requirePolicy(bool require = true);
 
         /// Like requirePiracy(), but for pre-piracy data
         void requirePre(bool require = true);
 
-        /** Requires short-run data for long-run piracy/public data that exists in the source data.
+        /** Requires short-run data for long-run piracy/policy data that exists in the source data.
          * In particular, if this option is enabled, the data must contain short-run observations
          * for each category with equivalent long-run observations: that is, if there is long-run
-         * piracy data, there must also be short-run piracy data, and likewise for public sharing
-         * data.  If the source data does not contain long-run piracy data, this option will not
-         * require short-run piracy data.
+         * piracy data, there must also be short-run piracy data, and likewise for policy data.  If
+         * the source data does not contain long-run piracy data, this option will not require
+         * short-run piracy data.
          *
          * Like requirePiracy(), this throws immediately if data has already been parsed; if not,
          * the exception will be raised if attempting to read data that doesn't contain the required
@@ -60,20 +60,20 @@ class Treatment {
         /// True if the source data has piracy data
         const bool& hasPiracy() const { return has_piracy_; }
 
-        /// True if the source data has public data
-        const bool& hasPublic() const { return has_public_; }
+        /// True if the source data has policy data
+        const bool& hasPolicy() const { return has_policy_; }
 
         /// True if the source data has short-run piracy data
         const bool& hasPiracySR() const { return has_piracy_sr_; }
 
-        /// True if the source data has short-run public data
-        const bool& hasPublicSR() const { return has_public_sr_; }
+        /// True if the source data has short-run policy data
+        const bool& hasPolicySR() const { return has_policy_sr_; }
 
         /** True if the source data has short-run data for each type of associated long-run data.
          * That is, if the data has piracy data, it must also have short-run piracy data; likewise
-         * for public data.
+         * for policy data.
          */
-        bool hasShortrun() const { return (hasPublicSR() or not hasPublic()) and (hasPiracySR() or not hasPiracy()); }
+        bool hasShortrun() const { return (hasPolicySR() or not hasPolicy()) and (hasPiracySR() or not hasPiracy()); }
 
         /// The number of data rows per simulation input.  This equals 1 plus the number of treatments.
         const unsigned int& rowsPerSimulation() const { return rows_per_sim_; }
@@ -101,7 +101,7 @@ class Treatment {
 
         /** Accesses the map of field name to column indices.  Data fields (e.g. "books_written")
          * are not prefixed with "pre.", "piracy.", etc.; parameters (e.g. "param.readers") are
-         * prefixed; there are also dummies "piracy", "public", "SR", and "LR".
+         * prefixed; there are also dummies "piracy", "policy", "SR", and "LR".
          */
         const std::unordered_map<std::string, unsigned>& columns() const;
 
@@ -126,11 +126,11 @@ class Treatment {
              has_pre_{false}, ///< True if the data contains pre-piracy, non-treatment rows
              has_piracy_{false}, ///< True if the data contains LR piracy treatment rows
              has_piracy_sr_{false}, ///< True if the data contains SR piracy treatment rows
-             has_public_{false}, ///< True if the data contains LR public treatment rows
-             has_public_sr_{false}, ///< True if the data contains SR public treatment rows
+             has_policy_{false}, ///< True if the data contains LR policy treatment rows
+             has_policy_sr_{false}, ///< True if the data contains SR policy treatment rows
              require_pre_{false}, ///< True if pre data is required
              require_piracy_{false}, ///< True if piracy data is required
-             require_public_{false}, ///< True if public data is required
+             require_policy_{false}, ///< True if policy data is required
              require_sr_{false}; ///< True if short-run data is required for each type of long-run data
         /// The number of treatment row observations per source data rows (i.e. per simulation)
         unsigned int rows_per_sim_{0};
@@ -145,7 +145,7 @@ class Treatment {
          *
          * \param csv the CSVParser positioned at the desired row.
          * \param newrow the matrix row in which values will be set
-         * \param prefix the prefix (such as "pre." or "public.SR.") to add to non-param. data
+         * \param prefix the prefix (such as "pre." or "policy.SR.") to add to non-param. data
          * columns.
          */
         void generateRow(const CSVParser &csv,

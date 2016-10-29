@@ -28,7 +28,7 @@ namespace creativity { namespace data {
  *     TreatmentFilter pre_and_piracy(
  *         data,
  *         [](const TreatmentFilter::Properties&) { return true; } // No per-simulation filtering
- *         [](bool pre, bool piracy, bool public_sharing, bool short_run) {
+ *         [](bool pre, bool piracy, bool policy, bool short_run) {
  *             return pre or (piracy and not short_run);
  *         }
  *     );
@@ -67,11 +67,11 @@ class TreatmentFilter : public Treatment {
                  * depends on whether or not the field is in the source data, *not* whether or not
                  * the stage will be included in the filtered data. */
                 std::unique_ptr<const StageProperties> piracy;
-                /** A pointer to the Properties values for the LR public row associated with this
+                /** A pointer to the Properties values for the LR policy row associated with this
                  * row.  Will be a nullptr if there is no such row. Note that whether this is set
                  * depends on whether or not the field is in the source data, *not* whether or not
                  * the stage will be included in the filtered data. */
-                std::unique_ptr<const StageProperties> public_sharing;
+                std::unique_ptr<const StageProperties> policy;
                 /** A pointer to the Properties values for the SR piracy row associated with this
                  * row.  Will be a nullptr if there is no such row. Note that whether this is set
                  * depends on whether or not the field is in the source data, *not* whether or not
@@ -81,7 +81,7 @@ class TreatmentFilter : public Treatment {
                  * row.  Will be a nullptr if there is no such row. Note that whether this is set
                  * depends on whether or not the field is in the source data, *not* whether or not
                  * the stage will be included in the filtered data. */
-                std::unique_ptr<const StageProperties> public_sharing_SR;
+                std::unique_ptr<const StageProperties> policy_SR;
                 /// The source data simulation filename.
                 std::string source;
         };
@@ -100,7 +100,7 @@ class TreatmentFilter : public Treatment {
          */
         TreatmentFilter(const Treatment &source,
                 std::function<bool(const Properties&)> filter,
-                std::function<bool(bool pre, bool piracy, bool public_sharing, bool short_run)> stage_filter = [](bool,bool,bool,bool) { return true; }
+                std::function<bool(bool pre, bool piracy, bool policy, bool short_run)> stage_filter = [](bool,bool,bool,bool) { return true; }
                 );
 };
 

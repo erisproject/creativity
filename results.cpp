@@ -6,6 +6,7 @@
 #include "creativity/data/Treatment.hpp"
 #include "creativity/data/TreatmentFilter.hpp"
 #include "creativity/cmdargs/Results.hpp"
+#include "creativity/Policy.hpp"
 #include <Eigen/Core>
 #include <cerrno>
 #include <exception>
@@ -22,6 +23,7 @@
 #include <boost/filesystem/operations.hpp>
 
 using creativity::cmdargs::Results;
+using namespace creativity;
 using namespace creativity::data;
 using namespace eris;
 using namespace Eigen;
@@ -37,11 +39,11 @@ int main(int argc, char *argv[]) {
     }
 
     // data holds all the data read from the file.
-    Treatment data;
-    data.requirePre();
-    if (args.analysis.shortrun) data.requireSR();
+    Treatment rawdata;
+    rawdata.requirePre();
+    if (args.analysis.shortrun) rawdata.requireSR();
     try {
-        data.readCSV(CSVParser(args.input));
+        rawdata.readCSV(CSVParser(args.input));
     }
     catch (const std::exception &e) {
         std::cerr << "Error: failed to read input file `" << args.input << "': " << e.what() << "\n\n";
@@ -56,57 +58,68 @@ int main(int argc, char *argv[]) {
         ? [](bool,bool,bool,bool) { return true; }
         : [](bool, bool, bool, bool short_run) { return not short_run; };
 
+    Treatment *data = &rawdata;
+    std::unique_ptr<TreatmentFilter> data_policy;
+    if (args.analysis.policy_filter) {
+        data_policy.reset(new TreatmentFilter(*data, [&](const TreatmentFilter::Properties &p) {
+                return args.analysis.policy == Policy((uint32_t) p.pre->value("param.policy"));
+                },
+                shortrun_filter));
+        data = data_policy.get();
+    }
+
 // Macro that is true if at least writing_threshold books were written and the mean initial price is
 // a number
 #define WRITING_AND_MARKET(var) ((var)->value("books_written") >= writing_threshold and not std::isnan((var)->value("book_p0")))
 // Macro that is true whenever WRITING_AND_MARKET is true and either the shortrun variable does not
 // exist, or else it also satisfied the above.
 #define WRITING_AND_MARKET_SRLR(var) (WRITING_AND_MARKET(var) and (not args.analysis.shortrun or not (var##_SR) or WRITING_AND_MARKET(var##_SR)))
+
     // Observations with writing in every stage:
-    TreatmentFilter data_writing_always(data, [&](const TreatmentFilter::Properties &p) {
+    TreatmentFilter data_writing_always(*data, [&](const TreatmentFilter::Properties &p) {
             // Only allow simulations that have writing in every stage contained in the data
             return (not p.pre or WRITING_AND_MARKET(p.pre))
                 and (not p.piracy or WRITING_AND_MARKET_SRLR(p.piracy))
-                and (not p.public_sharing or WRITING_AND_MARKET_SRLR(p.public_sharing));
+                and (not p.policy or WRITING_AND_MARKET_SRLR(p.policy));
         },
         shortrun_filter
     );
-    // Observations with no writing under piracy, but with writing in public (and pre)
-    TreatmentFilter data_no_piracy_writing(data, [&](const TreatmentFilter::Properties &p) {
-            // Require that this data actually has pre, piracy, and public:
-            if (not p.pre or not p.piracy or not p.public_sharing) return false;
-            // writing in pre and public:
+    // Observations with no writing under piracy, but with writing in policy (and pre)
+    TreatmentFilter data_no_piracy_writing(*data, [&](const TreatmentFilter::Properties &p) {
+            // Require that this data actually has pre, piracy, and policy:
+            if (not p.pre or not p.piracy or not p.policy) return false;
+            // writing in pre and policy:
             return WRITING_AND_MARKET(p.pre)
                 and not WRITING_AND_MARKET_SRLR(p.piracy)
-                and WRITING_AND_MARKET_SRLR(p.public_sharing);
+                and WRITING_AND_MARKET_SRLR(p.policy);
         },
         shortrun_filter
     );
-    // Observations with pre writing but no public writing:
-    TreatmentFilter data_no_post_writing(data, [&](const TreatmentFilter::Properties &p) {
-            // Require that this data actually has pre, piracy, and public:
-            if (not p.pre or not p.piracy or not p.public_sharing) return false;
+    // Observations with pre writing but no policy writing:
+    TreatmentFilter data_no_post_writing(*data, [&](const TreatmentFilter::Properties &p) {
+            // Require that this data actually has pre, piracy, and policy:
+            if (not p.pre or not p.piracy or not p.policy) return false;
             // Require writing in pre"
             return WRITING_AND_MARKET(p.pre)
                 and not WRITING_AND_MARKET_SRLR(p.piracy)
-                and not WRITING_AND_MARKET_SRLR(p.public_sharing);
+                and not WRITING_AND_MARKET_SRLR(p.policy);
         },
         shortrun_filter
     );
     // Observations with no pre writing:
-    TreatmentFilter data_no_pre_writing(data, [&](const TreatmentFilter::Properties &p) {
+    TreatmentFilter data_no_pre_writing(*data, [&](const TreatmentFilter::Properties &p) {
             return p.pre and not WRITING_AND_MARKET(p.pre);
         },
         shortrun_filter
     );
-    // Observations with pre and piracy, but not public writing:
-    TreatmentFilter data_no_pub_writing(data, [&](const TreatmentFilter::Properties &p) {
-            // Require that this data actually has pre, piracy, and public:
-            if (not p.pre or not p.piracy or not p.public_sharing) return false;
+    // Observations with pre and piracy, but not policy writing:
+    TreatmentFilter data_no_pol_writing(*data, [&](const TreatmentFilter::Properties &p) {
+            // Require that this data actually has pre, piracy, and policy:
+            if (not p.pre or not p.piracy or not p.policy) return false;
             // Require writing in pre"
             return WRITING_AND_MARKET(p.pre)
                 and WRITING_AND_MARKET_SRLR(p.piracy)
-                and not WRITING_AND_MARKET_SRLR(p.public_sharing);
+                and not WRITING_AND_MARKET_SRLR(p.policy);
         },
         shortrun_filter
     );
@@ -139,12 +152,13 @@ int main(int argc, char *argv[]) {
 
     if (args.analysis.summary) {
         out << tabulate_escape(std::string("Data summary:\n") +
-                "    " + std::to_string(data.simulations()) + " total simulations (with " + std::to_string(data.rowsPerSimulation()) + " data rows per simulation)\n" +
+                "    " + std::to_string(rawdata.simulations()) + " total simulations (with " + std::to_string(rawdata.rowsPerSimulation()) + " data rows per simulation)\n" +
+                (args.analysis.policy_filter ? "    " + std::to_string(data->simulations()) + " simulations match the requested policy\n" : std::string()) +
                 "    " + std::to_string(data_writing_always.simulations()) + " simulations with non-zero # books written during each stage\n" +
                 "    " + std::to_string(data_no_pre_writing.simulations()) + " simulations with zero books written during pre-piracy stage\n" +
-                "    " + std::to_string(data_no_piracy_writing.simulations()) + " simulations with zero books written under piracy, but writing resuming under public sharing\n" +
-                "    " + std::to_string(data_no_post_writing.simulations()) + " simulations with zero books written during piracy and no recovery under public sharing\n" +
-                "    " + std::to_string(data_no_pub_writing.simulations()) + " simulations with writing under piracy, but no writing under public sharing\n",
+                "    " + std::to_string(data_no_piracy_writing.simulations()) + " simulations with zero books written under piracy, but writing resuming under the policy\n" +
+                "    " + std::to_string(data_no_post_writing.simulations()) + " simulations with zero books written during piracy and no recovery under the policy\n" +
+                "    " + std::to_string(data_no_pol_writing.simulations()) + " simulations with writing under piracy, but no writing under the policy\n",
                 args.format.type);
     }
 
@@ -169,13 +183,13 @@ int main(int argc, char *argv[]) {
         enum : unsigned { f_mean, f_se, f_min, f_5, f_25, f_median, f_75, f_95, f_max, /* last: captures size: */ num_fields };
         std::vector<std::string> colnames({"Mean", "s.e.", "Min", "5th %", "25th %", "Median", "75th %", "95th %", "Max"});
 
-        for (auto d : {&data_writing_always, &data_no_piracy_writing, &data_no_pre_writing, &data_no_post_writing, &data_no_pub_writing}) {
+        for (auto d : {&data_writing_always, &data_no_piracy_writing, &data_no_pre_writing, &data_no_post_writing, &data_no_pol_writing}) {
             param_opts.title = "Parameter values for " + std::to_string(d->simulations()) + " simulations " +
                 (d == &data_writing_always ? "with writing in all stages" :
                  d == &data_no_pre_writing ? "without pre-piracy writing" :
-                 d == &data_no_piracy_writing ? "with no piracy writing, but recovery under public sharing" :
-                 d == &data_no_post_writing ? "without piracy or public sharing writing" :
-                 "with piracy writing but not public sharing writing") + ":";
+                 d == &data_no_piracy_writing ? "with no piracy writing, but recovery under the policy" :
+                 d == &data_no_post_writing ? "without piracy or policy writing" :
+                 "with piracy writing but not policy writing") + ":";
             // Look at conditional means of parameters in periods with no activity vs parameters in
             // periods with activity
 
@@ -268,12 +282,12 @@ int main(int argc, char *argv[]) {
             else if (data_writing_always.hasPiracy())
                 eq % data_writing_always["piracy"];
 
-            if (data_writing_always.hasPublic()) {
-                if (data_writing_always.hasPublicSR())
-                    eq % (data_writing_always["public"]*data_writing_always["SR"])
-                        + data_writing_always["public"]*data_writing_always["LR"];
+            if (data_writing_always.hasPolicy()) {
+                if (data_writing_always.hasPolicySR())
+                    eq % (data_writing_always["policy"]*data_writing_always["SR"])
+                        + data_writing_always["policy"]*data_writing_always["LR"];
                 else
-                    eq % data_writing_always["public"];
+                    eq % data_writing_always["policy"];
             }
 
             avg_effects.add(std::move(eq));
@@ -350,11 +364,11 @@ int main(int argc, char *argv[]) {
             if (args.format.latex) {
                 avg_opts.escape = false;
                 columns.push_back("$\\Delta$ Piracy");
-                columns.push_back("$\\Delta$ Public");
+                columns.push_back("$\\Delta$ Policy");
             }
             else {
                 columns.push_back("Piracy");
-                columns.push_back("Public");
+                columns.push_back("Policy");
             }
             out << tabulate(condensed, avg_opts, depvars, columns, stars);
         }
@@ -370,20 +384,20 @@ int main(int argc, char *argv[]) {
             Equation eq(data_writing_always[y]);
             eq % 1;
             if (data_writing_always.hasPiracy()) eq % data_writing_always["piracy"];
-            if (data_writing_always.hasPublic()) eq % data_writing_always["public"];
+            if (data_writing_always.hasPolicy()) eq % data_writing_always["policy"];
             for (auto &x : {"param.density", "param.cost_market", "param.creation_time", "param.creation_fixed", "param.cost_unit"}) {
                 eq % data_writing_always[x];
                 if (data_writing_always.hasPiracy()) eq % (data_writing_always["piracy"] * data_writing_always[x]);
-                if (data_writing_always.hasPublic()) eq % (data_writing_always["public"] * data_writing_always[x]);
+                if (data_writing_always.hasPolicy()) eq % (data_writing_always["policy"] * data_writing_always[x]);
             }
             // These don't get included in "pre":
             for (auto &x : {"param.cost_piracy", "param.piracy_link_proportion"}) {
                 if (data_writing_always.hasPiracy()) eq % (data_writing_always["piracy"] * data_writing_always[x]);
-                if (data_writing_always.hasPublic()) eq % (data_writing_always["public"] * data_writing_always[x]);
+                if (data_writing_always.hasPolicy()) eq % (data_writing_always["policy"] * data_writing_always[x]);
             }
             // These don't get included in "pre" or "piracy":
             for (auto &x : {"param.public_sharing_tax"}) {
-                if (data_writing_always.hasPublic()) eq % (data_writing_always["public"] * data_writing_always[x]);
+                if (data_writing_always.hasPolicy()) eq % (data_writing_always["policy"] * data_writing_always[x]);
             }
             marg_effects.add(eq);
         }

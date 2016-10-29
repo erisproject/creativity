@@ -7,11 +7,11 @@ using namespace Eigen;
 
 TreatmentFilter::TreatmentFilter(const Treatment &source,
         std::function<bool(const Properties&)> filter,
-        std::function<bool(bool pre, bool piracy, bool public_sharing, bool short_run)> stage_filter) {
+        std::function<bool(bool pre, bool piracy, bool policy, bool short_run)> stage_filter) {
     std::vector<unsigned> stages;
     stages.reserve(source.rowsPerSimulation());
     unsigned stage_i = 0;
-    // Data is always added in this order: pre, piracy.SR, piracy.LR, public.SR, public.LR
+    // Data is always added in this order: pre, piracy.SR, piracy.LR, policy.SR, policy.LR
     has_pre_ = false; // Everything else defaults to false already
     if (source.hasPre()) {
         if (stage_filter(true, false, false, false)) {
@@ -34,16 +34,16 @@ TreatmentFilter::TreatmentFilter(const Treatment &source,
         }
         stage_i++;
     }
-    if (source.hasPublicSR()) {
+    if (source.hasPolicySR()) {
         if (stage_filter(false, false, true, true)) {
-            has_public_sr_ = true;
+            has_policy_sr_ = true;
             stages.push_back(stage_i);
         }
         stage_i++;
     }
-    if (source.hasPublic()) {
+    if (source.hasPolicy()) {
         if (stage_filter(false, false, true, false)) {
-            has_public_ = true;
+            has_policy_ = true;
             stages.push_back(stage_i);
         }
         stage_i++;
@@ -62,8 +62,8 @@ TreatmentFilter::TreatmentFilter(const Treatment &source,
         if (source.hasPre())      props.pre.reset(new StageProperties(source, i + j++));
         if (source.hasPiracySR()) props.piracy_SR.reset(new StageProperties(source, i + j++));
         if (source.hasPiracy())   props.piracy.reset(new StageProperties(source, i + j++));
-        if (source.hasPublicSR()) props.public_sharing_SR.reset(new StageProperties(source, i + j++));
-        if (source.hasPublic())   props.public_sharing.reset(new StageProperties(source, i + j++));
+        if (source.hasPolicySR()) props.policy_SR.reset(new StageProperties(source, i + j++));
+        if (source.hasPolicy())   props.policy.reset(new StageProperties(source, i + j++));
 
         if (filter(props)) {
             if (datapos >= data_.rows()) data_.conservativeResize(data_.rows() + rowincr, NoChange);

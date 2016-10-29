@@ -12,18 +12,18 @@ Treatment::Treatment(const std::string &filename) : Treatment(CSVParser(filename
 
 void Treatment::readCSV(CSVParser &&csv) {
     // The data contains values like pre.whatever, piracy.whatever, piracy.SR.whatever,
-    // public.whatever, public.SR.whatever.  We need to convert those into five rows:
-    // - one with `whatever' set to pre.whatever and piracy=public=SR=0, LR=1
-    // - one with `whatever' set to piracy.SR.whatever, piracy=1, public=0, SR=1, LR=0
-    // - one with `whatever' set to piracy.whatever, piracy=1, public=0, SR=0, LR=1
-    // - one with `whatever' set to public.SR.whatever, piracy=0, public=1, SR=1, LR=0
-    // - one with `whatever' set to public.whatever, piracy=0, public=1, SR=0, LR=1
+    // policy.whatever, policy.SR.whatever.  We need to convert those into five rows:
+    // - one with `whatever' set to pre.whatever and piracy=policy=SR=0, LR=1
+    // - one with `whatever' set to piracy.SR.whatever, piracy=1, policy=0, SR=1, LR=0
+    // - one with `whatever' set to piracy.whatever, piracy=1, policy=0, SR=0, LR=1
+    // - one with `whatever' set to policy.SR.whatever, piracy=0, policy=1, SR=1, LR=0
+    // - one with `whatever' set to policy.whatever, piracy=0, policy=1, SR=0, LR=1
     //
-    // The data might not, however, have any piracy and/or public and/or short run data, in which
+    // The data might not, however, have any piracy and/or policy and/or short run data, in which
     // case we omit the relevant row(s).
     //
     // This maps every CSV field (by name) into a column.  The mapping isn't unique, however: any
-    // pre.whatever, piracy.whatever, and public.whatever all map to "whatever", albeit with
+    // pre.whatever, piracy.whatever, and policy.whatever all map to "whatever", albeit with
     // different rows, as described above.
     //
     // Fields starting with "param." are left as-is; anything else must have one of the "prefix."
@@ -40,9 +40,9 @@ void Treatment::readCSV(CSVParser &&csv) {
         std::string data_field;
         if (f.substr(0, 4) == "pre.") { data_field = f.substr(4); has_pre_ = true; }
         else if (f.substr(0, 10) == "piracy.SR.") { data_field = f.substr(10); has_piracy_sr_ = true; }
-        else if (f.substr(0, 10) == "public.SR.") { data_field = f.substr(10); has_public_sr_ = true; }
+        else if (f.substr(0, 10) == "policy.SR.") { data_field = f.substr(10); has_policy_sr_ = true; }
         else if (f.substr(0, 7) == "piracy.") { data_field = f.substr(7); has_piracy_ = true; }
-        else if (f.substr(0, 7) == "public.") { data_field = f.substr(7); has_public_ = true; }
+        else if (f.substr(0, 7) == "policy.") { data_field = f.substr(7); has_policy_ = true; }
         else if (f.substr(0, 6) == "param.") { data_field = f; } // leave leading param.
         else { throw std::runtime_error("CSV file has invalid/unknown field `" + f + "': fields must have a (known) prefix"); }
 
@@ -57,19 +57,19 @@ void Treatment::readCSV(CSVParser &&csv) {
     }
 
     // The pre-data plus each treatment effect contributes an output row
-    rows_per_sim_ = has_pre_ + has_piracy_ + has_piracy_sr_ + has_public_ + has_public_sr_;
+    rows_per_sim_ = has_pre_ + has_piracy_ + has_piracy_sr_ + has_policy_ + has_policy_sr_;
 
-    if (rows_per_sim_ == 0) throw std::runtime_error("CSV file contains no usable data (no pre, piracy, or public observations found)");
+    if (rows_per_sim_ == 0) throw std::runtime_error("CSV file contains no usable data (no pre, piracy, or policy observations found)");
 
     // Check required data
     requirePre(require_pre_);
     requirePiracy(require_piracy_);
-    requirePublic(require_public_);
+    requirePolicy(require_policy_);
     requireSR(require_sr_);
 
     // Add dummy columns (even if the data means they will always be 0/1)
     data_column_.insert({"piracy", next_col++}); // piracy dummy
-    data_column_.insert({"public", next_col++}); // public sharing dummy
+    data_column_.insert({"policy", next_col++}); // policy sharing dummy
     data_column_.insert({"SR", next_col++}); // short-run stage dummy
     data_column_.insert({"LR", next_col++}); // long-run stage dummy
 
@@ -90,10 +90,10 @@ void Treatment::readCSV(CSVParser &&csv) {
         if (has_piracy_sr_) generateRow(csv, data_.row(pos++), "piracy.SR.");
         // Third: long run piracy
         if (has_piracy_) generateRow(csv, data_.row(pos++), "piracy.");
-        // Fourth: short run public
-        if (has_public_sr_) generateRow(csv, data_.row(pos++), "public.SR.");
-        // Fifth: long run public
-        if (has_public_) generateRow(csv, data_.row(pos++), "public.");
+        // Fourth: short run policy
+        if (has_policy_sr_) generateRow(csv, data_.row(pos++), "policy.SR.");
+        // Fifth: long run policy
+        if (has_policy_) generateRow(csv, data_.row(pos++), "policy.");
 
         source_.push_back(csv.rowSkipped().at("source"));
     }
@@ -124,7 +124,7 @@ void Treatment::generateRow(
     for (const auto &field : data_column_) {
         // Look for special dummies:
         if (field.first == "piracy") newrow[field.second] = (prefix.substr(0, 7) == "piracy.");
-        else if (field.first == "public") newrow[field.second] = (prefix.substr(0, 7) == "public.");
+        else if (field.first == "policy") newrow[field.second] = (prefix.substr(0, 7) == "policy.");
         else if (field.first == "LR") newrow[field.second] = (prefix.find(".SR.") == prefix.npos);
         else if (field.first == "SR") newrow[field.second] = (prefix.find(".SR.") != prefix.npos);
         else {
@@ -144,12 +144,12 @@ void Treatment::require##Meth(bool req) { \
 }
 REQUIRE(Pre, pre, "pre-piracy")
 REQUIRE(Piracy, piracy, "piracy")
-REQUIRE(Public, public, "public")
+REQUIRE(Policy, policy, "policy")
 void Treatment::requireSR(bool req) {
     require_sr_ = req;
     if (have_data_ and require_sr_) {
         if (has_piracy_ and not has_piracy_sr_) throw std::runtime_error("CSV file has long-run but no short-run piracy data");
-        if (has_public_ and not has_public_sr_) throw std::runtime_error("CSV file has long-run but no short-run public data");
+        if (has_policy_ and not has_policy_sr_) throw std::runtime_error("CSV file has long-run but no short-run policy data");
     }
 }
 
