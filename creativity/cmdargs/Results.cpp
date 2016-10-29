@@ -28,6 +28,7 @@ void Results::addOptions() {
         ("all,a", value(analysis.all), "Implies --summary --write-vs-nowrite --average-effects --marginal-effects, but not --write-vs-nowrite-corr.  If none of the above are given, this is the default.")
 //        ("none,n", value(analysis.none), "Show none of the above analysis.  May not be combined with any of this above.  This flag is intended for use with the --dump-* options.")
         ("short-run,s", value(analysis.shortrun), "Include short-run piracy/public analysis in the results.  The data file must have short-run analysis (i.e. it must not have been created with --skip-short-run).  Short-run analysis is skipped by default.")
+        ("policy,g", value(policy_str_), "Only show analysis for simulations with this policy (or set of policies).  Values are the same as creativity-cli's --policy argument, except for the special (default) value 'any', which disables policy filtering.")
         ;
     options_.add(analysis_desc);
 
@@ -78,6 +79,19 @@ void Results::postParse(boost::program_options::variables_map&) {
             analysis.all or // --all explicitly given
             not (analysis.summary or analysis.write_or_not or analysis.average or analysis.marginal)) // Nothing given: --all is default
         analysis.summary = analysis.write_or_not = analysis.average = analysis.marginal = true;
+
+    if (policy_str_ == "any") {
+        analysis.policy_filter = false;
+    }
+    else {
+        analysis.policy_filter = true;
+        try {
+            analysis.policy = Policy(policy_str_);
+        }
+        catch (std::runtime_error &e) {
+            throw po::invalid_option_value("--policy " + policy_str_);
+        }
+    }
 }
 
 std::string Results::usage() const {

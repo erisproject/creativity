@@ -53,9 +53,9 @@ class FileStorage : public StorageBackend, public eris::serialize::Serialization
 
         /** Constructs and returns a FileStorage object that uses the given file for reading and
          * (optionally) writing state data.  The file is read or created immediately.  All arguments
-         * (except the first) are forwarded to Serialize::open().
+         * (except the first) are forwarded to eris::Serializer::open().
          *
-         * \sa Serialize::open()
+         * \sa eris::Serializer::open()
          *
          * \throws various exceptions if the file does not exist, cannot be read, is empty, or
          * contains invalid data.

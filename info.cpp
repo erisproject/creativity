@@ -69,9 +69,10 @@ int main(int argc, char *argv[]) {
     const auto &policies = creativity.parameters.policy;
     std::cout << std::setw(30) << "policy";
     bool comma = false;
-    if (policies & POLICY_PUBLIC_SHARING) { if (comma) std::cout << ", "; comma = true; std::cout << "public sharing"; }
-    if (policies & POLICY_CATCH_PIRATES)  { if (comma) std::cout << ", "; comma = true; std::cout << "catch and fine pirates"; }
-    if (policies & ~(POLICY_PUBLIC_SHARING | POLICY_CATCH_PIRATES)) { if (comma) std::cout << ", "; comma = true; std::cout << "(unknown policy)"; }
+    if (policies.publicSharing()) { if (comma) std::cout << ", "; comma = true; std::cout << "public sharing"; }
+    if (policies.publicVoting())  { if (comma) std::cout << ", "; comma = true; std::cout << "public voting"; }
+    if (policies.catchPirates())  { if (comma) std::cout << ", "; comma = true; std::cout << "catch pirates"; }
+    if (policies.unknown())       { if (comma) std::cout << ", "; comma = true; std::cout << "(unknown policy)"; }
     if (!policies) std::cout << "no policy response";
     std::cout << "\n";
     PRINT_SETTING(policy_begins);
@@ -131,10 +132,10 @@ int main(int argc, char *argv[]) {
         ADD_SAME(piracy_link_proportion);
 
         std::list<std::string> policies;
-        bool policy_public = false, policy_catch = false;
-        if (creativity.parameters.policy & POLICY_PUBLIC_SHARING) { policy_public = true; policies.push_back("public-sharing"); }
-        if (creativity.parameters.policy & POLICY_CATCH_PIRATES) { policy_catch = true; policies.push_back("catch-pirates"); }
-        if (creativity.parameters.policy & ~(POLICY_CATCH_PIRATES | POLICY_PUBLIC_SHARING)) policies.push_back("unknown-policy");
+        if (creativity.parameters.policy.publicSharing()) policies.push_back("public-sharing");
+        if (creativity.parameters.policy.publicVoting())  policies.push_back("public-voting");
+        if (creativity.parameters.policy.catchPirates())  policies.push_back("catch-pirates");
+        if (creativity.parameters.policy.unknown())       policies.push_back("unknown-policy");
         if (!policies.empty()) {
             std::cout << " --policy ";
             bool first = true;
@@ -147,9 +148,15 @@ int main(int argc, char *argv[]) {
             ADD_SAME(policy_begins);
         }
 
+        if (creativity.parameters.policy.publicSharing())
+            ADD("--public-sharing-tax", policy_public_sharing_tax);
 
-        if (policy_public) ADD("--public-sharing-tax", policy_public_sharing_tax);
-        if (policy_catch) {
+        if (creativity.parameters.policy.publicVoting()) {
+            ADD("--public-voting-tax", policy_public_voting_tax);
+            ADD("--public-voting-votes", policy_public_voting_votes);
+        }
+
+        if (creativity.parameters.policy.catchPirates()) {
             ADD("--catch-tax", policy_catch_tax);
             ADD("--catch-fine-any", policy_catch_fine[0]);
             ADD("--catch-fine-const", policy_catch_fine[1]);

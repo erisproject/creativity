@@ -1,6 +1,7 @@
 #pragma once
 #include "creativity/cmdargs/CmdArgs.hpp"
 #include "creativity/data/tabulate.hpp"
+#include "creativity/Policy.hpp"
 #include <eris/types.hpp>
 #include <limits>
 #include <string>
@@ -51,6 +52,13 @@ class Results : public CmdArgs {
 
             /// If true, do short-run analysis (will raise error if it doesn't exist in the data file)
             bool shortrun = false;
+
+            /// If true, only show simulations with policy equal to `policy`
+            bool policy_filter = false;
+            /** The policy implied by the given --policy value.  If none is given, this will be a
+             * no-policy option, and policy_str will be set to "any".
+             */
+            Policy policy;
         } analysis;
 
         /// Condensed table output (currently only for average effects model)
@@ -91,6 +99,9 @@ class Results : public CmdArgs {
         /// Overridden to make sure only one of --text/--html/--latex are given.
         virtual void postParse(boost::program_options::variables_map &vars) override;
 
+
+        /// The --policy argument (which is parsed into analysis.policy and .policy_filter)
+        std::string policy_str_ = "any";
 };
 
 }}

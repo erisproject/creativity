@@ -14,19 +14,6 @@ namespace creativity { class Book; }
 /// Primary namespace for all Creativity library code.
 namespace creativity {
 
-/** The bit for the public-sharing policy in `settings.policy`.
- * \internal
- */
-constexpr uint32_t POLICY_PUBLIC_SHARING = 1 << 0;
-/** The bit for the catch-pirates policy in `settings.policy`.
- * \internal
- */
-constexpr uint32_t POLICY_CATCH_PIRATES  = 1 << 1;
-/** The bit for the public-sharing-with-voting policy in `settings.policy`.
- * \internal
- */
-constexpr uint32_t POLICY_PUBLIC_SHARING_VOTING = 1 << 2;
-
 /** Central class for a creativity simulation; this class handles setting up the simulation
  * according to configured parameters and running the simulation.
  *

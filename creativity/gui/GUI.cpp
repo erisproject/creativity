@@ -9,6 +9,7 @@
 #include "creativity/state/Storage.hpp"
 #include "creativity/Creativity.hpp"
 #include "creativity/config.hpp"
+#include "creativity/Policy.hpp"
 #include <eris/random/rng.hpp>
 #include <boost/filesystem/path.hpp>
 #include <cairomm/matrix.h>
@@ -952,13 +953,13 @@ void GUI::thr_update_parameters() {
 #undef SET_SB_ARRAY
 
     widget<Gtk::CheckButton>("set_policy_public_sharing")->set_active(
-            creativity_.parameters.policy & POLICY_PUBLIC_SHARING);
+            creativity_.parameters.policy.publicSharing());
     widget<Gtk::CheckButton>("set_policy_catch")->set_active(
-            creativity_.parameters.policy & POLICY_CATCH_PIRATES);
+            creativity_.parameters.policy.catchPirates());
     widget<Gtk::CheckButton>("set_policy_public_voting")->set_active(
-            creativity_.parameters.policy & POLICY_PUBLIC_SHARING_VOTING);
+            creativity_.parameters.policy.publicVoting());
 
-    if (creativity_.parameters.policy & ~(POLICY_PUBLIC_SHARING | POLICY_CATCH_PIRATES | POLICY_PUBLIC_SHARING_VOTING))
+    if (creativity_.parameters.policy.unknown())
         throw std::logic_error("Internal error: simulation policy value set to an unknown/invalid value");
 }
 
@@ -1260,12 +1261,13 @@ void GUI::initializeSim() {
 #undef COPY_SB_ARRAY
 #undef COPY_SB_INIT_D
 
-    set.policy = 0;
+    set.policy = Policy();
     if (widget<Gtk::CheckButton>("set_policy_public_sharing")->get_active())
-        set.policy |= POLICY_PUBLIC_SHARING;
+        set.policy += Policy::PublicSharing();
+    if (widget<Gtk::CheckButton>("set_policy_public_voting")->get_active())
+        set.policy += Policy::PublicVoting();
     if (widget<Gtk::CheckButton>("set_policy_catch")->get_active())
-        set.policy |= POLICY_CATCH_PIRATES;
-
+        set.policy += Policy::CatchPirates();
 
     // Other non-simulation options need to be queued via a configure event:
     Parameter p;

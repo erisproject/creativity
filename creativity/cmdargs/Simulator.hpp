@@ -37,8 +37,8 @@ class Simulator : public CmdArgs {
          */
         unsigned int periods = 300;
 
-        /// Stores the --policy= arguments given
-        std::vector<std::string> policies;
+        /// Stores the --policy= argument given
+        std::string policy;
 
         /** The output file for simulation results; default is "creativity-SEED.crstate" for the
          * CLI, unset for the GUI.

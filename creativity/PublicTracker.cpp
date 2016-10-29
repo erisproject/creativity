@@ -11,8 +11,8 @@ namespace creativity {
 using namespace eris;
 
 PublicTracker::PublicTracker(const Creativity &creativity) : creativity_{std::move(creativity)} {
-    bool dl = creativity_.parameters.policy & POLICY_PUBLIC_SHARING;
-    bool vote = creativity_.parameters.policy & POLICY_PUBLIC_SHARING_VOTING;
+    bool dl = creativity_.parameters.policy.publicSharing();
+    bool vote = creativity_.parameters.policy.publicVoting();
     if (!dl && !vote)
         throw std::logic_error("PublicTracker created for a simulation without public sharing or public voting!");
 

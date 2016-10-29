@@ -78,7 +78,7 @@ void Simulator::addOptions() {
     options_.add(piracy);
 
     policy.add_options()
-        ("policy,g", value(policies), "A list of policies to enable in the policy phase of the simulation.  This option may be specified multiple times, or may be specified with a comma-separated list of policies.  If the option is omitted, defaults to `public-sharing`; specify 'none' to disable all policies.  Currently accepted policy names: 'public-sharing' - enables public sharing with redistribution (can be shorted to 'public'); 'public-voting' - like public-sharing, but readers cast votes for public works to determine payoffs (can be shorted to 'vote'); 'catch-pirates' - enables detection and fines (can be shorted to 'catch')")
+        ("policy,g", value(this->policy), "A list of policies to enable in the policy phase of the simulation.  May be specified as a comma-separated list of policies to enable simultaneously.  If the option is omitted, defaults to `public-sharing`; specify 'none' or '' to disable all policies.  Currently accepted policy names: 'public-sharing' - enables public sharing with redistribution (can be shorted to 'public'); 'public-voting' - like public-sharing, but readers cast votes for public works to determine payoffs (can be shorted to 'vote'); 'catch-pirates' - enables detection and fines (can be shorted to 'catch')")
         ("policy-begins,G", value(s_.policy_begins), "When a policy response is enabled, this specifies the period in which it begins.  Has no effect if no policy response is enabled")
         ("prior-scale-policy,S", min<1>(s_.prior_scale_policy), "The same as --prior-scale, but applied in the first policy response period")
         ;
@@ -139,25 +139,14 @@ void Simulator::postParse(boost::program_options::variables_map &vars) {
     // Default, but only if the argument isn't specified (so that `--policy=` by itself disables the
     // policy)
     if (vars.count("policy") == 0) {
-        policies.push_back("public-sharing");
+        policy = "public-sharing";
     }
 
-    for (const auto &p : policies) {
-        std::istringstream iss;
-        iss.str(p);
-        std::string policy;
-        while (std::getline(iss, policy, ',')) {
-            if (policy == "public" or policy == "public-sharing")
-                s_.policy |= POLICY_PUBLIC_SHARING;
-            else if (policy == "catch" or policy == "catch-pirates")
-                s_.policy |= POLICY_CATCH_PIRATES;
-            else if (policy == "vote" or policy == "voting" or policy == "public-voting")
-                s_.policy |= POLICY_PUBLIC_SHARING_VOTING;
-            else if (policy == "none" or policy == "")
-                /* ignore */;
-            else
-                throw po::invalid_option_value("--policy " + policy);
-        }
+    try {
+        s_.policy = Policy(policy);
+    }
+    catch (std::runtime_error &e) {
+        throw po::invalid_option_value("--policy " + policy);
     }
 }
 

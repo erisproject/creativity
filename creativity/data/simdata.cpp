@@ -453,7 +453,7 @@ std::vector<initial_datum> initial_data_fields() {
     ADD_SETTING(piracy_begins);
     ADD_SETTING(piracy_link_proportion);
 
-    ADD_SETTING(policy);
+    initial_data.emplace_back("policy", [](const CreativitySettings &cs) -> uint32_t { return cs.policy; });
     ADD_SETTING(policy_begins);
     ADD_SETTING(policy_public_sharing_tax);
     ADD_SETTING(policy_catch_tax);

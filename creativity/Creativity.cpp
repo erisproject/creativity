@@ -5,6 +5,7 @@
 #include "creativity/state/Storage.hpp"
 #include "creativity/Reader.hpp"
 #include "creativity/BookMarket.hpp"
+#include "creativity/Policy.hpp"
 #include <eris/random/rng.hpp>
 #include <boost/random/uniform_int_distribution.hpp>
 #include <boost/random/uniform_real_distribution.hpp>
@@ -60,6 +61,8 @@ void Creativity::checkParameters() {
     PROHIBIT(initial.keep_price, < 0);
 #undef PROHIBIT
 
+    if (parameters.policy.unknown()) throw std::domain_error("Invalid Creativity setting: parameters.policy " + std::to_string((uint32_t) parameters.policy) + " is invalid");
+
     // Reader optimization depends on the fine being non-decreasing in the number of books (so that
     // each additional pirated book increases the fine by at least as much as the previous book).
     // This simplifies the optimization problem greatly: readers can just increase pirated books
@@ -74,7 +77,7 @@ void Creativity::checkParameters() {
     // (Actually, we really care about probability times the fine, and so we could, in theory, allow
     // a little bit of concavity depending on the detection parameters, but that would be a
     // difficult calculation involving the CDF of a normal).
-    if (parameters.policy & POLICY_CATCH_PIRATES) {
+    if (parameters.policy.catchPirates()) {
         if (parameters.policy_catch_fine[2] < 0)
             throw std::domain_error("Invalid Creativity setting: parameters.policy_catch_fine must be convex (i.e. element [2] must be >= 0)");
         if (parameters.policy_catch_fine[1] + parameters.policy_catch_fine[2] < 0)
@@ -149,21 +152,18 @@ void Creativity::run() {
     // If the next period is the first when the policy response becomes active, initialize it as
     // needed.
     if (sim->t() + 1 == parameters.policy_begins) {
-        uint32_t policies = parameters.policy;
-        auto pub_track_mask = POLICY_PUBLIC_SHARING | POLICY_PUBLIC_SHARING_VOTING;
-        if (policies & pub_track_mask) {
-            policies &= ~pub_track_mask;
-            // Create the PublicTracker to provide and compensate authors:
-            sim->spawn<PublicTracker>(*this);
-        }
-        if (policies & POLICY_CATCH_PIRATES) {
-            policies &= ~POLICY_CATCH_PIRATES;
-            // Spawn the agent that detects and handles piracy:
-            sim->spawn<CopyrightPolice>(*this);
-        }
+        Policy policies(parameters.policy);
+        if (policies.unknown()) throw std::runtime_error("Creativity simulation has unknown/invalid `policy` value");
 
-        if (policies)
-            throw std::runtime_error("Creativity simulation has unknown/invalid `policy` value");
+        // Create the PublicTracker to provide and compensate authors (if under either public
+        // sharing policy):
+        if (policies.publicSharing() || policies.publicVoting())
+            sim->spawn<PublicTracker>(*this);
+
+        // Spawn the agent that detects and handles piracy fines (if under the catch pirates policy):
+        if (policies.catchPirates())
+            sim->spawn<CopyrightPolice>(*this);
+
     }
 
     sim->run();
@@ -277,17 +277,17 @@ bool Creativity::policyActive() const {
 
 bool Creativity::publicSharingActive() const {
     if (!setup_sim_) throw std::logic_error("Cannot call publicSharingActive() on a non-live or unconfigured simulation");
-    return parameters.policy & POLICY_PUBLIC_SHARING and policyActive();
+    return parameters.policy.publicSharing() && policyActive();
 }
 
 bool Creativity::publicVotingActive() const {
     if (!setup_sim_) throw std::logic_error("Cannot call publicVotingActive() on a non-live or unconfigured simulation");
-    return parameters.policy & POLICY_PUBLIC_SHARING_VOTING and policyActive();
+    return parameters.policy.publicVoting() && policyActive();
 }
 
 bool Creativity::catchPiratesActive() const {
     if (!setup_sim_) throw std::logic_error("Cannot call catchPiratesActive() on a non-live or unconfigured simulation");
-    return parameters.policy & POLICY_CATCH_PIRATES and policyActive();
+    return parameters.policy.catchPirates() && policyActive();
 }
 
 double Creativity::policyTaxes() const {
