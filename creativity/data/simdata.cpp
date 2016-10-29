@@ -456,11 +456,13 @@ std::vector<initial_datum> initial_data_fields() {
     initial_data.emplace_back("policy", [](const CreativitySettings &cs) -> uint32_t { return cs.policy; });
     ADD_SETTING(policy_begins);
     ADD_SETTING(policy_public_sharing_tax);
+    ADD_SETTING(policy_public_voting_tax);
+    ADD_SETTING(policy_public_voting_votes);
     ADD_SETTING(policy_catch_tax);
+    ADD_SETTING(policy_catch_cost);
     ADD_SETTING(policy_catch_fine[0]);
     ADD_SETTING(policy_catch_fine[1]);
     ADD_SETTING(policy_catch_fine[2]);
-    ADD_SETTING(policy_catch_fine[3]);
     ADD_SETTING(policy_catch_mu[0]);
     ADD_SETTING(policy_catch_mu[1]);
     ADD_SETTING(policy_catch_mu[2]);
