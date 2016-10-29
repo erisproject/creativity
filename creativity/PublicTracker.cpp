@@ -19,7 +19,7 @@ PublicTracker::PublicTracker(const Creativity &creativity) : creativity_{std::mo
     if (dl and dlTax() < 0) throw std::domain_error("PublicTracker creation error: public sharing lump sum tax cannot be negative");
     if (vote) {
         if (voteTax() <= 0) throw std::domain_error("PublicTracker creation error: public voting lump sum tax must be positive");
-        if (creativity_.parameters.policy_public_sharing_voting_votes <= 0)
+        if (creativity_.parameters.policy_public_voting_votes <= 0)
             throw std::domain_error("PublicTracker creation error: number of votes must be positive");
     }
 }
@@ -27,7 +27,7 @@ PublicTracker::PublicTracker(const Creativity &creativity) : creativity_{std::mo
 void PublicTracker::interApply() {
     auto lock = writeLock();
     // If the tax is 0, we don't need to do any transfers.
-    if (creativity_.publicSharing() and dlTax() > 0) {
+    if (creativity_.publicSharingActive() and dlTax() > 0) {
         Bundle tax_bill(creativity_.money, dlTax());
         for (auto &r : simulation()->agents<Reader>()) {
             lock.add(r);
@@ -36,7 +36,7 @@ void PublicTracker::interApply() {
         }
     }
 
-    if (creativity_.publicSharingVoting() and voteTax() > 0) {
+    if (creativity_.publicVotingActive() and voteTax() > 0) {
         Bundle tax_bill(creativity_.money, voteTax());
         for (auto &r : simulation()->agents<Reader>()) {
             lock.add(r);
@@ -114,10 +114,10 @@ void PublicTracker::distributeVoteFunds() {
 
 void PublicTracker::intraFinish() {
 
-    if (creativity_.publicSharing())
+    if (creativity_.publicSharingActive())
         distributeDLFunds();
 
-    if (creativity_.publicSharingVoting())
+    if (creativity_.publicVotingActive())
         distributeVoteFunds();
 
 }

@@ -158,21 +158,21 @@ class Creativity : private eris::noncopyable {
          * begins).  Attempting to call this on a Creativity object that is not a live simulation,
          * or is a live simulation but has not been set up yet, will raise an exception.
          */
-        bool publicSharing() const;
+        bool publicSharingActive() const;
 
         /** Returns true if public sharing with voting is an enabled policy response *and* it is
          * active in the simulation (i.e. the simulation has reached the period in which the policy
          * response begins).  Attempting to call this on a Creativity object that is not a live
          * simulation, or is a live simulation but has not been set up yet, will raise an exception.
          */
-        bool publicSharingVoting() const;
+        bool publicVotingActive() const;
 
         /** Returns true if getting caught for piracy is a configured policy response *and* it is
          * active in the simulation (i.e. the simulation has reached the policy response stage).
          * Attempting to call this on a Creativity object that is not a live simulation, or is a
          * live simulation but has not been set up yet, will raise an exception.
          */
-        bool catchPirates() const;
+        bool catchPiratesActive() const;
 
         /** Returns the per-user policies taxes currently in effect.  Before the policy comes into
          * effect, this is 0; afterwards, it is whatever is the sum of the taxes of whichever

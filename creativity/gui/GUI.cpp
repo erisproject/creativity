@@ -938,8 +938,8 @@ void GUI::thr_update_parameters() {
     SET_SB(policy_public_sharing_tax);
 
     // Public voting policy:
-    SET_SB(policy_public_sharing_voting_tax);
-    SET_SB(policy_public_sharing_voting_votes);
+    SET_SB(policy_public_voting_tax);
+    SET_SB(policy_public_voting_votes);
 
     // Catching policy:
     SET_SB(policy_catch_tax);
@@ -955,7 +955,7 @@ void GUI::thr_update_parameters() {
             creativity_.parameters.policy & POLICY_PUBLIC_SHARING);
     widget<Gtk::CheckButton>("set_policy_catch")->set_active(
             creativity_.parameters.policy & POLICY_CATCH_PIRATES);
-    widget<Gtk::CheckButton>("set_policy_public_sharing_voting")->set_active(
+    widget<Gtk::CheckButton>("set_policy_public_voting")->set_active(
             creativity_.parameters.policy & POLICY_PUBLIC_SHARING_VOTING);
 
     if (creativity_.parameters.policy & ~(POLICY_PUBLIC_SHARING | POLICY_CATCH_PIRATES | POLICY_PUBLIC_SHARING_VOTING))

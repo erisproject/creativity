@@ -62,7 +62,7 @@
     <property name="step_increment">1</property>
     <property name="page_increment">10</property>
   </object>
-  <object class="GtkAdjustment" id="adj_policy_public_sharing_voting_tax">
+  <object class="GtkAdjustment" id="adj_policy_public_voting_tax">
     <property name="lower">0.01</property>
     <property name="upper">1000</property>
     <property name="step_increment">1</property>
@@ -2399,7 +2399,7 @@ This paramter is &lt;b&gt;s₂&lt;/b&gt;.</property>
                                                   </packing>
                                                 </child>
                                                 <child>
-                                                  <object class="GtkLabel" id="lbl_policy_public_sharing_voting">
+                                                  <object class="GtkLabel" id="lbl_policy_public_voting">
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="label" translatable="yes">&lt;b&gt;&lt;u&gt;Public voting&lt;/u&gt;&lt;/b&gt;</property>
@@ -2412,7 +2412,7 @@ This paramter is &lt;b&gt;s₂&lt;/b&gt;.</property>
                                                   </packing>
                                                 </child>
                                                 <child>
-                                                  <object class="GtkLabel" id="lbl_policy_public_sharing_voting_tax">
+                                                  <object class="GtkLabel" id="lbl_policy_public_voting_tax">
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="label" translatable="yes">Lump-sum tax</property>
@@ -2424,7 +2424,7 @@ This paramter is &lt;b&gt;s₂&lt;/b&gt;.</property>
                                                   </packing>
                                                 </child>
                                                 <child>
-                                                  <object class="GtkCheckButton" id="set_policy_public_sharing_voting">
+                                                  <object class="GtkCheckButton" id="set_policy_public_voting">
                                                     <property name="label" translatable="yes">Enabled</property>
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">True</property>
@@ -2438,7 +2438,7 @@ This paramter is &lt;b&gt;s₂&lt;/b&gt;.</property>
                                                   </packing>
                                                 </child>
                                                 <child>
-                                                  <object class="GtkLabel" id="lbl_policy_public_sharing_voting_votes">
+                                                  <object class="GtkLabel" id="lbl_policy_public_voting_votes">
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">False</property>
                                                     <property name="label" translatable="yes">Votes per reader</property>
@@ -2450,7 +2450,7 @@ This paramter is &lt;b&gt;s₂&lt;/b&gt;.</property>
                                                   </packing>
                                                 </child>
                                                 <child>
-                                                  <object class="GtkSpinButton" id="set_policy_public_sharing_voting_tax">
+                                                  <object class="GtkSpinButton" id="set_policy_public_voting_tax">
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">True</property>
                                                     <property name="tooltip_text" translatable="yes">The per-period lump-sum tax paid by each reader to fund public provisioning.  The amount is redistributed to authors in proportion to votes cast for their works.</property>
@@ -2458,7 +2458,7 @@ This paramter is &lt;b&gt;s₂&lt;/b&gt;.</property>
                                                     <property name="invisible_char">●</property>
                                                     <property name="text" translatable="yes">0.00</property>
                                                     <property name="input_purpose">number</property>
-                                                    <property name="adjustment">adj_policy_public_sharing_voting_tax</property>
+                                                    <property name="adjustment">adj_policy_public_voting_tax</property>
                                                     <property name="digits">2</property>
                                                     <property name="numeric">True</property>
                                                     <property name="update_policy">if-valid</property>
@@ -2469,7 +2469,7 @@ This paramter is &lt;b&gt;s₂&lt;/b&gt;.</property>
                                                   </packing>
                                                 </child>
                                                 <child>
-                                                  <object class="GtkSpinButton" id="set_policy_public_sharing_voting_votes">
+                                                  <object class="GtkSpinButton" id="set_policy_public_voting_votes">
                                                     <property name="visible">True</property>
                                                     <property name="can_focus">True</property>
                                                     <property name="tooltip_text" translatable="yes">The number of votes each reader receives.  Readers cast their votes using a mechanism that is coarsely proportional to the net utility they gained from each public market book (ignoring the opportunity cost).

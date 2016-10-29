@@ -323,7 +323,7 @@ void Reader::interOptimize() {
         // sharing cost (which is the minimum of unit cost and piracy cost) if that is lower (since
         // that's what the public sharing marginal cost and price ends up being).
         double marginal_cost = creativity_.parameters.cost_unit;
-        if (creativity_.publicSharing() and creativity_.parameters.cost_piracy < marginal_cost)
+        if (creativity_.publicSharingActive() and creativity_.parameters.cost_piracy < marginal_cost)
             marginal_cost = creativity_.parameters.cost_piracy;
         double min_effort = creationEffort(distancePenalty(0) + numBooksPenalty(1) + 1.05 * marginal_cost);
         double max_effort = income_available - creation_base_cost;
@@ -769,7 +769,7 @@ void Reader::updateProfitBelief() {
             // beliefs
             extrap_books.push_back(b);
         }
-        else if (creativity_.publicSharing()) {
+        else if (creativity_.publicSharingActive()) {
             // If public sharing exists, we wait until the book has been off the private market for
             // 5 periods (so that it has most likely earned any public money it's going to get)
             if (t - b->leftPrivateMarket() >= 5)
@@ -902,7 +902,7 @@ void Reader::intraOptimize() {
     // Get expected piracy penalty value:
     SharedMember<CopyrightPolice> police;
     auto exp_piracy_cost = [this, &police](unsigned pirated) -> double {
-        if (!creativity_.catchPirates())
+        if (!creativity_.catchPiratesActive())
             return 0.0;
 
         double prob = police->prob(pirated);
@@ -912,7 +912,7 @@ void Reader::intraOptimize() {
 
     unsigned books_pirating = 0;
     double piracy_penalty = 0, piracy_penalty_next = 0;
-    if (creativity_.catchPirates())
+    if (creativity_.catchPiratesActive())
         police = simulation()->agents<CopyrightPolice>()[0];
 
     // Baseline expected penalty: even if we don't pirate, there's some probability of being
@@ -1064,7 +1064,7 @@ void Reader::intraApply() {
     }
     reserved_books_.clear();
 
-    if (creativity_.publicSharingVoting()) {
+    if (creativity_.publicVotingActive()) {
         // If we are voting, figure out the distribution of votes, by allocating votes in coarse
         // proportion to the realized book sub-utility (i.e. uBook(), the book utility, minus its
         // cost (market or piracy), without taking into account the added opportunity cost of
@@ -1105,7 +1105,7 @@ void Reader::intraApply() {
 
         if (not book_subu.empty()) {
 
-            while (total_votes < creativity_.parameters.policy_public_sharing_voting_votes) {
+            while (total_votes < creativity_.parameters.policy_public_voting_votes) {
                 // We need to change the key, which means we have to remove and reinsert the element
                 // (so that it gets resorted into the right place in the multimap).
                 auto best = book_subu.begin();

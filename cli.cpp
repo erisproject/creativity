@@ -177,9 +177,9 @@ int main(int argc, char *argv[]) {
                 "Policy ";
             if (creativity.policyActive()) {
                 std::cout << u8"✔[";
-                if (creativity.publicSharing()) std::cout << 'P';
-                if (creativity.publicSharingVoting()) std::cout << 'V';
-                if (creativity.catchPirates()) std::cout << 'C';
+                if (creativity.publicSharingActive()) std::cout << 'P';
+                if (creativity.publicVotingActive()) std::cout << 'V';
+                if (creativity.catchPiratesActive()) std::cout << 'C';
                 std::cout << "]; ";
             }
             else std::cout << u8"✘; ";

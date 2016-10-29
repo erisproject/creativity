@@ -145,7 +145,7 @@ struct CreativitySettings {
     /** This is the lump-sum per-reader tax for public sharing with voting.  Has no effect when
      * public sharing with voting is not enabled.  Must be strictly greater than 0.
      */
-    double policy_public_sharing_voting_tax = 10.0;
+    double policy_public_voting_tax = 10.0;
 
     /** The number of votes each reader receives in the public-sharing-with-voting regime.  Voters
      * cast votes in (rough) proportion to the net utility they received from reading each public
@@ -155,7 +155,7 @@ struct CreativitySettings {
      * given 4 votes, he would cast 3 votes for book 1, and 1 vote for book 2; with 18 votes he
      * would cast 10, 5, 2, 1.
      */
-    uint32_t policy_public_sharing_voting_votes = 3;
+    uint32_t policy_public_voting_votes = 3;
 
     /** This is the lump-sum tax extracted from each user to fund the policing policy to catch and
      * fine readers using piracy.  Has no effect when the catching policy is not enabled.

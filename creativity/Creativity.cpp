@@ -45,8 +45,8 @@ void Creativity::checkParameters() {
     PROHIBIT(piracy_link_proportion, < 0);
     PROHIBIT(piracy_link_proportion, > 1);
     PROHIBIT(policy_public_sharing_tax, < 0);
-    PROHIBIT(policy_public_sharing_voting_tax, <= 0);
-    PROHIBIT(policy_public_sharing_voting_votes, < 1);
+    PROHIBIT(policy_public_voting_tax, <= 0);
+    PROHIBIT(policy_public_voting_votes, < 1);
     PROHIBIT(policy_catch_tax, <= 0);
     PROHIBIT(policy_catch_cost, < 0);
     PROHIBIT(initial.prob_write, < 0);
@@ -275,27 +275,27 @@ bool Creativity::policyActive() const {
     return parameters.policy and parameters.policy_begins > 0 and sim->t() >= parameters.policy_begins;
 }
 
-bool Creativity::publicSharing() const {
-    if (!setup_sim_) throw std::logic_error("Cannot call publicSharing() on a non-live or unconfigured simulation");
+bool Creativity::publicSharingActive() const {
+    if (!setup_sim_) throw std::logic_error("Cannot call publicSharingActive() on a non-live or unconfigured simulation");
     return parameters.policy & POLICY_PUBLIC_SHARING and policyActive();
 }
 
-bool Creativity::publicSharingVoting() const {
-    if (!setup_sim_) throw std::logic_error("Cannot call publicSharingVoting() on a non-live or unconfigured simulation");
+bool Creativity::publicVotingActive() const {
+    if (!setup_sim_) throw std::logic_error("Cannot call publicVotingActive() on a non-live or unconfigured simulation");
     return parameters.policy & POLICY_PUBLIC_SHARING_VOTING and policyActive();
 }
 
-bool Creativity::catchPirates() const {
-    if (!setup_sim_) throw std::logic_error("Cannot call catchPirates() on a non-live or unconfigured simulation");
+bool Creativity::catchPiratesActive() const {
+    if (!setup_sim_) throw std::logic_error("Cannot call catchPiratesActive() on a non-live or unconfigured simulation");
     return parameters.policy & POLICY_CATCH_PIRATES and policyActive();
 }
 
 double Creativity::policyTaxes() const {
     if (!setup_sim_) throw std::logic_error("Cannot call policyTaxes() on a non-live or unconfigured simulation");
     double tax = 0;
-    if (catchPirates()) tax += parameters.policy_catch_tax;
-    if (publicSharing()) tax += parameters.policy_public_sharing_tax;
-    if (publicSharingVoting()) tax += parameters.policy_public_sharing_voting_tax;
+    if (catchPiratesActive())  tax += parameters.policy_catch_tax;
+    if (publicSharingActive()) tax += parameters.policy_public_sharing_tax;
+    if (publicVotingActive())  tax += parameters.policy_public_voting_tax;
     return tax;
 }
 

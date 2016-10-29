@@ -146,8 +146,8 @@ void FileStorage::configureHeaderFields() {
 
     addHeaderField(settings_.policy_public_sharing_tax);
 
-    addHeaderField(settings_.policy_public_sharing_voting_tax);
-    addHeaderField(settings_.policy_public_sharing_voting_votes);
+    addHeaderField(settings_.policy_public_voting_tax);
+    addHeaderField(settings_.policy_public_voting_votes);
 
     addHeaderField(settings_.policy_catch_tax);
     addHeaderField(settings_.policy_catch_cost);

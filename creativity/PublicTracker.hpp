@@ -73,7 +73,7 @@ class PublicTracker : public eris::Agent,
         double dlTax() const { return creativity_.parameters.policy_public_sharing_tax; }
 
         /// Returns the lump sum per-reader tax collected each period for vote-based compensation
-        double voteTax() const { return creativity_.parameters.policy_public_sharing_voting_tax; }
+        double voteTax() const { return creativity_.parameters.policy_public_voting_tax; }
 
         /** Returns the current total asset pool that will be distributed to authors (proportional
          * to downloads) at the end of the current period.  If called between periods, this will be

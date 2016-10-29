@@ -85,8 +85,8 @@ void Simulator::addOptions() {
 
     pol_public.add_options()
         ("public-sharing-tax,A", min<0>(s_.policy_public_sharing_tax), "The per-period, lump sum tax collected from each reader for --policy=public-sharing")
-        ("public-voting-tax,V", above<0>(s_.policy_public_sharing_voting_tax), "The per-period, lump sum tax collected from each reader for --policy=public-voting")
-        ("public-voting-votes,v", min<1>(s_.policy_public_sharing_voting_votes), "The number of votes each readers gets for --policy=public-voting")
+        ("public-voting-tax,V", above<0>(s_.policy_public_voting_tax), "The per-period, lump sum tax collected from each reader for --policy=public-voting")
+        ("public-voting-votes,v", min<1>(s_.policy_public_voting_votes), "The number of votes each readers gets for --policy=public-voting")
         ;
     policy.add(pol_public);
 
