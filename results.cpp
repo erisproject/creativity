@@ -50,6 +50,24 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+    std::ofstream f;
+    if (not args.output.filename.empty()) {
+        if (not args.output.overwrite and fs::exists(args.output.filename)) {
+            std::cerr << "Error: `" << args.output.filename << "' already exists; specify a different file or add `--overwrite' option to overwrite\n";
+            exit(1);
+        }
+
+        try {
+            f.exceptions(f.failbit | f.badbit);
+            f.open(args.output.filename, std::ios_base::trunc);
+        }
+        catch (std::ios_base::failure &c) {
+            // Catch, wrap message, and rethrow:
+            throw std::ios_base::failure("Unable to open " + args.output.filename + ": " + strerror(errno));
+        }
+    }
+    std::ostream &out = args.output.filename.empty() ? std::cout : f;
+
     // The minimum value of books_written that needs to be satisified to count as writing occuring
     // during a period:
     double writing_threshold = 0.2;
@@ -84,6 +102,14 @@ int main(int argc, char *argv[]) {
         },
         shortrun_filter
     );
+
+    if (args.output.list_filtered_write) {
+        for (const auto &source : data_writing_always.sourceFiles()) {
+            out << source << "\n";
+        }
+        return 0; // Done, exit.
+    }
+
     // Observations with no writing under piracy, but with writing in policy (and pre)
     TreatmentFilter data_no_piracy_writing(*data, [&](const TreatmentFilter::Properties &p) {
             // Require that this data actually has pre, piracy, and policy:
@@ -124,23 +150,14 @@ int main(int argc, char *argv[]) {
         shortrun_filter
     );
 
-    std::ofstream f;
-    if (not args.output.filename.empty()) {
-        if (not args.output.overwrite and fs::exists(args.output.filename)) {
-            std::cerr << "Error: `" << args.output.filename << "' already exists; specify a different file or add `--overwrite' option to overwrite\n";
-            exit(1);
+    if (args.output.list_filtered_nowrite) {
+        for (auto &list : {data_no_pre_writing, data_no_piracy_writing, data_no_pol_writing, data_no_post_writing}) {
+            for (const auto &source : list.sourceFiles()) {
+                out << source << "\n";
+            }
         }
-
-        try {
-            f.exceptions(f.failbit | f.badbit);
-            f.open(args.output.filename, std::ios_base::trunc);
-        }
-        catch (std::ios_base::failure &c) {
-            // Catch, wrap message, and rethrow:
-            throw std::ios_base::failure("Unable to open " + args.output.filename + ": " + strerror(errno));
-        }
+        return 0; // Done, exit
     }
-    std::ostream &out = args.output.filename.empty() ? std::cout : f;
 
 
     tabulation_options tabopts(args.format.type, args.format.precision, true);

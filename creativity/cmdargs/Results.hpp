@@ -77,6 +77,9 @@ class Results : public CmdArgs {
             bool overwrite = false; ///< If true, overwrite the above, otherwise throw exception.
 
             bool no_preamble = false; ///< If true, suppress preamble/postamble (HTML/LaTeX only)
+
+            bool list_filtered_write = false; ///< If true, show has-writing simulation source files
+            bool list_filtered_nowrite = false; ///< If true, show non-writing simulation source files
         } output;
 
 

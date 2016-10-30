@@ -44,6 +44,8 @@ void Results::addOptions() {
 
     output_desc.add_options()
         ("output,o", value(output.filename), "If specified, data analysis results will be written to the given filename instead of displayed.  The file must not exist unless --overwrite is specified.")
+        ("list-write", value(output.list_filtered_write), "If specified, instead of calculating results, simply list (one-per-line) the input source filenames that will be considered to have writing in every period.  (Simulations filtered out by --policy are not included)")
+        ("list-nowrite", value(output.list_filtered_nowrite), "Like --list-write, but lists all simulations omitted because of no writing.  (Simulations filtered out by --policy are not included)")
         //("dump-write", value(output.dump_writing), "If specified, dump intermediate data of simulations with writing in each stage to the given CSV file.  The file must not exist unless --overwrite is specified.")
         //("dump-nowrite", value(output.dump_nowriting), "If specified, dump intermediate data of simulations *without* writing in one or more stages to the given CSV file.  The file must not exist unless --overwrite is specified.")
         //("overwrite,O", value(output.overwrite), "If specified, files given to --output, --dump-write or --dump-nowrite will be overwritten if they exist.")
