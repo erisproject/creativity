@@ -191,7 +191,9 @@ int main(int argc, char *argv[]) {
                 "readers", "density", "reader_step_mean", "reader_creation_scale_range", "creation_fixed",
                 "creation_time", "cost_market", "cost_unit", "cost_piracy", "initial.prob_write", "initial.l_min",
                 "initial.l_range", "initial.p_min", "initial.p_range", "initial.prob_keep", "initial.keep_price",
-                "piracy_link_proportion", "public_sharing_tax"});
+                "piracy_link_proportion",
+                "policy_public_sharing_tax", "policy_public_voting_tax", "policy_public_voting_votes",
+                "policy_catch_tax", "policy_catch_fine[1]"});
         const std::vector<std::string> pre_fields({
                 "net_u", "book_p0", "book_sales", "book_profit", "book_quality", "books_written"});
         std::vector<std::string> params_abbrev;
@@ -327,7 +329,7 @@ int main(int argc, char *argv[]) {
             for (unsigned j = 0; j < avg_effects.equations().size(); j++) {
                 auto &eq = avg_effects.equations()[j];
                 std::ostringstream title;
-                title << "Equation " << j+1 << ": " << eq << ":";
+                title << "\nEquation " << j+1 << ": " << eq << ":";
                 avg_opts.title = title.str();
 
                 out << tabulate(avg_effects.summary(j), avg_opts, avg_effects.varNames(j), {"Coefficient", "std.err.", "t-stat", "p-value"}, avg_effects.pStars(j));
@@ -413,7 +415,8 @@ int main(int argc, char *argv[]) {
                 if (data_writing_always.hasPolicy()) eq % (data_writing_always["policy"] * data_writing_always[x]);
             }
             // These don't get included in "pre" or "piracy":
-            for (auto &x : {"param.public_sharing_tax"}) {
+            for (auto &x : {"param.policy_public_sharing_tax", "param.policy_public_voting_tax", "param.policy_public_voting_votes",
+                    "param.policy_catch_tax", "param.policy_catch_fine[1]"}) {
                 if (data_writing_always.hasPolicy()) eq % (data_writing_always["policy"] * data_writing_always[x]);
             }
             marg_effects.add(eq);
