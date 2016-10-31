@@ -19,6 +19,11 @@
 #include <list>
 #include <queue>
 #include <mutex>
+#ifdef __linux__
+extern "C" {
+#include <sys/prctl.h>
+}
+#endif
 
 namespace creativity { namespace state { class State; } }
 
@@ -51,8 +56,8 @@ std::string double_str(double d, unsigned precision) {
     return ss.str();
 }
 
-unsigned int output_count;
-std::mutex output_mutex; // Guards std::out, output_count
+unsigned int processing_counter = 0, output_count = 0, input_count = 0;
+std::mutex output_mutex; // Guards std::cout, std::cerr, output_count
 decltype(cmdargs::Data::input.cbegin()) input_it, input_it_end;
 std::queue<std::pair<std::string, std::unique_ptr<std::stringstream>>> preload_queue;
 bool preload_done = false;
@@ -81,9 +86,11 @@ void thr_preload(const cmdargs::Data &args) {
                 success = true;
             }
             catch (std::ios_base::failure &e) {
+                std::lock_guard<std::mutex> g(output_mutex);
                 std::cerr << "Unable to preload `" << source << "': " << std::strerror(errno) << "\n";
             }
             catch (std::exception &e) {
+                std::lock_guard<std::mutex> g(output_mutex);
                 std::cerr << "Unable to preload `" << source << "': " << e.what() << "\n";
             }
 
@@ -123,6 +130,7 @@ void thr_parse_file(
                 preload_queue.pop();
                 preload_next_cv.notify_all();
                 if (!ss) {
+                    std::lock_guard<std::mutex> g(output_mutex);
                     std::cerr << "Unable to read preloaded file `" << source << "': stringstream pointer is null\n";
                     continue;
                 }
@@ -138,7 +146,21 @@ void thr_parse_file(
         input_lock.unlock();
 
         output_mutex.lock();
-        std::cerr << "Processing " << source << "\n";
+        processing_counter++;
+        std::cerr << "Processing [" << processing_counter << "/" << input_count << "]: " << source << "\n";
+
+#ifdef __linux__
+        // Update the process name to something like "crdata [43/123]" (the space and "a" before the [ get
+        // eliminated if required--we aren't allowed to set a name longer than 15 characters).
+        {
+            std::string progress = "[" + std::to_string(processing_counter) + "/" + std::to_string(input_count) + "]";
+            std::string name = "crdat";
+            if (progress.size() <= 9) { name += 'a'; if (progress.size() <= 8) name += ' '; }
+            name += progress;
+
+            prctl(PR_SET_NAME, name.c_str());
+        }
+#endif
         output_mutex.unlock();
 
         std::ostringstream output;
@@ -150,10 +172,12 @@ void thr_parse_file(
                 creativity.read<FileStorage>(source, FileStorage::Mode::READONLY, args.memory_xz, args.tmpdir);
         }
         catch (std::ios_base::failure&) {
+            std::lock_guard<std::mutex> g(output_mutex);
             std::cerr << "Unable to read/parse `" << source << "': " << std::strerror(errno) << "\n";
             continue;
         }
         catch (std::exception &e) {
+            std::lock_guard<std::mutex> g(output_mutex);
             std::cerr << "Unable to read/parse `" << source << "': " << e.what() << "\n";
             continue;
         }
@@ -177,7 +201,11 @@ void thr_parse_file(
                     : policy_begins
                 : piracy_begins);
 
-#define SKIP_IF(CONDITION, REASON) if (CONDITION) { std::cerr << "Skipping `" << source << "': " << REASON << "\n"; continue; }
+#define SKIP_IF(CONDITION, REASON) if (CONDITION) { \
+    std::lock_guard<std::mutex> g(output_mutex); \
+    std::cerr << "Skipping `" << source << "': " << REASON << "\n"; \
+    continue; \
+}
 
         SKIP_IF(args.verify.periods > 0 and (size_t) args.verify.periods != storage.size()-1,
                 "simulation periods " << storage.size()-1 << " != " << args.verify.periods);
@@ -347,6 +375,7 @@ int main(int argc, char *argv[]) {
         std::cout << output.str();
     }
 
+    input_count = args.input.size();
     input_it = args.input.cbegin();
     input_it_end = args.input.cend();
     std::vector<std::thread> threads;
