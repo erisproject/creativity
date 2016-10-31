@@ -19,8 +19,7 @@ namespace creativity { namespace data {
 
 double book_market_periods(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (from > to) throw std::logic_error("from > to");
-    unsigned long total = 0;
-    unsigned int count = 0;
+    uint_fast32_t total = 0, count = 0;
     auto csto = cs[to];
     for (auto &bp : csto->books) {
         auto &b = bp.second;
@@ -36,7 +35,7 @@ double book_market_periods(const Storage &cs, eris_time_t from, eris_time_t to) 
 double book_p0(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (from > to) throw std::logic_error("from > to");
     double p_total = 0;
-    unsigned int count = 0;
+    uint_fast32_t count = 0;
     for (eris_time_t t = std::max<eris_time_t>(1, from); t <= to; t++) {
         auto cst = cs[t];
         for (auto &bp : cst->books) {
@@ -292,62 +291,71 @@ DIST_FNS(book_author_effort)
 
 double books_written(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (from > to) throw std::logic_error("from > to");
-    unsigned int count = 0;
+    double count = 0;
     for (eris_time_t t = from; t <= to; t++) {
         auto cst = cs[t];
+        uint_fast32_t period_count = 0;
         for (auto &bp : cst->books) {
             auto &b = bp.second;
             if (b.created == t) {
-                count++;
+                period_count++;
             }
         }
+
+        count += period_count / (double) cst->readers.size();
     }
 
-    return count / (double) (to-from+1);
+    return count / (to-from+1) * 100.0;
 }
 
 double books_bought(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (from > to) throw std::logic_error("from > to");
-    unsigned long count = 0;
+    double count = 0;
     for (eris_time_t t = from; t <= to; t++) {
         auto cst = cs[t];
+        uint_fast32_t period_count = 0;
         for (auto &bp : cst->books) {
             auto &b = bp.second;
 
             if (b.market_private)
-                count += b.sales;
+                period_count += b.sales;
         }
+        count += period_count / (double) cst->readers.size();
     }
 
-    return count / (double) (to-from+1);
+    return count / (to-from+1);
 }
 
 double books_pirated(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (from > to) throw std::logic_error("from > to");
-    unsigned long count = 0;
+    double count = 0;
     for (eris_time_t t = from; t <= to; t++) {
         auto cst = cs[t];
+        uint_fast32_t period_count = 0;
         for (auto &bp : cst->books) {
             auto &b = bp.second;
 
-            count += b.pirated;
+            period_count += b.pirated;
         }
+        count += period_count / (double) cst->readers.size();
     }
 
-    return count / (double) (to-from+1);
+    return count / (to-from+1);
 }
 
 double books_public_copies(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (from > to) throw std::logic_error("from > to");
-    unsigned long count = 0;
+    double count = 0;
     for (eris_time_t t = from; t <= to; t++) {
         auto cst = cs[t];
+        uint_fast32_t period_count = 0;
         for (auto &bp : cst->books) {
             auto &b = bp.second;
 
             if (b.market_public())
-                count += b.sales;
+                period_count += b.sales;
         }
+        count += period_count / (double) cst->readers.size();
     }
 
     return count / (double) (to-from+1);

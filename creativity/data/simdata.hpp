@@ -182,20 +182,21 @@ DIST_FNS(net_u)
 
 #undef DIST_FNS
 
-/** Average number of books written per period.
+/** Average number of books written per 100 agents per period.
  */
 double books_written(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
 
-/** Average number of books purchased per period (aggregate, not per-reader)
+/** Average number of books purchased per reader per period
  */
 double books_bought(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
 
-/** Average number of books pirated per period (aggreate, not per-reader).  Note that pirated copies
- * of books that left the market before `from` are still included.
+/** Average number of books pirated per reader per period.  Note that pirated copies of books that
+ * left the market before `from` are still included, i.e. this counts all piracy activity in the
+ * given period, not just piracy activity for books written in the given period.
  */
 double books_pirated(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
 
-/** Average number of books obtained from the public provider.
+/** Average number of books obtained from the public provider per reader per period.
  */
 double books_public_copies(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
 
