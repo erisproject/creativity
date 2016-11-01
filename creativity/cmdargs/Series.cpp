@@ -40,7 +40,7 @@ void Series::addOptions() {
 }
 
 void Series::postParse(boost::program_options::variables_map&) {
-    if (output_dir.empty())
+    if (output_dir.empty() and not help_series)
         throw std::logic_error("Error: --output-directory/-o argument is required");
 }
 

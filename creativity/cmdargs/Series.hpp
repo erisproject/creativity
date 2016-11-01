@@ -15,7 +15,7 @@ class Series : public CmdArgs {
 
         /** comma-separated list of series to display
          */
-        std::string series = "net_u,reader_spending,books_bought,books_pirated,books_written,book_quality,book_profit,book_author_effort,book_author_scale,book_p0";
+        std::string series = "net_u,reader_spending,reader_market_spending,reader_piracy_spending,reader_public_spending,books_bought,books_pirated,books_public_copies,books_written,book_quality,book_sales,book_revenue,book_profit,book_author_effort,book_author_scale,book_p0";
 
         /// A plea for help about possible series values
         bool help_series = false;
