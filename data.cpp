@@ -133,7 +133,6 @@ void thr_parse_file(
     while (preload_mode || input_it != input_it_end) {
         std::string source;
         std::unique_ptr<std::stringstream> ss;
-        Creativity creativity;
         if (preload_mode) {
             preload_cv.wait(input_lock, []{ return preload_done || !preload_queue.empty(); });
             if (!preload_queue.empty()) {
@@ -152,7 +151,7 @@ void thr_parse_file(
             }
             else {
                 // Preloading is finished *and* the queue is empty, so we're done.
-                return;
+                break;
             }
         }
         else {
@@ -168,6 +167,7 @@ void thr_parse_file(
 
         std::ostringstream output;
         output.precision(args.double_precision);
+        Creativity creativity;
         try {
             if (preload_mode) // Preloaded input:
                 creativity.read<FileStorage>(std::move(ss), FileStorage::Mode::READONLY);
