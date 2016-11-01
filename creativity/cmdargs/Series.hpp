@@ -51,6 +51,9 @@ class Series : public CmdArgs {
         /// Number of threads to use
         unsigned int threads = 0;
 
+        /// Number of files to preload from disk into memory
+        unsigned int preload = 0;
+
         /// The input files to load data from
         std::vector<std::string> input;
 
