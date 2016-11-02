@@ -290,13 +290,17 @@ bool Creativity::catchPiratesActive() const {
     return parameters.policy.catchPirates() && policyActive();
 }
 
+double Creativity::policyTaxes(const CreativitySettings &parameters) {
+    double tax = 0;
+    if (parameters.policy.catchPirates())  tax += parameters.policy_catch_tax;
+    if (parameters.policy.publicSharing()) tax += parameters.policy_public_sharing_tax;
+    if (parameters.policy.publicVoting())  tax += parameters.policy_public_voting_tax;
+    return tax;
+}
+
 double Creativity::policyTaxes() const {
     if (!setup_sim_) throw std::logic_error("Cannot call policyTaxes() on a non-live or unconfigured simulation");
-    double tax = 0;
-    if (catchPiratesActive())  tax += parameters.policy_catch_tax;
-    if (publicSharingActive()) tax += parameters.policy_public_sharing_tax;
-    if (publicVotingActive())  tax += parameters.policy_public_voting_tax;
-    return tax;
+    return policyActive() ? policyTaxes(parameters) : 0.0;
 }
 
 double Creativity::disposableIncome() const {

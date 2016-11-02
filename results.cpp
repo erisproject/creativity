@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
     }
     std::ostream &out = args.output.filename.empty() ? std::cout : f;
 
-    // The minimum value of books_written that needs to be satisified to count as writing occuring
+    // The minimum value of books_written_pc that needs to be satisified to count as writing occuring
     // during a period:
     double writing_threshold = 0.2;
     // If we're not doing shortrun, filter out any shortrun rows:
@@ -88,7 +88,7 @@ int main(int argc, char *argv[]) {
 
 // Macro that is true if at least writing_threshold books were written and the mean initial price is
 // a number
-#define WRITING_AND_MARKET(var) ((var)->value("books_written") >= writing_threshold and not std::isnan((var)->value("book_p0")))
+#define WRITING_AND_MARKET(var) ((var)->value("books_written_pc") >= writing_threshold and not std::isnan((var)->value("book_p0")))
 // Macro that is true whenever WRITING_AND_MARKET is true and either the shortrun variable does not
 // exist, or else it also satisfied the above.
 #define WRITING_AND_MARKET_SRLR(var) (WRITING_AND_MARKET(var) and (not args.analysis.shortrun or not (var##_SR) or WRITING_AND_MARKET(var##_SR)))
@@ -195,7 +195,7 @@ int main(int argc, char *argv[]) {
                 "policy_public_sharing_tax", "policy_public_voting_tax", "policy_public_voting_votes",
                 "policy_catch_tax", "policy_catch_fine[1]"});
         const std::vector<std::string> pre_fields({
-                "net_u", "book_p0", "book_sales", "book_profit", "book_quality", "books_written"});
+                "net_u", "book_p0", "book_sales", "book_profit", "book_quality", "books_written_pc"});
         std::vector<std::string> params_abbrev;
         std::regex word_re("([a-zA-Z0-9])[a-zA-Z0-9]+");
         for (const auto &p : params) params_abbrev.push_back(std::regex_replace(p, word_re, "$1"));
@@ -281,7 +281,7 @@ int main(int argc, char *argv[]) {
 #define VALUE_PLUS_DIST(v) v, v"_5th", v"_median", v"_95th"
         for (auto &y : {
                 VALUE_PLUS_DIST("net_u"),
-                "books_written",
+                "books_written_pc",
                 VALUE_PLUS_DIST("book_quality"),
                 "book_p0",
                 "book_revenue",
@@ -344,7 +344,7 @@ int main(int argc, char *argv[]) {
 #define LATEX_NAME_QUANTILE(v, t) LATEX_NAME(v, t), LATEX_NAME_SUB(v"_5th", t, "(Q=.05)"), LATEX_NAME_SUB(v"_median", t, "(Q=.50)"), LATEX_NAME_SUB(v"_95th", t, "(Q=.95)")
             std::unordered_map<std::string, std::string> latex_name({
                     LATEX_NAME_QUANTILE("net_u", "net\\ utility"),
-                    LATEX_NAME("books_written", "books\\ written"),
+                    LATEX_NAME("books_written_pc", "books\\ written"),
                     LATEX_NAME_QUANTILE("book_quality", "book\\ quality"),
                     LATEX_NAME_SUB("book_p0", "book\\ p", "t=0"),
                     LATEX_NAME("book_revenue", "book\\ revenue"),
@@ -399,7 +399,7 @@ int main(int argc, char *argv[]) {
             out << "\n\n\nMarginal effects:\n=================\n";
 
         SUR marg_effects;
-        for (auto &y : {"net_u", "books_written", "book_quality", "book_p0", "book_revenue", "book_profit"}) {
+        for (auto &y : {"net_u", "books_written_pc", "book_quality", "book_p0", "book_revenue", "book_profit"}) {
             Equation eq(data_writing_always[y]);
             eq % 1;
             if (data_writing_always.hasPiracy()) eq % data_writing_always["piracy"];

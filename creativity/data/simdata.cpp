@@ -289,7 +289,7 @@ DIST_FNS(book_author_effort)
 #undef QUANTILE_FN
 #undef DIST_FNS
 
-double books_written(const Storage &cs, eris_time_t from, eris_time_t to) {
+double books_written_pc(const Storage &cs, eris_time_t from, eris_time_t to) {
     if (from > to) throw std::logic_error("from > to");
     double count = 0;
     for (eris_time_t t = from; t <= to; t++) {
@@ -438,6 +438,25 @@ double reader_spending(const Storage &cs, eris_time_t from, eris_time_t to) {
     return avg_spending / (to-from+1);
 }
 
+double reader_taxes(const Storage &cs, eris_time_t from, eris_time_t to) {
+    if (from > to) throw std::logic_error("from > to");
+    // If the range doesn't include the policy the tax is 0:
+    if (cs.settings.policy_begins > to) return 0.0;
+
+    double tax = Creativity::policyTaxes(cs.settings);
+    if (cs.settings.policy_begins > from) {
+        // If policy_begins \in (from,to] then the average tax is the per-period tax multiplied
+        // by the proportion of periods that include the policy:
+        tax *= (to - cs.settings.policy_begins + 1) / double(to + - from + 1);
+    }
+    // Otherwise the average per-period tax is just the average of a constant, i.e. the actual tax value.
+
+    return tax;
+}
+
+double reader_spending_total(const Storage &cs, eris_time_t from, eris_time_t to) {
+    return reader_spending(cs, from, to) + reader_taxes(cs, from, to);
+}
 
 std::vector<initial_datum> initial_data_fields() {
     std::vector<initial_datum> initial_data;
@@ -522,14 +541,18 @@ std::vector<datum> data_fields() {
     ADD_DATUM(book_gross_margin);
     ADD_DATUM(book_profit);
     ADD_DIST_DATA(book_quality);
-    ADD_DATUM(books_written);
+    ADD_DATUM(books_written_pc);
     ADD_DATUM(books_bought);
-    ADD_DATUM(books_pirated, false, true, true);
-    ADD_DATUM(books_public_copies, false, false, true);
+    ADD_DATUM(books_pirated, false);
+    ADD_DATUM(books_public_copies, false, false);
     ADD_DATUM(reader_spending);
     ADD_DATUM(reader_market_spending);
-    ADD_DATUM(reader_piracy_spending, false, true, true);
-    ADD_DATUM(reader_public_spending, false, false, true);
+    ADD_DATUM(reader_piracy_spending, false);
+    ADD_DATUM(reader_public_spending, false, false);
+//    ADD_DATUM(readers_caught_pc, false, false);
+//    ADD_DATUM(reader_fines, false, false);
+    ADD_DATUM(reader_taxes, false, false);
+    ADD_DATUM(reader_spending_total);
     ADD_DIST_DATA(book_author_scale);
     ADD_DIST_DATA(book_author_effort);
 #undef ADD_DATUM

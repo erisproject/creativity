@@ -169,6 +169,11 @@ class Creativity : private eris::noncopyable {
          */
         double policyTaxes() const;
 
+        /** Returns the policy taxes that will be in effect in a simulation using the given
+         * CreativitySettings during the policy period.
+         */
+        static double policyTaxes(const CreativitySettings &s);
+
         /** Returns the level of exogenous, disposable income, i.e. income minus policy taxes.  This
          * is simply a shortcut for `creativity.parameters.income - creativity.policyTaxes()`.  Note
          * that this does not include any income or costs associated with authorship.

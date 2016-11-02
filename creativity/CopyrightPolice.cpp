@@ -39,6 +39,9 @@ void CopyrightPolice::interApply() {
 }
 
 void CopyrightPolice::intraFinish() {
+    // FIXME: record the number of people accused, and number guilty for analysis.  (Will need to
+    // store them here, then extract them into the state object/file).
+    //
     auto lock = writeLock();
     for (auto &r : simulation()->agents<Reader>()) {
         lock.add(r);
@@ -57,6 +60,7 @@ void CopyrightPolice::intraFinish() {
         bool caught = rcoin(prob(pirated));
         bool guilty = pirated > 0;
         if (caught) {
+            // FIXME: record this status (so that it is tracked in the reader state)
             r->alterUtility(-creativity_.parameters.policy_catch_cost);
 
             if (guilty) {

@@ -184,7 +184,7 @@ DIST_FNS(net_u)
 
 /** Average number of books written per 100 agents per period.
  */
-double books_written(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+double books_written_pc(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
 
 /** Average number of books purchased per reader per period
  */
@@ -228,6 +228,27 @@ double reader_public_spending(const state::Storage &cs, eris::eris_time_t from, 
  */
 double reader_spending(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
 
+/** Returns the average per-reader lump-sum taxes collected, averaged over the given period.
+ *
+ * If the period doesn't overlap the beginning of the policy period, this will simply be 0 (if
+ * before the policy period begins) or the per-period tax value (if during the policy period).
+ */
+double reader_taxes(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+
+/** Average per-reader expenditure on books, including lump-sum taxes (e.g. policing or public
+ * sharing prize costs).
+ *
+ * This is simply a shortcut for `reader_spending(...) + reader_taxes(...)`.
+ */
+double reader_spending_total(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+
+// FIXME: don't have this info stored yet
+
+/** Average number of readers caught per 100 readers per period for piracy. */
+//double readers_caught_pc(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
+
+/** Average fines paid (e.g. for being caught pirating) per reader. */
+//double reader_fines(const state::Storage &cs, eris::eris_time_t from, eris::eris_time_t to);
 
 /** Returns a vector of all supported initial datum values. */
 std::vector<initial_datum> initial_data_fields();

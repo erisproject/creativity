@@ -11,11 +11,11 @@ namespace creativity { namespace data {
  *
  *     Treatment data("some.csv");
  *     TreatmentFilter data_filtered(data, [](const TreatmentFilter::Properties &p) {
- *         return p.piracy and p.piracy->value("books_written") >= 0.2;
+ *         return p.piracy and p.piracy->value("books_written_pc") >= 0.2;
  *     });
  *
  * constructs a filter that only includes data observations that have piracy data with at a piracy
- * books_written value of at least 0.2.
+ * books_written_pc value of at least 0.2.
  *
  * The filter is applied on a simulation-by-simulation row, which typically corresponds to multiple
  * treatment rows at once.
