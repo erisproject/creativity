@@ -53,7 +53,6 @@ bool need_parameters = true;
 void thr_preload(const cmdargs::Series &args) {
     std::unique_lock<std::mutex> input_lock(input_mutex);
     const unsigned int max_queue = args.preload;
-    std::cerr << "preload = " << max_queue << "\n";
     if (max_queue < 1) throw std::logic_error("Internal error: thr_preload called in non-preload mode");
     while ((error_count == 0 or args.ignore_errors) and input_index < args.input.size()) {
         preload_next_cv.wait(input_lock, [&max_queue]{ return preload_queue.size() < max_queue; });
