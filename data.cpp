@@ -412,9 +412,9 @@ int main(int argc, char *argv[]) {
         // Update the process name to something like "crdata [43/123]" (the space and "a" before the [ get
         // eliminated if required--we aren't allowed to set a name longer than 15 characters).
         std::string progress = "[" + std::to_string(processing_counter) + "/" + std::to_string(input_count) + "]";
-        std::string name = "crdat";
-        if (progress.size() <= 9) { name += 'a'; if (progress.size() <= 8) name += ' '; }
-        name += progress;
+        std::string name =
+            std::string("crdata ").substr(0, std::max<int>(5, 15 - (int) progress.size()))
+            + progress;
 
         prctl(PR_SET_NAME, name.c_str());
     }
