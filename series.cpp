@@ -83,7 +83,6 @@ void thr_preload(const cmdargs::Series &args) {
 
             input_lock.lock();
             if (success) {
-                std::cout << "preloaded " << source << "\n";
                 preload_queue.emplace(std::move(source), std::move(s));
                 preload_cv.notify_all();
             }
