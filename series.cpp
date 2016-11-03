@@ -160,21 +160,15 @@ void thr_parse_file(
 
         // If parameters were given, use them; otherwise infer them from the first file read
         if (need_parameters) {
-            if (args.periods != 0) {
-                periods = args.periods;
-                allow_unused_periods = args.allow_unused_periods;
-            }
-            else {
+            if (periods == 0) {
                 periods = storage.size()-1;
                 std::cout << "Inferred --periods " << periods << std::endl;
             }
-            if (args.piracy_begins != 0) piracy_begins = args.piracy_begins;
-            else {
+            if (piracy_begins == 0) {
                 piracy_begins = creativity.parameters.piracy_begins;
                 std::cout << "Inferred --piracy-begins " << piracy_begins << std::endl;
             }
-            if (args.policy_begins != 0) policy_begins = args.policy_begins;
-            else {
+            if (policy_begins == 0) {
                 policy_begins = creativity.parameters.policy_begins;
                 std::cout << "Inferred --policy-begins " << policy_begins << std::endl;
             }
@@ -318,6 +312,19 @@ int main(int argc, char *argv[]) {
     }
 
     files.reserve(args.input.size());
+
+    need_parameters = false;
+    if (args.periods != 0) {
+        periods = args.periods;
+        allow_unused_periods = args.allow_unused_periods;
+    }
+    else need_parameters = true;
+
+    if (args.piracy_begins != 0) piracy_begins = args.piracy_begins;
+    else need_parameters = true;
+
+    if (args.policy_begins != 0) policy_begins = args.policy_begins;
+    else need_parameters = true;
 
     std::vector<std::thread> threads;
     if (args.preload > 0) {
