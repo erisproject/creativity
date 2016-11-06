@@ -1,6 +1,7 @@
 import os
 import subprocess
 import ycm_core
+import re
 
 flags = [
         '-Wall',
