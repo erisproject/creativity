@@ -8,8 +8,7 @@ flags = [
         '-std=c++11',
         '-I', '.',
         '-I', '/usr/include/eigen3',
-        '-isystem', '/usr/include/x86_64-linux-gnu/c++/6',
-        '-I', 'build' # The pick up the generated creativity/config.hpp
+        '-I', 'build' # To pick up the generated creativity/config.hpp
         ]
 
 # Try to invoke pkg-config to get the addition include directories needed for
@@ -56,9 +55,22 @@ def MakeRelativePathsInFlagsAbsolute( flags, working_directory ):
             new_flags.append( new_flag )
     return new_flags
 
+def LoadSystemIncludes():
+    regex = re.compile(ur'(?:\#include \<...\> search starts here\:)(?P<list>.*?)(?:End of search list)', re.DOTALL);
+    process = subprocess.Popen(['clang', '-v', '-E', '-x', 'c++', '-'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE);
+    process_out, process_err = process.communicate('');
+    output = process_out + process_err;
+    includes = [];
+    for p in re.search(regex, output).group('list').split('\n'):
+        p = p.strip();
+        if len(p) > 0 and p.find('(framework directory)') < 0:
+            includes.append('-isystem');
+            includes.append(p);
+    return includes;
+
 
 def FlagsForFile( filename, **kwargs ):
-    final_flags = MakeRelativePathsInFlagsAbsolute( flags, DirectoryOfThisScript() )
+    final_flags = MakeRelativePathsInFlagsAbsolute( flags, DirectoryOfThisScript() ) + LoadSystemIncludes()
     return {
             'flags': final_flags,
             'do_cache': True
