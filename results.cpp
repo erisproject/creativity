@@ -412,7 +412,10 @@ int main(int argc, char *argv[]) {
                     LATEX_NAME("book_revenue", "book\\ revenue"),
                     LATEX_NAME("book_profit", "book\\ profit"),
                     LATEX_NAME_QUANTILE("book_author_scale", "book\\ author\\ } {\\alpha"),
-                    LATEX_NAME_QUANTILE("book_author_effort", "book\\ author\\ } {\\ell")
+                    LATEX_NAME_QUANTILE("book_author_effort", "book\\ author\\ } {\\ell"),
+                    LATEX_NAME("books_bought", "books\\ bought/reader"),
+                    LATEX_NAME("books_pirated", "books\\ pirated/reader"),
+                    LATEX_NAME("books_public", "books\\ public/reader"),
                     });
 
             for (unsigned j = 0; j < avg_effects.equations().size(); j++) {
