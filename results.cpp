@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
         exit(2);
     }
 
-    // data holds all the data read from the file.
+    // rawdata holds all the data read from the file.
     Treatment rawdata;
     rawdata.requirePre();
     if (args.analysis.shortrun) rawdata.requireSR();
@@ -76,15 +76,15 @@ int main(int argc, char *argv[]) {
         ? [](bool,bool,bool,bool) { return true; }
         : [](bool, bool, bool, bool short_run) { return not short_run; };
 
-    Treatment *data = &rawdata;
+    // If filtering by policy, data is the filtered version of rawdata; otherwise it is just the rawdata itself.
     std::unique_ptr<TreatmentFilter> data_policy;
     if (args.analysis.policy_filter) {
-        data_policy.reset(new TreatmentFilter(*data, [&](const TreatmentFilter::Properties &p) {
+        data_policy.reset(new TreatmentFilter(rawdata, [&](const TreatmentFilter::Properties &p) {
                 return args.analysis.policy == Policy((uint32_t) p.pre->value("param.policy"));
                 },
                 shortrun_filter));
-        data = data_policy.get();
     }
+    Treatment &data = args.analysis.policy_filter ? *data_policy : rawdata;
 
 // Macro that is true if at least writing_threshold books were written and the mean initial price is
 // a number
@@ -94,7 +94,7 @@ int main(int argc, char *argv[]) {
 #define WRITING_AND_MARKET_SRLR(var) (WRITING_AND_MARKET(var) and (not args.analysis.shortrun or not (var##_SR) or WRITING_AND_MARKET(var##_SR)))
 
     // Observations with writing in every stage:
-    TreatmentFilter data_writing_always(*data, [&](const TreatmentFilter::Properties &p) {
+    TreatmentFilter data_writing_always(data, [&](const TreatmentFilter::Properties &p) {
             // Only allow simulations that have writing in every stage contained in the data
             return (not p.pre or WRITING_AND_MARKET(p.pre))
                 and (not p.piracy or WRITING_AND_MARKET_SRLR(p.piracy))
@@ -111,7 +111,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Observations with no writing under piracy, but with writing in policy (and pre)
-    TreatmentFilter data_no_piracy_writing(*data, [&](const TreatmentFilter::Properties &p) {
+    TreatmentFilter data_no_piracy_writing(data, [&](const TreatmentFilter::Properties &p) {
             // Require that this data actually has pre, piracy, and policy:
             if (not p.pre or not p.piracy or not p.policy) return false;
             // writing in pre and policy:
@@ -122,7 +122,7 @@ int main(int argc, char *argv[]) {
         shortrun_filter
     );
     // Observations with pre writing but no policy writing:
-    TreatmentFilter data_no_post_writing(*data, [&](const TreatmentFilter::Properties &p) {
+    TreatmentFilter data_no_post_writing(data, [&](const TreatmentFilter::Properties &p) {
             // Require that this data actually has pre, piracy, and policy:
             if (not p.pre or not p.piracy or not p.policy) return false;
             // Require writing in pre"
@@ -133,13 +133,13 @@ int main(int argc, char *argv[]) {
         shortrun_filter
     );
     // Observations with no pre writing:
-    TreatmentFilter data_no_pre_writing(*data, [&](const TreatmentFilter::Properties &p) {
+    TreatmentFilter data_no_pre_writing(data, [&](const TreatmentFilter::Properties &p) {
             return p.pre and not WRITING_AND_MARKET(p.pre);
         },
         shortrun_filter
     );
     // Observations with pre and piracy, but not policy writing:
-    TreatmentFilter data_no_pol_writing(*data, [&](const TreatmentFilter::Properties &p) {
+    TreatmentFilter data_no_pol_writing(data, [&](const TreatmentFilter::Properties &p) {
             // Require that this data actually has pre, piracy, and policy:
             if (not p.pre or not p.piracy or not p.policy) return false;
             // Require writing in pre"
@@ -177,7 +177,7 @@ int main(int argc, char *argv[]) {
             };
             lv("Total", rawdata.simulations(), "total simulations in data set");
             lv("RowsPerSim", rawdata.rowsPerSimulation(), "analysis rows per simulation");
-            lv("Policy", data->simulations(), "total simulations matching the requested policy (if applicable)");
+            lv("Policy", data.simulations(), "total simulations matching the requested policy (if applicable)");
             lv("WritingAlways", data_writing_always.simulations(), "# sims with writing in pre, piracy, and policy");
             lv("NoPreWriting", data_no_pre_writing.simulations(), "# sims with no pre-piracy writing");
             lv("NoPostWriting", data_no_post_writing.simulations(), "# sims with pre-piracy but no piracy or policy writing");
@@ -187,7 +187,7 @@ int main(int argc, char *argv[]) {
         else {
             out << tabulate_escape(std::string("Data summary:\n") +
                     "    " + std::to_string(rawdata.simulations()) + " total simulations (with " + std::to_string(rawdata.rowsPerSimulation()) + " data rows per simulation)\n" +
-                    (args.analysis.policy_filter ? "    " + std::to_string(data->simulations()) + " simulations match the requested policy\n" : std::string()) +
+                    (args.analysis.policy_filter ? "    " + std::to_string(data.simulations()) + " simulations match the requested policy\n" : std::string()) +
                     "    " + std::to_string(data_writing_always.simulations()) + " simulations with non-zero # books written during each stage\n" +
                     "    " + std::to_string(data_no_pre_writing.simulations()) + " simulations with zero books written during pre-piracy stage\n" +
                     "    " + std::to_string(data_no_piracy_writing.simulations()) + " simulations with zero books written under piracy, but writing resuming under the policy\n" +
