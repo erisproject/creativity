@@ -27,6 +27,7 @@ void SeriesGraphs::addOptions() {
         ("resolution,r", above<0>(resolution), "The resolution of the images for PNG output, in pixels per inch.")
         ("t-min", min<-1>(graph_min_t), "The t value at which to start the graph.  If -1, the graph starts at the lowest t value found in the input file(s).")
         ("t-max", min<-1>(graph_max_t), "The t value at which to end the graph.  If -1, the graph ends at the largest t value found in the input file(s).")
+        ("t-extra", value(t_extra), "Draw an extra-wide background grid line at the given `t` value.  Can be specified multiple times.")
         ("y-min", value(graph_min_value), "The data value at which the y-axis should begin.  If NaN (the default), the y-axis is sized to fit all of the required values.")
         ("y-max", value(graph_max_value), "The data value at which the y-axis should end.  If NaN (the default), the y-axis is sized to fit all of the required values.")
         ("t-from", min<-1>(data_min_t), "The t value at which to start including observations.  If -1, include all observations.  In contrast to --t-min, this controls when data is plotted, not the graph axis limits.")

@@ -332,6 +332,7 @@ int main(int argc, char *argv[]) {
     PDF output(args.output, args.width, args.height);
     Series graph(output, tmin, tmax, ymin, ymax);
     graph.tick_grid_style.colour = RGBA(0.9);
+    graph.tick_grid_extra_style.colour = RGBA(0.5);
     graph.legend_position = args.legend_position;
     graph.legend_rel_x = args.legend_rel_x;
     graph.legend_rel_y = args.legend_rel_y;
@@ -374,6 +375,7 @@ int main(int argc, char *argv[]) {
         graph.setExtents(local_tmin, local_tmax, local_ymin, local_ymax, false);
         graph.recalcTicks(10, 8, Series::TickEnds::Add);
         graph.title = in.title;
+        graph.t_grid_extra.insert(args.t_extra.cbegin(), args.t_extra.cend());
 
         for (const auto &conf : in.quantiles)
             graph.addRegion(conf.second, confband_style);

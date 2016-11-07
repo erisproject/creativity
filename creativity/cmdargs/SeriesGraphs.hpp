@@ -100,6 +100,11 @@ class SeriesGraphs : public CmdArgs {
          */
         int data_max_t = -1;
 
+        /** Draw extra-wide graph t grid marks at these points.  Typically the piracy-begins and
+         * policy-begins periods.
+         */
+        std::vector<int> t_extra;
+
         /** Determines the minimum value to include in the series plot.  The default, NaN,
          * determines the minimum from the data.
          */

@@ -17,7 +17,12 @@ Series::Series(Target &target, int tmin, int tmax, double ymin, double ymax,
     : title{std::move(title)}, x_label{std::move(x_label)},
     y_label{std::move(y_label)}, target_{target}
 {
-    setExtents(tmin, tmax, ymin, ymax);
+    try {
+        setExtents(tmin, tmax, ymin, ymax);
+    }
+    catch (const std::invalid_argument &e) {
+        throw std::invalid_argument("Unable to initialize series '" + title + "': " + e.what());
+    }
     recalcTicks();
 }
 
@@ -368,25 +373,35 @@ void Series::finishPage() {
         ctx->move_to(graph_left, graph_top);
         drawRectangle(ctx, graph_outer_width, graph_outer_height, graph_style, true);
         // We're now clipped inside it
-        // If we have tick grid lines, draw them:
-        if (tick_grid_style.colour and not (t_grid.empty() and y_grid.empty())) {
-            double left = graph_left, right = total_width-graph_right, top = graph_top, bottom = total_height-graph_bottom;
-            for (const auto &t : t_grid) {
-                double grid_x = t, dontcare = 0;
-                graph_translation.transform_point(grid_x, dontcare);
-                ctx->move_to(grid_x, top);
-                ctx->line_to(grid_x, bottom);
-            }
-            for (const auto &y : y_grid) {
-                double grid_y = y, dontcare = 0;
-                graph_translation.transform_point(dontcare, grid_y);
-                ctx->move_to(left, grid_y);
-                ctx->line_to(right, grid_y);
-            }
 
-            tick_grid_style.applyTo(ctx);
-            ctx->stroke();
+        std::tuple<LineStyle&, std::set<int>&, std::set<int>&>
+            tick_grid(tick_grid_style, t_grid, y_grid),
+            tick_grid_extra(tick_grid_extra_style, t_grid_extra, y_grid_extra);
+
+        const double left = graph_left, right = total_width-graph_right, top = graph_top, bottom = total_height-graph_bottom;
+        // If we have tick grid lines, draw them:
+        for (const auto &tg : {tick_grid, tick_grid_extra}) {
+            auto &style = std::get<0>(tg);
+            auto &ts = std::get<1>(tg), &ys = std::get<2>(tg);
+            if (style.colour and not (ts.empty() and ys.empty())) {
+                for (const auto &t : ts) {
+                    double grid_x = t, dontcare = 0;
+                    graph_translation.transform_point(grid_x, dontcare);
+                    ctx->move_to(grid_x, top);
+                    ctx->line_to(grid_x, bottom);
+                }
+                for (const auto &y : ys) {
+                    double grid_y = y, dontcare = 0;
+                    graph_translation.transform_point(dontcare, grid_y);
+                    ctx->move_to(left, grid_y);
+                    ctx->line_to(right, grid_y);
+                }
+
+                style.applyTo(ctx);
+                ctx->stroke();
+            }
         }
+
         // Now draw the graph surface (lines, regions, whatever)
         for (const auto &draw : draw_) {
             Cairo::SaveGuard saver(ctx);

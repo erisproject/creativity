@@ -196,6 +196,11 @@ class Series {
          * lines). */
         LineStyle tick_grid_style{Transparent, 0.5};
 
+        /** The line style to use for extra grid lines (those set manually into `t_grid_extra` and
+         * `y_grid_extra`.  Defaults to a medium gray line of width 0.5.
+         */
+        LineStyle tick_grid_extra_style{RGBA{0.75}, 0.5};
+
         /** The font colour for tick values.  If completely transparent, tick values are not drawn. */
         RGBA tick_font_colour{Black};
 
@@ -384,6 +389,13 @@ class Series {
          */
         std::set<int> t_grid;
 
+        /** Extra x-axis grid marks to draw.  This can be used to mark special values in addition to
+         * (and styled differently) than the regular t_grid lines.
+         *
+         * The defaults to empty.
+         */
+        std::set<int> t_grid_extra;
+
         /** Y-axis grid mark locations, calculated during construction.  Can be recalculated by
          * calling recalcTicks().  If cleared, no horizontal grid lines are drawn.
          *
@@ -391,6 +403,9 @@ class Series {
          * for the other end modes, the grid end points can differ.
          */
         std::set<int> y_grid;
+
+        /** Like t_grid_extra, but for y axis values. */
+        std::set<int> y_grid_extra;
 
         /** Different modes for what to do with the tmin/tmax/ymin/ymax graph end points given
          * during construction. */
