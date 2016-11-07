@@ -374,7 +374,7 @@ void Series::finishPage() {
         drawRectangle(ctx, graph_outer_width, graph_outer_height, graph_style, true);
         // We're now clipped inside it
 
-        std::tuple<LineStyle&, std::set<int>&, std::set<int>&>
+        std::tuple<LineStyle&, std::set<int>&, std::set<double>&>
             tick_grid(tick_grid_style, t_grid, y_grid),
             tick_grid_extra(tick_grid_extra_style, t_grid_extra, y_grid_extra);
 
@@ -382,7 +382,8 @@ void Series::finishPage() {
         // If we have tick grid lines, draw them:
         for (const auto &tg : {tick_grid, tick_grid_extra}) {
             auto &style = std::get<0>(tg);
-            auto &ts = std::get<1>(tg), &ys = std::get<2>(tg);
+            auto &ts = std::get<1>(tg);
+            auto &ys = std::get<2>(tg);
             if (style.colour and not (ts.empty() and ys.empty())) {
                 for (const auto &t : ts) {
                     double grid_x = t, dontcare = 0;

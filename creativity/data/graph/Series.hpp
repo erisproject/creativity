@@ -402,10 +402,10 @@ class Series {
          * This will, by default, be equal to y_ticks if recalcTicks() is called with TickEnds::None;
          * for the other end modes, the grid end points can differ.
          */
-        std::set<int> y_grid;
+        std::set<double> y_grid;
 
         /** Like t_grid_extra, but for y axis values. */
-        std::set<int> y_grid_extra;
+        std::set<double> y_grid_extra;
 
         /** Different modes for what to do with the tmin/tmax/ymin/ymax graph end points given
          * during construction. */

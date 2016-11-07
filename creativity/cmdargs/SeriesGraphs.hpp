@@ -100,7 +100,7 @@ class SeriesGraphs : public CmdArgs {
          */
         int data_max_t = -1;
 
-        /** Draw extra-wide graph t grid marks at these points.  Typically the piracy-begins and
+        /** Draw heavier graph t grid marks at these points.  Typically the piracy-begins and
          * policy-begins periods.
          */
         std::vector<int> t_extra;
