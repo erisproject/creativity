@@ -69,8 +69,14 @@ class Results : public CmdArgs {
             Policy policy;
         } analysis;
 
-        /// Condensed table output (currently only for average effects model)
+        /** Condensed output mode.
+         *
+         * For average effects, this produces a single table instead of detailed equation results
+         */
         bool condensed = false;
+
+        /** Output latex variables instead of sentences for data summary in --latex mode */
+        std::string latex_variables = "";
 
         /// Disable analysis section headings
         bool no_headings = false;

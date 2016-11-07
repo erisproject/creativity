@@ -168,15 +168,33 @@ int main(int argc, char *argv[]) {
     }
 
     if (args.analysis.summary) {
-        out << tabulate_escape(std::string("Data summary:\n") +
-                "    " + std::to_string(rawdata.simulations()) + " total simulations (with " + std::to_string(rawdata.rowsPerSimulation()) + " data rows per simulation)\n" +
-                (args.analysis.policy_filter ? "    " + std::to_string(data->simulations()) + " simulations match the requested policy\n" : std::string()) +
-                "    " + std::to_string(data_writing_always.simulations()) + " simulations with non-zero # books written during each stage\n" +
-                "    " + std::to_string(data_no_pre_writing.simulations()) + " simulations with zero books written during pre-piracy stage\n" +
-                "    " + std::to_string(data_no_piracy_writing.simulations()) + " simulations with zero books written under piracy, but writing resuming under the policy\n" +
-                "    " + std::to_string(data_no_post_writing.simulations()) + " simulations with zero books written during piracy and no recovery under the policy\n" +
-                "    " + std::to_string(data_no_pol_writing.simulations()) + " simulations with writing under piracy, but no writing under the policy\n",
-                args.format.type);
+        if (!args.latex_variables.empty()) {
+            out << "% Data summary stats (" << args.latex_variables << "):\n";
+            auto lv = [&out, &args](const std::string &suffix, unsigned int value, const std::string &comment = "") {
+                out << "\\newcommand{\\" << args.latex_variables << suffix << "}{" << value << "}";
+                if (!comment.empty()) out << " % " << comment;
+                out << "\n";
+            };
+            lv("Total", rawdata.simulations(), "total simulations in data set");
+            lv("RowsPerSim", rawdata.rowsPerSimulation(), "analysis rows per simulation");
+            lv("Policy", data->simulations(), "total simulations matching the requested policy (if applicable)");
+            lv("WritingAlways", data_writing_always.simulations(), "# sims with writing in pre, piracy, and policy");
+            lv("NoPreWriting", data_no_pre_writing.simulations(), "# sims with no pre-piracy writing");
+            lv("NoPostWriting", data_no_post_writing.simulations(), "# sims with pre-piracy but no piracy or policy writing");
+            lv("NoPiracyWriting", data_no_piracy_writing.simulations(), "# sims with pre-piracy and policy writing, but no piracy writing");
+            lv("NoPolicyWriting", data_no_pol_writing.simulations(), "# sums with pre-piracy and piracy writing, but not no policy writing");
+        }
+        else {
+            out << tabulate_escape(std::string("Data summary:\n") +
+                    "    " + std::to_string(rawdata.simulations()) + " total simulations (with " + std::to_string(rawdata.rowsPerSimulation()) + " data rows per simulation)\n" +
+                    (args.analysis.policy_filter ? "    " + std::to_string(data->simulations()) + " simulations match the requested policy\n" : std::string()) +
+                    "    " + std::to_string(data_writing_always.simulations()) + " simulations with non-zero # books written during each stage\n" +
+                    "    " + std::to_string(data_no_pre_writing.simulations()) + " simulations with zero books written during pre-piracy stage\n" +
+                    "    " + std::to_string(data_no_piracy_writing.simulations()) + " simulations with zero books written under piracy, but writing resuming under the policy\n" +
+                    "    " + std::to_string(data_no_post_writing.simulations()) + " simulations with zero books written during piracy and no recovery under the policy\n" +
+                    "    " + std::to_string(data_no_pol_writing.simulations()) + " simulations with writing under piracy, but no writing under the policy\n",
+                    args.format.type);
+        }
     }
 
     if (args.analysis.write_or_not) {
@@ -221,6 +239,12 @@ int main(int argc, char *argv[]) {
         enum : unsigned { f_mean, f_se, f_min, f_5, f_25, f_median, f_75, f_95, f_max, /* last: captures size: */ num_fields };
         std::vector<std::string> colnames({"Mean", "s.e.", "Min", "5th %", "25th %", "Median", "75th %", "95th %", "Max"});
 
+        if (args.format.latex) {
+            param_opts.escape = false; // We put some latex in the title, so need non-escaping
+            // Unfortunately that means we have to manually escape the column names:
+            for (auto &col : colnames) col = tabulate_escape(col, param_opts);
+        }
+
         for (auto d : {&data_no_pre_writing, &data_no_post_writing, &data_no_piracy_writing, &data_no_pol_writing, &data_writing_always}) {
             param_opts.title = "Parameter values for " + std::to_string(d->simulations()) + " simulations " +
                 (d == &data_writing_always ? "with writing in all stages" :
@@ -228,6 +252,10 @@ int main(int argc, char *argv[]) {
                  d == &data_no_piracy_writing ? "with no piracy writing, but recovery under the policy" :
                  d == &data_no_post_writing ? "without piracy or policy writing" :
                  "with piracy writing but not policy writing") + ":";
+
+            if (args.format.latex) {
+                param_opts.title = "\\underline{\\normalsize{" + param_opts.title + "}\\nopagebreak}\\nopagebreak";
+            }
 
             std::vector<std::string> local_params, local_params_abbrev;
             for (size_t i = 0; i < params.size(); i++) {
@@ -287,6 +315,8 @@ int main(int argc, char *argv[]) {
             row_names.push_back("Parameter");
             row_names.insert(row_names.end(), local_params.begin(), local_params.end());
             for (const auto &pre : pre_fields) row_names.push_back("pre." + pre);
+
+            for (auto &row : row_names) row = tabulate_escape(row, param_opts);
 
             out << tabulate(results, param_opts, row_names, colnames) << "\n";
 

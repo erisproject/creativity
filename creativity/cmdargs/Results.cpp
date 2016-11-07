@@ -41,6 +41,7 @@ void Results::addOptions() {
         ("precision,p", range<2,std::numeric_limits<double>::max_digits10>(format.precision), "      Specifies the precision level (number of significant digits) for result values.")
         ("no-headings,d", value(no_headings), "Suppress headings before analysis sections such as 'Average effects:\\n================'.")
         ("condensed,c", value(condensed), "Output tables in condensed form; currently only has an effect with --average-effects analysis.")
+        ("latex-variables", value(latex_variables), "If non-empty, outputs summary variables as latex \\newcommand's.  The value is the prefix of the comment, e.g. 'summaryABC' will define commands such as '\\summaryABCWritingAlways' containing the associated counts.  Note that latex commands may only contain letters (no numbers or underscores).  Requires --latex and --summary.")
         ;
     options_.add(format_desc);
 
