@@ -18,6 +18,7 @@
 #include <iomanip>
 #include <vector>
 #include <set>
+#include <queue>
 #include <fstream>
 #include <sstream>
 #include <mutex>
