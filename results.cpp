@@ -399,7 +399,7 @@ int main(int argc, char *argv[]) {
         }
         else {
             // Condensed form: all results in one table
-            Eigen::MatrixXd condensed(avg_effects.equations().size(), 3);
+            Eigen::MatrixXd condensed(avg_effects.equations().size(), avg_effects.equations().at(0).numVars());
             std::vector<std::string> depvars, stars;
 #define LATEX_NAME(v, textit) {v, "$\\mathit{" textit "}$"}
 #define LATEX_NAME_SUB(v, textit, sub) {v, "$\\mathit{" textit "}_{" sub "}$"}
@@ -431,8 +431,16 @@ int main(int argc, char *argv[]) {
 
                 condensed.row(j) = avg_effects.beta(j).transpose();
                 auto st = avg_effects.pStars(j);
-                if (st[0] == st[1] and st[0] == st[2]) stars.push_back(st[0]);
-                else stars.push_back(st[0] + "/" + st[1] + "/" + st[2]);
+                // If all the p-value stars are the same, just put it once; otherwise separate each
+                // with /
+                if (std::all_of(st.cbegin() + 1, st.cend(), [&st](const std::string &s) { return s == st[0]; }))
+                    stars.push_back(st[0]);
+                else {
+                    std::ostringstream s;
+                    s << st[0];
+                    for (size_t i = 1; i < st.size(); i++) s << '/' << st[i];
+                    stars.push_back(s.str());
+                }
             }
 
             if (not args.no_headings)
@@ -442,15 +450,16 @@ int main(int argc, char *argv[]) {
 
             std::vector<std::string> columns;
             columns.push_back("Constant");
-            if (args.format.latex) {
-                avg_opts.escape = false;
-                columns.push_back("$\\Delta$ Piracy");
-                columns.push_back("$\\Delta$ Policy");
-            }
-            else {
-                columns.push_back("Piracy");
-                columns.push_back("Policy");
-            }
+            if (args.format.latex) avg_opts.escape = false;
+
+            std::string delta(args.format.latex ? "$\\Delta$ " : "d ");
+
+            if (data_writing_always.hasPiracySR()) columns.push_back(delta + "Piracy (SR)");
+            columns.push_back(delta + "Piracy");
+
+            if (data_writing_always.hasPolicySR()) columns.push_back(delta + "Policy (SR)");
+            columns.push_back(delta + "Policy");
+
             out << tabulate(condensed, avg_opts, depvars, columns, stars);
         }
     }
