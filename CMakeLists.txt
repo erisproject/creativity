@@ -6,6 +6,7 @@ project(creativity CXX)
 set(CREATIVITY_VERSION_MAJOR "1")
 set(CREATIVITY_VERSION_MINOR "3")
 set(CREATIVITY_VERSION_PATCH "0")
+
 set(CREATIVITY_VERSION "${CREATIVITY_VERSION_MAJOR}.${CREATIVITY_VERSION_MINOR}.${CREATIVITY_VERSION_PATCH}")
 
 set(creativity_author "Jason Rhinelander <jason@imaginary.ca>")
