@@ -38,7 +38,7 @@ void Results::addOptions() {
         ("text,t", value(format.text), "Output the results in plain text.  This is the default when neither --html or --latex are specified.")
         ("html,h", value(format.html), "Output the results in HTML tables.  This cannot be used with --text or --latex.")
         ("latex,l", value(format.latex), "Output the results in LaTeX tables.  This cannot be used with --text or --html.")
-        ("precision,p", range<2,std::numeric_limits<double>::max_digits10>(format.precision), "      Specifies the precision level for result values.  The default is 6.")
+        ("precision,p", range<2,std::numeric_limits<double>::max_digits10>(format.precision), "      Specifies the precision level (number of significant digits) for result values.")
         ("no-headings,d", value(no_headings), "Suppress headings before analysis sections such as 'Average effects:\\n================'.")
         ("condensed,c", value(condensed), "Output tables in condensed form; currently only has an effect with --average-effects analysis.")
         ;
