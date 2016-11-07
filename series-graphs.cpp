@@ -373,7 +373,7 @@ int main(int argc, char *argv[]) {
             local_ymax = std::isfinite(args.graph_max_value) ? args.graph_max_value : in.ymax;
         }
         graph.setExtents(local_tmin, local_tmax, local_ymin, local_ymax, false);
-        graph.recalcTicks(10, 8, Series::TickEnds::Add);
+        graph.recalcTicks(10, 8, Series::TickEnds::None);
         graph.title = in.title;
         graph.t_grid_extra.insert(args.t_extra.cbegin(), args.t_extra.cend());
 
