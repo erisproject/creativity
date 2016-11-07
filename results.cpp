@@ -187,60 +187,92 @@ int main(int argc, char *argv[]) {
         param_opts.showpoint = false;
         param_opts.dot_align = false;
         cor_opts.matrix.diagonal = false;
-        const std::vector<std::string> params({
+        std::vector<std::string> params({
                 "readers", "density", "reader_step_mean", "reader_creation_scale_range", "creation_fixed",
-                "creation_time", "cost_market", "cost_unit", "cost_piracy", "initial.prob_write", "initial.l_min",
-                "initial.l_range", "initial.p_min", "initial.p_range", "initial.prob_keep", "initial.keep_price",
-                "piracy_link_proportion",
-                "policy_public_sharing_tax", "policy_public_voting_tax", "policy_public_voting_votes",
-                "policy_catch_tax", "policy_catch_fine[1]"});
-        const std::vector<std::string> pre_fields({
-                "net_u", "book_p0", "book_sales", "book_profit", "book_quality", "books_written_pc"});
+                "creation_time", "cost_market", "cost_unit", "cost_piracy", "piracy_link_proportion"});
+        if (args.analysis.initial) {
+            for (const std::string &i : {"prob_write", "l_min", "l_range", "p_min", "p_range", "prob_keep", "keep_price"})
+                params.push_back("initial." + i);
+        }
+
+        if (not args.analysis.policy_filter or args.analysis.policy.publicSharing()) {
+            params.push_back("policy_public_sharing_tax");
+        }
+        if (not args.analysis.policy_filter or args.analysis.policy.publicVoting()) {
+            for (const std::string &p : {"tax", "votes"})
+                params.push_back("policy_public_voting_" + p);
+        }
+        if (not args.analysis.policy_filter or args.analysis.policy.catchPirates()) {
+            // FIXME: there are more parameters (I'm just not varying them yet)
+            for (const std::string &p : {"tax", "fine[1]"})
+                params.push_back("policy_catch_" + p);
+        }
+
+        std::vector<std::string> pre_fields;
+        if (args.analysis.pre) {
+            for (auto &f :{
+                "net_u", "book_p0", "book_sales", "book_profit", "book_quality", "books_written_pc"})
+                pre_fields.push_back(f);
+        }
+
         std::vector<std::string> params_abbrev;
         std::regex word_re("([a-zA-Z0-9])[a-zA-Z0-9]+");
         for (const auto &p : params) params_abbrev.push_back(std::regex_replace(p, word_re, "$1"));
         enum : unsigned { f_mean, f_se, f_min, f_5, f_25, f_median, f_75, f_95, f_max, /* last: captures size: */ num_fields };
         std::vector<std::string> colnames({"Mean", "s.e.", "Min", "5th %", "25th %", "Median", "75th %", "95th %", "Max"});
 
-        for (auto d : {&data_writing_always, &data_no_piracy_writing, &data_no_pre_writing, &data_no_post_writing, &data_no_pol_writing}) {
+        for (auto d : {&data_no_pre_writing, &data_no_post_writing, &data_no_piracy_writing, &data_no_pol_writing, &data_writing_always}) {
             param_opts.title = "Parameter values for " + std::to_string(d->simulations()) + " simulations " +
                 (d == &data_writing_always ? "with writing in all stages" :
                  d == &data_no_pre_writing ? "without pre-piracy writing" :
                  d == &data_no_piracy_writing ? "with no piracy writing, but recovery under the policy" :
                  d == &data_no_post_writing ? "without piracy or policy writing" :
                  "with piracy writing but not policy writing") + ":";
+
+            std::vector<std::string> local_params, local_params_abbrev;
+            for (size_t i = 0; i < params.size(); i++) {
+                const auto &p = params[i];
+                // For the no-pre writing case, prune out piracy and policy variables:
+                if (d == &data_no_pre_writing and (
+                            p.find("piracy") != p.npos or p.find("policy") != p.npos))
+                    continue;
+
+                local_params.push_back(p);
+                local_params_abbrev.push_back(params_abbrev[i]);
+            }
+
             // Look at conditional means of parameters in periods with no activity vs parameters in
             // periods with activity
 
-            MatrixXd results(params.size() + pre_fields.size(), (unsigned) num_fields);
-            MatrixXd X(d->data().rows() / d->rowsPerSimulation(), params.size() + pre_fields.size());
-            int i = 0;
-            for (const auto &p : params) {
+            MatrixXd results(local_params.size() + pre_fields.size(), (unsigned) num_fields);
+            MatrixXd X(d->data().rows() / d->rowsPerSimulation(), local_params.size() + pre_fields.size());
+            int x_row = 0;
+            for (const auto &p : local_params) {
                 VectorXd rawvals = (*d)["param." + p]->values();
                 VectorXd paramvals = VectorXd::Map(rawvals.data(), rawvals.size()/d->rowsPerSimulation(), InnerStride<Dynamic>(d->rowsPerSimulation()));
                 std::sort(paramvals.data(), paramvals.data() + paramvals.size());
-                results(i, f_min) = quantile(paramvals, 0);
-                results(i, f_5) = quantile(paramvals, .05);
-                results(i, f_25) = quantile(paramvals, .25);
-                results(i, f_median) = quantile(paramvals, .5);
-                results(i, f_75) = quantile(paramvals, .75);
-                results(i, f_95) = quantile(paramvals, .95);
-                results(i, f_max) = quantile(paramvals, 1);
-                X.col(i++) = paramvals;
+                results(x_row, f_min) = quantile(paramvals, 0);
+                results(x_row, f_5) = quantile(paramvals, .05);
+                results(x_row, f_25) = quantile(paramvals, .25);
+                results(x_row, f_median) = quantile(paramvals, .5);
+                results(x_row, f_75) = quantile(paramvals, .75);
+                results(x_row, f_95) = quantile(paramvals, .95);
+                results(x_row, f_max) = quantile(paramvals, 1);
+                X.col(x_row++) = paramvals;
             }
             for (const auto &p : pre_fields) {
                 VectorXd rawvals = (*d)[p]->values();
                 // Start at 0, increment by nobs_per_sim: that should keep us in the pre-sim rows
                 VectorXd prevals = VectorXd::Map(rawvals.data(), rawvals.size()/d->rowsPerSimulation(), InnerStride<Dynamic>(d->rowsPerSimulation()));
                 std::sort(prevals.data(), prevals.data() + prevals.size());
-                results(i, f_min) = quantile(prevals, 0);
-                results(i, f_5) = quantile(prevals, .05);
-                results(i, f_25) = quantile(prevals, .25);
-                results(i, f_median) = quantile(prevals, .5);
-                results(i, f_75) = quantile(prevals, .75);
-                results(i, f_95) = quantile(prevals, .95);
-                results(i, f_max) = quantile(prevals, 1);
-                X.col(i++) = prevals;
+                results(x_row, f_min) = quantile(prevals, 0);
+                results(x_row, f_5) = quantile(prevals, .05);
+                results(x_row, f_25) = quantile(prevals, .25);
+                results(x_row, f_median) = quantile(prevals, .5);
+                results(x_row, f_75) = quantile(prevals, .75);
+                results(x_row, f_95) = quantile(prevals, .95);
+                results(x_row, f_max) = quantile(prevals, 1);
+                X.col(x_row++) = prevals;
             }
             RowVectorXd mu = X.colwise().mean();
             results.col(f_mean) = mu.transpose();
@@ -253,7 +285,7 @@ int main(int argc, char *argv[]) {
 
             std::vector<std::string> row_names;
             row_names.push_back("Parameter");
-            row_names.insert(row_names.end(), params.begin(), params.end());
+            row_names.insert(row_names.end(), local_params.begin(), local_params.end());
             for (const auto &pre : pre_fields) row_names.push_back("pre." + pre);
 
             out << tabulate(results, param_opts, row_names, colnames) << "\n";
@@ -267,7 +299,7 @@ int main(int argc, char *argv[]) {
 
 
                 out << "Correlations (below diagonal), variance (diagonal), and covariance (above diagonal):\n" << tabulate(
-                        corr.topLeftCorner(params.size(), params.size()), cor_opts, params, params_abbrev) << "\n";
+                        corr.topLeftCorner(local_params.size(), local_params.size()), cor_opts, local_params, local_params_abbrev) << "\n";
             }
         }
     }

@@ -50,6 +50,14 @@ class Results : public CmdArgs {
             /// None of the above; none of the above will be true.
             bool none = false;
 
+            /** If true, include initial parameters in the dependent variables (e.g. for
+             * write-vs-nowrite).
+             */
+            bool initial = false;
+
+            /** If true, include a few pre.* variables in the write-vs-not analysis. */
+            bool pre = false;
+
             /// If true, do short-run analysis (will raise error if it doesn't exist in the data file)
             bool shortrun = false;
 

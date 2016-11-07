@@ -28,6 +28,8 @@ void Results::addOptions() {
         ("all,a", value(analysis.all), "Implies --summary --write-vs-nowrite --average-effects --marginal-effects, but not --write-vs-nowrite-corr.  If none of the above are given, this is the default.")
 //        ("none,n", value(analysis.none), "Show none of the above analysis.  May not be combined with any of this above.  This flag is intended for use with the --dump-* options.")
         ("short-run,s", value(analysis.shortrun), "Include short-run piracy/public analysis in the results.  The data file must have short-run analysis (i.e. it must not have been created with --skip-short-run).  Short-run analysis is skipped by default.")
+        ("initial,i", value(analysis.initial), "Include initial simulation parameters in write-vs-not analysis variables (e.g. to verify insignificance).  The default omits them.")
+        ("pre", value(analysis.pre), "Include pre-piracy distributions in write-vs-not analysis variables.  The default omits them.")
         ("policy,g", value(policy_str_), "Only show analysis for simulations with this policy (or set of policies).  Values are the same as creativity-cli's --policy argument, except for the special (default) value 'any', which disables policy filtering.")
         ;
     options_.add(analysis_desc);
