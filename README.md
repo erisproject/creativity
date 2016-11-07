@@ -32,29 +32,9 @@ You can install directly to the system (usually under /usr/local) using:
 
     make install
 
-## Debian/Ubuntu packages
-
-Regularly updated library, header, and documentation packages are available for
-amd64 systems by adding one of the following lines to /etc/apt/sources.list:
-
-    deb https://imaginary.ca/debian jessie main
-    deb https://imaginary.ca/debian sid main
-    deb https://imaginary.ca/ubuntu trusty main
-    deb https://imaginary.ca/ubuntu wily main
-
-The first is for debian stable; the second for debian testing and unstable; the
-last two are for the referenced Ubuntu releases.
-
-The required key signature for package verification can be installed using:
-
-    curl -s https://imaginary.ca/public.gpg | sudo apt-key add -
-
-The 'creativity' package contains the command-line tools, the 'creativity-gui' package includes
-the graphical simulation interface.
-
 ## License
 
-Copyright © 2015 Jason Rhinelander
+Copyright © 2016 Jason Rhinelander
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
