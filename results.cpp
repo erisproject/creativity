@@ -391,7 +391,7 @@ int main(int argc, char *argv[]) {
             for (unsigned j = 0; j < avg_effects.equations().size(); j++) {
                 auto &eq = avg_effects.equations()[j];
                 std::ostringstream title;
-                title << "\nEquation " << j+1 << ": " << eq << ":";
+                title << (args.format.latex ? "" : "\n") << "Equation " << j+1 << ": " << eq << ":";
                 avg_opts.title = title.str();
 
                 out << tabulate(avg_effects.summary(j), avg_opts, avg_effects.varNames(j), {"Coefficient", "std.err.", "t-stat", "p-value"}, avg_effects.pStars(j));
