@@ -311,7 +311,19 @@ int main(int argc, char *argv[]) {
 
             std::vector<std::string> row_names;
             row_names.push_back("Parameter");
-            row_names.insert(row_names.end(), local_params.begin(), local_params.end());
+
+            std::unordered_map<std::string, std::string> param_shortener;
+            param_shortener.emplace("reader_creation_scale_range", "ability_max");
+            param_shortener.emplace("piracy_link_proportion", "piracy_links");
+            param_shortener.emplace("policy_public_sharing_tax", "policy_tax");
+            param_shortener.emplace("policy_public_voting_tax", "policy_tax");
+            param_shortener.emplace("policy_catch_tax", "policy_tax");
+            param_shortener.emplace("policy_public_voting_votes", "policy_votes");
+            param_shortener.emplace("policy_catch_fine[1]", "policy_fine");
+
+            for (auto s : local_params)
+                row_names.push_back(param_shortener.count(s) ? param_shortener[s] : s);
+
             for (const auto &pre : pre_fields) row_names.push_back("pre." + pre);
 
             for (auto &row : row_names) row = tabulate_escape(row, param_opts);
