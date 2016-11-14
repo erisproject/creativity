@@ -388,20 +388,43 @@ int main(int argc, char *argv[]) {
             // Full set of tables
             for (unsigned j = 0; j < avg_effects.equations().size(); j++) {
                 auto &eq = avg_effects.equations()[j];
+
                 std::ostringstream title;
-                title << (args.format.latex ? "" : "\n") << "Equation " << j+1 << ": " << eq << ":";
+                title << (args.format.latex ? "" : "\n") << "Equation " << j+1 << ": ";
+
+                auto var_names = avg_effects.varNames(j);
+                if (args.format.latex) {
+                    avg_opts.escape = false;
+                    std::ostringstream eqss;
+                    eqss << eq;
+                    // Replace * for interaction terms in equations with $\times$ in LaTeX output
+                    for (auto c : tabulate_escape(eqss.str(), TableFormat::LaTeX)) {
+                        if (c == '*') title << "{$\\times$}"; else title << c;
+                    }
+                    for (std::string &name : var_names) {
+                        if (name.find('*') != name.npos) {
+                            std::ostringstream nss;
+                            for (auto c : tabulate_escape(name, TableFormat::LaTeX)) { if (c == '*') nss << "{$\\times$}"; else nss << c; }
+                            name = nss.str();
+                        }
+                    }
+                }
+                else {
+                    title << eq;
+                }
+
                 avg_opts.title = title.str();
 
-                out << tabulate(avg_effects.summary(j), avg_opts, avg_effects.varNames(j), {"Coefficient", "std.err.", "t-stat", "p-value"}, avg_effects.pStars(j));
+                out << tabulate(avg_effects.summary(j), avg_opts, var_names, {"Coeff.", "std.err.", "t-stat", "p-value"}, avg_effects.pStars(j));
             }
         }
         else {
             // Condensed form: all results in one table
             Eigen::MatrixXd condensed(avg_effects.equations().size(), avg_effects.equations().at(0).numVars());
-            std::vector<std::string> depvars, stars;
+            std::vector<std::string> depvars;//, stars;
 #define LATEX_NAME(v, textit) {v, "$\\mathit{" textit "}$"}
 #define LATEX_NAME_SUB(v, textit, sub) {v, "$\\mathit{" textit "}_{" sub "}$"}
-#define LATEX_NAME_QUANTILE(v, t) LATEX_NAME(v, t), LATEX_NAME_SUB(v"_5th", t, "(Q=.05)"), LATEX_NAME_SUB(v"_median", t, "(Q=.50)"), LATEX_NAME_SUB(v"_95th", t, "(Q=.95)")
+#define LATEX_NAME_QUANTILE(v, t) LATEX_NAME(v, t), LATEX_NAME_SUB(v"_5th", t, "5\\%"), LATEX_NAME_SUB(v"_median", t, "50\\%"), LATEX_NAME_SUB(v"_95th", t, "95\\%")
             std::unordered_map<std::string, std::string> latex_name({
                     LATEX_NAME_QUANTILE("net_u", "net\\ utility"),
                     LATEX_NAME("books_written_pc", "books\\ written"),
@@ -431,17 +454,17 @@ int main(int argc, char *argv[]) {
                     depvars.push_back(y_name);
 
                 condensed.row(j) = avg_effects.beta(j).transpose();
-                auto st = avg_effects.pStars(j);
-                // If all the p-value stars are the same, just put it once; otherwise separate each
-                // with /
-                if (std::all_of(st.cbegin() + 1, st.cend(), [&st](const std::string &s) { return s == st[0]; }))
-                    stars.push_back(st[0]);
-                else {
-                    std::ostringstream s;
-                    s << st[0];
-                    for (size_t i = 1; i < st.size(); i++) s << '/' << st[i];
-                    stars.push_back(s.str());
-                }
+//                auto st = avg_effects.pStars(j);
+//                // If all the p-value stars are the same, just put it once; otherwise separate each
+//                // with /
+//                if (std::all_of(st.cbegin() + 1, st.cend(), [&st](const std::string &s) { return s == st[0]; }))
+//                    stars.push_back(st[0]);
+//                else {
+//                    std::ostringstream s;
+//                    s << st[0];
+//                    for (size_t i = 1; i < st.size(); i++) s << '/' << st[i];
+//                    stars.push_back(s.str());
+//                }
             }
 
             if (not args.no_headings)
@@ -455,13 +478,13 @@ int main(int argc, char *argv[]) {
 
             std::string delta(args.format.latex ? "$\\Delta$ " : "d ");
 
-            if (data_writing_always.hasPiracySR()) columns.push_back(delta + "Piracy (SR)");
+            if (data_writing_always.hasPiracySR()) columns.push_back(delta + "Pir.(SR)");
             columns.push_back(delta + "Piracy");
 
-            if (data_writing_always.hasPolicySR()) columns.push_back(delta + "Policy (SR)");
+            if (data_writing_always.hasPolicySR()) columns.push_back(delta + "Pol.(SR)");
             columns.push_back(delta + "Policy");
 
-            out << tabulate(condensed, avg_opts, depvars, columns, stars);
+            out << tabulate(condensed, avg_opts, depvars, columns/*, stars*/);
         }
     }
 
