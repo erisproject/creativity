@@ -251,11 +251,9 @@ int main(int argc, char *argv[]) {
                  d == &data_no_pre_writing ? "without pre-piracy writing" :
                  d == &data_no_piracy_writing ? "with no piracy writing, but recovery under the policy" :
                  d == &data_no_post_writing ? "without piracy or policy writing" :
-                 "with piracy writing but not policy writing") + ":";
-
-            if (args.format.latex) {
-                param_opts.title = "\\underline{\\normalsize{" + param_opts.title + "}\\nopagebreak}\\nopagebreak";
-            }
+                 "with piracy writing but not policy writing") +
+                (args.format.latex ? "" : ":");
+            if (args.format.latex) param_opts.title_as_caption = true;
 
             std::vector<std::string> local_params, local_params_abbrev;
             for (size_t i = 0; i < params.size(); i++) {

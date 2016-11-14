@@ -173,7 +173,8 @@ std::string tabulate_latex(
 #define E(s) escape(s, options)
 
     latex << "\\begin{minipage}{\\linewidth}\\begin{center}\n\n";
-    if (not options.title.empty()) latex << std::regex_replace(E(options.title), std::regex("(?=\n)"), "\\\\")
+    if (not options.title_as_caption and not options.title.empty())
+        latex << std::regex_replace(E(options.title), std::regex("(?=\n)"), "\\\\")
         << "\n\\\\\n";
 
     latex << "\\begin{tabular}{" << (options.rows_align_left ? "l" : "r");
@@ -270,7 +271,10 @@ std::string tabulate_latex(
         latex << " \\\\\n";
     }
 
-    latex << "\\end{tabular}\n\n\\end{center}\\end{minipage}\n\n";
+    latex << "\\end{tabular}\n";
+    if (options.title_as_caption and not options.title.empty())
+        latex << "\\captionfor{table}{" << options.title << "}\n";
+    latex << "\n\\end{center}\\end{minipage}\n\n";
 
     if (options.postamble) latex << tabulate_postamble(options);
 

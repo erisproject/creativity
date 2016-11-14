@@ -29,6 +29,10 @@ struct tabulation_options {
      * format-specific way.  If empty (the default) no heading precedes the data.
      */
     std::string title;
+    /** If true, show the title as a caption under the table instead of showing it before the table.
+     * Only current has an effect in LaTeX mode.
+     */
+    bool title_as_caption = false;
     /** Whether to escape special characters (default) or leave them in formatted output.  This has
      * no effect for Text format, but matters for LaTeX (to escape things like %, _, etc.) and HTML
      * (<, &, etc.).
