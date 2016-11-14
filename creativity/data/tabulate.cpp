@@ -273,7 +273,7 @@ std::string tabulate_latex(
 
     latex << "\\end{tabular}\n";
     if (options.title_as_caption and not options.title.empty())
-        latex << "\\captionfor{table}{" << options.title << "}\n";
+        latex << "\\captionof{table}{" << options.title << "}\n";
     latex << "\n\\end{center}\\end{minipage}\n\n";
 
     if (options.postamble) latex << tabulate_postamble(options);
